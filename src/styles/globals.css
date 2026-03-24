@@ -1,0 +1,85 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Inter', 'Helvetica Neue', sans-serif;
+  background: #fff;
+  color: #111827;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* MapLibre popup overrides — clean white card */
+.maplibregl-popup-content {
+  padding: 0 !important;
+  border-radius: 10px !important;
+  overflow: hidden !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10) !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+.maplibregl-popup-close-button {
+  font-size: 18px !important;
+  color: #6b7280 !important;
+  padding: 4px 8px !important;
+  top: 4px !important;
+  right: 4px !important;
+  z-index: 1;
+  background: rgba(255,255,255,0.8) !important;
+  border-radius: 50% !important;
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+}
+
+.maplibregl-popup-close-button:hover {
+  background: #f3f4f6 !important;
+  color: #111827 !important;
+}
+
+/* NavControl — light style */
+.maplibregl-ctrl-group {
+  background: rgba(255,255,255,0.92) !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
+  overflow: hidden;
+}
+
+.maplibregl-ctrl-group button {
+  background-color: transparent !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+}
+
+.maplibregl-ctrl-group button:last-child {
+  border-bottom: none !important;
+}
+
+.maplibregl-ctrl-group button:hover {
+  background-color: #f9fafb !important;
+}
+
+/* Attribution */
+.maplibregl-ctrl-attrib.maplibregl-compact {
+  background: transparent !important;
+  border: none !important;
+}
+
+.maplibregl-ctrl-bottom-right {
+  padding: 0 8px 8px 0;
+}

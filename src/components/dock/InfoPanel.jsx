@@ -31,6 +31,14 @@ const VAL = {
   lineHeight: 1.55,
 };
 
+/* ─── Color ramp gradients matching TiTiler colormaps ────────────────── */
+const COLORMAP_CSS = {
+  terrain:  'linear-gradient(to right, #0B6623, #90EE90, #F5F5DC, #D2B48C, #8B4513, #FFFFFF)',
+  rdylgn_r: 'linear-gradient(to right, #1A9850, #91CF60, #D9EF8B, #FEE08B, #FC8D59, #D73027)',
+  hsv:      'linear-gradient(to right, #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000)',
+  plasma:   'linear-gradient(to right, #0D0887, #7E03A8, #CC4778, #F89441, #F0F921)',
+};
+
 /* ─── Layer info map ──────────────────────────────────────────────────── */
 const LAYER_INFO = {
   tdmean: {
@@ -108,7 +116,7 @@ function AVAButton({ item, onSelectAva, onHoverAva }) {
   );
 }
 
-export default function InfoPanel({ selectedAva, activeLayer, onSelectAva, onHoverAva }) {
+export default function InfoPanel({ selectedAva, activeLayer, onSelectAva, onHoverAva, topoStats }) {
   const ava = WV_SUB_AVAS.find(a => a.slug === selectedAva);
   const layerInfo = activeLayer ? LAYER_INFO[activeLayer] : null;
 
@@ -269,6 +277,68 @@ export default function InfoPanel({ selectedAva, activeLayer, onSelectAva, onHov
               </div>
             </div>
           </div>
+
+          {/* ── Data range card (topo layers only, when stats are loaded) ── */}
+          {topoStats && activeLayer && TOPO_LAYER_TYPES[activeLayer] && (() => {
+            const { min, max, mean, std } = topoStats;
+            const layerCfg = TOPO_LAYER_TYPES[activeLayer];
+            const unit = layerCfg.unit ?? '';
+            const gradient = COLORMAP_CSS[layerCfg.colormap] ?? COLORMAP_CSS.terrain;
+            const fmt = (v) => typeof v === 'number' ? v.toFixed(1) : '—';
+            return (
+              <div style={CARD}>
+                <div style={{ ...LBL, marginBottom: 8 }}>Data Range — {selectedAva ? WV_SUB_AVAS.find(a => a.slug === selectedAva)?.name : 'AVA'}</div>
+
+                {/* Color ramp bar */}
+                <div style={{
+                  height: 10,
+                  borderRadius: 6,
+                  background: gradient,
+                  marginBottom: 4,
+                  border: '1px solid rgba(250,247,242,0.1)',
+                }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: GLASS.textDim, marginBottom: 10 }}>
+                  <span>{fmt(min)}{unit}</span>
+                  <span>{fmt(max)}{unit}</span>
+                </div>
+
+                {/* Stats grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div>
+                    <div style={LBL}>Min</div>
+                    <div style={VAL}>{fmt(min)}{unit}</div>
+                  </div>
+                  <div>
+                    <div style={LBL}>Max</div>
+                    <div style={VAL}>{fmt(max)}{unit}</div>
+                  </div>
+                  <div>
+                    <div style={LBL}>Mean</div>
+                    <div style={VAL}>{fmt(mean)}{unit}</div>
+                  </div>
+                  <div>
+                    <div style={LBL}>Std Dev</div>
+                    <div style={VAL}>±{fmt(std)}{unit}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Loading state while stats are being fetched */}
+          {!topoStats && activeLayer && TOPO_LAYER_TYPES[activeLayer] && selectedAva && (
+            <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                width: 14, height: 14, borderRadius: '50%',
+                border: `2px solid rgba(250,247,242,0.15)`,
+                borderTopColor: GLASS.text,
+                animation: 'spin 0.8s linear infinite',
+                flexShrink: 0,
+              }} />
+              <span style={{ fontSize: 11, color: GLASS.textDim }}>Loading data range…</span>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+          )}
         </>
       )}
     </div>

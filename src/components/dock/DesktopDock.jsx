@@ -3,6 +3,7 @@ import MapToolkit from './MapToolkit';
 import DataLayerPanel from './DataLayerPanel';
 import ScalePanel from './ScalePanel';
 import InfoPanel from './InfoPanel';
+import WineriesPanel from './WineriesPanel';
 import { BRAND } from '../../config/brandColors';
 import { GLASS } from './glassTokens';
 
@@ -11,10 +12,72 @@ import { GLASS } from './glassTokens';
  * Adapted from the main Terranthro site for the WVWA wine palette.
  *
  * Buttons: View · Layers · Scale · Info
- * Only one left‑side panel open at a time; Info opens on the right independently.
+ * Only one panel can be open at a time; all panels open to the left side.
  */
 
 const DOCK_WIDTH = 52;
+
+/* ─── Floating panel shell (module-level so React never remounts it) ─── */
+const PanelShell = ({ title, onClose, children }) => (
+  <div style={{
+    position: 'absolute',
+    left: DOCK_WIDTH + 10,
+    top: '50%',
+    transform: 'translateY(-50%)',
+    width: 272,
+    maxHeight: 'calc(100vh - 120px)',
+    background: GLASS.bg,
+    backdropFilter: GLASS.blur,
+    WebkitBackdropFilter: GLASS.blur,
+    border: `1px solid ${GLASS.border}`,
+    borderRadius: 14,
+    boxShadow: GLASS.shadow,
+    fontFamily: 'Inter, sans-serif',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    zIndex: 40,
+    animation: 'dockFadeIn 0.18s ease-out',
+  }}>
+    {/* Header */}
+    <div style={{
+      padding: '12px 16px',
+      borderBottom: `1px solid ${GLASS.borderLight}`,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      flexShrink: 0,
+    }}>
+      <span style={{
+        fontSize: 12,
+        fontWeight: 700,
+        color: GLASS.text,
+        textTransform: 'uppercase',
+        letterSpacing: '0.08em',
+      }}>
+        {title}
+      </span>
+      <button
+        onClick={onClose}
+        style={{
+          background: 'none',
+          border: 'none',
+          color: GLASS.textDim,
+          cursor: 'pointer',
+          fontSize: 16,
+          lineHeight: 1,
+          padding: '2px 4px',
+        }}
+      >
+        ✕
+      </button>
+    </div>
+    {/* Body */}
+    <div style={{ overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: `${GLASS.textMuted} transparent` }}>
+      {children}
+    </div>
+  </div>
+);
 
 /* ─── Icon SVGs ────────────────────────────────────────────────────────── */
 const ViewIcon = () => (
@@ -50,11 +113,20 @@ const InfoIcon = () => (
   </svg>
 );
 
+const WineriesIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M8 22h8" />
+    <path d="M12 11v11" />
+    <path d="M6 3h12l1 7c0 3.31-2.69 6-7 6S5 13.31 5 10L6 3z" />
+  </svg>
+);
+
 const BUTTONS = [
-  { id: 'view',   label: 'View',   Icon: ViewIcon,   side: 'left' },
-  { id: 'layers', label: 'Layers', Icon: LayersIcon,  side: 'left' },
-  { id: 'scale',  label: 'Scale',  Icon: ScaleIcon,   side: 'left' },
-  { id: 'info',   label: 'Info',   Icon: InfoIcon,    side: 'right' },
+  { id: 'info',      label: 'Info',      Icon: InfoIcon      },
+  { id: 'wineries',  label: 'Wineries',  Icon: WineriesIcon  },
+  { id: 'layers',    label: 'Layers',    Icon: LayersIcon    },
+  { id: 'scale',     label: 'Scale',     Icon: ScaleIcon     },
+  { id: 'view',      label: 'View',      Icon: ViewIcon      },
 ];
 
 export default function DesktopDock({
@@ -67,81 +139,21 @@ export default function DesktopDock({
   currentMonth,
   onMonthChange,
   onHoverAva,
+  topoStats,
+  activeCategories,
+  onToggleCategory,
+  onListingClick,
+  onHoverListing,
+  insideIds,
 }) {
-  // Left panels (View/Layers/Scale) are mutually exclusive
-  const [leftPanel, setLeftPanel] = useState(null);   // 'view' | 'layers' | 'scale' | null
-  // Info panel is independent — starts open
-  const [infoOpen, setInfoOpen]   = useState(true);
+  // All four panels are mutually exclusive — only one open at a time
+  const [activePanel, setActivePanel] = useState('info'); // 'view' | 'layers' | 'scale' | 'info' | null
 
-  const toggleLeft = useCallback((id) => {
-    setLeftPanel(prev => prev === id ? null : id);
+  const togglePanel = useCallback((id) => {
+    setActivePanel(prev => prev === id ? null : id);
   }, []);
 
-  const toggleInfo = useCallback(() => {
-    setInfoOpen(prev => !prev);
-  }, []);
-
-  /* ─── Floating panel shell (shared wrapper for left panels) ──────── */
-  const PanelShell = ({ title, children }) => (
-    <div style={{
-      position: 'absolute',
-      left: DOCK_WIDTH + 10,
-      top: '50%',
-      transform: 'translateY(-50%)',
-      width: 272,
-      maxHeight: 'calc(100vh - 120px)',
-      background: GLASS.bg,
-      backdropFilter: GLASS.blur,
-      WebkitBackdropFilter: GLASS.blur,
-      border: `1px solid ${GLASS.border}`,
-      borderRadius: 14,
-      boxShadow: GLASS.shadow,
-      fontFamily: 'Inter, sans-serif',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-      zIndex: 40,
-      animation: 'dockFadeIn 0.18s ease-out',
-    }}>
-      {/* Header */}
-      <div style={{
-        padding: '12px 16px',
-        borderBottom: `1px solid ${GLASS.borderLight}`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexShrink: 0,
-      }}>
-        <span style={{
-          fontSize: 12,
-          fontWeight: 700,
-          color: GLASS.text,
-          textTransform: 'uppercase',
-          letterSpacing: '0.08em',
-        }}>
-          {title}
-        </span>
-        <button
-          onClick={() => setLeftPanel(null)}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: GLASS.textDim,
-            cursor: 'pointer',
-            fontSize: 16,
-            lineHeight: 1,
-            padding: '2px 4px',
-          }}
-        >
-          ✕
-        </button>
-      </div>
-      {/* Body */}
-      <div style={{ overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: `${GLASS.textMuted} transparent` }}>
-        {children}
-      </div>
-    </div>
-  );
+  const closePanel = useCallback(() => setActivePanel(null), []);
 
   return (
     <>
@@ -167,13 +179,12 @@ export default function DesktopDock({
         fontFamily: 'Inter, sans-serif',
       }}>
         {BUTTONS.map(({ id, label, Icon }) => {
-          const isActive = id === 'info' ? infoOpen : leftPanel === id;
-          const handleClick = id === 'info' ? toggleInfo : () => toggleLeft(id);
+          const isActive = activePanel === id;
           return (
             <button
               key={id}
               title={label}
-              onClick={handleClick}
+              onClick={() => togglePanel(id)}
               style={{
                 width: 40,
                 height: 40,
@@ -214,15 +225,28 @@ export default function DesktopDock({
         })}
       </div>
 
-      {/* ── Left panels (View / Layers / Scale) ────────────────────────── */}
-      {leftPanel === 'view' && (
-        <PanelShell title="View">
-          <MapToolkit map={map} mapLoaded={mapLoaded} selectedAva={selectedAva} onSelectAva={onSelectAva} />
+      {/* ── Panels (all on left side) ───────────────────────────────────── */}
+      {activePanel === 'info' && (
+        <PanelShell title="Info" onClose={closePanel}>
+          <InfoPanel selectedAva={selectedAva} activeLayer={activeLayer} onSelectAva={onSelectAva} onHoverAva={onHoverAva} topoStats={topoStats} />
         </PanelShell>
       )}
 
-      {leftPanel === 'layers' && (
-        <PanelShell title="Layers">
+      {activePanel === 'wineries' && (
+        <PanelShell title="Wineries" onClose={closePanel}>
+          <WineriesPanel
+            activeCategories={activeCategories}
+            onToggleCategory={onToggleCategory}
+            onListingClick={onListingClick}
+            onHoverListing={onHoverListing}
+            selectedAva={selectedAva}
+            insideIds={insideIds}
+          />
+        </PanelShell>
+      )}
+
+      {activePanel === 'layers' && (
+        <PanelShell title="Layers" onClose={closePanel}>
           <DataLayerPanel
             activeLayer={activeLayer}
             onLayerChange={onLayerChange}
@@ -232,71 +256,16 @@ export default function DesktopDock({
         </PanelShell>
       )}
 
-      {leftPanel === 'scale' && (
-        <PanelShell title="Scale">
-          <ScalePanel activeLayer={activeLayer} />
+      {activePanel === 'scale' && (
+        <PanelShell title="Scale" onClose={closePanel}>
+          <ScalePanel activeLayer={activeLayer} topoStats={topoStats} />
         </PanelShell>
       )}
 
-      {/* ── Info panel (right side) — independent, always toggleable ──── */}
-      {infoOpen && (
-        <div style={{
-          position: 'absolute',
-          right: 16,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          width: 288,
-          maxHeight: 'calc(100vh - 120px)',
-          background: GLASS.bg,
-          backdropFilter: GLASS.blur,
-          WebkitBackdropFilter: GLASS.blur,
-          border: `1px solid ${GLASS.border}`,
-          borderRadius: 14,
-          boxShadow: GLASS.shadow,
-          fontFamily: 'Inter, sans-serif',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          zIndex: 40,
-          animation: 'dockFadeIn 0.18s ease-out',
-        }}>
-          {/* Header */}
-          <div style={{
-            padding: '12px 16px',
-            borderBottom: `1px solid ${GLASS.borderLight}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexShrink: 0,
-          }}>
-            <span style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: GLASS.text,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-            }}>
-              Info
-            </span>
-            <button
-              onClick={() => setInfoOpen(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: GLASS.textDim,
-                cursor: 'pointer',
-                fontSize: 16,
-                lineHeight: 1,
-                padding: '2px 4px',
-              }}
-            >
-              ✕
-            </button>
-          </div>
-          <div style={{ overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: `${GLASS.textMuted} transparent` }}>
-            <InfoPanel selectedAva={selectedAva} activeLayer={activeLayer} onSelectAva={onSelectAva} onHoverAva={onHoverAva} />
-          </div>
-        </div>
+      {activePanel === 'view' && (
+        <PanelShell title="View" onClose={closePanel}>
+          <MapToolkit map={map} mapLoaded={mapLoaded} selectedAva={selectedAva} onSelectAva={onSelectAva} />
+        </PanelShell>
       )}
 
       {/* ── Keyframe animation ─────────────────────────────────────────── */}

@@ -1,0 +1,170 @@
+import { GLASS } from './glassTokens';
+import { LISTING_CATEGORIES, LISTINGS } from '../WVWAMap';
+
+/**
+ * WineriesPanel — "Wineries" dock panel.
+ * Category filter chips + scrollable listing directory.
+ */
+
+export default function WineriesPanel({ activeCategories, onToggleCategory, onListingClick, onHoverListing, selectedAva, insideIds }) {
+  // Filter listings by active categories + AVA allowlist (insideIds = null means all)
+  const visible = LISTINGS.filter(l =>
+    activeCategories.has(l.category) &&
+    (insideIds === null || insideIds === undefined || insideIds.includes(l.id))
+  );
+
+  return (
+    <div style={{ padding: '12px 12px 16px', fontFamily: 'Inter, sans-serif' }}>
+
+      {/* ── Category filter chips ─────────────────────────────────── */}
+      <div style={{
+        fontSize: 10,
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.08em',
+        color: GLASS.textDim,
+        marginBottom: 8,
+      }}>
+        Filter by Type
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+        {Object.entries(LISTING_CATEGORIES).map(([key, cat]) => {
+          const isOn = activeCategories.has(key);
+          return (
+            <button
+              key={key}
+              onClick={() => onToggleCategory(key)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '4px 10px',
+                borderRadius: 20,
+                border: `1px solid ${isOn ? cat.color + '99' : 'rgba(250,247,242,0.12)'}`,
+                background: isOn ? cat.color + '28' : 'rgba(250,247,242,0.04)',
+                cursor: 'pointer',
+                outline: 'none',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <div style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: isOn ? cat.color : 'rgba(250,247,242,0.25)',
+                flexShrink: 0,
+              }} />
+              <span style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: isOn ? 'rgba(250,247,242,0.9)' : 'rgba(250,247,242,0.35)',
+                whiteSpace: 'nowrap',
+                letterSpacing: '0.01em',
+              }}>
+                {cat.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Listing count ─────────────────────────────────────────── */}
+      <div style={{
+        fontSize: 10,
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.08em',
+        color: GLASS.textDim,
+        marginBottom: 8,
+      }}>
+        {visible.length} {visible.length === 1 ? 'Listing' : 'Listings'}
+        {selectedAva ? ' in AVA' : ''}
+      </div>
+
+      {/* ── Listing rows ──────────────────────────────────────────── */}
+      {visible.length === 0 ? (
+        <div style={{
+          padding: '20px 0',
+          textAlign: 'center',
+          color: 'rgba(250,247,242,0.3)',
+          fontSize: 12,
+        }}>
+          No categories selected
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {visible.map(listing => {
+            const cat = LISTING_CATEGORIES[listing.category];
+            return (
+              <button
+                key={listing.id}
+                onClick={() => onListingClick?.(listing)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(250,247,242,0.07)',
+                  background: 'rgba(250,247,242,0.04)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  outline: 'none',
+                  width: '100%',
+                  transition: 'background 0.12s ease',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(250,247,242,0.09)';
+                  onHoverListing?.(listing);
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'rgba(250,247,242,0.04)';
+                  onHoverListing?.(null);
+                }}
+              >
+                {/* Number badge */}
+                <span style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  background: cat.color,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  color: '#fff',
+                  flexShrink: 0,
+                }}>
+                  {listing.num}
+                </span>
+                {/* Text */}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: 'rgba(250,247,242,0.88)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}>
+                    {listing.title}
+                  </div>
+                  <div style={{
+                    fontSize: 10,
+                    color: cat.color,
+                    fontWeight: 600,
+                    marginTop: 1,
+                    letterSpacing: '0.02em',
+                  }}>
+                    {cat.label}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

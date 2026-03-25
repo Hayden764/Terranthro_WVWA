@@ -123,12 +123,30 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
   const popupRef        = useRef(null);
   const avaDataRef      = useRef({});
   const [mapLoaded, setMapLoaded]       = useState(false);
+  const [introComplete, setIntroComplete] = useState(false);
   const [activeLayer, setActiveLayer]   = useState(null);
+  const [topoStats, setTopoStats]       = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [hoveredAva, setHoveredAva]     = useState(null);
+  const [selectedListing, setSelectedListing] = useState(null);
+  const [hoveredListing, setHoveredListing] = useState(null);
   const [activeCategories, setActiveCategories] = useState(
     () => new Set() // start with all categories off — user enables what they want
   );
+  const [insideIds, setInsideIds] = useState(null); // IDs inside the selected AVA, null = all
+
+  const selectedListingRef = useRef(null);
+  const setSelectedListingRef = useRef(null); // stable ref to the setter
+  const setHoveredListingRef  = useRef(null); // stable ref for map closure hover
+
+  // Keep selectedListingRef in sync so map click handlers can update state
+  const setSelectedListingBoth = useCallback((listing) => {
+    selectedListingRef.current = listing;
+    setSelectedListing(listing);
+  }, []);
+
+  // Store the setter in a ref so the map's [] effect closure can call it
+  useEffect(() => { setSelectedListingRef.current = setSelectedListingBoth; }, [setSelectedListingBoth]);
 
   // Refs to share current filter state with map effects without stale closures
   const insideIdsRef = useRef(null);
@@ -138,6 +156,48 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
   useEffect(() => {
     activeCategoriesRef.current = activeCategories;
   }, [activeCategories]);
+
+  // ── Sync hovered-listing source with hoveredListing state ────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    const src = map.getSource('hovered-listing');
+    if (!src) return;
+    if (!hoveredListing) {
+      src.setData({ type: 'FeatureCollection', features: [] });
+      return;
+    }
+    const cat = LISTING_CATEGORIES[hoveredListing.category];
+    src.setData({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [hoveredListing.lng, hoveredListing.lat] },
+        properties: { color: cat.color, num: String(hoveredListing.num) },
+      }],
+    });
+  }, [hoveredListing, mapLoaded]);
+
+  // ── Sync selected-listing source with selectedListing state ──────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    const src = map.getSource('selected-listing');
+    if (!src) return;
+    if (!selectedListing) {
+      src.setData({ type: 'FeatureCollection', features: [] });
+      return;
+    }
+    const cat = LISTING_CATEGORIES[selectedListing.category];
+    src.setData({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [selectedListing.lng, selectedListing.lat] },
+        properties: { color: cat.color, num: String(selectedListing.num) },
+      }],
+    });
+  }, [selectedListing, mapLoaded]);
 
   // ── Panel hover → highlight that AVA border in sky blue ─────────────
   useEffect(() => {
@@ -176,9 +236,9 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: `https://api.maptiler.com/maps/hybrid-v4/style.json?key=${import.meta.env.VITE_MAPTILER_KEY}`,
-      bounds: WV_BOUNDS,
-      fitBoundsOptions: { padding: 40 },
-      pitch: 30,
+      center: [-98.5795, 39.8283], // geographic center of the contiguous US
+      zoom: 3.5,
+      pitch: 0,
       bearing: 0,
       minPitch: 0,
       maxPitch: 85,
@@ -283,18 +343,13 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
 
           // Hover
           map.on('mouseenter', `ava-${ava.slug}-fill`, () => {
-            map.getCanvas().style.cursor = 'pointer';
             setHoveredAva(ava.slug);
           });
           map.on('mouseleave', `ava-${ava.slug}-fill`, () => {
-            map.getCanvas().style.cursor = '';
             setHoveredAva(null);
           });
 
-          // Click → select AVA
-          map.on('click', `ava-${ava.slug}-fill`, (e) => {
-            onSelectAva(ava.slug);
-          });
+          // Click removed — AVA selection is panel-only now
         } catch (e) {
           console.warn(`WVWAMap: failed to load ${ava.slug}`, e);
         }
@@ -410,6 +465,132 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
         },
       });
 
+      // ── Selected listing highlight layers ─────────────────────────
+      // A separate single-feature source so we never re-filter the cluster source.
+      map.addSource('selected-listing', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+      // Outer glow / halo ring
+      map.addLayer({
+        id: 'listings-selected-glow',
+        type: 'circle',
+        source: 'selected-listing',
+        paint: {
+          'circle-color': 'transparent',
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 20, 14, 28],
+          'circle-stroke-width': 3,
+          'circle-stroke-color': '#38BDF8',
+          'circle-stroke-opacity': 0.55,
+          'circle-opacity': 0,
+          'circle-blur': 0.6,
+        },
+      });
+      // Inner highlighted dot — same color as category, bigger + blue stroke
+      map.addLayer({
+        id: 'listings-selected-dot',
+        type: 'circle',
+        source: 'selected-listing',
+        paint: {
+          'circle-color': ['get', 'color'],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 12, 14, 17],
+          'circle-stroke-width': 3.5,
+          'circle-stroke-color': '#38BDF8',
+          'circle-stroke-opacity': 1,
+          'circle-opacity': 1,
+        },
+      });
+      // Number label on top of the selected dot
+      map.addLayer({
+        id: 'listings-selected-num',
+        type: 'symbol',
+        source: 'selected-listing',
+        layout: {
+          'text-field': ['get', 'num'],
+          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-size': 10,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        paint: {
+          'text-color': '#fff',
+          'text-halo-color': 'rgba(0,0,0,0.25)',
+          'text-halo-width': 0.5,
+        },
+      });
+
+      // ── Hovered listing highlight (from Wineries panel row hover) ─────
+      map.addSource('hovered-listing', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+      // Hovered glow ring
+      map.addLayer({
+        id: 'listings-hovered-glow',
+        type: 'circle',
+        source: 'hovered-listing',
+        paint: {
+          'circle-color': 'transparent',
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 18, 14, 25],
+          'circle-stroke-width': 2.5,
+          'circle-stroke-color': '#38BDF8',
+          'circle-stroke-opacity': 0.45,
+          'circle-opacity': 0,
+          'circle-blur': 0.5,
+        },
+      });
+      // Hovered dot
+      map.addLayer({
+        id: 'listings-hovered-dot',
+        type: 'circle',
+        source: 'hovered-listing',
+        paint: {
+          'circle-color': ['get', 'color'],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 11, 14, 15],
+          'circle-stroke-width': 3,
+          'circle-stroke-color': '#38BDF8',
+          'circle-stroke-opacity': 0.85,
+          'circle-opacity': 1,
+        },
+      });
+      // Number label on hovered dot
+      map.addLayer({
+        id: 'listings-hovered-num',
+        type: 'symbol',
+        source: 'hovered-listing',
+        layout: {
+          'text-field': ['get', 'num'],
+          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-size': 10,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        paint: {
+          'text-color': '#fff',
+          'text-halo-color': 'rgba(0,0,0,0.25)',
+          'text-halo-width': 0.5,
+        },
+      });
+
+      // ── Ensure highlight layers always render above everything else ──
+      // AVA layers load asynchronously and can end up above the highlight
+      // layers. Move all highlight layers to the top of the stack now that
+      // all sources/layers have been added.
+      for (const layerId of [
+        'listings-clusters',
+        'listings-cluster-count',
+        'listings-unclustered',
+        'listings-unclustered-num',
+        'listings-hovered-glow',
+        'listings-hovered-dot',
+        'listings-hovered-num',
+        'listings-selected-glow',
+        'listings-selected-dot',
+        'listings-selected-num',
+      ]) {
+        if (map.getLayer(layerId)) map.moveLayer(layerId);
+      }
+
       // ── Cluster click → zoom in ───────────────────────────────────
       map.on('click', 'listings-clusters', (e) => {
         const features = map.queryRenderedFeatures(e.point, { layers: ['listings-clusters'] });
@@ -421,21 +602,30 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
         });
       });
 
-      // ── Unclustered dot click → popup ────────────────────────────
+      // ── Unclustered dot click → right-side detail panel ──────────
       map.on('click', 'listings-unclustered', (e) => {
         if (!e.features?.length) return;
         const props = e.features[0].properties;
-        const coords = e.features[0].geometry.coordinates.slice();
         const listing = LISTINGS.find(l => l.id === props.id);
         if (!listing) return;
-        openListingPopup(map, listing, coords, popupRef);
+        setSelectedListingRef.current?.(listing);
+        map.easeTo({ center: [listing.lng, listing.lat], zoom: 15, duration: 1500 });
       });
 
-      // Cursor changes
+      // Cursor changes + map-dot hover highlight
       map.on('mouseenter', 'listings-clusters',    () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', 'listings-clusters',    () => { map.getCanvas().style.cursor = ''; });
-      map.on('mouseenter', 'listings-unclustered', () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', 'listings-unclustered', () => { map.getCanvas().style.cursor = ''; });
+      map.on('mouseenter', 'listings-unclustered', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+        if (!e.features?.length) return;
+        const props = e.features[0].properties;
+        const listing = LISTINGS.find(l => l.id === props.id);
+        if (listing) setHoveredListingRef.current?.(listing);
+      });
+      map.on('mouseleave', 'listings-unclustered', () => {
+        map.getCanvas().style.cursor = '';
+        setHoveredListingRef.current?.(null);
+      });
 
       // Register each listing for the directory modal
       if (registerMarkerRef) {
@@ -444,6 +634,21 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           registerMarkerRef(listing.id, { openPopup, listing, map, el: null });
         });
       }
+
+      // ── Intro fly-in: single smooth arc from the US into the Willamette Valley ──
+      setTimeout(() => {
+        map.flyTo({
+          center:   [WV_CAMERA.lng, WV_CAMERA.lat],
+          zoom:     WV_CAMERA.zoom,
+          pitch:    WV_CAMERA.pitch,
+          bearing:  WV_CAMERA.bearing,
+          duration: 3000,
+          curve:    1.1,
+          speed:    0.5,
+          easing:   t => t * (2 - t),
+        });
+        map.once('moveend', () => setIntroComplete(true));
+      }, 300);
 
       setMapLoaded(true);
     });
@@ -467,6 +672,9 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
 
     // Close any open popup when switching AVAs
     if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
+
+    // Clear any selected listing when changing AVA context
+    setSelectedListingBoth(null);
 
     if (selectedAva) {
       // ── Style layers: highlight selected, hide others ─────────────
@@ -517,6 +725,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           .filter(l => pointInPolygon(l.lng, l.lat))
           .map(l => l.id);
         insideIdsRef.current = insideIds;
+        setInsideIds(insideIds);
         // Update source data so clusters re-compute with only the AVA's points
         const src = map.getSource('listings');
         if (src) src.setData(buildListingsGeoJSON(activeCategoriesRef.current, insideIds));
@@ -553,6 +762,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
     } else {
       // ── Reset everything ──────────────────────────────────────────
       insideIdsRef.current = null;
+      setInsideIds(null);
       // Restore source to current category filter (no AVA restriction)
       const src = map.getSource('listings');
       if (src) src.setData(buildListingsGeoJSON(activeCategoriesRef.current, null));
@@ -600,14 +810,38 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
 
   const handleLayerChange = useCallback((layer) => {
     setActiveLayer(layer);
+    setTopoStats(null); // clear stale stats when switching layers
   }, []);
+
+  const handleToggleCategory = useCallback((key) => {
+    setActiveCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const handleListingClick = useCallback((listing) => {
+    setSelectedListingBoth(listing);
+    if (mapRef.current) {
+      mapRef.current.easeTo({ center: [listing.lng, listing.lat], zoom: 15, duration: 1500 });
+    }
+  }, [setSelectedListingBoth]);
+
+  const handleHoverListing = useCallback((listing) => {
+    setHoveredListing(listing); // null to clear
+  }, []);
+
+  // Keep setHoveredListingRef in sync so the map's [] closure can call it
+  useEffect(() => { setHoveredListingRef.current = handleHoverListing; }, [handleHoverListing]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
 
       {/* AVA hover label */}
-      {hoveredAva && !selectedAva && (() => {
+      {introComplete && hoveredAva && !selectedAva && (() => {
         const ava = WV_SUB_AVAS.find(a => a.slug === hoveredAva);
         return ava ? (
           <div style={{
@@ -625,6 +859,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
       })()}
 
       {/* Willamette logo — top-left map overlay */}
+      {introComplete && (
       <div style={{
         position: 'absolute', top: 16, left: 72, zIndex: 10,
         pointerEvents: 'none',
@@ -635,33 +870,36 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           style={{ height: 40, width: 'auto', display: 'block', filter: 'drop-shadow(0 2px 6px rgba(46,34,26,0.5))' }}
         />
       </div>
+      )}
 
-      {/* Selected AVA badge — sits below the logo when an AVA is selected */}
-      {selectedAva && (() => {
+      {/* Selected AVA badge — top center focal point when an AVA is selected */}
+      {introComplete && selectedAva && (() => {
         const ava = WV_SUB_AVAS.find(a => a.slug === selectedAva);
         return ava ? (
           <div style={{
-            position: 'absolute', top: 68, left: 72,
-            background: 'rgba(72,55,41,0.82)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            borderRadius: 10,
-            padding: '8px 14px',
+            position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(46,34,26,0.88)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            borderRadius: 12,
+            padding: '10px 20px',
             fontFamily: 'Inter, sans-serif',
-            boxShadow: '0 4px 20px rgba(46,34,26,0.25)',
-            border: '1px solid rgba(250,247,242,0.12)',
+            boxShadow: '0 4px 24px rgba(46,34,26,0.35)',
+            border: `1.5px solid ${ava.color}55`,
             zIndex: 10,
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
+            gap: 10,
+            whiteSpace: 'nowrap',
           }}>
             <div style={{
-              width: 8, height: 8, borderRadius: '50%',
+              width: 10, height: 10, borderRadius: '50%',
               background: ava.color,
-              border: '1px solid rgba(250,247,242,0.3)',
+              border: '1.5px solid rgba(250,247,242,0.4)',
               flexShrink: 0,
+              boxShadow: `0 0 6px ${ava.color}88`,
             }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: BRAND.eggshell }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: BRAND.eggshell, letterSpacing: '0.01em' }}>
               {ava.name}
             </span>
           </div>
@@ -669,7 +907,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
       })()}
 
       {/* Climate raster layer */}
-      {mapLoaded && mapRef.current && (
+      {introComplete && mapLoaded && mapRef.current && (
         <ClimateLayer
           map={mapRef.current}
           isVisible={isClimateActive}
@@ -680,15 +918,17 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
       )}
 
       {/* Topography raster layers (all sub-AVAs) */}
-      {mapLoaded && mapRef.current && (
+      {introComplete && mapLoaded && mapRef.current && (
         <TopographyLayer
           map={mapRef.current}
           activeLayer={isTopoActive ? activeLayer : null}
+          selectedAva={selectedAva}
+          onStats={setTopoStats}
         />
       )}
 
       {/* Desktop Dock — always visible */}
-      {mapLoaded && (
+      {introComplete && mapLoaded && (
         <DesktopDock
           map={mapRef.current}
           mapLoaded={mapLoaded}
@@ -699,81 +939,181 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           currentMonth={currentMonth}
           onMonthChange={setCurrentMonth}
           onHoverAva={onPanelHoverAva}
+          topoStats={topoStats}
+          activeCategories={activeCategories}
+          onToggleCategory={handleToggleCategory}
+          onListingClick={handleListingClick}
+          onHoverListing={handleHoverListing}
+          insideIds={insideIds}
         />
       )}
 
       {/* Category legend / filter — bottom center */}
-      <div style={{
-        position: 'absolute',
-        bottom: 14,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        background: 'rgba(72,55,41,0.82)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        border: '1px solid rgba(250,247,242,0.12)',
-        borderRadius: 12,
-        padding: '6px 10px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 4,
-        fontFamily: 'Inter, sans-serif',
-        zIndex: 10,
-        flexWrap: 'wrap',
-        boxShadow: '0 4px 20px rgba(46,34,26,0.35)',
-      }}>
-        {Object.entries(LISTING_CATEGORIES).map(([key, cat]) => {
-          const isOn = activeCategories.has(key);
-          return (
+
+      {/* Right-side listing detail panel */}
+      {introComplete && selectedListing && (() => {
+        const listing = selectedListing;
+        const cat = LISTING_CATEGORIES[listing.category];
+        return (
+          <div style={{
+            position: 'absolute',
+            right: 16,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 288,
+            maxHeight: 'calc(100vh - 120px)',
+            background: 'rgba(46,34,26,0.90)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(250,247,242,0.12)',
+            borderRadius: 14,
+            boxShadow: '0 8px 40px rgba(46,34,26,0.45)',
+            fontFamily: 'Inter, sans-serif',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            zIndex: 40,
+          }}>
+            {/* Close button */}
             <button
-              key={key}
-              onClick={() => {
-                setActiveCategories(prev => {
-                  const next = new Set(prev);
-                  if (next.has(key)) {
-                    next.delete(key);
-                  } else {
-                    next.add(key);
-                  }
-                  return next;
-                });
-              }}
+              onClick={() => setSelectedListingBoth(null)}
               style={{
+                position: 'absolute',
+                top: 10,
+                right: 10,
+                zIndex: 2,
+                background: 'rgba(46,34,26,0.7)',
+                border: '1px solid rgba(250,247,242,0.15)',
+                borderRadius: 8,
+                color: 'rgba(250,247,242,0.7)',
+                width: 28,
+                height: 28,
+                cursor: 'pointer',
+                fontSize: 14,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 6,
-                padding: '5px 10px',
-                borderRadius: 8,
-                border: `1px solid ${isOn ? cat.color + '88' : 'rgba(250,247,242,0.1)'}`,
-                background: isOn ? cat.color + '22' : 'rgba(250,247,242,0.04)',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                outline: 'none',
-                whiteSpace: 'nowrap',
+                justifyContent: 'center',
+                lineHeight: 1,
               }}
             >
+              ✕
+            </button>
+
+            {/* Hero image */}
+            {listing.image_url && (
+              <div style={{ flexShrink: 0, height: 150, overflow: 'hidden' }}>
+                <img
+                  src={listing.image_url}
+                  alt={listing.title}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  onError={e => { e.currentTarget.parentElement.style.display = 'none'; }}
+                />
+              </div>
+            )}
+
+            {/* Content */}
+            <div style={{ padding: '14px 16px 18px', overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: 'rgba(250,247,242,0.15) transparent' }}>
+              {/* Category badge */}
               <div style={{
-                width: 9,
-                height: 9,
-                borderRadius: '50%',
-                background: isOn ? cat.color : 'rgba(250,247,242,0.2)',
-                border: `1.5px solid ${isOn ? cat.color : 'rgba(250,247,242,0.25)'}`,
-                flexShrink: 0,
-                transition: 'all 0.15s ease',
-              }} />
-              <span style={{
+                display: 'inline-block',
+                padding: '2px 10px',
+                borderRadius: 20,
+                background: cat.color + '28',
+                border: `1px solid ${cat.color}66`,
+                color: cat.color,
                 fontSize: 10,
-                fontWeight: 600,
-                color: isOn ? 'rgba(250,247,242,0.9)' : 'rgba(250,247,242,0.35)',
-                transition: 'color 0.15s ease',
-                letterSpacing: '0.01em',
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                marginBottom: 10,
               }}>
                 {cat.label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+              </div>
+
+              {/* Title row */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
+                <span style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: '50%',
+                  background: cat.color,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: '#fff',
+                  flexShrink: 0,
+                  marginTop: 1,
+                }}>
+                  {listing.num}
+                </span>
+                <div style={{
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: 'rgba(250,247,242,0.95)',
+                  lineHeight: 1.3,
+                }}>
+                  {listing.title}
+                </div>
+              </div>
+
+              {/* Description */}
+              {listing.desc && (
+                <p style={{
+                  fontSize: 12,
+                  color: 'rgba(250,247,242,0.6)',
+                  lineHeight: 1.6,
+                  margin: '0 0 14px 0',
+                }}>
+                  {listing.desc.slice(0, 300)}{listing.desc.length > 300 ? '…' : ''}
+                </p>
+              )}
+
+              {/* Phone */}
+              {listing.phone && (
+                <a
+                  href={`tel:${listing.phone}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontSize: 12,
+                    color: 'rgba(250,247,242,0.7)',
+                    textDecoration: 'none',
+                    marginBottom: 10,
+                  }}
+                >
+                  📞 {listing.phone}
+                </a>
+              )}
+
+              {/* Website button */}
+              {listing.url && (
+                <a
+                  href={listing.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'block',
+                    padding: '8px 14px',
+                    background: cat.color,
+                    color: '#fff',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    textAlign: 'center',
+                    marginTop: 4,
+                  }}
+                >
+                  Visit Website ↗
+                </a>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -10,7 +10,8 @@ export const TOPO_LAYER_TYPES = {
     colormap: 'terrain',
     description: 'Height above sea level',
     legend: {
-      colors: ['#0B6623', '#90EE90', '#F5F5DC', '#D2B48C', '#8B4513', '#FFFFFF'],
+      // Matches matplotlib 'terrain': blue → cyan → green → tan → grey → white
+      colors: ['#333399', '#57A5CC', '#339966', '#B8A06A', '#9E9E9E', '#FFFFFF'],
       labels: ['0m', '200m', '500m', '1000m', '2000m', '3000m+']
     }
   },
@@ -82,6 +83,12 @@ export const getTopoTileUrl = (avaSlug, layerType, rescale = null) => {
   const encodedUrl = encodeURIComponent(cogUrl);
   const rescaleParam = rescale ? `&rescale=${rescale}` : '';
   return `${TITILER_URL}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodedUrl}${rescaleParam}&colormap_name=${config.colormap}`;
+};
+
+export const getTopoStatsUrl = (avaSlug, layerType) => {
+  const cogUrl = getTopoCogUrl(avaSlug, layerType);
+  if (!cogUrl) return null;
+  return `${TITILER_URL}/cog/statistics?url=${encodeURIComponent(cogUrl)}`;
 };
 
 export const getTopoSourceId = (avaSlug, layerType) => `topo-${avaSlug}-${layerType}`;

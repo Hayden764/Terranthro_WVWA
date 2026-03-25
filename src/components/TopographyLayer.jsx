@@ -1,46 +1,62 @@
 import { useEffect, useRef } from 'react';
 import {
   getTopoTileUrl,
+  getTopoStatsUrl,
   getTopoSourceId,
   getTopoLayerId,
   TOPO_LAYER_OPACITY,
-  WV_SUB_AVAS,
 } from '../config/topographyConfig';
 
 /**
- * Loads topography raster tiles for ALL WV sub-AVAs simultaneously.
- * Each sub-AVA gets its own MapLibre source + layer, inserted below
- * the AVA boundary lines so terrain doesn't obscure borders.
+ * Loads a topography raster tile for the currently selected sub-AVA only.
+ * Fetches per-AVA statistics from TiTiler first so the colormap rescale is
+ * relative to that specific AVA's actual data range (not a global range).
+ * Reports the fetched stats back via onStats({ min, max, mean, std }).
  */
-const TopographyLayer = ({ map, activeLayer }) => {
+const TopographyLayer = ({ map, activeLayer, selectedAva, onStats }) => {
   const prevLayerRef = useRef(null);
+  const prevAvaRef   = useRef(null);
 
   useEffect(() => {
     if (!map) return;
 
-    // Remove previous layer type for all AVAs
-    const prev = prevLayerRef.current;
-    if (prev && prev !== activeLayer) {
-      WV_SUB_AVAS.forEach(({ slug }) => {
-        try {
-          const lid = getTopoLayerId(slug, prev);
-          const sid = getTopoSourceId(slug, prev);
-          if (map.getLayer(lid)) map.removeLayer(lid);
-          if (map.getSource(sid)) map.removeSource(sid);
-        } catch (e) { /* ignore */ }
-      });
+    const prev    = prevLayerRef.current;
+    const prevAva = prevAvaRef.current;
+
+    const removeLayer = (slug, layerType) => {
+      if (!slug || !layerType) return;
+      try {
+        const lid = getTopoLayerId(slug, layerType);
+        const sid = getTopoSourceId(slug, layerType);
+        if (map.getLayer(lid)) map.removeLayer(lid);
+        if (map.getSource(sid)) map.removeSource(sid);
+      } catch (e) { /* ignore */ }
+    };
+
+    // Tear down whatever was previously shown
+    if (prevAva && prev && (prevAva !== selectedAva || prev !== activeLayer)) {
+      removeLayer(prevAva, prev);
       prevLayerRef.current = null;
+      prevAvaRef.current   = null;
     }
 
-    if (!activeLayer) return;
+    if (!activeLayer || !selectedAva) {
+      onStats?.(null);
+      return;
+    }
 
-    // Add topo layers for all 8 sub-AVAs
-    WV_SUB_AVAS.forEach(({ slug }) => {
-      const tileUrl = getTopoTileUrl(slug, activeLayer);
+    let cancelled = false;
+
+    const statsUrl = getTopoStatsUrl(selectedAva, activeLayer);
+
+    const addTileLayer = (rescale) => {
+      if (cancelled || !map) return;
+
+      const tileUrl = getTopoTileUrl(selectedAva, activeLayer, rescale);
       if (!tileUrl) return;
 
-      const sourceId = getTopoSourceId(slug, activeLayer);
-      const layerId  = getTopoLayerId(slug, activeLayer);
+      const sourceId = getTopoSourceId(selectedAva, activeLayer);
+      const layerId  = getTopoLayerId(selectedAva, activeLayer);
 
       try {
         if (map.getLayer(layerId)) map.removeLayer(layerId);
@@ -56,7 +72,6 @@ const TopographyLayer = ({ map, activeLayer }) => {
           maxzoom: 18,
         });
 
-        // Insert below AVA boundary lines
         let beforeLayerId;
         if (map.getLayer('wv-boundary-line')) beforeLayerId = 'wv-boundary-line';
 
@@ -69,23 +84,47 @@ const TopographyLayer = ({ map, activeLayer }) => {
             'raster-fade-duration': 300,
           },
         }, beforeLayerId);
-      } catch (e) {
-        console.warn(`TopographyLayer: failed to add ${slug}/${activeLayer}`, e);
-      }
-    });
 
-    prevLayerRef.current = activeLayer;
+        prevLayerRef.current = activeLayer;
+        prevAvaRef.current   = selectedAva;
+      } catch (e) {
+        console.warn(`TopographyLayer: failed to add ${selectedAva}/${activeLayer}`, e);
+      }
+    };
+
+    // Fetch per-AVA stats → rescale colormap to actual data range
+    if (statsUrl) {
+      fetch(statsUrl)
+        .then(r => r.json())
+        .then(json => {
+          if (cancelled) return;
+          // TiTiler returns { "b1": { min, max, mean, std, ... } }
+          const band = json?.b1 ?? Object.values(json ?? {})[0];
+          if (band?.min != null && band?.max != null) {
+            const { min, max, mean, std } = band;
+            onStats?.({ min, max, mean, std });
+            addTileLayer(`${min},${max}`);
+          } else {
+            onStats?.(null);
+            addTileLayer(null);
+          }
+        })
+        .catch(() => {
+          if (cancelled) return;
+          onStats?.(null);
+          addTileLayer(null);
+        });
+    } else {
+      onStats?.(null);
+      addTileLayer(null);
+    }
 
     return () => {
+      cancelled = true;
       if (!map) return;
-      WV_SUB_AVAS.forEach(({ slug }) => {
-        try {
-          if (map.getLayer(getTopoLayerId(slug, activeLayer))) map.removeLayer(getTopoLayerId(slug, activeLayer));
-          if (map.getSource(getTopoSourceId(slug, activeLayer))) map.removeSource(getTopoSourceId(slug, activeLayer));
-        } catch (e) { /* map may be destroyed */ }
-      });
+      removeLayer(selectedAva, activeLayer);
     };
-  }, [map, activeLayer]);
+  }, [map, activeLayer, selectedAva]);
 
   return null;
 };

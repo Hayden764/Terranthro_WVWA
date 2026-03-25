@@ -33,7 +33,7 @@ const CLIMATE_RAMPS = {
   },
 };
 
-export default function ScalePanel({ activeLayer }) {
+export default function ScalePanel({ activeLayer, topoStats }) {
   if (!activeLayer) {
     return (
       <div style={{ padding: 16, textAlign: 'center' }}>
@@ -49,6 +49,26 @@ export default function ScalePanel({ activeLayer }) {
   const topoConfig = TOPO_LAYER_TYPES[activeLayer];
   if (topoConfig) {
     const { legend, label, unit, description } = topoConfig;
+
+    // Use real per-AVA stats if available, else fall back to config labels
+    const hasStats = topoStats?.min != null && topoStats?.max != null;
+    const realMin  = hasStats ? topoStats.min  : null;
+    const realMax  = hasStats ? topoStats.max  : null;
+    const realMean = hasStats ? topoStats.mean : null;
+    const realStd  = hasStats ? topoStats.std  : null;
+
+    // Build N evenly-spaced stops across the real range for the legend
+    const N = legend.colors.length;
+    const realLabels = hasStats
+      ? legend.colors.map((_, i) => {
+          const val = realMin + (realMax - realMin) * (i / (N - 1));
+          return `${Math.round(val)}${unit}`;
+        })
+      : legend.labels;
+
+    const gradientMinLabel = hasStats ? `${Math.round(realMin)}${unit}` : legend.labels[0];
+    const gradientMaxLabel = hasStats ? `${Math.round(realMax)}${unit}` : legend.labels[legend.labels.length - 1];
+
     return (
       <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
         {/* Layer name */}
@@ -68,14 +88,34 @@ export default function ScalePanel({ activeLayer }) {
             marginBottom: 6,
           }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: GLASS.textMuted }}>
-            <span>{legend.labels[0]}</span>
-            <span>{legend.labels[legend.labels.length - 1]}</span>
+            <span>{gradientMinLabel}</span>
+            <span>{gradientMaxLabel}</span>
           </div>
         </div>
 
-        {/* Discrete stops */}
+        {/* Stats summary — only shown when real data is available */}
+        {hasStats && (
+          <div style={CARD}>
+            <div style={LABEL}>AVA Statistics</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {[
+                { key: 'Min',  val: `${Math.round(realMin)}${unit}` },
+                { key: 'Max',  val: `${Math.round(realMax)}${unit}` },
+                { key: 'Mean', val: `${Math.round(realMean)}${unit}` },
+                { key: 'Std',  val: `±${Math.round(realStd)}${unit}` },
+              ].map(({ key, val }) => (
+                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: GLASS.textDim }}>{key}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: GLASS.text }}>{val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Discrete colour stops */}
         <div style={CARD}>
-          <div style={LABEL}>Legend</div>
+          <div style={LABEL}>Legend{hasStats ? ' (this AVA)' : ''}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {legend.colors.map((color, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -87,7 +127,7 @@ export default function ScalePanel({ activeLayer }) {
                   flexShrink: 0,
                   border: `1px solid rgba(250,247,242,0.15)`,
                 }} />
-                <span style={{ fontSize: 11, color: GLASS.text }}>{legend.labels[i] || ''}</span>
+                <span style={{ fontSize: 11, color: GLASS.text }}>{realLabels[i] || ''}</span>
               </div>
             ))}
           </div>

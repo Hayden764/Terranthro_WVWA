@@ -44,21 +44,27 @@ export const AVA_TOPO_REGISTRY = {
   'dundee-hills':        { state: 'OR', folder: 'dundee_hills' },
   'eola-amity-hills':    { state: 'OR', folder: 'eola_amity_hills' },
   'laurelwood-district': { state: 'OR', folder: 'laurelwood_district' },
+  'lower-long-tom':      { state: 'OR', folder: 'lower_long_tom' },
   'mcminnville':         { state: 'OR', folder: 'mcminnville' },
   'ribbon-ridge':        { state: 'OR', folder: 'ribbon_ridge' },
   'tualatin-hills':      { state: 'OR', folder: 'tualatin_hills' },
+  'mount-pisgah-polk-county': { state: 'OR', folder: 'mount_pisgah_polk_county' },
+  'van-duzer-corridor':  { state: 'OR', folder: 'van_duzer_corridor' },
   'yamhill-carlton':     { state: 'OR', folder: 'yamhill_carlton' },
 };
 
 export const WV_SUB_AVAS = [
-  { slug: 'chehalem-mountains',  name: 'Chehalem Mountains',  file: '/data/chehalem_mountains.geojson',  color: '#2D6A4F' },
-  { slug: 'dundee-hills',        name: 'Dundee Hills',        file: '/data/dundee_hills.geojson',        color: '#8B1A1A' },
-  { slug: 'eola-amity-hills',    name: 'Eola-Amity Hills',    file: '/data/eola_amity_hills.geojson',    color: '#6B4226' },
-  { slug: 'laurelwood-district', name: 'Laurelwood District', file: '/data/laurelwood_district.geojson', color: '#7B5E7B' },
-  { slug: 'mcminnville',         name: 'McMinnville',         file: '/data/mcminnville.geojson',         color: '#4B7B9E' },
-  { slug: 'ribbon-ridge',        name: 'Ribbon Ridge',        file: '/data/ribbon_ridge.geojson',        color: '#9E6B2A' },
-  { slug: 'tualatin-hills',      name: 'Tualatin Hills',      file: '/data/tualatin_hills.geojson',      color: '#3A7D44' },
-  { slug: 'yamhill-carlton',     name: 'Yamhill-Carlton',     file: '/data/yamhill_carlton.geojson',     color: '#8B6914' },
+  { slug: 'chehalem-mountains',  name: 'Chehalem Mountains',  file: '/data/chehalem_mountains.geojson',  color: '#C9A84C' },
+  { slug: 'dundee-hills',        name: 'Dundee Hills',        file: '/data/dundee_hills.geojson',        color: '#C9A84C' },
+  { slug: 'eola-amity-hills',    name: 'Eola-Amity Hills',    file: '/data/eola_amity_hills.geojson',    color: '#C9A84C' },
+  { slug: 'laurelwood-district', name: 'Laurelwood District', file: '/data/laurelwood_district.geojson', color: '#C9A84C' },
+  { slug: 'lower-long-tom',      name: 'Lower Long Tom',      file: '/data/lower_long_tom.geojson',      color: '#C9A84C' },
+  { slug: 'mcminnville',              name: 'McMinnville',              file: '/data/mcminnville.geojson',              color: '#C9A84C' },
+  { slug: 'mount-pisgah-polk-county', name: 'Mount Pisgah/Polk County',  file: '/data/mount_pisgah_polk_county.geojson', color: '#C9A84C' },
+  { slug: 'ribbon-ridge',             name: 'Ribbon Ridge',             file: '/data/ribbon_ridge.geojson',             color: '#C9A84C' },
+  { slug: 'tualatin-hills',      name: 'Tualatin Hills',      file: '/data/tualatin_hills.geojson',      color: '#C9A84C' },
+  { slug: 'van-duzer-corridor',  name: 'Van Duzer Corridor',  file: '/data/van_duzer_corridor.geojson',  color: '#C9A84C' },
+  { slug: 'yamhill-carlton',     name: 'Yamhill-Carlton',     file: '/data/yamhill_carlton.geojson',     color: '#C9A84C' },
 ];
 
 export const hasTopographyData = (avaSlug) => avaSlug in AVA_TOPO_REGISTRY;

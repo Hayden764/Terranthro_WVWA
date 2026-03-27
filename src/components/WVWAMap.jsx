@@ -5,7 +5,7 @@ import ClimateLayer from './ClimateLayer';
 import TopographyLayer from './TopographyLayer';
 import DesktopDock from './dock/DesktopDock';
 import wineries from '../data/wineries.json';
-import { WV_SUB_AVAS } from '../config/topographyConfig';
+import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { AVA_CAMERA, WV_CAMERA } from '../config/avaCameraConfig';
 import { BRAND } from '../config/brandColors';
 
@@ -117,6 +117,310 @@ function openListingPopup(map, listing, coords, popupRef) {
 // Export LISTINGS so the directory modal can use them
 export { LISTINGS };
 
+// Ordered list of listing layers — always kept on top of AVA boundary layers
+const LISTING_LAYER_ORDER = [
+  'listings-clusters',
+  'listings-cluster-count',
+  'listings-unclustered',
+  'listings-unclustered-num',
+  'listings-hovered-glow',
+  'listings-hovered-dot',
+  'listings-hovered-num',
+  'listings-selected-glow',
+  'listings-selected-dot',
+  'listings-selected-num',
+];
+
+/** Re-raise all listing layers to the top of the map stack. */
+function raiseListingLayers(map) {
+  for (const layerId of LISTING_LAYER_ORDER) {
+    if (map.getLayer(layerId)) map.moveLayer(layerId);
+  }
+}
+
+// ── Right-side tabbed context panel ──────────────────────────────────────
+// Shown whenever a listing is selected, a layer is active, or both.
+// When both are present a tab bar appears; when only one is present no tabs
+// are shown (the single content fills the panel directly).
+function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, onCloseListing, onCloseLayer }) {
+  const hasBoth = !!(listing && activeLayer);
+  // Default tab: winery when a listing is selected, otherwise layer
+  const [tab, setTab] = useState(listing ? 'listing' : 'layer');
+
+  // Keep the active tab valid when content changes
+  const resolvedTab = hasBoth ? tab : (listing ? 'listing' : 'layer');
+
+  const cat = listing ? LISTING_CATEGORIES[listing.category] : null;
+
+  // ── Shared shell ──────────────────────────────────────────────────────
+  return (
+    <div style={{
+      position: 'absolute',
+      right: 16,
+      top: '50%',
+      transform: 'translateY(-50%)',
+      width: 288,
+      maxHeight: 'calc(100vh - 120px)',
+      background: 'rgba(46,34,26,0.92)',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      border: '1px solid rgba(250,247,242,0.12)',
+      borderRadius: 14,
+      boxShadow: '0 8px 40px rgba(46,34,26,0.45)',
+      fontFamily: 'Inter, sans-serif',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      zIndex: 40,
+    }}>
+
+      {/* ── Header / tab bar ─────────────────────────────────────────── */}
+      <div style={{
+        padding: hasBoth ? '0' : '12px 14px 0',
+        borderBottom: '1px solid rgba(250,247,242,0.08)',
+        flexShrink: 0,
+      }}>
+        {hasBoth ? (
+          /* Tab bar */
+          <div style={{ display: 'flex' }}>
+            {[
+              { id: 'listing', icon: cat?.icon ?? '📍', label: 'Listing' },
+              { id: 'layer',   icon: getLayerIcon(activeLayer), label: getLayerLabel(activeLayer) },
+            ].map(t => {
+              const isActive = resolvedTab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  style={{
+                    flex: 1,
+                    padding: '10px 8px',
+                    background: isActive ? 'rgba(250,247,242,0.06)' : 'transparent',
+                    border: 'none',
+                    borderBottom: isActive ? `2px solid ${BRAND.burgundy}` : '2px solid transparent',
+                    color: isActive ? 'rgba(250,247,242,0.95)' : 'rgba(250,247,242,0.4)',
+                    cursor: 'pointer',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    fontFamily: 'Inter, sans-serif',
+                    letterSpacing: '0.04em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 5,
+                    transition: 'color 0.15s, border-color 0.15s, background 0.15s',
+                  }}
+                >
+                  <span style={{ fontSize: 13 }}>{t.icon}</span>
+                  {t.label}
+                  {/* Per-tab close × */}
+                  <span
+                    role="button"
+                    title={`Close ${t.label}`}
+                    onClick={e => { e.stopPropagation(); t.id === 'listing' ? onCloseListing() : onCloseLayer(); }}
+                    style={{
+                      marginLeft: 4,
+                      fontSize: 10,
+                      opacity: 0.5,
+                      lineHeight: 1,
+                      cursor: 'pointer',
+                      padding: '1px 3px',
+                      borderRadius: 3,
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                    onMouseLeave={e => e.currentTarget.style.opacity = '0.5'}
+                  >✕</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          /* Single-mode header row */
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 16 }}>
+                {resolvedTab === 'listing' ? (cat?.icon ?? '📍') : getLayerIcon(activeLayer)}
+              </span>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(250,247,242,0.4)', lineHeight: 1, marginBottom: 2 }}>
+                  {resolvedTab === 'listing' ? cat?.label : 'Active Layer'}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(250,247,242,0.95)', lineHeight: 1.2 }}>
+                  {resolvedTab === 'listing' ? listing.title : getLayerLabel(activeLayer)}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={resolvedTab === 'listing' ? onCloseListing : onCloseLayer}
+              style={{
+                background: 'rgba(46,34,26,0.7)',
+                border: '1px solid rgba(250,247,242,0.15)',
+                borderRadius: 8,
+                color: 'rgba(250,247,242,0.7)',
+                width: 28, height: 28,
+                cursor: 'pointer', fontSize: 14,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                lineHeight: 1, flexShrink: 0,
+              }}
+            >✕</button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Body ─────────────────────────────────────────────────────── */}
+      <div style={{ overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: 'rgba(250,247,242,0.15) transparent' }}>
+        {resolvedTab === 'listing' && listing && (
+          <ListingTabContent listing={listing} cat={cat} />
+        )}
+        {resolvedTab === 'layer' && activeLayer && (
+          <LayerTabContent activeLayer={activeLayer} topoStats={topoStats} selectedAva={selectedAva} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Helpers ──────────────────────────────────────────────────────────── */
+const LAYER_META = {
+  tdmean:    { icon: '🌡️', label: 'Mean Temperature' },
+  elevation: { icon: '⛰️',  label: 'Elevation' },
+  slope:     { icon: '📐', label: 'Slope' },
+  aspect:    { icon: '🧭', label: 'Aspect' },
+};
+function getLayerIcon(id)  { return LAYER_META[id]?.icon  ?? '🗺️'; }
+function getLayerLabel(id) { return LAYER_META[id]?.label ?? id; }
+
+/* ── Listing tab ──────────────────────────────────────────────────────── */
+function ListingTabContent({ listing, cat }) {
+  return (
+    <div>
+      {/* Hero image */}
+      {listing.image_url && (
+        <div style={{ height: 140, overflow: 'hidden', flexShrink: 0 }}>
+          <img
+            src={listing.image_url}
+            alt={listing.title}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            onError={e => { e.currentTarget.parentElement.style.display = 'none'; }}
+          />
+        </div>
+      )}
+      <div style={{ padding: '14px 16px 18px' }}>
+        {/* Number + title */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+          <span style={{
+            width: 24, height: 24, borderRadius: '50%', background: cat.color,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0, marginTop: 2,
+          }}>
+            {listing.num}
+          </span>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(250,247,242,0.95)', lineHeight: 1.3 }}>
+            {listing.title}
+          </div>
+        </div>
+
+        {listing.desc && (
+          <p style={{ fontSize: 12, color: 'rgba(250,247,242,0.6)', lineHeight: 1.6, margin: '0 0 12px 0' }}>
+            {listing.desc.slice(0, 300)}{listing.desc.length > 300 ? '…' : ''}
+          </p>
+        )}
+
+        {listing.phone && (
+          <a href={`tel:${listing.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(250,247,242,0.7)', textDecoration: 'none', marginBottom: 10 }}>
+            📞 {listing.phone}
+          </a>
+        )}
+
+        {listing.url && (
+          <a href={listing.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', padding: '8px 14px', background: cat.color, color: '#fff', borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', textAlign: 'center', marginTop: 4 }}>
+            Visit Website ↗
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Layer tab (imports from LayerDetailPanel's data) ─────────────────── */
+const LAYER_INFO_FULL = {
+  tdmean:    { why: 'Average daily mean temperature from PRISM 30-year normals (1991–2020). This helps understand the thermal character of each growing region across different months.', source: 'PRISM Climate Group, Oregon State University', period: '30-year normals (1991–2020)' },
+  elevation: { why: 'Height above sea level. Higher-elevation vineyards experience cooler temperatures, more wind exposure, and often better drainage — all factors that influence grape quality.', source: 'USGS Digital Elevation Model', period: 'Static terrain data' },
+  slope:     { why: 'Steepness of terrain in degrees. Slopes between 5–15° are generally ideal for viticulture, providing good drainage and sun exposure.', source: 'Derived from USGS DEM', period: 'Static terrain data' },
+  aspect:    { why: 'The compass direction a slope faces. South- and southwest-facing slopes receive more sunlight in the Northern Hemisphere, producing warmer and more sun-exposed microclimates.', source: 'Derived from USGS DEM', period: 'Static terrain data' },
+};
+
+const COLORMAP_GRADIENTS = {
+  terrain:  'linear-gradient(to right, #0B6623, #90EE90, #F5F5DC, #D2B48C, #8B4513, #FFFFFF)',
+  rdylgn_r: 'linear-gradient(to right, #1A9850, #91CF60, #D9EF8B, #FEE08B, #FC8D59, #D73027)',
+  hsv:      'linear-gradient(to right, #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000)',
+  plasma:   'linear-gradient(to right, #0D0887, #7E03A8, #CC4778, #F89441, #F0F921)',
+};
+
+function LayerTabContent({ activeLayer, topoStats, selectedAva }) {
+  const info = LAYER_INFO_FULL[activeLayer];
+  if (!info) return null;
+
+  const avaName = selectedAva ? WV_SUB_AVAS.find(a => a.slug === selectedAva)?.name : null;
+  const topoConfig = TOPO_LAYER_TYPES[activeLayer];
+
+  const CARD = { background: 'rgba(250,247,242,0.06)', border: '1px solid rgba(250,247,242,0.08)', borderRadius: 10, padding: '12px 14px', marginBottom: 8 };
+  const LBL  = { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(250,247,242,0.4)', marginBottom: 4 };
+  const VAL  = { fontSize: 13, color: 'rgba(250,247,242,0.9)', lineHeight: 1.55 };
+  const fmt  = (v) => typeof v === 'number' ? v.toFixed(1) : '—';
+
+  return (
+    <div style={{ padding: '12px 12px 16px' }}>
+      <div style={CARD}>
+        <p style={{ fontSize: 12, color: 'rgba(250,247,242,0.55)', lineHeight: 1.7, margin: 0 }}>{info.why}</p>
+      </div>
+
+      <div style={CARD}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div><div style={LBL}>Period</div><div style={VAL}>{info.period}</div></div>
+          <div><div style={LBL}>Source</div><div style={{ ...VAL, fontSize: 11, color: 'rgba(250,247,242,0.45)' }}>{info.source}</div></div>
+        </div>
+      </div>
+
+      {topoStats && topoConfig && (() => {
+        const { min, max, mean, std } = topoStats;
+        const unit = topoConfig.unit ?? '';
+        const gradient = COLORMAP_GRADIENTS[topoConfig.colormap] ?? COLORMAP_GRADIENTS.terrain;
+        return (
+          <div style={CARD}>
+            <div style={{ ...LBL, marginBottom: 8 }}>Data Range{avaName ? ` — ${avaName}` : ''}</div>
+            <div style={{ height: 10, borderRadius: 6, background: gradient, marginBottom: 4, border: '1px solid rgba(250,247,242,0.1)' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(250,247,242,0.4)', marginBottom: 12 }}>
+              <span>{fmt(min)}{unit}</span><span>{fmt(max)}{unit}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div><div style={LBL}>Min</div><div style={VAL}>{fmt(min)}{unit}</div></div>
+              <div><div style={LBL}>Max</div><div style={VAL}>{fmt(max)}{unit}</div></div>
+              <div><div style={LBL}>Mean</div><div style={VAL}>{fmt(mean)}{unit}</div></div>
+              <div><div style={LBL}>Std Dev</div><div style={VAL}>±{fmt(std)}{unit}</div></div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {!topoStats && topoConfig && selectedAva && (
+        <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(250,247,242,0.15)', borderTopColor: 'rgba(250,247,242,0.9)', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+          <span style={{ fontSize: 11, color: 'rgba(250,247,242,0.4)' }}>Loading data range…</span>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
+
+      {!topoStats && topoConfig && !selectedAva && (
+        <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16 }}>💡</span>
+          <span style={{ fontSize: 11, color: 'rgba(250,247,242,0.4)', lineHeight: 1.5 }}>Select an AVA to see terrain statistics for that region.</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, registerMarkerRef, panelHoveredAva, onPanelHoverAva }) {
   const mapContainerRef = useRef(null);
   const mapRef          = useRef(null);
@@ -216,17 +520,18 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           map.setPaintProperty(lineId, 'line-width', 3);
           map.setPaintProperty(lineId, 'line-opacity', 1);
         } else {
+          // (paint-only reset — no moveLayer needed for non-hovered AVAs)
           map.setPaintProperty(lineId, 'line-color', '#C9A84C');
           map.setPaintProperty(lineId, 'line-width',
             ['case', ['boolean', ['feature-state', 'hover'], false], 2.5, 1.8]);
           map.setPaintProperty(lineId, 'line-opacity',
             ['case', ['boolean', ['feature-state', 'hover'], false], 1.0, 0.75]);
         }
-      } catch (e) { /* ignore */ }
+        } catch (e) { /* ignore */ }
     }
-  }, [panelHoveredAva, mapLoaded, selectedAva]);
-
-  const isClimateActive = activeLayer === 'tdmean';
+    // Always keep winery dots on top of AVA boundaries
+    if (panelHoveredAva) raiseListingLayers(map);
+  }, [panelHoveredAva, mapLoaded, selectedAva]);  const isClimateActive = activeLayer === 'tdmean';
   const isTopoActive    = ['elevation', 'slope', 'aspect'].includes(activeLayer);
 
   // ── Map initialization ────────────────────────────────────────────────
@@ -576,20 +881,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
       // AVA layers load asynchronously and can end up above the highlight
       // layers. Move all highlight layers to the top of the stack now that
       // all sources/layers have been added.
-      for (const layerId of [
-        'listings-clusters',
-        'listings-cluster-count',
-        'listings-unclustered',
-        'listings-unclustered-num',
-        'listings-hovered-glow',
-        'listings-hovered-dot',
-        'listings-hovered-num',
-        'listings-selected-glow',
-        'listings-selected-dot',
-        'listings-selected-num',
-      ]) {
-        if (map.getLayer(layerId)) map.moveLayer(layerId);
-      }
+      raiseListingLayers(map);
 
       // ── Cluster click → zoom in ───────────────────────────────────
       map.on('click', 'listings-clusters', (e) => {
@@ -950,170 +1242,17 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
 
       {/* Category legend / filter — bottom center */}
 
-      {/* Right-side listing detail panel */}
-      {introComplete && selectedListing && (() => {
-        const listing = selectedListing;
-        const cat = LISTING_CATEGORIES[listing.category];
-        return (
-          <div style={{
-            position: 'absolute',
-            right: 16,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            width: 288,
-            maxHeight: 'calc(100vh - 120px)',
-            background: 'rgba(46,34,26,0.90)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            border: '1px solid rgba(250,247,242,0.12)',
-            borderRadius: 14,
-            boxShadow: '0 8px 40px rgba(46,34,26,0.45)',
-            fontFamily: 'Inter, sans-serif',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            zIndex: 40,
-          }}>
-            {/* Close button */}
-            <button
-              onClick={() => setSelectedListingBoth(null)}
-              style={{
-                position: 'absolute',
-                top: 10,
-                right: 10,
-                zIndex: 2,
-                background: 'rgba(46,34,26,0.7)',
-                border: '1px solid rgba(250,247,242,0.15)',
-                borderRadius: 8,
-                color: 'rgba(250,247,242,0.7)',
-                width: 28,
-                height: 28,
-                cursor: 'pointer',
-                fontSize: 14,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                lineHeight: 1,
-              }}
-            >
-              ✕
-            </button>
-
-            {/* Hero image */}
-            {listing.image_url && (
-              <div style={{ flexShrink: 0, height: 150, overflow: 'hidden' }}>
-                <img
-                  src={listing.image_url}
-                  alt={listing.title}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  onError={e => { e.currentTarget.parentElement.style.display = 'none'; }}
-                />
-              </div>
-            )}
-
-            {/* Content */}
-            <div style={{ padding: '14px 16px 18px', overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: 'rgba(250,247,242,0.15) transparent' }}>
-              {/* Category badge */}
-              <div style={{
-                display: 'inline-block',
-                padding: '2px 10px',
-                borderRadius: 20,
-                background: cat.color + '28',
-                border: `1px solid ${cat.color}66`,
-                color: cat.color,
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                marginBottom: 10,
-              }}>
-                {cat.label}
-              </div>
-
-              {/* Title row */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
-                <span style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: '50%',
-                  background: cat.color,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: '#fff',
-                  flexShrink: 0,
-                  marginTop: 1,
-                }}>
-                  {listing.num}
-                </span>
-                <div style={{
-                  fontSize: 15,
-                  fontWeight: 700,
-                  color: 'rgba(250,247,242,0.95)',
-                  lineHeight: 1.3,
-                }}>
-                  {listing.title}
-                </div>
-              </div>
-
-              {/* Description */}
-              {listing.desc && (
-                <p style={{
-                  fontSize: 12,
-                  color: 'rgba(250,247,242,0.6)',
-                  lineHeight: 1.6,
-                  margin: '0 0 14px 0',
-                }}>
-                  {listing.desc.slice(0, 300)}{listing.desc.length > 300 ? '…' : ''}
-                </p>
-              )}
-
-              {/* Phone */}
-              {listing.phone && (
-                <a
-                  href={`tel:${listing.phone}`}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    fontSize: 12,
-                    color: 'rgba(250,247,242,0.7)',
-                    textDecoration: 'none',
-                    marginBottom: 10,
-                  }}
-                >
-                  📞 {listing.phone}
-                </a>
-              )}
-
-              {/* Website button */}
-              {listing.url && (
-                <a
-                  href={listing.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'block',
-                    padding: '8px 14px',
-                    background: cat.color,
-                    color: '#fff',
-                    borderRadius: 8,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                    textAlign: 'center',
-                    marginTop: 4,
-                  }}
-                >
-                  Visit Website ↗
-                </a>
-              )}
-            </div>
-          </div>
-        );
-      })()}
+      {/* ── Right-side context panel (tabbed when both listing + layer active) ── */}
+      {introComplete && (selectedListing || activeLayer) && (
+        <RightContextPanel
+          listing={selectedListing}
+          activeLayer={activeLayer}
+          topoStats={topoStats}
+          selectedAva={selectedAva}
+          onCloseListing={() => setSelectedListingBoth(null)}
+          onCloseLayer={() => handleLayerChange(null)}
+        />
+      )}
     </div>
   );
 }

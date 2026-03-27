@@ -228,7 +228,7 @@ export default function DesktopDock({
       {/* ── Panels (all on left side) ───────────────────────────────────── */}
       {activePanel === 'info' && (
         <PanelShell title="Info" onClose={closePanel}>
-          <InfoPanel selectedAva={selectedAva} activeLayer={activeLayer} onSelectAva={onSelectAva} onHoverAva={onHoverAva} topoStats={topoStats} />
+          <InfoPanel selectedAva={selectedAva} onSelectAva={onSelectAva} onHoverAva={onHoverAva} />
         </PanelShell>
       )}
 

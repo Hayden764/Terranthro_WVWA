@@ -55,14 +55,21 @@ export const AVA_TOPO_REGISTRY = {
 };
 
 export const WV_SUB_AVAS = [
-  { slug: 'chehalem-mountains',  name: 'Chehalem Mountains',  file: '/data/chehalem_mountains.geojson',  color: '#C9A84C' },
+  // Chehalem Mountains is itself a nested AVA of WV, but also a parent of
+  // Ribbon Ridge and Laurelwood District (double-nested).
+  { slug: 'chehalem-mountains',  name: 'Chehalem Mountains',  file: '/data/chehalem_mountains.geojson',  color: '#C9A84C',
+    subAvas: ['ribbon-ridge', 'laurelwood-district'] },
   { slug: 'dundee-hills',        name: 'Dundee Hills',        file: '/data/dundee_hills.geojson',        color: '#C9A84C' },
   { slug: 'eola-amity-hills',    name: 'Eola-Amity Hills',    file: '/data/eola_amity_hills.geojson',    color: '#C9A84C' },
-  { slug: 'laurelwood-district', name: 'Laurelwood District', file: '/data/laurelwood_district.geojson', color: '#C9A84C' },
+  // Laurelwood District is nested inside Chehalem Mountains (double-nested)
+  { slug: 'laurelwood-district', name: 'Laurelwood District', file: '/data/laurelwood_district.geojson', color: '#C9A84C',
+    parentAva: 'chehalem-mountains' },
   { slug: 'lower-long-tom',      name: 'Lower Long Tom',      file: '/data/lower_long_tom.geojson',      color: '#C9A84C' },
   { slug: 'mcminnville',              name: 'McMinnville',              file: '/data/mcminnville.geojson',              color: '#C9A84C' },
   { slug: 'mount-pisgah-polk-county', name: 'Mount Pisgah/Polk County',  file: '/data/mount_pisgah_polk_county.geojson', color: '#C9A84C' },
-  { slug: 'ribbon-ridge',             name: 'Ribbon Ridge',             file: '/data/ribbon_ridge.geojson',             color: '#C9A84C' },
+  // Ribbon Ridge is nested inside Chehalem Mountains (double-nested)
+  { slug: 'ribbon-ridge',             name: 'Ribbon Ridge',             file: '/data/ribbon_ridge.geojson',             color: '#C9A84C',
+    parentAva: 'chehalem-mountains' },
   { slug: 'tualatin-hills',      name: 'Tualatin Hills',      file: '/data/tualatin_hills.geojson',      color: '#C9A84C' },
   { slug: 'van-duzer-corridor',  name: 'Van Duzer Corridor',  file: '/data/van_duzer_corridor.geojson',  color: '#C9A84C' },
   { slug: 'yamhill-carlton',     name: 'Yamhill-Carlton',     file: '/data/yamhill_carlton.geojson',     color: '#C9A84C' },

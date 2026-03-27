@@ -1,6 +1,6 @@
 import { BRAND } from '../../config/brandColors';
 import { GLASS } from './glassTokens';
-import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../../config/topographyConfig';
+import { WV_SUB_AVAS } from '../../config/topographyConfig';
 
 /**
  * InfoPanel — "Info" panel content (right side).
@@ -72,7 +72,7 @@ const LAYER_INFO = {
 };
 
 /* ── Clickable AVA list item ─────────────────────────────────────────── */
-function AVAButton({ item, onSelectAva, onHoverAva }) {
+function AVAButton({ item, onSelectAva, onHoverAva, badge }) {
   return (
     <button
       onClick={() => onSelectAva?.(item.slug)}
@@ -111,14 +111,43 @@ function AVAButton({ item, onSelectAva, onHoverAva }) {
       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {item.name}
       </span>
+      {badge && (
+        <span style={{
+          fontSize: 9,
+          fontWeight: 700,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          padding: '2px 6px',
+          borderRadius: 10,
+          background: 'rgba(201,168,76,0.18)',
+          border: '1px solid rgba(201,168,76,0.4)',
+          color: '#C9A84C',
+          marginLeft: 6,
+          flexShrink: 0,
+        }}>
+          {badge}
+        </span>
+      )}
       <span style={{ fontSize: 13, marginLeft: 8, opacity: 0.55, flexShrink: 0 }}>↗</span>
     </button>
   );
 }
 
-export default function InfoPanel({ selectedAva, activeLayer, onSelectAva, onHoverAva, topoStats }) {
+export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
   const ava = WV_SUB_AVAS.find(a => a.slug === selectedAva);
-  const layerInfo = activeLayer ? LAYER_INFO[activeLayer] : null;
+
+  // Nesting helpers
+  const parentAvaSlug = ava?.parentAva ?? null;
+  const parentAva = parentAvaSlug ? WV_SUB_AVAS.find(a => a.slug === parentAvaSlug) : null;
+  const subAvas = ava?.subAvas
+    ? WV_SUB_AVAS.filter(a => ava.subAvas.includes(a.slug))
+    : [];
+  const isDoubleNested = !!parentAva;
+  const isChehalemParent = (ava?.subAvas?.length ?? 0) > 0;
+
+  // AVAs shown in the "siblings" list — exclude self, and for double-nested exclude
+  // the parent (shown separately in breadcrumb)
+  const siblingAvas = WV_SUB_AVAS.filter(a => a.slug !== selectedAva);
 
   return (
     <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -127,78 +156,197 @@ export default function InfoPanel({ selectedAva, activeLayer, onSelectAva, onHov
       {ava ? (
         <>
           <div style={CARD}>
-            <div style={{
-              display: 'inline-block',
-              padding: '3px 10px',
-              borderRadius: 20,
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              background: GLASS.accentDim,
-              border: '1px solid rgba(142,21,55,0.35)',
-              color: GLASS.text,
-              marginBottom: 10,
-            }}>
-              Nested AVA
+            {/* Nesting badge */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+              <div style={{
+                display: 'inline-block',
+                padding: '3px 10px',
+                borderRadius: 20,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                background: GLASS.accentDim,
+                border: '1px solid rgba(142,21,55,0.35)',
+                color: GLASS.text,
+              }}>
+                {isDoubleNested ? 'Double-Nested AVA' : 'Nested AVA'}
+              </div>
+              {isChehalemParent && (
+                <div style={{
+                  display: 'inline-block',
+                  padding: '3px 10px',
+                  borderRadius: 20,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  background: 'rgba(201,168,76,0.15)',
+                  border: '1px solid rgba(201,168,76,0.4)',
+                  color: '#C9A84C',
+                }}>
+                  Parent AVA
+                </div>
+              )}
             </div>
+
+            {/* Breadcrumb for double-nested */}
+            {isDoubleNested && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
+                <button
+                  onClick={() => onSelectAva?.(null)}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, color: GLASS.textDim, fontFamily: 'Inter, sans-serif' }}
+                >
+                  Willamette Valley
+                </button>
+                <span style={{ color: GLASS.textMuted, fontSize: 11 }}>›</span>
+                <button
+                  onClick={() => onSelectAva?.(parentAvaSlug)}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, color: '#C9A84C', fontFamily: 'Inter, sans-serif', fontWeight: 600 }}
+                >
+                  {parentAva.name}
+                </button>
+                <span style={{ color: GLASS.textMuted, fontSize: 11 }}>›</span>
+                <span style={{ fontSize: 11, color: GLASS.text, fontWeight: 600 }}>{ava.name}</span>
+              </div>
+            )}
+
             <div style={{ fontSize: 18, fontWeight: 700, color: GLASS.text, fontFamily: 'Georgia, serif', marginBottom: 4 }}>
               {ava.name}
             </div>
             <div style={{ fontSize: 12, color: GLASS.textDim }}>
-              Willamette Valley, Oregon
+              {isDoubleNested
+                ? `${parentAva.name} · Willamette Valley, Oregon`
+                : 'Willamette Valley, Oregon'}
             </div>
           </div>
 
-          {/* Parent AVA */}
+          {/* ── Sub-AVAs (shown only for Chehalem Mountains) ─────────── */}
+          {isChehalemParent && (
+            <div style={CARD}>
+              <div style={{ ...LBL, marginBottom: 2 }}>
+                Contains Sub-AVAs
+                <span style={{ fontWeight: 400, opacity: 0.6, marginLeft: 6 }}>({subAvas.length})</span>
+              </div>
+              <div style={{ fontSize: 11, color: GLASS.textDim, lineHeight: 1.5, marginBottom: 8 }}>
+                These appellations are nested within Chehalem Mountains and also within the broader Willamette Valley AVA — making them double-nested.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {subAvas.map(sub => (
+                  <AVAButton key={sub.slug} item={sub} onSelectAva={onSelectAva} onHoverAva={onHoverAva} badge="2× Nested" />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Parent AVA breadcrumb card */}
           <div style={CARD}>
-            <div style={LBL}>Part of</div>
-            <button
-              onClick={() => onSelectAva?.(null)}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'rgba(56,189,248,0.12)';
-                e.currentTarget.style.borderColor = 'rgba(56,189,248,0.55)';
-                e.currentTarget.style.color = '#7DD3FC';
-                e.currentTarget.style.boxShadow = '0 0 0 2px rgba(56,189,248,0.18), inset 0 0 8px rgba(56,189,248,0.06)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'rgba(250,247,242,0.05)';
-                e.currentTarget.style.borderColor = 'rgba(250,247,242,0.10)';
-                e.currentTarget.style.color = GLASS.textDim;
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: 8,
-                border: '1px solid rgba(250,247,242,0.10)',
-                background: 'rgba(250,247,242,0.05)',
-                color: GLASS.textDim,
-                fontSize: 12,
-                fontWeight: 500,
-                fontFamily: 'Inter, sans-serif',
-                cursor: 'pointer',
-                transition: 'background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s',
-                textAlign: 'left',
-              }}
-            >
-              <span>Willamette Valley AVA</span>
-              <span style={{ fontSize: 13, marginLeft: 8, opacity: 0.55, flexShrink: 0 }}>↗</span>
-            </button>
+            <div style={LBL}>{isDoubleNested ? 'Parent AVAs' : 'Part of'}</div>
+
+            {isDoubleNested ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {/* Chehalem Mountains parent */}
+                <button
+                  onClick={() => onSelectAva?.(parentAvaSlug)}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'rgba(56,189,248,0.12)';
+                    e.currentTarget.style.borderColor = 'rgba(56,189,248,0.55)';
+                    e.currentTarget.style.color = '#7DD3FC';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'rgba(201,168,76,0.08)';
+                    e.currentTarget.style.borderColor = 'rgba(201,168,76,0.3)';
+                    e.currentTarget.style.color = '#C9A84C';
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    width: '100%', padding: '8px 12px', borderRadius: 8,
+                    border: '1px solid rgba(201,168,76,0.3)',
+                    background: 'rgba(201,168,76,0.08)',
+                    color: '#C9A84C', fontSize: 12, fontWeight: 600,
+                    fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                    transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span>{parentAva.name}</span>
+                  <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 8 }}>Direct parent ↗</span>
+                </button>
+                {/* Willamette Valley grandparent */}
+                <button
+                  onClick={() => onSelectAva?.(null)}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'rgba(56,189,248,0.12)';
+                    e.currentTarget.style.borderColor = 'rgba(56,189,248,0.55)';
+                    e.currentTarget.style.color = '#7DD3FC';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'rgba(250,247,242,0.05)';
+                    e.currentTarget.style.borderColor = 'rgba(250,247,242,0.10)';
+                    e.currentTarget.style.color = GLASS.textDim;
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    width: '100%', padding: '8px 12px', borderRadius: 8,
+                    border: '1px solid rgba(250,247,242,0.10)',
+                    background: 'rgba(250,247,242,0.05)',
+                    color: GLASS.textDim, fontSize: 12, fontWeight: 500,
+                    fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                    transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span>Willamette Valley AVA</span>
+                  <span style={{ fontSize: 13, marginLeft: 8, opacity: 0.55 }}>↗</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => onSelectAva?.(null)}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(56,189,248,0.12)';
+                  e.currentTarget.style.borderColor = 'rgba(56,189,248,0.55)';
+                  e.currentTarget.style.color = '#7DD3FC';
+                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(56,189,248,0.18), inset 0 0 8px rgba(56,189,248,0.06)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'rgba(250,247,242,0.05)';
+                  e.currentTarget.style.borderColor = 'rgba(250,247,242,0.10)';
+                  e.currentTarget.style.color = GLASS.textDim;
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  width: '100%', padding: '8px 12px', borderRadius: 8,
+                  border: '1px solid rgba(250,247,242,0.10)',
+                  background: 'rgba(250,247,242,0.05)',
+                  color: GLASS.textDim, fontSize: 12, fontWeight: 500,
+                  fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                  transition: 'background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s',
+                  textAlign: 'left',
+                }}
+              >
+                <span>Willamette Valley AVA</span>
+                <span style={{ fontSize: 13, marginLeft: 8, opacity: 0.55, flexShrink: 0 }}>↗</span>
+              </button>
+            )}
           </div>
 
-          {/* Nested AVAs (siblings) */}
+          {/* Sibling AVAs */}
           <div style={CARD}>
             <div style={{ ...LBL, marginBottom: 6 }}>
-              Nested AVAs
-              <span style={{ fontWeight: 400, opacity: 0.6, marginLeft: 6 }}>({WV_SUB_AVAS.length - 1})</span>
+              Other AVAs
+              <span style={{ fontWeight: 400, opacity: 0.6, marginLeft: 6 }}>({siblingAvas.length})</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: `${GLASS.textMuted} transparent` }}>
-              {WV_SUB_AVAS.filter(a => a.slug !== selectedAva).map(sibling => (
-                <AVAButton key={sibling.slug} item={sibling} onSelectAva={onSelectAva} onHoverAva={onHoverAva} />
+              {siblingAvas.map(sibling => (
+                <AVAButton
+                  key={sibling.slug}
+                  item={sibling}
+                  onSelectAva={onSelectAva}
+                  onHoverAva={onHoverAva}
+                  badge={sibling.parentAva ? '2× Nested' : sibling.subAvas ? 'Has Sub-AVAs' : null}
+                />
               ))}
             </div>
           </div>
@@ -223,7 +371,13 @@ export default function InfoPanel({ selectedAva, activeLayer, onSelectAva, onHov
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 280, overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: `${GLASS.textMuted} transparent` }}>
               {WV_SUB_AVAS.map(a => (
-                <AVAButton key={a.slug} item={a} onSelectAva={onSelectAva} onHoverAva={onHoverAva} />
+                <AVAButton
+                  key={a.slug}
+                  item={a}
+                  onSelectAva={onSelectAva}
+                  onHoverAva={onHoverAva}
+                  badge={a.parentAva ? '2× Nested' : a.subAvas ? 'Has Sub-AVAs' : null}
+                />
               ))}
             </div>
           </div>
@@ -243,104 +397,6 @@ export default function InfoPanel({ selectedAva, activeLayer, onSelectAva, onHov
         </>
       )}
 
-      {/* ── Divider ──────────────────────────────────────────────────── */}
-      {layerInfo && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
-          <div style={{ flex: 1, height: 1, background: GLASS.borderLight }} />
-          <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: GLASS.textMuted }}>
-            Active Layer
-          </span>
-          <div style={{ flex: 1, height: 1, background: GLASS.borderLight }} />
-        </div>
-      )}
-
-      {/* ── Layer info ───────────────────────────────────────────────── */}
-      {layerInfo && (
-        <>
-          <div style={CARD}>
-            <div style={{ fontSize: 24, marginBottom: 6 }}>{layerInfo.icon}</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: GLASS.text, marginBottom: 4 }}>{layerInfo.label}</div>
-            <p style={{ fontSize: 12, color: GLASS.textDim, lineHeight: 1.65, margin: 0 }}>
-              {layerInfo.why}
-            </p>
-          </div>
-
-          <div style={CARD}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div>
-                <div style={LBL}>Period</div>
-                <div style={VAL}>{layerInfo.period}</div>
-              </div>
-              <div>
-                <div style={LBL}>Source</div>
-                <div style={{ ...VAL, fontSize: 11, color: GLASS.textDim }}>{layerInfo.source}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Data range card (topo layers only, when stats are loaded) ── */}
-          {topoStats && activeLayer && TOPO_LAYER_TYPES[activeLayer] && (() => {
-            const { min, max, mean, std } = topoStats;
-            const layerCfg = TOPO_LAYER_TYPES[activeLayer];
-            const unit = layerCfg.unit ?? '';
-            const gradient = COLORMAP_CSS[layerCfg.colormap] ?? COLORMAP_CSS.terrain;
-            const fmt = (v) => typeof v === 'number' ? v.toFixed(1) : '—';
-            return (
-              <div style={CARD}>
-                <div style={{ ...LBL, marginBottom: 8 }}>Data Range — {selectedAva ? WV_SUB_AVAS.find(a => a.slug === selectedAva)?.name : 'AVA'}</div>
-
-                {/* Color ramp bar */}
-                <div style={{
-                  height: 10,
-                  borderRadius: 6,
-                  background: gradient,
-                  marginBottom: 4,
-                  border: '1px solid rgba(250,247,242,0.1)',
-                }} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: GLASS.textDim, marginBottom: 10 }}>
-                  <span>{fmt(min)}{unit}</span>
-                  <span>{fmt(max)}{unit}</span>
-                </div>
-
-                {/* Stats grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <div>
-                    <div style={LBL}>Min</div>
-                    <div style={VAL}>{fmt(min)}{unit}</div>
-                  </div>
-                  <div>
-                    <div style={LBL}>Max</div>
-                    <div style={VAL}>{fmt(max)}{unit}</div>
-                  </div>
-                  <div>
-                    <div style={LBL}>Mean</div>
-                    <div style={VAL}>{fmt(mean)}{unit}</div>
-                  </div>
-                  <div>
-                    <div style={LBL}>Std Dev</div>
-                    <div style={VAL}>±{fmt(std)}{unit}</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Loading state while stats are being fetched */}
-          {!topoStats && activeLayer && TOPO_LAYER_TYPES[activeLayer] && selectedAva && (
-            <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{
-                width: 14, height: 14, borderRadius: '50%',
-                border: `2px solid rgba(250,247,242,0.15)`,
-                borderTopColor: GLASS.text,
-                animation: 'spin 0.8s linear infinite',
-                flexShrink: 0,
-              }} />
-              <span style={{ fontSize: 11, color: GLASS.textDim }}>Loading data range…</span>
-              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            </div>
-          )}
-        </>
-      )}
     </div>
   );
 }

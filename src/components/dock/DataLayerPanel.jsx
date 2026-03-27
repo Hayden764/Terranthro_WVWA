@@ -195,39 +195,6 @@ export default function DataLayerPanel({ activeLayer, onLayerChange, currentMont
         )}
       </div>
 
-      {/* ── Active Layer Indicator ───────────────────────────────────── */}
-      {activeLayer && (
-        <div style={{
-          marginTop: 4,
-          padding: '8px 12px',
-          borderRadius: 8,
-          background: GLASS.accentDim,
-          border: `1px solid rgba(142,21,55,0.3)`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: GLASS.text }}>
-            {activeLayer === 'tdmean' ? 'Mean Temp' : activeLayer.charAt(0).toUpperCase() + activeLayer.slice(1)}
-          </span>
-          <button
-            onClick={() => onLayerChange(null)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: GLASS.textDim,
-              cursor: 'pointer',
-              fontSize: 12,
-              fontWeight: 700,
-              padding: '2px 6px',
-              borderRadius: 4,
-            }}
-            title="Clear active layer"
-          >
-            ✕
-          </button>
-        </div>
-      )}
     </div>
   );
 }

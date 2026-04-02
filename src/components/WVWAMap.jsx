@@ -375,10 +375,10 @@ function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onVineyar
                     ...CARD,
                     cursor: 'pointer',
                     border: isHovered
-                      ? '1px solid rgba(168,230,188,0.55)'
+                      ? '1px solid rgba(56,189,248,0.55)'
                       : '1px solid rgba(250,247,242,0.08)',
                     background: isHovered
-                      ? 'rgba(109,191,138,0.12)'
+                      ? 'rgba(56,189,248,0.10)'
                       : 'rgba(250,247,242,0.06)',
                     transition: 'border-color 0.15s, background 0.15s',
                     position: 'relative',
@@ -395,10 +395,10 @@ function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onVineyar
                   title="Click to zoom to this parcel"
                 >
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: isHovered ? '#A8E6BC' : '#6DBF8A', transition: 'color 0.15s', flex: 1, paddingRight: 8 }}>{name}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: isHovered ? '#38BDF8' : '#6DBF8A', transition: 'color 0.15s', flex: 1, paddingRight: 8 }}>{name}</div>
                     <span style={{
                       fontSize: 10,
-                      color: isHovered ? 'rgba(168,230,188,0.9)' : 'rgba(109,191,138,0.4)',
+                      color: isHovered ? 'rgba(56,189,248,0.9)' : 'rgba(109,191,138,0.4)',
                       transition: 'color 0.15s, transform 0.15s',
                       transform: isHovered ? 'scale(1.15)' : 'scale(1)',
                       flexShrink: 0,
@@ -805,8 +805,8 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           type: 'fill',
           source: 'vineyards-selected',
           paint: {
-            'fill-color': '#6DBF8A',
-            'fill-opacity': 0.28,
+            'fill-color': '#38BDF8',
+            'fill-opacity': 0.18,
           },
         });
         map.addLayer({
@@ -814,7 +814,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           type: 'line',
           source: 'vineyards-selected',
           paint: {
-            'line-color': '#6DBF8A',
+            'line-color': '#38BDF8',
             'line-width': 2,
             'line-opacity': 0.9,
           },
@@ -830,8 +830,8 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           type: 'fill',
           source: 'vineyards-hovered',
           paint: {
-            'fill-color': '#A8E6BC',
-            'fill-opacity': 0.45,
+            'fill-color': '#38BDF8',
+            'fill-opacity': 0.32,
           },
         });
         map.addLayer({
@@ -839,7 +839,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           type: 'line',
           source: 'vineyards-hovered',
           paint: {
-            'line-color': '#A8E6BC',
+            'line-color': '#38BDF8',
             'line-width': 2.5,
             'line-opacity': 1,
           },

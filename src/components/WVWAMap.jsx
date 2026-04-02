@@ -153,7 +153,7 @@ function raiseListingLayers(map) {
 // Shown whenever a listing is selected, a layer is active, or both.
 // When both are present a tab bar appears; when only one is present no tabs
 // are shown (the single content fills the panel directly).
-function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, vineyards, onCloseListing, onCloseLayer, onVineyardHover, onVineyardClick }) {
+function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, vineyards, onCloseListing, onCloseLayer, onVineyardHover, onVineyardClick, onViewAllVineyards }) {
   const hasBoth = !!(listing && activeLayer);
   // Default tab: winery when a listing is selected, otherwise layer
   const [tab, setTab] = useState(listing ? 'listing' : 'layer');
@@ -281,7 +281,7 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
       {/* ── Body ─────────────────────────────────────────────────────── */}
       <div style={{ overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: 'rgba(250,247,242,0.15) transparent' }}>
         {resolvedTab === 'listing' && listing && (
-          <ListingTabContent listing={listing} cat={cat} vineyards={vineyards} onVineyardHover={onVineyardHover} onVineyardClick={onVineyardClick} />
+          <ListingTabContent listing={listing} cat={cat} vineyards={vineyards} onVineyardHover={onVineyardHover} onVineyardClick={onVineyardClick} onViewAllVineyards={onViewAllVineyards} />
         )}
         {resolvedTab === 'layer' && activeLayer && (
           <LayerTabContent activeLayer={activeLayer} topoStats={topoStats} selectedAva={selectedAva} />
@@ -302,7 +302,7 @@ function getLayerIcon(id)  { return LAYER_META[id]?.icon  ?? '🗺️'; }
 function getLayerLabel(id) { return LAYER_META[id]?.label ?? id; }
 
 /* ── Listing tab ──────────────────────────────────────────────────────── */
-function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onVineyardClick }) {
+function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onVineyardClick, onViewAllVineyards }) {
   const CARD = { background: 'rgba(250,247,242,0.06)', border: '1px solid rgba(250,247,242,0.08)', borderRadius: 10, padding: '12px 14px', marginBottom: 8 };
   const LBL  = { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(250,247,242,0.4)', marginBottom: 4 };
   const VAL  = { fontSize: 12, color: 'rgba(250,247,242,0.85)', lineHeight: 1.5 };
@@ -358,8 +358,45 @@ function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onVineyar
         {/* ── Vineyard parcels ─────────────────────────────────────── */}
         {vineyards && vineyards.length > 0 && (
           <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(250,247,242,0.35)', marginBottom: 8 }}>
-              🍇 Estate Vineyard{vineyards.length > 1 ? 's' : ''}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(250,247,242,0.35)' }}>
+                🍇 Estate Vineyard{vineyards.length > 1 ? 's' : ''}
+              </div>
+              {vineyards.length > 1 && (
+                <button
+                  onClick={() => onViewAllVineyards?.(vineyards)}
+                  style={{
+                    background: 'rgba(109,191,138,0.12)',
+                    border: '1px solid rgba(109,191,138,0.35)',
+                    borderRadius: 6,
+                    color: '#6DBF8A',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    fontFamily: 'Inter, sans-serif',
+                    letterSpacing: '0.04em',
+                    padding: '3px 8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+                    whiteSpace: 'nowrap',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'rgba(56,189,248,0.12)';
+                    e.currentTarget.style.borderColor = 'rgba(56,189,248,0.45)';
+                    e.currentTarget.style.color = '#38BDF8';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'rgba(109,191,138,0.12)';
+                    e.currentTarget.style.borderColor = 'rgba(109,191,138,0.35)';
+                    e.currentTarget.style.color = '#6DBF8A';
+                  }}
+                  title="Fit map to all estate parcels"
+                >
+                  ⌖ View All
+                </button>
+              )}
             </div>
             {vineyards.map((f, i) => {
               const p = f.properties;
@@ -563,6 +600,30 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
     map.fitBounds(
       [[minLng, minLat], [maxLng, maxLat]],
       { padding: { top: 80, bottom: 80, left: 320, right: 80 }, duration: 800, maxZoom: 16 }
+    );
+  }, []);
+
+  // ── "View All Vineyards" → fit map to combined bbox of every parcel ──
+  const onViewAllVineyards = useCallback((features) => {
+    const map = mapRef.current;
+    if (!map || !features?.length) return;
+    let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+    for (const feature of features) {
+      const rings = feature.geometry.type === 'Polygon'
+        ? feature.geometry.coordinates
+        : feature.geometry.coordinates.flat();
+      for (const ring of rings) {
+        for (const [lng, lat] of ring) {
+          if (lng < minLng) minLng = lng;
+          if (lat < minLat) minLat = lat;
+          if (lng > maxLng) maxLng = lng;
+          if (lat > maxLat) maxLat = lat;
+        }
+      }
+    }
+    map.fitBounds(
+      [[minLng, minLat], [maxLng, maxLat]],
+      { padding: { top: 100, bottom: 100, left: 340, right: 100 }, duration: 900, maxZoom: 14 }
     );
   }, []);
 
@@ -1484,6 +1545,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           onCloseLayer={() => handleLayerChange(null)}
           onVineyardHover={onVineyardHover}
           onVineyardClick={onVineyardClick}
+          onViewAllVineyards={onViewAllVineyards}
         />
       )}
     </div>

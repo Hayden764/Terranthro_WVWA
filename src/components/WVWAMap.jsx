@@ -400,10 +400,9 @@ function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onVineyar
             </div>
             {vineyards.map((f, i) => {
               const p = f.properties;
-              const name = p.A1_VineyardName || 'Vineyard Parcel';
-              const acres = p.VA0_TotalVineAcres ? Number(p.VA0_TotalVineAcres).toFixed(1) : null;
-              const varietals = p.W1_VarietalsList || null;
-              const ava = p.C3_NestNestAVA || p.C2_NestAVA || p.C1_AVA || null;
+              const name = p.Vineyard_Name || p.A1_VineyardName || 'Vineyard Parcel';
+              const acres = (p.Acres || p.VA0_TotalVineAcres) ? Number(p.Acres ?? p.VA0_TotalVineAcres).toFixed(1) : null;
+              const ava = p.Nested_Nested_AVA || p.Nested_AVA || p.C3_NestNestAVA || p.C2_NestAVA || p.C1_AVA || null;
               const isHovered = hoveredIdx === i;
               return (
                 <div
@@ -444,8 +443,7 @@ function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onVineyar
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     {acres && <div><div style={LBL}>Acres</div><div style={VAL}>{acres} ac</div></div>}
-                    {varietals && <div><div style={LBL}>Varietals</div><div style={VAL}>{varietals}</div></div>}
-                    {ava && <div style={{ gridColumn: acres && varietals ? '1 / -1' : undefined }}><div style={LBL}>AVA</div><div style={VAL}>{ava}</div></div>}
+                    {ava && <div><div style={LBL}>AVA</div><div style={VAL}>{ava}</div></div>}
                   </div>
                 </div>
               );

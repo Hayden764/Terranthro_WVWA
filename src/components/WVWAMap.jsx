@@ -398,7 +398,7 @@ function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onVineyar
                     <div style={{ fontSize: 12, fontWeight: 700, color: isHovered ? '#38BDF8' : '#6DBF8A', transition: 'color 0.15s', flex: 1, paddingRight: 8 }}>{name}</div>
                     <span style={{
                       fontSize: 10,
-                      color: isHovered ? 'rgba(56,189,248,0.9)' : 'rgba(109,191,138,0.4)',
+                      color: isHovered ? 'rgba(56,189,248,0.9)' : 'rgba(109,191,138,0.5)',
                       transition: 'color 0.15s, transform 0.15s',
                       transform: isHovered ? 'scale(1.15)' : 'scale(1)',
                       flexShrink: 0,
@@ -805,8 +805,8 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           type: 'fill',
           source: 'vineyards-selected',
           paint: {
-            'fill-color': '#38BDF8',
-            'fill-opacity': 0.18,
+            'fill-color': '#6DBF8A',
+            'fill-opacity': 0.22,
           },
         });
         map.addLayer({
@@ -814,7 +814,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           type: 'line',
           source: 'vineyards-selected',
           paint: {
-            'line-color': '#38BDF8',
+            'line-color': '#6DBF8A',
             'line-width': 2,
             'line-opacity': 0.9,
           },

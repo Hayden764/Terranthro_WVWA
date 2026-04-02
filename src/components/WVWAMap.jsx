@@ -9,6 +9,11 @@ import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { AVA_CAMERA, WV_CAMERA } from '../config/avaCameraConfig';
 import { BRAND } from '../config/brandColors';
 
+// ── Vineyard parcel data (fetched at map load, indexed here at runtime) ──
+// Keyed by winery_recid (integer) → array of GeoJSON Feature objects
+// so a single winery can map to multiple parcels.
+let VINEYARD_BY_RECID = {}; // populated after fetch in map load effect
+
 // ── Listing categories ────────────────────────────────────────────────────
 export const LISTING_CATEGORIES = {
   hotel:      { label: 'Hotel / Inn',        color: '#C47C2B', icon: '🏨', emoji: '🏨' },
@@ -117,8 +122,12 @@ function openListingPopup(map, listing, coords, popupRef) {
 // Export LISTINGS so the directory modal can use them
 export { LISTINGS };
 
-// Ordered list of listing layers — always kept on top of AVA boundary layers
+// Ordered list of listing layers — always kept on top of AVA boundary layers.
+// Vineyard-selected layers sit just below the dot layers so dots are visible
+// on top of highlighted parcels.
 const LISTING_LAYER_ORDER = [
+  'vineyards-selected-fill',
+  'vineyards-selected-line',
   'listings-clusters',
   'listings-cluster-count',
   'listings-unclustered',
@@ -131,7 +140,7 @@ const LISTING_LAYER_ORDER = [
   'listings-selected-num',
 ];
 
-/** Re-raise all listing layers to the top of the map stack. */
+/** Re-raise all listing (+ vineyard-selected) layers to the top of the map stack. */
 function raiseListingLayers(map) {
   for (const layerId of LISTING_LAYER_ORDER) {
     if (map.getLayer(layerId)) map.moveLayer(layerId);
@@ -142,7 +151,7 @@ function raiseListingLayers(map) {
 // Shown whenever a listing is selected, a layer is active, or both.
 // When both are present a tab bar appears; when only one is present no tabs
 // are shown (the single content fills the panel directly).
-function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, onCloseListing, onCloseLayer }) {
+function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, vineyards, onCloseListing, onCloseLayer }) {
   const hasBoth = !!(listing && activeLayer);
   // Default tab: winery when a listing is selected, otherwise layer
   const [tab, setTab] = useState(listing ? 'listing' : 'layer');
@@ -270,7 +279,7 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, onClo
       {/* ── Body ─────────────────────────────────────────────────────── */}
       <div style={{ overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: 'rgba(250,247,242,0.15) transparent' }}>
         {resolvedTab === 'listing' && listing && (
-          <ListingTabContent listing={listing} cat={cat} />
+          <ListingTabContent listing={listing} cat={cat} vineyards={vineyards} />
         )}
         {resolvedTab === 'layer' && activeLayer && (
           <LayerTabContent activeLayer={activeLayer} topoStats={topoStats} selectedAva={selectedAva} />
@@ -291,7 +300,11 @@ function getLayerIcon(id)  { return LAYER_META[id]?.icon  ?? '🗺️'; }
 function getLayerLabel(id) { return LAYER_META[id]?.label ?? id; }
 
 /* ── Listing tab ──────────────────────────────────────────────────────── */
-function ListingTabContent({ listing, cat }) {
+function ListingTabContent({ listing, cat, vineyards }) {
+  const CARD = { background: 'rgba(250,247,242,0.06)', border: '1px solid rgba(250,247,242,0.08)', borderRadius: 10, padding: '12px 14px', marginBottom: 8 };
+  const LBL  = { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(250,247,242,0.4)', marginBottom: 4 };
+  const VAL  = { fontSize: 12, color: 'rgba(250,247,242,0.85)', lineHeight: 1.5 };
+
   return (
     <div>
       {/* Hero image */}
@@ -336,6 +349,32 @@ function ListingTabContent({ listing, cat }) {
           <a href={listing.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', padding: '8px 14px', background: cat.color, color: '#fff', borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', textAlign: 'center', marginTop: 4 }}>
             Visit Website ↗
           </a>
+        )}
+
+        {/* ── Vineyard parcels ─────────────────────────────────────── */}
+        {vineyards && vineyards.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(250,247,242,0.35)', marginBottom: 8 }}>
+              🍇 Estate Vineyard{vineyards.length > 1 ? 's' : ''}
+            </div>
+            {vineyards.map((f, i) => {
+              const p = f.properties;
+              const name = p.A1_VineyardName || 'Vineyard Parcel';
+              const acres = p.VA0_TotalVineAcres ? Number(p.VA0_TotalVineAcres).toFixed(1) : null;
+              const varietals = p.W1_VarietalsList || null;
+              const ava = p.C3_NestNestAVA || p.C2_NestAVA || p.C1_AVA || null;
+              return (
+                <div key={i} style={CARD}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#6DBF8A', marginBottom: 6 }}>{name}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {acres && <div><div style={LBL}>Acres</div><div style={VAL}>{acres} ac</div></div>}
+                    {varietals && <div><div style={LBL}>Varietals</div><div style={VAL}>{varietals}</div></div>}
+                    {ava && <div style={{ gridColumn: acres && varietals ? '1 / -1' : undefined }}><div style={LBL}>AVA</div><div style={VAL}>{ava}</div></div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
@@ -434,6 +473,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
   const [hoveredAva, setHoveredAva]     = useState(null);
   const [selectedListing, setSelectedListing] = useState(null);
   const [hoveredListing, setHoveredListing] = useState(null);
+  const [selectedVineyards, setSelectedVineyards] = useState([]); // GeoJSON features for selected listing's parcels
   const [activeCategories, setActiveCategories] = useState(
     () => new Set() // start with all categories off — user enables what they want
   );
@@ -501,6 +541,27 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
         properties: { color: cat.color, num: String(selectedListing.num) },
       }],
     });
+  }, [selectedListing, mapLoaded]);
+
+  // ── Sync vineyard highlight source with selectedListing state ─────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    const src = map.getSource('vineyards-selected');
+    if (!src) return;
+
+    if (!selectedListing) {
+      src.setData({ type: 'FeatureCollection', features: [] });
+      setSelectedVineyards([]);
+      return;
+    }
+
+    const features = VINEYARD_BY_RECID[selectedListing.id] ?? [];
+    setSelectedVineyards(features);
+    src.setData({ type: 'FeatureCollection', features });
+
+    // Keep selected parcel layers on top
+    raiseListingLayers(map);
   }, [selectedListing, mapLoaded]);
 
   // ── Panel hover → highlight that AVA border in sky blue ─────────────
@@ -617,6 +678,76 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           'line-opacity': 0.9,
         },
       });
+
+      // ── Load vineyard parcels ─────────────────────────────────────────
+      try {
+        const vineyardRes = await fetch('/data/vineyards.geojson');
+        const vineyardData = await vineyardRes.json();
+
+        // Build recid lookup
+        VINEYARD_BY_RECID = {};
+        for (const feature of vineyardData.features) {
+          const recid = feature.properties.winery_recid;
+          if (recid != null) {
+            if (!VINEYARD_BY_RECID[recid]) VINEYARD_BY_RECID[recid] = [];
+            VINEYARD_BY_RECID[recid].push(feature);
+          }
+        }
+
+        // Unmatched parcels only (no winery link) — always-visible subtle outlines
+        const unmatchedData = {
+          type: 'FeatureCollection',
+          features: vineyardData.features.filter(f => f.properties.winery_recid == null),
+        };
+
+        map.addSource('vineyards-unmatched', { type: 'geojson', data: unmatchedData });
+        map.addLayer({
+          id: 'vineyards-unmatched-fill',
+          type: 'fill',
+          source: 'vineyards-unmatched',
+          paint: {
+            'fill-color': '#4CAF72',
+            'fill-opacity': 0.04,
+          },
+        });
+        map.addLayer({
+          id: 'vineyards-unmatched-line',
+          type: 'line',
+          source: 'vineyards-unmatched',
+          paint: {
+            'line-color': '#6DBF8A',
+            'line-width': 0.8,
+            'line-opacity': 0.35,
+          },
+        });
+
+        // Selected parcel highlight — updated dynamically when a listing is chosen
+        map.addSource('vineyards-selected', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        map.addLayer({
+          id: 'vineyards-selected-fill',
+          type: 'fill',
+          source: 'vineyards-selected',
+          paint: {
+            'fill-color': '#6DBF8A',
+            'fill-opacity': 0.28,
+          },
+        });
+        map.addLayer({
+          id: 'vineyards-selected-line',
+          type: 'line',
+          source: 'vineyards-selected',
+          paint: {
+            'line-color': '#6DBF8A',
+            'line-width': 2,
+            'line-opacity': 0.9,
+          },
+        });
+      } catch (e) {
+        console.warn('WVWAMap: failed to load vineyards.geojson', e);
+      }
 
       // ── Load each sub-AVA — DASHED lines ──────────────────────────────
       for (const ava of WV_SUB_AVAS) {
@@ -1249,6 +1380,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           activeLayer={activeLayer}
           topoStats={topoStats}
           selectedAva={selectedAva}
+          vineyards={selectedVineyards}
           onCloseListing={() => setSelectedListingBoth(null)}
           onCloseLayer={() => handleLayerChange(null)}
         />

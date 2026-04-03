@@ -165,6 +165,19 @@ const LISTING_LAYERS_HIDDEN_IN_VINEYARD_FOCUS = [
   'listings-hovered-num',
 ];
 
+const LISTING_MARKER_LAYERS = [
+  'listings-clusters',
+  'listings-cluster-count',
+  'listings-unclustered',
+  'listings-unclustered-num',
+  'listings-hovered-glow',
+  'listings-hovered-dot',
+  'listings-hovered-num',
+  'listings-selected-glow',
+  'listings-selected-dot',
+  'listings-selected-num',
+];
+
 /** Re-raise all listing (+ vineyard-selected) layers to the top of the map stack. */
 function raiseListingLayers(map) {
   for (const layerId of LISTING_LAYER_ORDER) {
@@ -175,6 +188,15 @@ function raiseListingLayers(map) {
 function setListingVisibilityForVineyardFocus(map, isFocused) {
   const visibility = isFocused ? 'none' : 'visible';
   for (const layerId of LISTING_LAYERS_HIDDEN_IN_VINEYARD_FOCUS) {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, 'visibility', visibility);
+    }
+  }
+}
+
+function setListingVisibilityForIntro(map, isIntroComplete) {
+  const visibility = isIntroComplete ? 'visible' : 'none';
+  for (const layerId of LISTING_MARKER_LAYERS) {
     if (map.getLayer(layerId)) {
       map.setLayoutProperty(layerId, 'visibility', visibility);
     }
@@ -867,8 +889,9 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
     if (!map || !mapLoaded) return;
     // Keep markers explorable in both modes; use soft-focus instead of full hide.
     setListingVisibilityForVineyardFocus(map, false);
+    setListingVisibilityForIntro(map, introComplete);
     setListingSoftFocus(map, !!selectedListing || vineyardFocusMode);
-  }, [selectedListing, vineyardFocusMode, mapLoaded]);
+  }, [selectedListing, vineyardFocusMode, mapLoaded, introComplete]);
   const listingFilterModeRef = useRef(LISTING_FILTER_MODES.allWineries);
   const vineyardRecidSetRef = useRef(new Set());
 
@@ -1247,6 +1270,9 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
         type: 'circle',
         source: 'listings',
         filter: ['has', 'point_count'],
+        layout: {
+          visibility: 'none',
+        },
         paint: {
           'circle-color': [
             'step', ['get', 'point_count'],
@@ -1268,6 +1294,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
         source: 'listings',
         filter: ['has', 'point_count'],
         layout: {
+          visibility: 'none',
           'text-field': '{point_count_abbreviated}',
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
           'text-size': 12,
@@ -1285,6 +1312,9 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
         type: 'circle',
         source: 'listings',
         filter: ['!', ['has', 'point_count']],
+        layout: {
+          visibility: 'none',
+        },
         paint: {
           'circle-color': ['get', 'color'],
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 7, 14, 11],
@@ -1302,6 +1332,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
         filter: ['!', ['has', 'point_count']],
         minzoom: 12,
         layout: {
+          visibility: 'none',
           'text-field': ['to-string', ['get', 'num']],
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
           'text-size': 9,

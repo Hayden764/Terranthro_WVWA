@@ -1662,23 +1662,20 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
 
-      {/* AVA hover label */}
-      {introComplete && hoveredAva && !selectedAva && (() => {
-        const ava = WV_SUB_AVAS.find(a => a.slug === hoveredAva);
-        return ava ? (
-          <div style={{
-            position: 'absolute', bottom: 40, left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(72,55,41,0.82)', backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            border: `1.5px solid #C9A84C`, borderRadius: 8,
-            padding: '5px 14px', fontSize: 13, fontWeight: 600, color: BRAND.eggshell,
-            pointerEvents: 'none', zIndex: 5, fontFamily: 'Inter, sans-serif',
-            boxShadow: '0 4px 20px rgba(46,34,26,0.25)',
-          }}>
-            {ava.name}
-          </div>
-        ) : null;
-      })()}
+      {/* Winery marker hover label */}
+      {introComplete && hoveredListing && (
+        <div style={{
+          position: 'absolute', bottom: 40, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(72,55,41,0.82)', backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: `1.5px solid #87CEEB`, borderRadius: 8,
+          padding: '5px 14px', fontSize: 13, fontWeight: 600, color: BRAND.eggshell,
+          pointerEvents: 'none', zIndex: 5, fontFamily: 'Inter, sans-serif',
+          boxShadow: '0 4px 20px rgba(46,34,26,0.25)',
+        }}>
+          {hoveredListing.title}
+        </div>
+      )}
 
       {/* Willamette logo — top-left map overlay */}
       {introComplete && (

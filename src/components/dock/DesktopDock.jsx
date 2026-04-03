@@ -148,8 +148,8 @@ export default function DesktopDock({
   onHoverListing,
   insideIds,
 }) {
-  // All four panels are mutually exclusive — only one open at a time
-  const [activePanel, setActivePanel] = useState('info'); // 'view' | 'layers' | 'scale' | 'info' | null
+  // Panels are mutually exclusive — only one open at a time.
+  const [activePanel, setActivePanel] = useState('wineries'); // 'view' | 'layers' | 'scale' | 'info' | 'wineries' | null
 
   const togglePanel = useCallback((id) => {
     setActivePanel(prev => prev === id ? null : id);

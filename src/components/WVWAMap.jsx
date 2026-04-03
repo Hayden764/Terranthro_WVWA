@@ -308,17 +308,19 @@ function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onViewAll
   const VAL  = { fontSize: 12, color: 'rgba(250,247,242,0.85)', lineHeight: 1.5 };
 
   const [hoveredIdx, setHoveredIdx] = useState(null);
+  const [expandedGroupKey, setExpandedGroupKey] = useState(null);
 
   // Phase 1 grouping: one modal card per vineyard name, combining all polygons
   // with that name for the selected winery.
   const vineyardGroups = Object.values((vineyards || []).reduce((acc, feature, index) => {
     const p = feature.properties || {};
     const rawName = (p.Vineyard_Name || p.A1_VineyardName || '').trim();
-    const key = rawName ? rawName.toLowerCase() : `__parcel_${index}`;
+    const key = rawName ? `name:${rawName.toLowerCase()}` : `block:${index}`;
 
     if (!acc[key]) {
       acc[key] = {
-        name: rawName || `Vineyard Parcel ${index + 1}`,
+        key,
+        name: rawName || `Vineyard Block Group ${index + 1}`,
         features: [],
         acresTotal: 0,
         acresCount: 0,
@@ -432,15 +434,31 @@ function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onViewAll
               )}
             </div>
             {vineyardGroups.map((group, i) => {
-              const parcelCount = group.features.length;
+              const blockRows = [];
+              const seenBlocks = new Set();
+              for (const f of group.features) {
+                const blocks = Array.isArray(f.properties?.blocks) ? f.properties.blocks : [];
+                for (const b of blocks) {
+                  const blockName = (b.Block || '').trim();
+                  const variety = (b.Variety || '').trim();
+                  const planted = (b['Year Planted'] || '').trim();
+                  const rowKey = `${blockName}|${variety}|${planted}`;
+                  if (!blockName || seenBlocks.has(rowKey)) continue;
+                  seenBlocks.add(rowKey);
+                  blockRows.push(b);
+                }
+              }
+
+              const blockCount = blockRows.length > 0 ? blockRows.length : group.features.length;
               const acres = group.acresCount > 0 ? group.acresTotal.toFixed(1) : null;
               const ava = group.avas.size === 1
                 ? Array.from(group.avas)[0]
                 : (group.avas.size > 1 ? `Multiple AVAs (${group.avas.size})` : null);
               const isHovered = hoveredIdx === i;
+              const isExpanded = expandedGroupKey === group.key;
               return (
                 <div
-                  key={i}
+                  key={group.key}
                   style={{
                     ...CARD,
                     cursor: 'pointer',
@@ -476,9 +494,96 @@ function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onViewAll
                     }} title="Zoom to vineyard">⌖</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <div><div style={LBL}>Parcels</div><div style={VAL}>{parcelCount}</div></div>
+                    <div><div style={LBL}>Blocks</div><div style={VAL}>{blockCount}</div></div>
                     {acres && <div><div style={LBL}>Acres</div><div style={VAL}>{acres} ac</div></div>}
                     {ava && <div><div style={LBL}>AVA</div><div style={VAL}>{ava}</div></div>}
+                  </div>
+
+                  <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(250,247,242,0.08)' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedGroupKey(isExpanded ? null : group.key);
+                      }}
+                      style={{
+                        width: '100%',
+                        background: 'rgba(250,247,242,0.04)',
+                        border: '1px solid rgba(250,247,242,0.12)',
+                        borderRadius: 6,
+                        color: 'rgba(250,247,242,0.82)',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        fontFamily: 'Inter, sans-serif',
+                        padding: '6px 8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span>{isExpanded ? 'Hide Blocks' : `Show Blocks (${blockCount})`}</span>
+                      <span style={{ opacity: 0.7 }}>{isExpanded ? '▴' : '▾'}</span>
+                    </button>
+
+                    {isExpanded && (
+                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {blockRows.length > 0 ? (
+                          blockRows.map((b, bi) => (
+                            <div
+                              key={`${b.Block || 'block'}-${bi}`}
+                              style={{
+                                border: '1px solid rgba(250,247,242,0.1)',
+                                borderRadius: 6,
+                                padding: '7px 8px',
+                                background: 'rgba(250,247,242,0.03)',
+                              }}
+                            >
+                              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(250,247,242,0.9)' }}>{b.Block || `Block ${bi + 1}`}</div>
+                              <div style={{ fontSize: 10, color: 'rgba(250,247,242,0.6)', marginTop: 2 }}>
+                                {[b.Variety, b.Clone ? `Clone ${b.Clone}` : null, b.Acres ? `${b.Acres} ac` : null].filter(Boolean).join(' • ') || 'Block details available'}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          group.features.map((feature, fi) => {
+                            const p = feature.properties || {};
+                            const fAcresRaw = p.Acres ?? p.VA0_TotalVineAcres;
+                            const fAcres = Number.isFinite(Number(fAcresRaw)) ? `${Number(fAcresRaw).toFixed(1)} ac` : null;
+                            return (
+                              <button
+                                key={`feature-${fi}`}
+                                onMouseEnter={(e) => {
+                                  e.stopPropagation();
+                                  onVineyardHover?.(feature);
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.stopPropagation();
+                                  onVineyardHover?.(group.features);
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onViewAllVineyards?.([feature]);
+                                }}
+                                style={{
+                                  textAlign: 'left',
+                                  border: '1px solid rgba(250,247,242,0.1)',
+                                  borderRadius: 6,
+                                  padding: '7px 8px',
+                                  background: 'rgba(250,247,242,0.03)',
+                                  color: 'rgba(250,247,242,0.84)',
+                                  fontSize: 11,
+                                  cursor: 'pointer',
+                                }}
+                                title="Zoom to this block footprint"
+                              >
+                                <div style={{ fontWeight: 700 }}>Block {fi + 1}</div>
+                                <div style={{ marginTop: 2, fontSize: 10, color: 'rgba(250,247,242,0.6)' }}>{fAcres || 'No acreage'} • Click to zoom</div>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );

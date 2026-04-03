@@ -85,6 +85,43 @@ function buildListingsGeoJSON(activeCategories, insideIds = null) {
   return { type: 'FeatureCollection', features };
 }
 
+// Accept either direct parcel features or winery-point features with nested
+// vineyard_polygons arrays, and normalize into parcel features.
+function normalizeVineyardFeatures(rawGeoJSON) {
+  const features = rawGeoJSON?.features || [];
+  if (!features.length) return [];
+
+  // Already in parcel format
+  const looksLikeParcel = features.some((f) => {
+    const t = f?.geometry?.type;
+    return t === 'Polygon' || t === 'MultiPolygon';
+  });
+  if (looksLikeParcel) return features;
+
+  // Adelsheim format: winery points with nested vineyard_polygons features
+  const flattened = [];
+  for (const wineryFeature of features) {
+    const wp = wineryFeature?.properties || {};
+    const recid = wp.recid ?? null;
+    const title = wp.title ?? null;
+    const nested = Array.isArray(wp.vineyard_polygons) ? wp.vineyard_polygons : [];
+
+    for (const parcelFeature of nested) {
+      if (!parcelFeature?.geometry) continue;
+      flattened.push({
+        type: 'Feature',
+        geometry: parcelFeature.geometry,
+        properties: {
+          ...(parcelFeature.properties || {}),
+          winery_recid: recid,
+          winery_title: title,
+        },
+      });
+    }
+  }
+  return flattened;
+}
+
 // Shared popup builder — used by map click and directory modal
 function openListingPopup(map, listing, coords, popupRef) {
   if (popupRef.current) popupRef.current.remove();
@@ -934,8 +971,10 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
 
       // ── Load vineyard parcels ─────────────────────────────────────────
       try {
-        const vineyardRes = await fetch('/data/vineyards.geojson');
-        const vineyardData = await vineyardRes.json();
+        const vineyardRes = await fetch('/data/Wineries_with_Polygons_Adelsheim.geojson');
+        const vineyardRaw = await vineyardRes.json();
+        const vineyardFeatures = normalizeVineyardFeatures(vineyardRaw);
+        const vineyardData = { type: 'FeatureCollection', features: vineyardFeatures };
 
         // Build recid lookup
         VINEYARD_BY_RECID = {};
@@ -1024,7 +1063,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           },
         });
       } catch (e) {
-        console.warn('WVWAMap: failed to load vineyards.geojson', e);
+        console.warn('WVWAMap: failed to load Adelsheim vineyard polygons', e);
       }
 
       // ── Load each sub-AVA — DASHED lines ──────────────────────────────

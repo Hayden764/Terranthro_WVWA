@@ -153,7 +153,7 @@ function raiseListingLayers(map) {
 // Shown whenever a listing is selected, a layer is active, or both.
 // When both are present a tab bar appears; when only one is present no tabs
 // are shown (the single content fills the panel directly).
-function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, vineyards, onCloseListing, onCloseLayer, onVineyardHover, onVineyardClick, onViewAllVineyards }) {
+function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, vineyards, onCloseListing, onCloseLayer, onVineyardHover, onViewAllVineyards }) {
   const hasBoth = !!(listing && activeLayer);
   // Default tab: winery when a listing is selected, otherwise layer
   const [tab, setTab] = useState(listing ? 'listing' : 'layer');
@@ -281,7 +281,7 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
       {/* ── Body ─────────────────────────────────────────────────────── */}
       <div style={{ overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: 'rgba(250,247,242,0.15) transparent' }}>
         {resolvedTab === 'listing' && listing && (
-          <ListingTabContent listing={listing} cat={cat} vineyards={vineyards} onVineyardHover={onVineyardHover} onVineyardClick={onVineyardClick} onViewAllVineyards={onViewAllVineyards} />
+          <ListingTabContent listing={listing} cat={cat} vineyards={vineyards} onVineyardHover={onVineyardHover} onViewAllVineyards={onViewAllVineyards} />
         )}
         {resolvedTab === 'layer' && activeLayer && (
           <LayerTabContent activeLayer={activeLayer} topoStats={topoStats} selectedAva={selectedAva} />
@@ -302,12 +302,45 @@ function getLayerIcon(id)  { return LAYER_META[id]?.icon  ?? '🗺️'; }
 function getLayerLabel(id) { return LAYER_META[id]?.label ?? id; }
 
 /* ── Listing tab ──────────────────────────────────────────────────────── */
-function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onVineyardClick, onViewAllVineyards }) {
+function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onViewAllVineyards }) {
   const CARD = { background: 'rgba(250,247,242,0.06)', border: '1px solid rgba(250,247,242,0.08)', borderRadius: 10, padding: '12px 14px', marginBottom: 8 };
   const LBL  = { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(250,247,242,0.4)', marginBottom: 4 };
   const VAL  = { fontSize: 12, color: 'rgba(250,247,242,0.85)', lineHeight: 1.5 };
 
   const [hoveredIdx, setHoveredIdx] = useState(null);
+
+  // Phase 1 grouping: one modal card per vineyard name, combining all polygons
+  // with that name for the selected winery.
+  const vineyardGroups = Object.values((vineyards || []).reduce((acc, feature, index) => {
+    const p = feature.properties || {};
+    const rawName = (p.Vineyard_Name || p.A1_VineyardName || '').trim();
+    const key = rawName ? rawName.toLowerCase() : `__parcel_${index}`;
+
+    if (!acc[key]) {
+      acc[key] = {
+        name: rawName || `Vineyard Parcel ${index + 1}`,
+        features: [],
+        acresTotal: 0,
+        acresCount: 0,
+        avas: new Set(),
+      };
+    }
+
+    const g = acc[key];
+    g.features.push(feature);
+
+    const acresRaw = p.Acres ?? p.VA0_TotalVineAcres;
+    const acresVal = Number(acresRaw);
+    if (Number.isFinite(acresVal) && acresVal > 0) {
+      g.acresTotal += acresVal;
+      g.acresCount += 1;
+    }
+
+    const ava = p.Nested_Nested_AVA || p.Nested_AVA || p.C3_NestNestAVA || p.C2_NestAVA || p.C1_AVA || null;
+    if (ava) g.avas.add(ava);
+
+    return acc;
+  }, {})).sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div>
@@ -398,11 +431,12 @@ function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onVineyar
                 </button>
               )}
             </div>
-            {vineyards.map((f, i) => {
-              const p = f.properties;
-              const name = p.Vineyard_Name || p.A1_VineyardName || 'Vineyard Parcel';
-              const acres = (p.Acres || p.VA0_TotalVineAcres) ? Number(p.Acres ?? p.VA0_TotalVineAcres).toFixed(1) : null;
-              const ava = p.Nested_Nested_AVA || p.Nested_AVA || p.C3_NestNestAVA || p.C2_NestAVA || p.C1_AVA || null;
+            {vineyardGroups.map((group, i) => {
+              const parcelCount = group.features.length;
+              const acres = group.acresCount > 0 ? group.acresTotal.toFixed(1) : null;
+              const ava = group.avas.size === 1
+                ? Array.from(group.avas)[0]
+                : (group.avas.size > 1 ? `Multiple AVAs (${group.avas.size})` : null);
               const isHovered = hoveredIdx === i;
               return (
                 <div
@@ -421,17 +455,17 @@ function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onVineyar
                   }}
                   onMouseEnter={() => {
                     setHoveredIdx(i);
-                    onVineyardHover?.(f);
+                    onVineyardHover?.(group.features);
                   }}
                   onMouseLeave={() => {
                     setHoveredIdx(null);
                     onVineyardHover?.(null);
                   }}
-                  onClick={() => onVineyardClick?.(f)}
-                  title="Click to zoom to this parcel"
+                  onClick={() => onViewAllVineyards?.(group.features)}
+                  title="Click to zoom to this vineyard"
                 >
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: isHovered ? '#38BDF8' : '#6DBF8A', transition: 'color 0.15s', flex: 1, paddingRight: 8 }}>{name}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: isHovered ? '#38BDF8' : '#6DBF8A', transition: 'color 0.15s', flex: 1, paddingRight: 8 }}>{group.name}</div>
                     <span style={{
                       fontSize: 10,
                       color: isHovered ? 'rgba(56,189,248,0.9)' : 'rgba(109,191,138,0.5)',
@@ -439,9 +473,10 @@ function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onVineyar
                       transform: isHovered ? 'scale(1.15)' : 'scale(1)',
                       flexShrink: 0,
                       lineHeight: 1.6,
-                    }} title="Zoom to parcel">⌖</span>
+                    }} title="Zoom to vineyard">⌖</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div><div style={LBL}>Parcels</div><div style={VAL}>{parcelCount}</div></div>
                     {acres && <div><div style={LBL}>Acres</div><div style={VAL}>{acres} ac</div></div>}
                     {ava && <div><div style={LBL}>AVA</div><div style={VAL}>{ava}</div></div>}
                   </div>
@@ -566,39 +601,19 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
   // Store the setter in a ref so the map's [] effect closure can call it
   useEffect(() => { setSelectedListingRef.current = setSelectedListingBoth; }, [setSelectedListingBoth]);
 
-  // ── Vineyard card hover → highlight that single parcel on the map ─────
-  const onVineyardHover = useCallback((feature) => {
+  // ── Vineyard card hover → highlight one or more parcels on the map ─────
+  const onVineyardHover = useCallback((featureOrFeatures) => {
     const map = mapRef.current;
     if (!map) return;
     const src = map.getSource('vineyards-hovered');
     if (!src) return;
+    const features = Array.isArray(featureOrFeatures)
+      ? featureOrFeatures
+      : (featureOrFeatures ? [featureOrFeatures] : []);
     src.setData({
       type: 'FeatureCollection',
-      features: feature ? [feature] : [],
+      features,
     });
-  }, []);
-
-  // ── Vineyard card click → zoom/fit map to that parcel's bbox ─────────
-  const onVineyardClick = useCallback((feature) => {
-    const map = mapRef.current;
-    if (!map || !feature) return;
-    // Compute axis-aligned bbox of the polygon coordinates
-    let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
-    const rings = feature.geometry.type === 'Polygon'
-      ? feature.geometry.coordinates
-      : feature.geometry.coordinates.flat(); // MultiPolygon → flatten one level
-    for (const ring of rings) {
-      for (const [lng, lat] of ring) {
-        if (lng < minLng) minLng = lng;
-        if (lat < minLat) minLat = lat;
-        if (lng > maxLng) maxLng = lng;
-        if (lat > maxLat) maxLat = lat;
-      }
-    }
-    map.fitBounds(
-      [[minLng, minLat], [maxLng, maxLat]],
-      { padding: { top: 80, bottom: 80, left: 320, right: 80 }, duration: 800, maxZoom: 16 }
-    );
   }, []);
 
   // ── "View All Vineyards" → fit map to combined bbox of every parcel ──
@@ -1542,7 +1557,6 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, regis
           onCloseListing={() => setSelectedListingBoth(null)}
           onCloseLayer={() => handleLayerChange(null)}
           onVineyardHover={onVineyardHover}
-          onVineyardClick={onVineyardClick}
           onViewAllVineyards={onViewAllVineyards}
         />
       )}

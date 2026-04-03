@@ -1,22 +1,26 @@
 import { GLASS } from './glassTokens';
-import { LISTING_CATEGORIES, LISTINGS } from '../WVWAMap';
+import { LISTING_CATEGORIES, LISTINGS, LISTING_FILTER_MODES } from '../WVWAMap';
 
 /**
  * WineriesPanel — "Wineries" dock panel.
- * Category filter chips + scrollable listing directory.
+ * Winery filter controls + scrollable listing directory.
  */
 
-export default function WineriesPanel({ activeCategories, onToggleCategory, onListingClick, onHoverListing, selectedAva, insideIds }) {
-  // Filter listings by active categories + AVA allowlist (insideIds = null means all)
+export default function WineriesPanel({ listingFilterMode, onListingFilterModeChange, activeFilterLabel, vineyardRecidSet, onListingClick, onHoverListing, selectedAva, insideIds }) {
+  // Filter listings to winery records + selected mode + AVA allowlist (insideIds = null means all)
   const visible = LISTINGS.filter(l =>
-    activeCategories.has(l.category) &&
+    l.category === 'winery' &&
+    (listingFilterMode !== LISTING_FILTER_MODES.withVineyardPolygons || vineyardRecidSet.has(l.id)) &&
     (insideIds === null || insideIds === undefined || insideIds.includes(l.id))
   );
+
+  const hasPolygonMode = listingFilterMode === LISTING_FILTER_MODES.withVineyardPolygons;
+  const wineryCategory = LISTING_CATEGORIES.winery;
 
   return (
     <div style={{ padding: '12px 12px 16px', fontFamily: 'Inter, sans-serif' }}>
 
-      {/* ── Category filter chips ─────────────────────────────────── */}
+      {/* ── Listing mode buttons ─────────────────────────────────── */}
       <div style={{
         fontSize: 10,
         fontWeight: 700,
@@ -25,47 +29,83 @@ export default function WineriesPanel({ activeCategories, onToggleCategory, onLi
         color: GLASS.textDim,
         marginBottom: 8,
       }}>
-        Filter by Type
+        Winery Listing Mode
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-        {Object.entries(LISTING_CATEGORIES).map(([key, cat]) => {
-          const isOn = activeCategories.has(key);
-          return (
-            <button
-              key={key}
-              onClick={() => onToggleCategory(key)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-                padding: '4px 10px',
-                borderRadius: 20,
-                border: `1px solid ${isOn ? cat.color + '99' : 'rgba(250,247,242,0.12)'}`,
-                background: isOn ? cat.color + '28' : 'rgba(250,247,242,0.04)',
-                cursor: 'pointer',
-                outline: 'none',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <div style={{
-                width: 7,
-                height: 7,
-                borderRadius: '50%',
-                background: isOn ? cat.color : 'rgba(250,247,242,0.25)',
-                flexShrink: 0,
-              }} />
-              <span style={{
-                fontSize: 10,
-                fontWeight: 600,
-                color: isOn ? 'rgba(250,247,242,0.9)' : 'rgba(250,247,242,0.35)',
-                whiteSpace: 'nowrap',
-                letterSpacing: '0.01em',
-              }}>
-                {cat.label}
-              </span>
-            </button>
-          );
-        })}
+        <button
+          onClick={() => onListingFilterModeChange?.(LISTING_FILTER_MODES.allWineries)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            padding: '4px 10px',
+            borderRadius: 20,
+            border: `1px solid ${!hasPolygonMode ? wineryCategory.color + '99' : 'rgba(250,247,242,0.12)'}`,
+            background: !hasPolygonMode ? wineryCategory.color + '28' : 'rgba(250,247,242,0.04)',
+            cursor: 'pointer',
+            outline: 'none',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <div style={{
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            background: !hasPolygonMode ? wineryCategory.color : 'rgba(250,247,242,0.25)',
+            flexShrink: 0,
+          }} />
+          <span style={{
+            fontSize: 10,
+            fontWeight: 600,
+            color: !hasPolygonMode ? 'rgba(250,247,242,0.9)' : 'rgba(250,247,242,0.35)',
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.01em',
+          }}>
+            All Wineries &amp; Vineyards
+          </span>
+        </button>
+
+        <button
+          onClick={() => onListingFilterModeChange?.(LISTING_FILTER_MODES.withVineyardPolygons)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            padding: '4px 10px',
+            borderRadius: 20,
+            border: `1px solid ${hasPolygonMode ? wineryCategory.color + '99' : 'rgba(250,247,242,0.12)'}`,
+            background: hasPolygonMode ? wineryCategory.color + '28' : 'rgba(250,247,242,0.04)',
+            cursor: 'pointer',
+            outline: 'none',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <div style={{
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            background: hasPolygonMode ? wineryCategory.color : 'rgba(250,247,242,0.25)',
+            flexShrink: 0,
+          }} />
+          <span style={{
+            fontSize: 10,
+            fontWeight: 600,
+            color: hasPolygonMode ? 'rgba(250,247,242,0.9)' : 'rgba(250,247,242,0.35)',
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.01em',
+          }}>
+            Wineries with Vineyard Polygons
+          </span>
+        </button>
+      </div>
+
+      <div style={{
+        fontSize: 10,
+        color: 'rgba(250,247,242,0.45)',
+        marginTop: -6,
+        marginBottom: 10,
+      }}>
+        Showing: {activeFilterLabel}
       </div>
 
       {/* ── Listing count ─────────────────────────────────────────── */}
@@ -89,7 +129,7 @@ export default function WineriesPanel({ activeCategories, onToggleCategory, onLi
           color: 'rgba(250,247,242,0.3)',
           fontSize: 12,
         }}>
-          No categories selected
+          No winery listings match this mode
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

@@ -1,28 +1,12 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState } from 'react';
 import WVWAMap from '../components/WVWAMap';
 import AVAListModal from '../components/AVAListModal';
-import ListingsModal from '../components/ListingsModal';
 import { BRAND } from '../config/brandColors';
 
 export default function WVWAMapPage() {
   const [selectedAva, setSelectedAva]           = useState(null);
   const [panelHoveredAva, setPanelHoveredAva]   = useState(null);
   const [modalOpen, setModalOpen]               = useState(false);
-  const [listingsOpen, setListingsOpen]         = useState(false);
-  const markerRefsMap = useRef({});  // id → { el, openPopup, listing, map }
-
-  const registerMarkerRef = useCallback((id, ref) => {
-    markerRefsMap.current[id] = ref;
-  }, []);
-
-  const handleSelectListing = useCallback((listing) => {
-    setListingsOpen(false);
-    const ref = markerRefsMap.current[listing.id];
-    if (!ref) return;
-    const { map, openPopup } = ref;
-    map.flyTo({ center: [listing.lng, listing.lat], zoom: Math.max(map.getZoom(), 13), duration: 900 });
-    setTimeout(openPopup, 950);
-  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', background: BRAND.eggshell }}>
@@ -63,30 +47,6 @@ export default function WVWAMapPage() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          {/* Directory button */}
-          <button
-            onClick={() => setListingsOpen(true)}
-            style={{
-              background: 'rgba(72,55,41,0.07)',
-              color: BRAND.brownDark,
-              border: '1px solid rgba(72,55,41,0.18)',
-              borderRadius: 8,
-              padding: '6px 14px',
-              fontSize: 12,
-              fontWeight: 600,
-              fontFamily: 'Inter, sans-serif',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              letterSpacing: '0.02em',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(72,55,41,0.13)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(72,55,41,0.07)'}
-          >
-            📋 Directory
-          </button>
           <button
             onClick={() => {
               if (selectedAva) {
@@ -122,7 +82,6 @@ export default function WVWAMapPage() {
           onSelectAva={setSelectedAva}
           panelHoveredAva={panelHoveredAva}
           onPanelHoverAva={setPanelHoveredAva}
-          registerMarkerRef={registerMarkerRef}
         />
       </div>
 
@@ -136,12 +95,6 @@ export default function WVWAMapPage() {
         }}
       />
 
-      {/* Listings Directory Modal */}
-      <ListingsModal
-        isOpen={listingsOpen}
-        onClose={() => setListingsOpen(false)}
-        onSelectListing={handleSelectListing}
-      />
     </div>
   );
 }

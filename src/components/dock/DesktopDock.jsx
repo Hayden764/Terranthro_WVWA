@@ -140,8 +140,10 @@ export default function DesktopDock({
   onMonthChange,
   onHoverAva,
   topoStats,
-  activeCategories,
-  onToggleCategory,
+  listingFilterMode,
+  onListingFilterModeChange,
+  activeFilterLabel,
+  vineyardRecidSet,
   onListingClick,
   onHoverListing,
   insideIds,
@@ -235,8 +237,10 @@ export default function DesktopDock({
       {activePanel === 'wineries' && (
         <PanelShell title="Wineries" onClose={closePanel}>
           <WineriesPanel
-            activeCategories={activeCategories}
-            onToggleCategory={onToggleCategory}
+            listingFilterMode={listingFilterMode}
+            onListingFilterModeChange={onListingFilterModeChange}
+            activeFilterLabel={activeFilterLabel}
+            vineyardRecidSet={vineyardRecidSet}
             onListingClick={onListingClick}
             onHoverListing={onHoverListing}
             selectedAva={selectedAva}

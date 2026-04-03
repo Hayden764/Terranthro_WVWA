@@ -471,20 +471,31 @@ function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onViewAll
               )}
             </div>
             {vineyardGroups.map((group, i) => {
-              const blockRows = [];
-              const seenBlocks = new Set();
+              const blockMap = new Map();
               for (const f of group.features) {
                 const blocks = Array.isArray(f.properties?.blocks) ? f.properties.blocks : [];
                 for (const b of blocks) {
                   const blockName = (b.Block || '').trim();
-                  const variety = (b.Variety || '').trim();
-                  const planted = (b['Year Planted'] || '').trim();
-                  const rowKey = `${blockName}|${variety}|${planted}`;
-                  if (!blockName || seenBlocks.has(rowKey)) continue;
-                  seenBlocks.add(rowKey);
-                  blockRows.push(b);
+                  if (!blockName) continue;
+
+                  if (!blockMap.has(blockName)) {
+                    blockMap.set(blockName, {
+                      name: blockName,
+                      varieties: new Set(),
+                      clones: new Set(),
+                      acres: [],
+                    });
+                  }
+
+                  const row = blockMap.get(blockName);
+                  if (b.Variety) row.varieties.add(String(b.Variety).trim());
+                  if (b.Clone) row.clones.add(String(b.Clone).trim());
+                  const acresNum = Number(b.Acres);
+                  if (Number.isFinite(acresNum) && acresNum > 0) row.acres.push(acresNum);
                 }
               }
+
+              const blockRows = Array.from(blockMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
               const blockCount = blockRows.length > 0 ? blockRows.length : group.features.length;
               const acres = group.acresCount > 0 ? group.acresTotal.toFixed(1) : null;
@@ -567,7 +578,7 @@ function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onViewAll
                         {blockRows.length > 0 ? (
                           blockRows.map((b, bi) => (
                             <div
-                              key={`${b.Block || 'block'}-${bi}`}
+                              key={`${b.name || 'block'}-${bi}`}
                               style={{
                                 border: '1px solid rgba(250,247,242,0.1)',
                                 borderRadius: 6,
@@ -575,9 +586,13 @@ function ListingTabContent({ listing, cat, vineyards, onVineyardHover, onViewAll
                                 background: 'rgba(250,247,242,0.03)',
                               }}
                             >
-                              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(250,247,242,0.9)' }}>{b.Block || `Block ${bi + 1}`}</div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(250,247,242,0.9)' }}>{b.name || `Block ${bi + 1}`}</div>
                               <div style={{ fontSize: 10, color: 'rgba(250,247,242,0.6)', marginTop: 2 }}>
-                                {[b.Variety, b.Clone ? `Clone ${b.Clone}` : null, b.Acres ? `${b.Acres} ac` : null].filter(Boolean).join(' • ') || 'Block details available'}
+                                {[
+                                  b.varieties.size > 0 ? Array.from(b.varieties).slice(0, 2).join(', ') : null,
+                                  b.clones.size > 0 ? `Clones: ${Array.from(b.clones).slice(0, 2).join(', ')}` : null,
+                                  b.acres.length > 0 ? `${Math.max(...b.acres).toFixed(2)} ac` : null,
+                                ].filter(Boolean).join(' • ') || 'Block details available'}
                               </div>
                             </div>
                           ))

@@ -256,6 +256,8 @@ export default function DesktopDock({
             onLayerChange={onLayerChange}
             currentMonth={currentMonth}
             onMonthChange={onMonthChange}
+            listingFilterMode={listingFilterMode}
+            onListingFilterModeChange={onListingFilterModeChange}
           />
         </PanelShell>
       )}

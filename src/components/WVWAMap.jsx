@@ -27,6 +27,8 @@ export const LISTING_FILTER_MODES = {
   allWineries: 'allWineries',
   withVineyardPolygons: 'withVineyardPolygons',
   withoutVineyardPolygons: 'withoutVineyardPolygons',
+  noVineyardsVisualized: 'noVineyardsVisualized',
+  noWineriesVisualized: 'noWineriesVisualized',
 };
 
 function classifyListing(item) {
@@ -216,6 +218,15 @@ function setListingVisibilityForIntro(map, isIntroComplete) {
   }
 }
 
+function setListingVisualizationVisibility(map, isVisible) {
+  const visibility = isVisible ? 'visible' : 'none';
+  for (const layerId of LISTING_MARKER_LAYERS) {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, 'visibility', visibility);
+    }
+  }
+}
+
 function setListingSoftFocus(map, isSoftFocused) {
   const clusterOpacity = isSoftFocused ? 0.3 : 1;
   const clusterCountOpacity = isSoftFocused ? 0.35 : 1;
@@ -259,6 +270,55 @@ function setListingSoftFocus(map, isSoftFocused) {
   }
   if (map.getLayer('listings-hovered-num')) {
     map.setPaintProperty('listings-hovered-num', 'text-opacity', hoveredNumOpacity);
+  }
+}
+
+function setVineyardReferenceSoftFocus(map, isSoftFocused) {
+  const referenceFillOpacity = isSoftFocused ? 0.002 : 0.01;
+  const referenceLineOpacity = isSoftFocused ? 0.08 : 0.95;
+  const linkedLineOpacity = isSoftFocused ? 0.12 : 0.95;
+  const hoverLineOpacity = isSoftFocused ? 0.35 : 0.95;
+  const referenceLineWidth = isSoftFocused ? 1.2 : 3.2;
+  const linkedLineWidth = isSoftFocused ? 1.4 : 3.0;
+  const hoverLineWidth = isSoftFocused ? 2.4 : 4.2;
+  const referenceLineColor = isSoftFocused ? '#D6D3D1' : '#FFFFFF';
+  const linkedLineColor = isSoftFocused ? '#7FA08A' : '#22C55E';
+
+  if (map.getLayer('vineyards-reference-fill')) {
+    map.setPaintProperty('vineyards-reference-fill', 'fill-opacity', referenceFillOpacity);
+  }
+  if (map.getLayer('vineyards-reference-line')) {
+    map.setPaintProperty('vineyards-reference-line', 'line-color', referenceLineColor);
+    map.setPaintProperty('vineyards-reference-line', 'line-width', referenceLineWidth);
+    map.setPaintProperty('vineyards-reference-line', 'line-opacity', referenceLineOpacity);
+  }
+  if (map.getLayer('vineyards-linked-line')) {
+    map.setPaintProperty('vineyards-linked-line', 'line-color', linkedLineColor);
+    map.setPaintProperty('vineyards-linked-line', 'line-width', linkedLineWidth);
+    map.setPaintProperty('vineyards-linked-line', 'line-opacity', linkedLineOpacity);
+  }
+  if (map.getLayer('vineyards-reference-hover-line')) {
+    map.setPaintProperty('vineyards-reference-hover-line', 'line-width', hoverLineWidth);
+    map.setPaintProperty('vineyards-reference-hover-line', 'line-opacity', hoverLineOpacity);
+  }
+}
+
+function setVineyardVisualizationVisibility(map, isVisible) {
+  const visibility = isVisible ? 'visible' : 'none';
+  const vineyardLayerIds = [
+    'vineyards-reference-fill',
+    'vineyards-reference-line',
+    'vineyards-linked-line',
+    'vineyards-reference-hover-line',
+    'vineyards-selected-fill',
+    'vineyards-selected-line',
+    'vineyards-hovered-fill',
+    'vineyards-hovered-line',
+  ];
+  for (const layerId of vineyardLayerIds) {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, 'visibility', visibility);
+    }
   }
 }
 
@@ -904,8 +964,14 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
     // Keep markers explorable in both modes; use soft-focus instead of full hide.
     setListingVisibilityForVineyardFocus(map, false);
     setListingVisibilityForIntro(map, introComplete);
+    setListingVisualizationVisibility(
+      map,
+      introComplete && listingFilterMode !== LISTING_FILTER_MODES.noWineriesVisualized,
+    );
     setListingSoftFocus(map, !!selectedListing || vineyardFocusMode);
-  }, [selectedListing, vineyardFocusMode, mapLoaded, introComplete]);
+    setVineyardVisualizationVisibility(map, listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized);
+    setVineyardReferenceSoftFocus(map, !!selectedListing);
+  }, [selectedListing, vineyardFocusMode, mapLoaded, introComplete, listingFilterMode]);
   const listingFilterModeRef = useRef(LISTING_FILTER_MODES.allWineries);
   const vineyardRecidSetRef = useRef(new Set());
 
@@ -924,6 +990,12 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
     }
     if (listingFilterMode === LISTING_FILTER_MODES.withoutVineyardPolygons) {
       return 'Wineries without Vineyard Polygons';
+    }
+    if (listingFilterMode === LISTING_FILTER_MODES.noVineyardsVisualized) {
+      return 'No Vineyards Visualized';
+    }
+    if (listingFilterMode === LISTING_FILTER_MODES.noWineriesVisualized) {
+      return 'No Wineries Visualized';
     }
     return 'All Wineries & Vineyards';
   }, [listingFilterMode]);
@@ -1108,7 +1180,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
 
       // ── Load vineyard parcels ─────────────────────────────────────────
       try {
-        const vineyardRes = await fetch('/data/Wineries_with_Polygons_Adelsheim.geojson');
+        const vineyardRes = await fetch('/data/Wineries_with_Polygons_Adelsheim.geojson', { cache: 'no-store' });
         const vineyardRaw = await vineyardRes.json();
         const vineyardFeatures = normalizeVineyardFeatures(vineyardRaw);
         const vineyardData = { type: 'FeatureCollection', features: vineyardFeatures };
@@ -1240,11 +1312,21 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
         });
         map.on('mousemove', 'vineyards-reference-fill', (e) => {
           if (!e.features?.length) return;
-          const org = e.features[0]?.properties?.__org_name || 'Unknown Organization';
-          const groupedFeatures = referenceVineyardsData.features.filter((f) => {
-            const name = f?.properties?.__org_name || 'Unknown Organization';
-            return name === org;
-          });
+          const hoveredFeature = e.features[0];
+          const hoveredProps = hoveredFeature?.properties || {};
+          const wineryRecid = hoveredProps.winery_recid != null
+            ? Number(hoveredProps.winery_recid)
+            : null;
+          const org = hoveredProps.__org_name || 'Unknown Organization';
+          const groupedFeatures = wineryRecid != null
+            ? (VINEYARD_BY_RECID[wineryRecid] || [])
+            : referenceVineyardsData.features.filter((f) => {
+              const name = f?.properties?.__org_name || 'Unknown Organization';
+              return name === org;
+            });
+          const linkedListing = wineryRecid != null
+            ? (LISTINGS.find((l) => l.id === wineryRecid) || null)
+            : null;
           const hoverSrc = map.getSource('vineyards-reference-hover');
           if (hoverSrc) {
             hoverSrc.setData({
@@ -1252,7 +1334,21 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
               features: groupedFeatures,
             });
           }
-          setHoveredVineyardOrganization(org);
+          setHoveredListingRef.current?.(linkedListing);
+          setHoveredVineyardOrganization(linkedListing ? null : org);
+        });
+        map.on('click', 'vineyards-reference-fill', (e) => {
+          if (!e.features?.length) return;
+          const hoveredProps = e.features[0]?.properties || {};
+          const wineryRecid = hoveredProps.winery_recid != null
+            ? Number(hoveredProps.winery_recid)
+            : null;
+          if (wineryRecid == null) return;
+          const linkedListing = LISTINGS.find((l) => l.id === wineryRecid);
+          if (linkedListing) {
+            setSelectedListingRef.current?.(linkedListing);
+            map.easeTo({ center: [linkedListing.lng, linkedListing.lat], zoom: 15, duration: 1900 });
+          }
         });
         map.on('mouseleave', 'vineyards-reference-fill', () => {
           map.getCanvas().style.cursor = '';
@@ -1260,6 +1356,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
           if (hoverSrc) {
             hoverSrc.setData({ type: 'FeatureCollection', features: [] });
           }
+          setHoveredListingRef.current?.(null);
           setHoveredVineyardOrganization(null);
         });
 
@@ -1815,7 +1912,9 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
 
   const handleHoverListing = useCallback((listing) => {
     setHoveredListing(listing); // null to clear
-  }, []);
+    setHoveredVineyardOrganization(null);
+    onVineyardHover(listing ? (VINEYARD_BY_RECID[listing.id] || []) : null);
+  }, [onVineyardHover]);
 
   // Keep setHoveredListingRef in sync so the map's [] closure can call it
   useEffect(() => { setHoveredListingRef.current = handleHoverListing; }, [handleHoverListing]);

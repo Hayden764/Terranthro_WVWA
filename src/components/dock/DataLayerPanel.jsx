@@ -3,6 +3,7 @@ import { BRAND } from '../../config/brandColors';
 import { GLASS } from './glassTokens';
 import { MONTH_ABBR } from '../../config/climateConfig';
 import { TOPO_LAYER_TYPES } from '../../config/topographyConfig';
+import { LISTING_FILTER_MODES } from '../WVWAMap';
 
 /**
  * DataLayerPanel — "Layers" panel content.
@@ -45,7 +46,14 @@ const Chevron = ({ open }) => (
   </svg>
 );
 
-export default function DataLayerPanel({ activeLayer, onLayerChange, currentMonth, onMonthChange }) {
+export default function DataLayerPanel({
+  activeLayer,
+  onLayerChange,
+  currentMonth,
+  onMonthChange,
+  listingFilterMode,
+  onListingFilterModeChange,
+}) {
   const [climateOpen, setClimateOpen] = useState(true);
   const [topoOpen, setTopoOpen] = useState(true);
 
@@ -134,6 +142,46 @@ export default function DataLayerPanel({ activeLayer, onLayerChange, currentMont
 
       {/* ── Divider ──────────────────────────────────────────────────── */}
       <div style={{ height: 1, background: GLASS.borderLight, margin: '4px 0' }} />
+
+      {/* ── Vineyard Visualization ─────────────────────────────────── */}
+      <div style={CARD}>
+        <div style={SECTION_LABEL}>Vineyard Visualization</div>
+        <button
+          onClick={() => onListingFilterModeChange?.(
+            listingFilterMode === LISTING_FILTER_MODES.noVineyardsVisualized
+              ? LISTING_FILTER_MODES.allWineries
+              : LISTING_FILTER_MODES.noVineyardsVisualized,
+          )}
+          style={{
+            width: '100%',
+            textAlign: 'left',
+            padding: '8px 10px',
+            borderRadius: 8,
+            border: `1.5px solid ${listingFilterMode === LISTING_FILTER_MODES.noVineyardsVisualized ? 'rgba(142,21,55,0.5)' : 'rgba(250,247,242,0.08)'}`,
+            background: listingFilterMode === LISTING_FILTER_MODES.noVineyardsVisualized ? GLASS.accentDim : 'transparent',
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+            fontFamily: 'Inter, sans-serif',
+          }}
+          onMouseEnter={e => {
+            if (listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized) {
+              e.currentTarget.style.background = 'rgba(250,247,242,0.06)';
+            }
+          }}
+          onMouseLeave={e => {
+            if (listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized) {
+              e.currentTarget.style.background = 'transparent';
+            }
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 600, color: listingFilterMode === LISTING_FILTER_MODES.noVineyardsVisualized ? GLASS.text : GLASS.textDim }}>
+            No Vineyards Visualized
+          </div>
+          <div style={{ fontSize: 10, color: GLASS.textMuted, marginTop: 2 }}>
+            Hide parcel polygons while keeping winery listings and markers available.
+          </div>
+        </button>
+      </div>
 
       {/* ── Topography Section ───────────────────────────────────────── */}
       <div style={CARD}>

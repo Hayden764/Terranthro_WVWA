@@ -26,6 +26,7 @@ export const LISTING_CATEGORIES = {
 export const LISTING_FILTER_MODES = {
   allWineries: 'allWineries',
   withVineyardPolygons: 'withVineyardPolygons',
+  withoutVineyardPolygons: 'withoutVineyardPolygons',
 };
 
 function classifyListing(item) {
@@ -43,9 +44,17 @@ function classifyListing(item) {
   return 'other';
 }
 
-// Enrich listings with category + global number at module load time
+// Enrich listings with category + global number at module load time.
+// The source feed can contain duplicate records with the same recid; keep
+// only the first instance so a winery appears once across the experience.
+const seenListingRecids = new Set();
 const LISTINGS = wineries
-  .filter(w => w.loc?.coordinates?.length === 2)
+  .filter((w) => {
+    if (w.loc?.coordinates?.length !== 2) return false;
+    if (seenListingRecids.has(w.recid)) return false;
+    seenListingRecids.add(w.recid);
+    return true;
+  })
   .map((w, i) => {
     const classified = classifyListing(w);
     return {
@@ -73,6 +82,7 @@ function buildListingsGeoJSON(listingFilterMode, vineyardRecidSet, insideIds = n
     .filter(l => {
       if (l.category !== 'winery') return false;
       if (listingFilterMode === LISTING_FILTER_MODES.withVineyardPolygons && !vineyardRecidSet.has(l.id)) return false;
+      if (listingFilterMode === LISTING_FILTER_MODES.withoutVineyardPolygons && vineyardRecidSet.has(l.id)) return false;
       if (insideIds && !insideIds.includes(l.id)) return false;
       return true;
     })
@@ -139,6 +149,9 @@ export { LISTINGS };
 // Vineyard-selected layers sit just below the dot layers so dots are visible
 // on top of highlighted parcels.
 const LISTING_LAYER_ORDER = [
+  'vineyards-reference-line',
+  'vineyards-linked-line',
+  'vineyards-reference-hover-line',
   'vineyards-selected-fill',
   'vineyards-selected-line',
   'vineyards-hovered-fill',
@@ -796,6 +809,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
   const [topoStats, setTopoStats]       = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [hoveredAva, setHoveredAva]     = useState(null);
+  const [hoveredVineyardOrganization, setHoveredVineyardOrganization] = useState(null);
   const [selectedListing, setSelectedListing] = useState(null);
   const [hoveredListing, setHoveredListing] = useState(null);
   const [selectedVineyards, setSelectedVineyards] = useState([]); // GeoJSON features for selected listing's parcels
@@ -905,9 +919,13 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
   }, [vineyardRecidSet]);
 
   const activeFilterLabel = useMemo(() => {
-    return listingFilterMode === LISTING_FILTER_MODES.withVineyardPolygons
-      ? 'Wineries with Vineyard Polygons'
-      : 'All Wineries & Vineyards';
+    if (listingFilterMode === LISTING_FILTER_MODES.withVineyardPolygons) {
+      return 'Wineries with Vineyard Polygons';
+    }
+    if (listingFilterMode === LISTING_FILTER_MODES.withoutVineyardPolygons) {
+      return 'Wineries without Vineyard Polygons';
+    }
+    return 'All Wineries & Vineyards';
   }, [listingFilterMode]);
 
   // ── Sync hovered-listing source with hoveredListing state ────────────
@@ -1106,31 +1124,143 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
         }
         setVineyardRecidSet(new Set(Object.keys(VINEYARD_BY_RECID).map((id) => Number(id)).filter(Number.isFinite)));
 
-        // Unmatched parcels only (no winery link) — always-visible subtle outlines
-        const unmatchedData = {
-          type: 'FeatureCollection',
-          features: vineyardData.features.filter(f => f.properties.winery_recid == null),
+        const isParcelFeature = (f) => f?.geometry?.type === 'Polygon' || f?.geometry?.type === 'MultiPolygon';
+        const getOrgName = (props = {}) => (
+          props.Vineyard_Organization
+          || props.B1_VineyardOrganization
+          || props.winery_title
+          || props.Vineyard_Name
+          || props.A1_VineyardName
+          || 'Unknown Organization'
+        );
+
+        // White reference polygons: Chehalem/Dundee + YC + Adelsheim parcels.
+        const loadGeoJSONFeatures = async (url) => {
+          try {
+            const res = await fetch(url);
+            if (!res.ok) return [];
+            const raw = await res.json();
+            return ((raw && raw.features) || []).filter(isParcelFeature);
+          } catch {
+            return [];
+          }
         };
 
-        map.addSource('vineyards-unmatched', { type: 'geojson', data: unmatchedData });
+        const [mergedFeatures, ycFeatures] = await Promise.all([
+          loadGeoJSONFeatures('/data/ChehalemMtn_DundeeHills_Vineyards_merged.geojson'),
+          loadGeoJSONFeatures('/data/YC_Vineyards_gdb.geojson'),
+        ]);
+        const adelsheimFeatures = vineyardData.features.filter(isParcelFeature);
+
+        const referenceVineyardsData = {
+          type: 'FeatureCollection',
+          features: [...mergedFeatures, ...ycFeatures, ...adelsheimFeatures].map((f) => {
+            const props = f.properties || {};
+            return {
+              ...f,
+              properties: {
+                ...props,
+                __org_name: getOrgName(props),
+              },
+            };
+          }),
+        };
+
+        map.addSource('vineyards-reference', { type: 'geojson', data: referenceVineyardsData });
         map.addLayer({
-          id: 'vineyards-unmatched-fill',
+          id: 'vineyards-reference-fill',
           type: 'fill',
-          source: 'vineyards-unmatched',
+          source: 'vineyards-reference',
           paint: {
-            'fill-color': '#4CAF72',
-            'fill-opacity': 0.04,
+            'fill-color': '#FFFFFF',
+            'fill-opacity': 0.01,
           },
         });
         map.addLayer({
-          id: 'vineyards-unmatched-line',
+          id: 'vineyards-reference-line',
           type: 'line',
-          source: 'vineyards-unmatched',
+          source: 'vineyards-reference',
           paint: {
-            'line-color': '#6DBF8A',
-            'line-width': 0.8,
-            'line-opacity': 0.35,
+            'line-color': '#FFFFFF',
+            'line-width': 3.2,
+            'line-opacity': 0.95,
           },
+        });
+
+        // Linked Adelsheim polygons rendered in green above the white base.
+        const linkedVineyardsData = {
+          type: 'FeatureCollection',
+          features: adelsheimFeatures
+            .filter((f) => f?.properties?.winery_recid != null)
+            .map((f) => {
+              const props = f.properties || {};
+              return {
+                ...f,
+                properties: {
+                  ...props,
+                  __org_name: getOrgName(props),
+                },
+              };
+            }),
+        };
+
+        map.addSource('vineyards-linked', {
+          type: 'geojson',
+          data: linkedVineyardsData,
+        });
+        map.addLayer({
+          id: 'vineyards-linked-line',
+          type: 'line',
+          source: 'vineyards-linked',
+          paint: {
+            'line-color': '#22C55E',
+            'line-width': 3.0,
+            'line-opacity': 0.95,
+          },
+        });
+
+        map.addSource('vineyards-reference-hover', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        map.addLayer({
+          id: 'vineyards-reference-hover-line',
+          type: 'line',
+          source: 'vineyards-reference-hover',
+          paint: {
+            'line-color': '#38BDF8',
+            'line-width': 4.2,
+            'line-opacity': 0.95,
+          },
+        });
+
+        // Group polygons by Vineyard_Organization on hover and highlight the whole org.
+        map.on('mouseenter', 'vineyards-reference-fill', () => {
+          map.getCanvas().style.cursor = 'pointer';
+        });
+        map.on('mousemove', 'vineyards-reference-fill', (e) => {
+          if (!e.features?.length) return;
+          const org = e.features[0]?.properties?.__org_name || 'Unknown Organization';
+          const groupedFeatures = referenceVineyardsData.features.filter((f) => {
+            const name = f?.properties?.__org_name || 'Unknown Organization';
+            return name === org;
+          });
+          const hoverSrc = map.getSource('vineyards-reference-hover');
+          if (hoverSrc) {
+            hoverSrc.setData({
+              type: 'FeatureCollection',
+              features: groupedFeatures,
+            });
+          }
+          setHoveredVineyardOrganization(org);
+        });
+        map.on('mouseleave', 'vineyards-reference-fill', () => {
+          map.getCanvas().style.cursor = '';
+          const hoverSrc = map.getSource('vineyards-reference-hover');
+          if (hoverSrc) {
+            hoverSrc.setData({ type: 'FeatureCollection', features: [] });
+          }
+          setHoveredVineyardOrganization(null);
         });
 
         // Selected parcel highlight — updated dynamically when a listing is chosen
@@ -1182,6 +1312,7 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
             'line-opacity': 1,
           },
         });
+
       } catch (e) {
         console.warn('WVWAMap: failed to load Adelsheim vineyard polygons', e);
       }
@@ -1705,6 +1836,21 @@ export default function WVWAMap({ selectedAva, onSelectAva, onMarkerClick, panel
           boxShadow: '0 4px 20px rgba(46,34,26,0.25)',
         }}>
           {hoveredListing.title}
+        </div>
+      )}
+
+      {/* Vineyard organization hover label */}
+      {!hoveredListing && hoveredVineyardOrganization && (
+        <div style={{
+          position: 'absolute', bottom: 40, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(32,47,59,0.82)', backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1.5px solid #38BDF8', borderRadius: 8,
+          padding: '5px 14px', fontSize: 13, fontWeight: 600, color: BRAND.eggshell,
+          pointerEvents: 'none', zIndex: 5, fontFamily: 'Inter, sans-serif',
+          boxShadow: '0 4px 20px rgba(15,23,42,0.25)',
+        }}>
+          {hoveredVineyardOrganization}
         </div>
       )}
 

@@ -11,10 +11,13 @@ export default function WineriesPanel({ listingFilterMode, onListingFilterModeCh
   const visible = LISTINGS.filter(l =>
     l.category === 'winery' &&
     (listingFilterMode !== LISTING_FILTER_MODES.withVineyardPolygons || vineyardRecidSet.has(l.id)) &&
+    (listingFilterMode !== LISTING_FILTER_MODES.withoutVineyardPolygons || !vineyardRecidSet.has(l.id)) &&
     (insideIds === null || insideIds === undefined || insideIds.includes(l.id))
   );
 
+  const isAllMode = listingFilterMode === LISTING_FILTER_MODES.allWineries;
   const hasPolygonMode = listingFilterMode === LISTING_FILTER_MODES.withVineyardPolygons;
+  const noPolygonMode = listingFilterMode === LISTING_FILTER_MODES.withoutVineyardPolygons;
   const wineryCategory = LISTING_CATEGORIES.winery;
 
   return (
@@ -40,8 +43,8 @@ export default function WineriesPanel({ listingFilterMode, onListingFilterModeCh
             gap: 5,
             padding: '4px 10px',
             borderRadius: 20,
-            border: `1px solid ${!hasPolygonMode ? wineryCategory.color + '99' : 'rgba(250,247,242,0.12)'}`,
-            background: !hasPolygonMode ? wineryCategory.color + '28' : 'rgba(250,247,242,0.04)',
+            border: `1px solid ${isAllMode ? wineryCategory.color + '99' : 'rgba(250,247,242,0.12)'}`,
+            background: isAllMode ? wineryCategory.color + '28' : 'rgba(250,247,242,0.04)',
             cursor: 'pointer',
             outline: 'none',
             transition: 'all 0.15s ease',
@@ -51,13 +54,13 @@ export default function WineriesPanel({ listingFilterMode, onListingFilterModeCh
             width: 7,
             height: 7,
             borderRadius: '50%',
-            background: !hasPolygonMode ? wineryCategory.color : 'rgba(250,247,242,0.25)',
+            background: isAllMode ? wineryCategory.color : 'rgba(250,247,242,0.25)',
             flexShrink: 0,
           }} />
           <span style={{
             fontSize: 10,
             fontWeight: 600,
-            color: !hasPolygonMode ? 'rgba(250,247,242,0.9)' : 'rgba(250,247,242,0.35)',
+            color: isAllMode ? 'rgba(250,247,242,0.9)' : 'rgba(250,247,242,0.35)',
             whiteSpace: 'nowrap',
             letterSpacing: '0.01em',
           }}>
@@ -95,6 +98,39 @@ export default function WineriesPanel({ listingFilterMode, onListingFilterModeCh
             letterSpacing: '0.01em',
           }}>
             Wineries with Vineyard Polygons
+          </span>
+        </button>
+
+        <button
+          onClick={() => onListingFilterModeChange?.(LISTING_FILTER_MODES.withoutVineyardPolygons)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            padding: '4px 10px',
+            borderRadius: 20,
+            border: `1px solid ${noPolygonMode ? wineryCategory.color + '99' : 'rgba(250,247,242,0.12)'}`,
+            background: noPolygonMode ? wineryCategory.color + '28' : 'rgba(250,247,242,0.04)',
+            cursor: 'pointer',
+            outline: 'none',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <div style={{
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            background: noPolygonMode ? wineryCategory.color : 'rgba(250,247,242,0.25)',
+            flexShrink: 0,
+          }} />
+          <span style={{
+            fontSize: 10,
+            fontWeight: 600,
+            color: noPolygonMode ? 'rgba(250,247,242,0.9)' : 'rgba(250,247,242,0.35)',
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.01em',
+          }}>
+            Wineries without Vineyard Polygons
           </span>
         </button>
       </div>

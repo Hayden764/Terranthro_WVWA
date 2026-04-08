@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+server/node_modules/
+
+# Environment variables — never commit secrets
+.env
+.env.local
+server/.env
+server/.env.local
+
+# Build output
+dist/
+.vite/
+
+# PMTiles (generated artifacts, serve from R2)
+*.pmtiles
+public/tiles/
+
+# Large GeoJSON source files (replaced by PostGIS API + PMTiles)
+# AVA boundary files in public/data/ are kept (still fetched by the map)
+src/data/
+public/data/Wineries_with_Polygons_Adelsheim.geojson
+public/data/ChehalemMtn_DundeeHills_Vineyards_merged.geojson
+public/data/YC_Vineyards_gdb.geojson
+public/data/vineyards.geojson
+
+# macOS metadata (AppleDouble files from external drives)
+.DS_Store
+**/.DS_Store
+._*
+**/._*
+
+# Data pipeline raw data (large raster/vector source files — not for git)
+data-pipeline/data/
+data-pipeline/.wrangler/
+data-pipeline/terrain-cogs.log
+
+# Editor
+.vscode/
+.idea/

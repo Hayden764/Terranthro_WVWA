@@ -1,0 +1,10 @@
+{
+  "name": "terranthro-data-pipeline",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "ETL scripts for seeding the Terranthro database",
+  "dependencies": {
+    "pg": "^8.11.3"
+  }
+}

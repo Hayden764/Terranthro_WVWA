@@ -447,6 +447,19 @@ function raiseListingLayers(map) {
   }
 }
 
+/**
+ * blinkMapLayer — pulse a paint property through a sequence of timed values.
+ * beats: [{ delay: ms, value: any }, ...]
+ */
+function blinkMapLayer(map, layerId, property, beats) {
+  beats.forEach(({ delay, value }) => {
+    setTimeout(() => {
+      if (!map || !map.getLayer(layerId)) return;
+      try { map.setPaintProperty(layerId, property, value); } catch { /* ignore */ }
+    }, delay);
+  });
+}
+
 function setListingVisibilityForVineyardFocus(map, isFocused) {
   const visibility = isFocused ? 'none' : 'visible';
   for (const layerId of LISTING_LAYERS_HIDDEN_IN_VINEYARD_FOCUS) {
@@ -1417,9 +1430,55 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
       const listing = listingsRef.current.find((l) => l.id === id);
       if (!listing) return;
       setSelectedListingRef.current?.(listing);
-      if (mapRef.current) {
-        mapRef.current.easeTo({ center: [listing.lng, listing.lat], zoom: 15, duration: 1900 });
+      const map = mapRef.current;
+      if (!map) return;
+
+      // Eagerly populate the vineyard source so it is ready before moveend fires,
+      // regardless of when React's useEffect runs.
+      const vineyardFeatures = VINEYARD_BY_RECID[listing.id] ?? [];
+      const vineyardsSrc = map.getSource('vineyards-selected');
+      if (vineyardsSrc) {
+        vineyardsSrc.setData({ type: 'FeatureCollection', features: vineyardFeatures });
+        raiseListingLayers(map);
       }
+
+      map.easeTo({ center: [listing.lng, listing.lat], zoom: 15, duration: 1900 });
+      map.once('moveend', () => {
+        const BLINK = [
+          { delay:   0, value: 1.0 },
+          { delay: 180, value: 0.08 },
+          { delay: 340, value: 1.0 },
+          { delay: 520, value: 0.08 },
+          { delay: 680, value: 1.0 },
+          { delay: 860, value: 0.5 },  // settle at normal
+        ];
+        // Marker dot blink
+        blinkMapLayer(map, 'listings-selected-glow', 'circle-stroke-opacity', BLINK);
+        blinkMapLayer(map, 'listings-selected-dot',  'circle-stroke-opacity', BLINK);
+        // Vineyard polygon blink — always attempt; no-op if source is empty
+        if (map.getLayer('vineyards-selected-fill'))
+          map.setLayoutProperty('vineyards-selected-fill', 'visibility', 'visible');
+        if (map.getLayer('vineyards-selected-line'))
+          map.setLayoutProperty('vineyards-selected-line', 'visibility', 'visible');
+        const VINE_FILL = [
+          { delay:   0, value: 0.85 },
+          { delay: 200, value: 0.04 },
+          { delay: 380, value: 0.85 },
+          { delay: 560, value: 0.04 },
+          { delay: 740, value: 0.85 },
+          { delay: 920, value: 0.2  },  // settle at layer default
+        ];
+        const VINE_LINE = [
+          { delay:   0, value: 1.0 },
+          { delay: 200, value: 0.06 },
+          { delay: 380, value: 1.0 },
+          { delay: 560, value: 0.06 },
+          { delay: 740, value: 1.0 },
+          { delay: 920, value: 0.9 },  // settle at layer default
+        ];
+        blinkMapLayer(map, 'vineyards-selected-fill', 'fill-opacity', VINE_FILL);
+        blinkMapLayer(map, 'vineyards-selected-line', 'line-opacity', VINE_LINE);
+      });
     },
     flyToCoords({ lng, lat, zoom = 14 }) {
       if (mapRef.current) {
@@ -2551,6 +2610,18 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
 
       // ── Fly to selected AVA — use curated camera from avaCameraConfig ──
       const cam = AVA_CAMERA[selectedAva];
+      const _avaSlugForBlink = selectedAva;
+      const _onAvaMoveEnd = () => {
+        const BLINK = [
+          { delay:   0, value: 0.45 },
+          { delay: 200, value: 0.03 },
+          { delay: 400, value: 0.45 },
+          { delay: 600, value: 0.03 },
+          { delay: 800, value: 0.45 },
+          { delay: 1000, value: 0.14 },  // settle at normal selected opacity
+        ];
+        blinkMapLayer(map, `ava-${_avaSlugForBlink}-fill`, 'fill-opacity', BLINK);
+      };
       if (cam) {
         map.flyTo({
           center:   [cam.lng, cam.lat],
@@ -2560,6 +2631,7 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
           duration: 1800,
           essential: true,
         });
+        map.once('moveend', _onAvaMoveEnd);
       } else {
         // Fallback: fit the AVA's own bounding box
         const avaSource = map.getSource(`ava-${selectedAva}`);
@@ -2573,6 +2645,7 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
             const features = avaSource._data.features || [avaSource._data];
             features.forEach(f => addCoords(f.geometry.coordinates));
             map.fitBounds(bounds, { padding: 80, pitch: 40, duration: 1800 });
+            map.once('moveend', _onAvaMoveEnd);
           } catch (e) { /* ignore */ }
         }
       }

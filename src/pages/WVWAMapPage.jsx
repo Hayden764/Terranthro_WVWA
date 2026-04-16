@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import WVWAMap from '../components/WVWAMap';
 import AVAListModal from '../components/AVAListModal';
+import SearchBar from '../components/SearchBar';
 import { BRAND } from '../config/brandColors';
 
 export default function WVWAMapPage() {
   const [selectedAva, setSelectedAva]           = useState(null);
   const [panelHoveredAva, setPanelHoveredAva]   = useState(null);
   const [modalOpen, setModalOpen]               = useState(false);
+  const mapRef                                  = useRef(null);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', background: BRAND.eggshell }}>
@@ -22,8 +24,9 @@ export default function WVWAMapPage() {
         borderBottom: '1px solid rgba(72,55,41,0.12)',
         boxShadow: '0 2px 12px rgba(46,34,26,0.08)',
         zIndex: 20,
+        position: 'relative',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
           <a
             href="https://www.willamettewines.com"
             target="_blank"
@@ -46,7 +49,16 @@ export default function WVWAMapPage() {
             Wineries &amp; AVA Explorer
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+
+        {/* Centered search bar — uses absolute positioning to stay truly centered */}
+        <SearchBar
+          mapRef={mapRef}
+          onSelectAva={(slug) => {
+            setSelectedAva(slug);
+          }}
+        />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
           <button
             onClick={() => {
               if (selectedAva) {
@@ -71,13 +83,13 @@ export default function WVWAMapPage() {
           >
             {selectedAva ? '← Back to Valley' : 'Explore AVAs'}
           </button>
-
         </div>
       </header>
 
       {/* Map fills remaining height */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         <WVWAMap
+          ref={mapRef}
           selectedAva={selectedAva}
           onSelectAva={setSelectedAva}
           panelHoveredAva={panelHoveredAva}

@@ -3420,40 +3420,6 @@
     }
   },
   {
-    "title": "Forage Cafe",
-    "recid": 2135,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/forage-cafe/2135/"
-    },
-    "description": "Forage invites wine tourists from around the globe to enjoy a delightful culinary experience curated by Chef Kris Utz. This charming bungalow-turned-neighborhood restaurant offers a rustic-chic ambiance and a menu that celebrates wood-fired cuisine with locally sourced and foraged ingredients. If you've ever seen the movie \"The Big Night,\" that's Forage. From savory wood-fired pizzas to delicate handmade pastas, scrumptious desserts, and vibrant seasonal sides and entrees, each dish highlights the bounty of the region, perfectly complemented by an exquisite selection of Oregon and global wines. Forage promises a low-key and quaint experience with amazing service that unites the flavors of the Pacific Northwest with unparalleled artisanal craftsmanship.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/6C7118A9-2E21-456F-A202-29E102169BD3_D46323E3-EDAB-4E90-851C7B9DC270FB4D_112bbcc1-0357-48e4-a6f67a7063bec496.jpg",
-    "phone": "(971) 281-8633",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -122.9807854,
-        45.3001409
-      ]
-    }
-  },
-  {
-    "title": "Golden Valley Brewery & Restaurant - McMinnville",
-    "recid": 450,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/golden-valley-brewery-%26-restaurant-mcminnville/450/"
-    },
-    "description": "At Golden Valley, our craftsmen take the time & care to brew our own beer, make sauces & soups from scratch & house smoke our meats. Using fresh Oregon seafood, locally grown produce & our All-Natural brewery grain and grass-fed Angus beef.\r\n\r\nEvery day, we provide our guests with fine handcrafted beers from our brewery, all natural, dry aged Angus beef raised on our family ranch with spring fed pastures and Golden Valley Brewery grain, organically raised produce from our gardens, and excellent Oregon wines from the great Willamette Valley. Our diverse menu offers exceptional burgers, dry aged hand-cut steaks, pastas, fresh NW seafood, salads, sandwiches, and a full range of entrees. All of our food is made in house from scratch using fresh local ingredients whenever possible.\r\n\r\nThe McMinnville building was originally a warehouse built in the 1920’s and constructed with huge local Douglas Fir post and beam timbers and concrete walls. Some of the timbers are two feet thick and three feet wide and over twenty feet long. The building was a concrete shell when the Kirchers bought it in 1993 and with a crew of 35 guys working six days a week they converted it into a restaurant and brewery. We have been in operation for twenty-five years now. For the first seven years the establishment boasted only the big bar and concrete floors, no booths or woodwork on the walls just paint and sheetrock. In March of 2000, the establishment underwent major renovation. A carpenter installed 11,000 feet of recycled Douglas fir wood trim and added carpet, booths and new furniture in the dining room. We have remodeled and expanded the kitchen three times since opening in 1993.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/WEB-GVB_PageImg_MacRestaurant-1_771252D0-5056-A36A-089790468F61EB53-771251445056a36_77125883-5056-a36a-08be654fcc8edaf8.jpg",
-    "phone": "(503) 472-2739",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -123.1890125,
-        45.210203
-      ]
-    }
-  },
-  {
     "title": "Grounded Table",
     "recid": 2328,
     "url": {
@@ -3467,57 +3433,6 @@
       "coordinates": [
         -123.1953514,
         45.2101301
-      ]
-    }
-  },
-  {
-    "title": "The Joel Palmer House Restaurant",
-    "recid": 174,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/the-joel-palmer-house-restaurant/174/"
-    },
-    "description": "Named Restaurant of the Region by Willamette Week; top rating  Best Places to Kiss and Best Places NW. Featured in NY Times, Travel & Leisure, Food & Wine, listed in 1,000 Places to go Before You Die. Innovative and exciting menu featuring choicest local produce and wild mushrooms. Extensive Oregon wine list and full bar. We have re-opened! Tues-Sat, 4:30pm-8pm. Reservations required.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/oalmer-e1511999562690_cba5751d-5056-a36a-08d4e60c0cb29f58.jpg",
-    "phone": "(503) 864-2995",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -123.0797278,
-        45.2178342
-      ]
-    }
-  },
-  {
-    "title": "JORY at The Allison Inn & Spa",
-    "recid": 2620,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/jory-at-the-allison-inn-%26-spa/2620/"
-    },
-    "description": "JORY, the signature restaurant at The Allison Inn & Spa, is named after the rich soil that defines the Willamette Valley as a world-class wine destination. Our creative fine dining menus celebrate the abundance of the region's native flavors and tell the story of this remarkable place through each thoughtfully crafted dish. \r\n\r\nNow serving breakfast and brunch daily, along with an exquisite dinner offered à la carte or as a multi-course tasting experience. Seasonal ingredients are sourced from our own 1.5-acre garden year-round, with ten colonies of honeybees pollinating the crops and producing nearly 300 pounds of honey annually - a key element in many of our culinary creations.\r\n\r\nSince opening in 2009, JORY has earned its reputation as the Willamette Valley’s premier destination for celebrating life’s most special moments. With thoughtful, attentive service and a passion for hospitality, our team will expertly personalize wine pairings from our extensive 500+ label list to complement each guest’s experience.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/JORY-Executive-Chef-1920-1080-1-_9EC00371-F47D-44CC-A92FDCA19EDDEE31_f9650e06-0d2f-464f-839b658902b22dba.jpg",
-    "phone": "(503) 554-2526",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -122.9470487,
-        45.3196268
-      ]
-    }
-  },
-  {
-    "title": "La Rambla Restaurant",
-    "recid": 456,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/la-rambla-restaurant/456/"
-    },
-    "description": "La Rambla is a culinary gem nestled in the heart of Oregon's wine country, blending Spanish influences and classics with the freshest ingredients the Northwest has to offer. Featuring tapas, paella and luscious deserts, a large wine-friendly menu serving lunch and dinner daily. La Rambla's award-winning wine list features Oregon and Spanish wines. See website for latest hours.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/LaRamblaFood12_cba5092c-5056-a36a-084e01fd5304773c.jpg",
-    "phone": "(503) 435-2126",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -123.1970818,
-        45.2098068
       ]
     }
   },
@@ -3573,23 +3488,6 @@
     }
   },
   {
-    "title": "Tributary Hotel & Spa",
-    "recid": 2080,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/tributary-hotel-%26-spa/2080/"
-    },
-    "description": "Tributary Hotel, the first and only Relais & Châteaux property in Oregon, is housed in a historic, beautifully maintained 100-year-old building in the heart of McMinnville’s charming downtown. Ten thoughtfully-designed suites, each named for a different river within Oregon, feature curated amenities personalized for your visit, as well as complimentary concierge services to plan your entire stay.\r\n\r\nThe boutique luxury accommodations pay homage to the region, offering an immersive experience highlighting the Valley’s seasonal rhythms and terroir, as well as the producers and purveyors who contribute to its distinct cultural landscape. Every morning, guests experience the lavish, multi-course ōkta farm and kitchen breakfast in-suite featuring bespoke ingredients from our nearby regenerative farm and larder. As a gateway to the region, Tributary Hotel aspires to curate a luxury experience that inspires guest connections to the surrounding wineries, restaurants, and beautiful natural areas.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/Tributary_Exterior_Wide_WVWA_CD3622A9-501E-4C24-9B571FB98937B7A4_1021715e-2a8c-40ac-ac04c76abcd9da47.png",
-    "phone": "(503) 376-5200",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -123.1930562,
-        45.2098155
-      ]
-    }
-  },
-  {
     "title": "Willamette Valley Vineyards",
     "recid": 536,
     "url": {
@@ -3624,23 +3522,6 @@
     }
   },
   {
-    "title": "3rd Street Flats",
-    "recid": 379,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/3rd-street-flats/379/"
-    },
-    "description": "3rd Street Flats is the ultimate fusion experience, blending the best elements of hotels, B&Bs and vacation rentals into one unforgettable stay in Oregon Wine Country. With two locations in the heart of Historic Downtown McMinnville, choose from 11 uniquely inspired flats, all perched above local wineries, acclaimed dining and eclectic boutiques. Find us at 219 NE Cowls and also 555 NE Third Street, just three blocks apart in Downtown McMinnville. NOW OPEN. Find COVID-19 information on our website.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/flats2_cbada53c-5056-a36a-08be7ecec2ac4ab3.jpg",
-    "phone": "(503) 857-6248",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -123.1936545,
-        45.2101117
-      ]
-    }
-  },
-  {
     "title": "A'Tuscan Estate",
     "recid": 403,
     "url": {
@@ -3658,39 +3539,6 @@
     }
   },
   {
-    "title": "Abbey Road Farm Silo Suites B&B",
-    "recid": 3141,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/abbey-road-farm-silo-suites-b%26b/3141/"
-    },
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/abbey-road-farm-010_orig-1-_BF709AC3-5056-A36A-081029FE0D69F794-bf7098bd5056a36_bf709fdb-5056-a36a-08626a1c61df49dd.jpg",
-    "phone": "(503) 687-3100",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -123.1004036,
-        45.2933191
-      ]
-    }
-  },
-  {
-    "title": "The Allison Inn & Spa",
-    "recid": 387,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/the-allison-inn-%26-spa/387/"
-    },
-    "description": "The Allison Inn & Spa is Oregon wine country’s premier destination resort, set on 35 hillside acres in the heart of the Willamette Valley. Our 85 luxurious guestrooms and suites feature a private terrace or balcony, cozy fireplace, spa-inspired bathroom and original artwork, creating a serene retreat immersed in nature.\r\n\r\nJORY Restaurant, named for the region’s rich soil, celebrates seasonal flavors through garden-to-table cuisine served at breakfast, brunch and dinner daily. Thoughtful, knowledgeable service is at the heart of every experience, with our highly trained team offering personalized wine pairings from our curated wine list of more than 500 labels to complement each dish.\r\n\r\nExperience tranquility in a peaceful environment devoted to health and well-being. With more than 15,000 sq. ft., our award-winning wellness spa has 14 treatment spaces, spacious lounges with private outdoor patios, and a menu that captures the essence of the Pacific Northwest. Our indoor swimming pool, whirlpool, pool terrace, eucalyptus-infused steam rooms, cedar saunas and fitness studio elevate the guest experience.\r\n\r\nWith 25,000 sq. ft. of indoor and outdoor event space, we provide the perfect backdrop for weddings, corporate retreats and social gatherings. Thoughtful service, breathtaking scenery and an unwavering commitment to hospitality make The Allison Inn & Spa an unforgettable escape in the heart of Oregon wine country.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/Allison-Estate-Garden_592A8BCC-8A4B-4DBD-B692FB6C876AD16D_6BCDB417-9DB7-1A44-81FCACF490F25B57-6bcdb272d94283a_6bcdd398-fc31-9218-a512736818b796f4.jpg",
-    "phone": "(503) 554-2525",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -122.9470487,
-        45.3196268
-      ]
-    }
-  },
-  {
     "title": "AtTheJoy",
     "recid": 67,
     "url": {
@@ -3704,23 +3552,6 @@
       "coordinates": [
         -123.1549271,
         45.028619
-      ]
-    }
-  },
-  {
-    "title": "Atticus Hotel",
-    "recid": 226,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/atticus-hotel/226/"
-    },
-    "description": "The Atticus Hotel is a luxury lifestyle hotel located in Historic Downtown McMinnville--the heart of Oregon Wine Country. With 36 uniquely inspired rooms--from Studios to a Penthouse--an onsite restaurant & bar, valet parking, concierge, Dutch bikes and more, the Atticus Hotel offers an extensive list of services & amenities in an unbeatable location.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/IMG_2665_cbd5d19b-5056-a36a-08f898f6006f1a97.jpg",
-    "phone": "(503) 472-1975",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -123.1934019,
-        45.2105821
       ]
     }
   },
@@ -3776,23 +3607,6 @@
     }
   },
   {
-    "title": "Chehalem Ridge Bed & Breakfast",
-    "recid": 390,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/chehalem-ridge-bed-%26-breakfast/390/"
-    },
-    "description": "Perched on 8 acres atop Chehalem Mountain, Chehalem Ridge B&B offers a peaceful retreat near wineries with stunning views. 5 rooms in the contemporary house reflect the spirit of Oregon with in-room details like fireplaces, jetted tubs and private decks with expansive valley views. Full gourmet breakfast, accommodating food allergies, is included.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/OutsideB-B_578573B2-1769-46A8-B460AED9517B8FFD_83ad67e7-5a3f-4cb4-85ff49d5237dc70d.jpg",
-    "phone": "(503) 538-3474",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -122.9431334,
-        45.3369486
-      ]
-    }
-  },
-  {
     "title": "Douglas On Third",
     "recid": 5753,
     "url": {
@@ -3805,23 +3619,6 @@
       "coordinates": [
         -123.1917432,
         45.2101703
-      ]
-    }
-  },
-  {
-    "title": "The Dundee Hotel",
-    "recid": 1368,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/the-dundee-hotel/1368/"
-    },
-    "description": "Relaxation and adventure await you in Dundee, the heart of the renowned Willamette Valley, where wineries and leisure abound. With a stylish vibe and touches of luxury, The Dundee is the perfect place to unwind and explore this world-class wine region.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/image_14B3CB55-3DE5-4DF8-B64E33F45B23B8AA_5ddf9dc9-62ca-4d7c-8597151490718427.jpg",
-    "phone": "(503) 538-7666",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -123.0163899,
-        45.2721678
       ]
     }
   },
@@ -3843,23 +3640,6 @@
     }
   },
   {
-    "title": "Franziska Haus Bed & Breakfast",
-    "recid": 334,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/franziska-haus-bed-%26-breakfast/334/"
-    },
-    "description": "Our new Log Lodge showcases a signature 29 foot high stone-crafted fireplace within its grand great room. Rustic architecture is contrasted with elegant Old World accents. Located in the heart of Willamette Valley Wine Country, this unique Inn offers exceptionally large and private suites, upscale amenities and comprehensive concierge services.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/great-room_cbba7441-5056-a36a-08ce5f558f3b1134.jpg",
-    "phone": "(503) 899-9043",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -123.0057544,
-        45.2907243
-      ]
-    }
-  },
-  {
     "title": "Holiday Inn Express Newberg - Wine Country",
     "recid": 5807,
     "url": {
@@ -3873,74 +3653,6 @@
       "coordinates": [
         -122.9595099,
         45.303595
-      ]
-    }
-  },
-  {
-    "title": "La Bastide Bed & Breakfast",
-    "recid": 164,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/la-bastide-bed-%26-breakfast/164/"
-    },
-    "description": "La Bastide. It’s not just the wineries, though there are hundreds nearby. And it’s not just the restaurants, despite the acclaim that local restaurants have earned. And it’s not just the local farms, produce stands, distilleries, or breweries. And it’s not just parks, trails, or the Air and Space Museum. And it’s not just the close proximity to Portland or the Oregon Coast. It’s all of these, and more. The Dundee Hills are home to some of the best wineries in the world. There are more boutique vineyards here than any place in the Northwest. You can wine, dine, and play here like no place else. And you can stay in some of the most comfortable and authentic inns in the world. La Bastide offers 7 comfortable guestrooms, each with a king- or queen-sized bed and private bathroom, and many with a fireplace. A memorable breakfast is included each morning. Your hosts, Mark and Elizabeth, are glad to help you plan your visit, whether it’s winery reservations, or a day-trip to the Oregon Coast.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/NewCover-scaled_cbf26e22-5056-a36a-085148f4a8702ed3.jpg",
-    "phone": "(503) 351-4239",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -123.0217301,
-        45.2712521
-      ]
-    }
-  },
-  {
-    "title": "Lifestyle Properties Vacation Rentals & More",
-    "recid": 76,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/lifestyle-properties-vacation-rentals-%26-more/76/"
-    },
-    "description": "Lifestyle Properties offers an exceptional collection of vacation homes in Oregon’s picturesque Northern Willamette Valley. Our carefully curated selection features high-end rentals in prime locations, from charming walkable towns to tranquil countryside estates nestled among the vineyards.\r\n\r\nEach property is designed to provide modern amenities and the comforts of home, ensuring a seamless and relaxing stay. Whether you’re seeking a cozy bungalow for a weekend getaway or a spacious estate for a group retreat, we have the perfect home to match your needs.\r\n\r\nOur locally-based concierge team is here to enhance your experience with personalized recommendations and seamless service. Not sure which property is right for you? We’ll guide you to the ideal stay.\r\n\r\nWe also specialize in group lodging solutions, offering tailored accommodations for winery retreats, corporate off-sites, and special events. Let us help you craft an unforgettable experience in Oregon wine country.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/Lifestyle-Properties-Vacation-Rentals_C2CF499B-A6C6-4879-B0B5AF3D887D3555_6b23258d-ec42-4d96-8f2973247523156d.jpg",
-    "phone": "(971) 832-3399",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -122.9459135,
-        45.3005251
-      ]
-    }
-  },
-  {
-    "title": "Olde Stone RV Resort",
-    "recid": 5119,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/olde-stone-rv-resort/5119/"
-    },
-    "description": "Luxurious RV Accommodations Await Your Arrival, nestled in the heart of the Willamette wine country. Big-rig friendly, full hook ups, level concrete sites, providing a clean, convenient, welcoming environment making this park enjoyable. Our wonderful amenities include a heated seasonal pool, clubhouse, exercise room, two laundry rooms, dog run, WIFI and Direct T.V.  A beautiful, landscaped park with a concrete walking path to visit neighboring Evergreen Aviation Museum. Conveniently located, we are just a short drive to downtown McMinnville, a foodie’s paradise with wine tasting rooms galore. Come stay at our beautiful park to enhance your wine tasting experience bringing some of the best of Willamette wineries all within a short reach.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/Olde-Stone-Twilight-7_7E903602-8A52-4766-A54073EE1D45BA64_f407fbbf-086a-4ffb-a7f8c0158494b005.jpg",
-    "phone": "(503) 472-4315",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -123.1363015,
-        45.2054915
-      ]
-    }
-  },
-  {
-    "title": "Oregon Garden Resort",
-    "recid": 275,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/oregon-garden-resort/275/"
-    },
-    "description": "Nestled in historic Silverton, Oregon, you will find the Oregon Garden Resort. Its tranquil here. Quiet and relaxing. Yet near Salem and less than one hour from Portland. Framed by rustic architecture and stunning views of the adjacent Oregon Garden and rolling hills of the Willamette Valley.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/OGR_drivewaysign_0A181662-08AA-4281-B1092EB9D4BCE933_4cc4a4e7-d760-4363-a8161c3b791361ed.jpg",
-    "phone": "(503) 874-2500",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -122.7949283,
-        44.9969245
       ]
     }
   },
@@ -3995,22 +3707,6 @@
     }
   },
   {
-    "title": "The Inn at Dayton",
-    "recid": 5746,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/the-inn-at-dayton/5746/"
-    },
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/495006374_122101338416856479_4387440752533100677_n_29787E35-B3A3-7609-2A9E28C6F9A0939B-29787c4ca1abf49_29789885-ab01-85f9-9f6392ddf23ea3c0.jpg",
-    "phone": "(503) 300-1907",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -123.0755069,
-        45.2205488
-      ]
-    }
-  },
-  {
     "title": "The Market Lofts",
     "recid": 6104,
     "url": {
@@ -4045,40 +3741,6 @@
     }
   },
   {
-    "title": "Tributary Hotel & Spa",
-    "recid": 2080,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/tributary-hotel-%26-spa/2080/"
-    },
-    "description": "Tributary Hotel, the first and only Relais & Châteaux property in Oregon, is housed in a historic, beautifully maintained 100-year-old building in the heart of McMinnville’s charming downtown. Ten thoughtfully-designed suites, each named for a different river within Oregon, feature curated amenities personalized for your visit, as well as complimentary concierge services to plan your entire stay.\r\n\r\nThe boutique luxury accommodations pay homage to the region, offering an immersive experience highlighting the Valley’s seasonal rhythms and terroir, as well as the producers and purveyors who contribute to its distinct cultural landscape. Every morning, guests experience the lavish, multi-course ōkta farm and kitchen breakfast in-suite featuring bespoke ingredients from our nearby regenerative farm and larder. As a gateway to the region, Tributary Hotel aspires to curate a luxury experience that inspires guest connections to the surrounding wineries, restaurants, and beautiful natural areas.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/Tributary_Exterior_Wide_WVWA_CD3622A9-501E-4C24-9B571FB98937B7A4_1021715e-2a8c-40ac-ac04c76abcd9da47.png",
-    "phone": "(503) 376-5200",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -123.1930562,
-        45.2098155
-      ]
-    }
-  },
-  {
-    "title": "Willamette Valley Bed and Breakfast",
-    "recid": 306,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/willamette-valley-bed-and-breakfast/306/"
-    },
-    "description": "An elevated wine country experience yet including all the details of home. 5 suites all have fireplace, two-person soaking tub, en-suite bath w/ heated floors, private deck, king bed, tv, wifi and more. We start each day with a 4-course breakfast. EV charging station for 2 vehicles. Within 10 minutes of 50+ wineries and all the best restaurants.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/Entry-01-1-scaled_cbc333e2-5056-a36a-082af4e13bfd0390.jpg",
-    "phone": "(425) 495-1181",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -122.9963798,
-        45.3117991
-      ]
-    }
-  },
-  {
     "title": "Willamette Valley Vineyards",
     "recid": 536,
     "url": {
@@ -4092,23 +3754,6 @@
       "coordinates": [
         -123.0083398,
         44.824156
-      ]
-    }
-  },
-  {
-    "title": "Youngberg Hill Inn",
-    "recid": 401,
-    "url": {
-      "url": "https://www.willamettewines.com/listing/youngberg-hill-inn/401/"
-    },
-    "description": "Old world ambiance meets modern luxuries at Youngberg Hill. Our bed and breakfast is surrounded by a naturally romantic landscape, offering a one-of-a-kind lodging experience in Oregon wine country. The expansive veranda and in-room comforts like fireplaces and Jacuzzi tubs make each stay a relaxing retreat.",
-    "image_url": "https://assets.simpleviewinc.com/simpleview/image/upload/crm/willametteor/JuraRm-01-e1511911307793_cba76807-5056-a36a-0838f91abdda9f25.jpg",
-    "phone": "(503) 472-2727",
-    "loc": {
-      "type": "Point",
-      "coordinates": [
-        -123.2789872,
-        45.1807204
       ]
     }
   },

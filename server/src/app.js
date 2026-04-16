@@ -9,6 +9,7 @@ import avaRoutes from './routes/avas.js';
 import climateRoutes from './routes/climate.js';
 import vineyardRoutes from './routes/vineyards.js';
 import wineryRoutes from './routes/wineries.js';
+import searchRoutes from './routes/search.js';
 import { requireApiKey } from './middleware/apiKey.js';
 import { pool } from './db/pool.js';
 
@@ -63,6 +64,7 @@ app.use('/api/avas', avaRoutes);
 app.use('/api/climate', climateRoutes);
 app.use('/api/wineries', requireApiKey, wineryRoutes);
 app.use('/api/vineyards', requireApiKey, vineyardRoutes);
+app.use('/api/search', requireApiKey, searchRoutes);
 
 // Health check — includes DB connectivity
 app.get('/api/health', async (req, res) => {

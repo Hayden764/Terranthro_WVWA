@@ -199,7 +199,21 @@ export default function DataLayerPanel({
             color: GLASS.textDim,
           }}
         >
-          <span style={SECTION_LABEL}>Topography</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={SECTION_LABEL}>Topography</span>
+            <span style={{
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              color: 'rgba(109,191,138,0.8)',
+              background: 'rgba(109,191,138,0.1)',
+              border: '1px solid rgba(109,191,138,0.25)',
+              borderRadius: 4,
+              padding: '1px 5px',
+              lineHeight: 1.4,
+              textTransform: 'uppercase',
+            }}>1m LiDAR</span>
+          </div>
           <Chevron open={topoOpen} />
         </button>
 

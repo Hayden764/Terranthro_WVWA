@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import {
   CLIMATE_SOURCE_ID,
   CLIMATE_LAYER_ID,
-  CLIMATE_LAYER_OPACITY
+  CLIMATE_LAYER_OPACITY,
+  TITILER_URL,
 } from '../config/climateConfig';
 
 /**
@@ -25,7 +26,7 @@ const ClimateLayer = ({
   useEffect(() => {
     if (!map) return;
 
-    const addLayer = () => {
+    const addLayer = async () => {
       if (!map || !map.getStyle || !map.getStyle()) return;
 
       try {
@@ -37,7 +38,19 @@ const ClimateLayer = ({
       const cogUrl = `https://cogs.terranthro.com/climate-data/national/prism_${prismVar}_us_30s_2020${monthStr}_avg_30y_cog.tif`;
       const encodedUrl = encodeURIComponent(cogUrl);
       const rescaleParam = rescale ? rescale : '-22,26';
-      const tileUrl = `https://titiler-latest-0cem.onrender.com/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodedUrl}&rescale=${rescaleParam}&colormap_name=${colormap}`;
+      const tileUrl = `${TITILER_URL}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodedUrl}&rescale=${rescaleParam}&colormap_name=${colormap}`;
+      const statsUrl = `${TITILER_URL}/cog/statistics?url=${encodedUrl}`;
+
+      try {
+        const statsRes = await fetch(statsUrl);
+        if (!statsRes.ok) {
+          setIsSourceAdded(false);
+          return;
+        }
+      } catch {
+        setIsSourceAdded(false);
+        return;
+      }
 
       try {
         map.addSource(CLIMATE_SOURCE_ID, {

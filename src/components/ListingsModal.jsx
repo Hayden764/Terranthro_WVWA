@@ -1,11 +1,11 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { LISTINGS, LISTING_CATEGORIES } from './WVWAMap';
+import { LISTING_CATEGORIES } from './WVWAMap';
 import { BRAND } from '../config/brandColors';
 
 // Category order for display
 const CATEGORY_ORDER = ['winery', 'tasting', 'restaurant', 'hotel', 'other'];
 
-export default function ListingsModal({ isOpen, onClose, onSelectListing }) {
+export default function ListingsModal({ isOpen, onClose, onSelectListing, listings = [] }) {
   const [query, setQuery]           = useState('');
   const [activeTab, setActiveTab]   = useState('all'); // 'all' | category key
   const searchRef = useRef(null);
@@ -28,7 +28,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing }) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return LISTINGS.filter(l => {
+    return listings.filter(l => {
       const matchesTab = activeTab === 'all' || l.category === activeTab;
       if (!matchesTab) return false;
       if (!q) return true;
@@ -52,12 +52,12 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing }) {
   }, [filtered, activeTab]);
 
   const counts = useMemo(() => {
-    const c = { all: LISTINGS.length };
+    const c = { all: listings.length };
     CATEGORY_ORDER.forEach(k => {
-      c[k] = LISTINGS.filter(l => l.category === k).length;
+      c[k] = listings.filter(l => l.category === k).length;
     });
     return c;
-  }, []);
+  }, [listings]);
 
   if (!isOpen) return null;
 
@@ -115,7 +115,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing }) {
                 <span style={{ color: BRAND.burgundy }}>W</span>illamette Valley Directory
               </h2>
               <p style={{ margin: '3px 0 0', fontSize: 12, color: 'rgba(250,247,242,0.45)' }}>
-                {LISTINGS.length} places · click any listing to locate on map
+                {listings.length} places · click any listing to locate on map
               </p>
             </div>
             <button

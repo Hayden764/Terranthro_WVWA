@@ -8,6 +8,8 @@ import { WV_SUB_AVAS } from '../../config/topographyConfig';
  */
 
 const WV_BOUNDS = [[-123.8, 44.0], [-122.0, 45.9]];
+const MAX_PITCH_FLAT = 85;
+const MAX_PITCH_WITH_TERRAIN = 71;
 
 /* ─── Shared card style ─────────────────────────────────────────────── */
 const CARD = {
@@ -27,7 +29,15 @@ const LABEL = {
   marginBottom: 6,
 };
 
-export default function MapToolkit({ map, mapLoaded, selectedAva, onSelectAva }) {
+export default function MapToolkit({
+  map,
+  mapLoaded,
+  selectedAva,
+  onSelectAva,
+  listingSymbologyPreset,
+  onListingSymbologyPresetChange,
+  listingSymbologyOptions = [],
+}) {
   if (!map || !mapLoaded) return null;
 
   const handleZoomIn = () => map.zoomIn({ duration: 300 });
@@ -44,6 +54,7 @@ export default function MapToolkit({ map, mapLoaded, selectedAva, onSelectAva })
     const terrain = map.getTerrain();
     if (terrain) {
       map.setTerrain(null);
+      map.setMaxPitch(MAX_PITCH_FLAT);
     } else {
       if (!map.getSource('terrainSource')) {
         map.addSource('terrainSource', {
@@ -55,6 +66,10 @@ export default function MapToolkit({ map, mapLoaded, selectedAva, onSelectAva })
         });
       }
       map.setTerrain({ source: 'terrainSource', exaggeration: 1.5 });
+      map.setMaxPitch(MAX_PITCH_WITH_TERRAIN);
+      if ((map.getPitch?.() || 0) > MAX_PITCH_WITH_TERRAIN) {
+        map.setPitch(MAX_PITCH_WITH_TERRAIN);
+      }
     }
   };
 
@@ -63,11 +78,15 @@ export default function MapToolkit({ map, mapLoaded, selectedAva, onSelectAva })
   };
 
   const handlePitchChange = (e) => {
-    map.setPitch(Number(e.target.value));
+    const nextPitch = Number(e.target.value);
+    const terrainOn = !!map.getTerrain?.();
+    const maxPitch = terrainOn ? MAX_PITCH_WITH_TERRAIN : MAX_PITCH_FLAT;
+    map.setPitch(Math.min(nextPitch, maxPitch));
   };
 
   const terrain = map.getTerrain?.();
   const terrainActive = !!terrain;
+  const pitchMax = terrainActive ? MAX_PITCH_WITH_TERRAIN : MAX_PITCH_FLAT;
   const currentBearing = Math.round(map.getBearing?.() || 0);
   const currentPitch = Math.round(map.getPitch?.() || 0);
 
@@ -150,13 +169,47 @@ export default function MapToolkit({ map, mapLoaded, selectedAva, onSelectAva })
           <input
             type="range"
             min={0}
-            max={85}
+            max={pitchMax}
             value={currentPitch}
             onChange={handlePitchChange}
             style={sliderStyle}
           />
         </div>
       </div>
+
+      {/* ── Winery Marker Symbology ─────────────────────────────────── */}
+      {listingSymbologyOptions.length > 0 && (
+        <div style={CARD}>
+          <div style={LABEL}>Winery Marker Symbology</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {listingSymbologyOptions.map((option) => {
+              const active = listingSymbologyPreset === option.id;
+              return (
+                <button
+                  key={option.id}
+                  onClick={() => onListingSymbologyPresetChange?.(option.id)}
+                  style={{
+                    ...btnStyle(active),
+                    width: '100%',
+                    justifyContent: 'space-between',
+                    color: active ? BRAND.eggshell : GLASS.text,
+                  }}
+                >
+                  <span>{option.label}</span>
+                  <span style={{
+                    fontSize: 10,
+                    opacity: active ? 0.95 : 0.45,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                  }}>
+                    {active ? 'Active' : 'Apply'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Quick-jump to AVA ────────────────────────────────────────── */}
       {selectedAva && (() => {

@@ -1,3 +1,4 @@
+import React from 'react';
 import { BRAND } from '../../config/brandColors';
 import { GLASS } from './glassTokens';
 import { WV_SUB_AVAS } from '../../config/topographyConfig';
@@ -72,65 +73,68 @@ const LAYER_INFO = {
 };
 
 /* ── Clickable AVA list item ─────────────────────────────────────────── */
-function AVAButton({ item, onSelectAva, onHoverAva, badge }) {
-  return (
+function AVAButton({ item, onSelectAva, onHoverAva, indent }) {
+  const [hovered, setHovered] = React.useState(false);
+
+  const btn = (
     <button
       onClick={() => onSelectAva?.(item.slug)}
-      onMouseEnter={e => {
-        e.currentTarget.style.background = 'rgba(56,189,248,0.12)';
-        e.currentTarget.style.borderColor = 'rgba(56,189,248,0.55)';
-        e.currentTarget.style.color = '#7DD3FC';
-        e.currentTarget.style.boxShadow = '0 0 0 2px rgba(56,189,248,0.18), inset 0 0 8px rgba(56,189,248,0.06)';
-        onHoverAva?.(item.slug);
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.background = 'rgba(250,247,242,0.05)';
-        e.currentTarget.style.borderColor = 'rgba(250,247,242,0.10)';
-        e.currentTarget.style.color = GLASS.textDim;
-        e.currentTarget.style.boxShadow = 'none';
-        onHoverAva?.(null);
-      }}
+      onMouseEnter={() => { setHovered(true);  onHoverAva?.(item.slug); }}
+      onMouseLeave={() => { setHovered(false); onHoverAva?.(null); }}
       style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         width: '100%',
-        padding: '8px 12px',
+        padding: indent ? '6px 10px' : '8px 12px',
         borderRadius: 8,
-        border: '1px solid rgba(250,247,242,0.10)',
-        background: 'rgba(250,247,242,0.05)',
-        color: GLASS.textDim,
-        fontSize: 12,
+        border: `1px solid ${hovered ? 'rgba(56,189,248,0.55)' : 'rgba(250,247,242,0.10)'}`,
+        background: hovered ? 'rgba(56,189,248,0.12)' : 'rgba(250,247,242,0.05)',
+        color: hovered ? '#7DD3FC' : GLASS.textDim,
+        boxShadow: hovered ? '0 0 0 2px rgba(56,189,248,0.18), inset 0 0 8px rgba(56,189,248,0.06)' : 'none',
+        fontSize: indent ? 11 : 12,
         fontWeight: 500,
         fontFamily: 'Inter, sans-serif',
         cursor: 'pointer',
-        transition: 'background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s',
         textAlign: 'left',
+        transition: 'background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s',
       }}
     >
       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {item.name}
       </span>
-      {badge && (
-        <span style={{
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-          padding: '2px 6px',
-          borderRadius: 10,
-          background: 'rgba(201,168,76,0.18)',
-          border: '1px solid rgba(201,168,76,0.4)',
-          color: '#C9A84C',
-          marginLeft: 6,
-          flexShrink: 0,
-        }}>
-          {badge}
-        </span>
-      )}
       <span style={{ fontSize: 13, marginLeft: 8, opacity: 0.55, flexShrink: 0 }}>↗</span>
     </button>
   );
+
+  if (indent) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, paddingLeft: 14 }}>
+        <span style={{ color: GLASS.textMuted, fontSize: 11, flexShrink: 0, userSelect: 'none', lineHeight: 1 }}>↳</span>
+        {btn}
+      </div>
+    );
+  }
+  return btn;
+}
+
+/* ── Renders a hierarchical AVA list, indenting children under parents ── */
+function renderAvaTree(avas, onSelectAva, onHoverAva) {
+  const slugSet = new Set(avas.map(a => a.slug));
+  const topLevel = avas.filter(a => !a.parentAva || !slugSet.has(a.parentAva));
+  return topLevel.map(a => {
+    const children = a.subAvas
+      ? a.subAvas.map(s => avas.find(x => x.slug === s)).filter(Boolean)
+      : [];
+    return (
+      <React.Fragment key={a.slug}>
+        <AVAButton item={a} onSelectAva={onSelectAva} onHoverAva={onHoverAva} />
+        {children.map(child => (
+          <AVAButton key={child.slug} item={child} onSelectAva={onSelectAva} onHoverAva={onHoverAva} indent />
+        ))}
+      </React.Fragment>
+    );
+  });
 }
 
 export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
@@ -233,7 +237,7 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {subAvas.map(sub => (
-                  <AVAButton key={sub.slug} item={sub} onSelectAva={onSelectAva} onHoverAva={onHoverAva} badge="2× Nested" />
+                  <AVAButton key={sub.slug} item={sub} onSelectAva={onSelectAva} onHoverAva={onHoverAva} />
                 ))}
               </div>
             </div>
@@ -339,15 +343,7 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
               <span style={{ fontWeight: 400, opacity: 0.6, marginLeft: 6 }}>({siblingAvas.length})</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: `${GLASS.textMuted} transparent` }}>
-              {siblingAvas.map(sibling => (
-                <AVAButton
-                  key={sibling.slug}
-                  item={sibling}
-                  onSelectAva={onSelectAva}
-                  onHoverAva={onHoverAva}
-                  badge={sibling.parentAva ? '2× Nested' : sibling.subAvas ? 'Has Sub-AVAs' : null}
-                />
-              ))}
+              {renderAvaTree(siblingAvas, onSelectAva, onHoverAva)}
             </div>
           </div>
         </>
@@ -370,15 +366,7 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
               <span style={{ fontWeight: 400, opacity: 0.6, marginLeft: 6 }}>({WV_SUB_AVAS.length})</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 280, overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: `${GLASS.textMuted} transparent` }}>
-              {WV_SUB_AVAS.map(a => (
-                <AVAButton
-                  key={a.slug}
-                  item={a}
-                  onSelectAva={onSelectAva}
-                  onHoverAva={onHoverAva}
-                  badge={a.parentAva ? '2× Nested' : a.subAvas ? 'Has Sub-AVAs' : null}
-                />
-              ))}
+              {renderAvaTree(WV_SUB_AVAS, onSelectAva, onHoverAva)}
             </div>
           </div>
 

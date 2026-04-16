@@ -1,6 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const DEV_API_PROXY_TARGET =
+  process.env.VITE_API_PROXY_TARGET ||
+  process.env.VITE_API_BASE_URL ||
+  'https://terranthrowvwa-production.up.railway.app';
+
 export default defineConfig({
   plugins: [react()],
   base: '/',
@@ -26,7 +31,15 @@ export default defineConfig({
   server: {
     port: 3002,
     strictPort: false,
-    host: true
+    host: true,
+    proxy: {
+      // In dev, proxy /api to the local Express server.
+      // In production, VITE_API_BASE_URL points directly to Railway — no proxy needed.
+      '/api': {
+        target: DEV_API_PROXY_TARGET,
+        changeOrigin: true,
+      }
+    }
   },
   preview: {
     port: 3002,

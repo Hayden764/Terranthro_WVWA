@@ -1,7 +1,58 @@
 import express from 'express';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { pool } from '../db/pool.js';
 
 const router = express.Router();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const LOCAL_WINERIES_GEOJSON_PATH = path.resolve(__dirname, '../../../src/data/wineries.geojson');
+
+function isPointWithinBbox(geometry, bbox) {
+  if (!bbox || !geometry || geometry.type !== 'Point' || !Array.isArray(geometry.coordinates)) {
+    return true;
+  }
+  const [lng, lat] = geometry.coordinates;
+  const [w, s, e, n] = bbox;
+  return lng >= w && lng <= e && lat >= s && lat <= n;
+}
+
+async function loadLocalWineriesFallback({ bbox, hasParcels, category }) {
+  const raw = await readFile(LOCAL_WINERIES_GEOJSON_PATH, 'utf8');
+  const parsed = JSON.parse(raw);
+  const features = Array.isArray(parsed?.features) ? parsed.features : [];
+
+  const filtered = features
+    .filter((feature) => isPointWithinBbox(feature.geometry, bbox))
+    .filter((feature) => {
+      const featureCategory = feature?.properties?.category || 'winery';
+      if (category && featureCategory !== category) return false;
+      if (!hasParcels) return true;
+      const parcelCount = Number(feature?.properties?.parcel_count ?? feature?.properties?.polygon_count ?? 0);
+      return parcelCount > 0;
+    });
+
+  return {
+    type: 'FeatureCollection',
+    features: filtered.map((feature, index) => ({
+      type: 'Feature',
+      properties: {
+        id: feature?.properties?.id ?? feature?.properties?.recid ?? index + 1,
+        recid: feature?.properties?.recid ?? index + 1,
+        title: feature?.properties?.title || `Winery ${index + 1}`,
+        description: feature?.properties?.description || '',
+        phone: feature?.properties?.phone || '',
+        url: feature?.properties?.url || '',
+        image_url: feature?.properties?.image_url || '',
+        category: feature?.properties?.category || 'winery',
+        parcel_count: Number(feature?.properties?.parcel_count ?? feature?.properties?.polygon_count ?? 0),
+        data_source: 'local_fallback',
+      },
+      geometry: feature.geometry,
+    })),
+  };
+}
 
 /**
  * GET /api/wineries
@@ -76,7 +127,13 @@ router.get('/', async (req, res) => {
     });
   } catch (err) {
     console.error('GET /api/wineries error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    try {
+      const fallbackData = await loadLocalWineriesFallback({ bbox, hasParcels, category });
+      return res.json(fallbackData);
+    } catch (fallbackErr) {
+      console.error('GET /api/wineries local fallback error:', fallbackErr);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   }
 });
 

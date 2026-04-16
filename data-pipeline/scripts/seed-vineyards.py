@@ -38,8 +38,8 @@ BASE = Path("/Volumes/T7/Terranthro/WV_Vineyards")
 WINERIES_JSON   = BASE / "wineries.json"
 ADELSHEIM_GEOJSON = BASE / "Wineries_with_Polygons_Adelsheim.geojson"
 BLOCKS_CSV      = BASE / "adelsheim_vineyard_blocks.csv"
-CHEHALEM_GEOJSON = BASE / "ChehalemMtn_DundeeHills_Vineyards_merged.geojson"
-YC_GEOJSON      = BASE / "YC_Vineyards_gdb.geojson"
+CHEHALEM_GEOJSON = BASE / "ChehalemMtn_DundeeHills_Vineyards_merged_no_linked.geojson"
+YC_GEOJSON      = BASE / "YC_Vineyards_gdb_no_linked.geojson"
 
 # ── DB connection ──────────────────────────────────────────────────────────────
 def get_conn():
@@ -171,6 +171,8 @@ def seed_adelsheim_parcels(cur) -> dict:
                 geom,
             ))
 
+    cur.execute("DELETE FROM vineyard_parcels WHERE source_dataset = 'adelsheim'")
+
     inserted_ids = execute_values(
         cur,
         """
@@ -234,6 +236,8 @@ def seed_blocks(cur, name_to_parcel_ids: dict):
                 year,
             ))
 
+    cur.execute("DELETE FROM vineyard_blocks")
+
     execute_values(
         cur,
         """
@@ -282,6 +286,8 @@ def seed_chehalem_parcels(cur):
         ))
     if skipped:
         print(f"  Skipped {skipped} features with null/invalid geometry")
+
+    cur.execute("DELETE FROM vineyard_parcels WHERE source_dataset = 'chehalem-dundee'")
 
     execute_values(
         cur,
@@ -340,6 +346,8 @@ def seed_yc_parcels(cur):
             z1,
             geom,
         ))
+
+    cur.execute("DELETE FROM vineyard_parcels WHERE source_dataset = 'yamhill-carlton'")
 
     execute_values(
         cur,

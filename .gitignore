@@ -34,6 +34,9 @@ public/data/vineyards.geojson
 data-pipeline/data/
 data-pipeline/.wrangler/
 data-pipeline/terrain-cogs.log
+data-pipeline/.venv/
+data-pipeline/**/__pycache__/
+data-pipeline/**/*.pyc
 
 # Editor
 .vscode/

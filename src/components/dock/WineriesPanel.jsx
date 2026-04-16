@@ -1,14 +1,14 @@
 import { GLASS } from './glassTokens';
-import { LISTING_CATEGORIES, LISTINGS, LISTING_FILTER_MODES } from '../WVWAMap';
+import { LISTING_CATEGORIES, LISTING_FILTER_MODES } from '../WVWAMap';
 
 /**
  * WineriesPanel — "Wineries" dock panel.
  * Winery filter controls + scrollable listing directory.
  */
 
-export default function WineriesPanel({ listingFilterMode, onListingFilterModeChange, activeFilterLabel, vineyardRecidSet, onListingClick, onHoverListing, selectedAva, insideIds }) {
+export default function WineriesPanel({ listings = [], listingFilterMode, onListingFilterModeChange, activeFilterLabel, vineyardRecidSet, onListingClick, onHoverListing, selectedAva, insideIds }) {
   // Filter listings to winery records + selected mode + AVA allowlist (insideIds = null means all)
-  const visible = LISTINGS.filter(l =>
+  const visible = listingFilterMode === LISTING_FILTER_MODES.noWineriesVisualized ? [] : listings.filter(l =>
     l.category === 'winery' &&
     (listingFilterMode !== LISTING_FILTER_MODES.withVineyardPolygons || vineyardRecidSet.has(l.id)) &&
     (listingFilterMode !== LISTING_FILTER_MODES.withoutVineyardPolygons || !vineyardRecidSet.has(l.id)) &&
@@ -207,7 +207,7 @@ export default function WineriesPanel({ listingFilterMode, onListingFilterModeCh
             const cat = LISTING_CATEGORIES[listing.category];
             return (
               <button
-                key={listing.id}
+                key={listing.num ?? listing.id}
                 onClick={() => onListingClick?.(listing)}
                 style={{
                   display: 'flex',

@@ -8,55 +8,53 @@ import {
 } from '../config/topographyConfig';
 
 /**
- * Loads a topography raster tile for the currently selected sub-AVA only.
- * Fetches per-AVA statistics from TiTiler first so the colormap rescale is
- * relative to that specific AVA's actual data range (not a global range).
- * Reports the fetched stats back via onStats({ min, max, mean, std }).
+ * Loads the full Willamette Valley 1m LiDAR topography raster for the active
+ * layer type (elevation / slope / aspect).
+ *
+ * The single WV-wide COG is used regardless of which sub-AVA (if any) is
+ * selected. TiTiler statistics are fetched first to rescale the colormap to
+ * the actual data range.
+ *
+ * Reports stats back via onStats({ min, max, mean, std }).
  */
-const TopographyLayer = ({ map, activeLayer, selectedAva, onStats }) => {
+const TopographyLayer = ({ map, activeLayer, onStats }) => {
   const prevLayerRef = useRef(null);
-  const prevAvaRef   = useRef(null);
 
   useEffect(() => {
     if (!map) return;
 
-    const prev    = prevLayerRef.current;
-    const prevAva = prevAvaRef.current;
+    const prev = prevLayerRef.current;
 
-    const removeLayer = (slug, layerType) => {
-      if (!slug || !layerType) return;
+    const removeLayer = (layerType) => {
+      if (!layerType) return;
       try {
-        const lid = getTopoLayerId(slug, layerType);
-        const sid = getTopoSourceId(slug, layerType);
+        const lid = getTopoLayerId(layerType);
+        const sid = getTopoSourceId(layerType);
         if (map.getLayer(lid)) map.removeLayer(lid);
         if (map.getSource(sid)) map.removeSource(sid);
       } catch (e) { /* ignore */ }
     };
 
-    // Tear down whatever was previously shown
-    if (prevAva && prev && (prevAva !== selectedAva || prev !== activeLayer)) {
-      removeLayer(prevAva, prev);
+    // Tear down the previous layer if the active layer type changed
+    if (prev && prev !== activeLayer) {
+      removeLayer(prev);
       prevLayerRef.current = null;
-      prevAvaRef.current   = null;
     }
 
-    if (!activeLayer || !selectedAva) {
+    if (!activeLayer) {
       onStats?.(null);
       return;
     }
 
     let cancelled = false;
-
-    const statsUrl = getTopoStatsUrl(selectedAva, activeLayer);
+    const statsUrl = getTopoStatsUrl(activeLayer);
 
     const addTileLayer = (rescale) => {
       if (cancelled || !map) return;
 
-      const tileUrl = getTopoTileUrl(selectedAva, activeLayer, rescale);
-      if (!tileUrl) return;
-
-      const sourceId = getTopoSourceId(selectedAva, activeLayer);
-      const layerId  = getTopoLayerId(selectedAva, activeLayer);
+      const tileUrl  = getTopoTileUrl(activeLayer, rescale);
+      const sourceId = getTopoSourceId(activeLayer);
+      const layerId  = getTopoLayerId(activeLayer);
 
       try {
         if (map.getLayer(layerId)) map.removeLayer(layerId);
@@ -86,45 +84,39 @@ const TopographyLayer = ({ map, activeLayer, selectedAva, onStats }) => {
         }, beforeLayerId);
 
         prevLayerRef.current = activeLayer;
-        prevAvaRef.current   = selectedAva;
       } catch (e) {
-        console.warn(`TopographyLayer: failed to add ${selectedAva}/${activeLayer}`, e);
+        console.warn(`TopographyLayer: failed to add ${activeLayer}`, e);
       }
     };
 
-    // Fetch per-AVA stats → rescale colormap to actual data range
-    if (statsUrl) {
-      fetch(statsUrl)
-        .then(r => r.json())
-        .then(json => {
-          if (cancelled) return;
-          // TiTiler returns { "b1": { min, max, mean, std, ... } }
-          const band = json?.b1 ?? Object.values(json ?? {})[0];
-          if (band?.min != null && band?.max != null) {
-            const { min, max, mean, std } = band;
-            onStats?.({ min, max, mean, std });
-            addTileLayer(`${min},${max}`);
-          } else {
-            onStats?.(null);
-            addTileLayer(null);
-          }
-        })
-        .catch(() => {
-          if (cancelled) return;
+    // Fetch WV-level COG stats → rescale colormap to actual data range
+    fetch(statsUrl)
+      .then(r => r.json())
+      .then(json => {
+        if (cancelled) return;
+        // TiTiler returns { "b1": { min, max, mean, std, ... } }
+        const band = json?.b1 ?? Object.values(json ?? {})[0];
+        if (band?.min != null && band?.max != null) {
+          const { min, max, mean, std } = band;
+          onStats?.({ min, max, mean, std });
+          addTileLayer(`${min},${max}`);
+        } else {
           onStats?.(null);
-          addTileLayer(null);
-        });
-    } else {
-      onStats?.(null);
-      addTileLayer(null);
-    }
+          removeLayer(activeLayer);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        onStats?.(null);
+        removeLayer(activeLayer);
+      });
 
     return () => {
       cancelled = true;
       if (!map) return;
-      removeLayer(selectedAva, activeLayer);
+      removeLayer(activeLayer);
     };
-  }, [map, activeLayer, selectedAva]);
+  }, [map, activeLayer]);
 
   return null;
 };

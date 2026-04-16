@@ -132,6 +132,7 @@ const BUTTONS = [
 export default function DesktopDock({
   map,
   mapLoaded,
+  listings,
   selectedAva,
   onSelectAva,
   activeLayer,
@@ -147,6 +148,9 @@ export default function DesktopDock({
   onListingClick,
   onHoverListing,
   insideIds,
+  listingSymbologyPreset,
+  onListingSymbologyPresetChange,
+  listingSymbologyOptions,
 }) {
   // Panels are mutually exclusive — only one open at a time.
   const [activePanel, setActivePanel] = useState('wineries'); // 'view' | 'layers' | 'scale' | 'info' | 'wineries' | null
@@ -237,6 +241,7 @@ export default function DesktopDock({
       {activePanel === 'wineries' && (
         <PanelShell title="Wineries" onClose={closePanel}>
           <WineriesPanel
+            listings={listings}
             listingFilterMode={listingFilterMode}
             onListingFilterModeChange={onListingFilterModeChange}
             activeFilterLabel={activeFilterLabel}
@@ -270,7 +275,15 @@ export default function DesktopDock({
 
       {activePanel === 'view' && (
         <PanelShell title="View" onClose={closePanel}>
-          <MapToolkit map={map} mapLoaded={mapLoaded} selectedAva={selectedAva} onSelectAva={onSelectAva} />
+          <MapToolkit
+            map={map}
+            mapLoaded={mapLoaded}
+            selectedAva={selectedAva}
+            onSelectAva={onSelectAva}
+            listingSymbologyPreset={listingSymbologyPreset}
+            onListingSymbologyPresetChange={onListingSymbologyPresetChange}
+            listingSymbologyOptions={listingSymbologyOptions}
+          />
         </PanelShell>
       )}
 

@@ -27,6 +27,7 @@ function parseBbox(bboxStr) {
  *   ?dataset=adelsheim|chehalem-dundee|yamhill-carlton
  *   ?variety=Pinot+Noir            — ILIKE match on varietals_list
  *   ?winery_id=42                  — only parcels for a specific winery db id
+ *   ?linked=true                   — only parcels with a winery_id (linked to a winery record)
  */
 router.get('/parcels', async (req, res) => {
   const bbox = parseBbox(req.query.bbox);
@@ -34,6 +35,7 @@ router.get('/parcels', async (req, res) => {
   const dataset = req.query.dataset || null;
   const variety = req.query.variety || null;
   const wineryId = req.query.winery_id ? parseInt(req.query.winery_id, 10) : null;
+  const linkedOnly = req.query.linked === 'true';
 
   const params = [];
 
@@ -59,6 +61,8 @@ router.get('/parcels', async (req, res) => {
     ? `AND vp.winery_id = $${params.push(wineryId)}`
     : '';
 
+  const linkedCondition = linkedOnly ? 'AND vp.winery_id IS NOT NULL' : '';
+
   try {
     const { rows } = await pool.query(
       `
@@ -82,6 +86,7 @@ router.get('/parcels', async (req, res) => {
         ${datasetCondition}
         ${varietyCondition}
         ${wineryCondition}
+        ${linkedCondition}
       ORDER BY vp.vineyard_name
       `,
       params
@@ -175,6 +180,80 @@ router.get('/parcels/by-winery/:recid', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+/**
+ * GET /api/vineyards/parcels/:id/topo-stats
+ *
+ * Returns 1m LiDAR topography statistics for a specific vineyard parcel.
+ */
+router.get('/parcels/:id/topo-stats', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ error: 'Invalid parcel id' });
+
+  try {
+    const { rows } = await pool.query(
+      `
+      SELECT
+        parcel_id,
+        elevation_min_ft,
+        elevation_max_ft,
+        elevation_mean_ft,
+        elevation_std_ft,
+        slope_mean_deg,
+        slope_max_deg,
+        slope_p10_deg,
+        slope_p90_deg,
+        aspect_dominant_deg,
+        aspect_mean_deg,
+        pixel_count,
+        data_source
+      FROM vineyard_parcel_topo_stats
+      WHERE parcel_id = $1
+      `,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'No topo stats found for this parcel' });
+    }
+
+    const r = rows[0];
+    const topo = {
+      elevation_min_ft:    r.elevation_min_ft != null ? Number(r.elevation_min_ft) : null,
+      elevation_max_ft:    r.elevation_max_ft != null ? Number(r.elevation_max_ft) : null,
+      elevation_mean_ft:   r.elevation_mean_ft != null ? Number(r.elevation_mean_ft) : null,
+      elevation_std_ft:    r.elevation_std_ft != null ? Number(r.elevation_std_ft) : null,
+      slope_mean_deg:      r.slope_mean_deg != null ? Number(r.slope_mean_deg) : null,
+      slope_max_deg:       r.slope_max_deg != null ? Number(r.slope_max_deg) : null,
+      slope_p10_deg:       r.slope_p10_deg != null ? Number(r.slope_p10_deg) : null,
+      slope_p90_deg:       r.slope_p90_deg != null ? Number(r.slope_p90_deg) : null,
+      aspect_dominant_deg: r.aspect_dominant_deg != null ? Number(r.aspect_dominant_deg) : null,
+      aspect_mean_deg:     r.aspect_mean_deg != null ? Number(r.aspect_mean_deg) : null,
+      aspect_label:        degreesToCompass(r.aspect_dominant_deg),
+      pixel_count:         r.pixel_count,
+      data_source:         r.data_source,
+    };
+
+    res.json({ parcel_id: id, topo });
+  } catch (err) {
+    console.error('GET /api/vineyards/parcels/:id/topo-stats error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * Convert aspect degrees (0–360) to a 16-point compass label.
+ * Returns 'Flat' for negative values (flat terrain from GDAL).
+ */
+function degreesToCompass(deg) {
+  if (deg == null || deg < 0) return 'Flat';
+  const labels = [
+    'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+    'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW',
+  ];
+  const idx = Math.round(Number(deg) / 22.5) % 16;
+  return labels[idx];
+}
 
 /**
  * GET /api/vineyards/parcels/:id/blocks

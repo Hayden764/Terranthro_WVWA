@@ -59,6 +59,7 @@ const MAP_STYLE = MAPTILER_KEY
 let VINEYARD_BY_RECID = {};
 let LINKED_VINEYARD_BY_RECID = {};
 let VINEYARD_FEATURES_BY_NAME = {}; // keyed by normalized vineyard_name → [feature, ...]
+let VINEYARD_ALL_BY_NAME = {};      // keyed by normalized vineyard_name → [feature, ...] (all datasets)
 
 function getVineyardNameFromProperties(properties = {}) {
   return properties.vineyard_name || properties.Vineyard_Name || properties.A1_VineyardName || '';
@@ -1480,6 +1481,74 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
         blinkMapLayer(map, 'vineyards-selected-line', 'line-opacity', VINE_LINE);
       });
     },
+    selectVineyardByName(name, { lng, lat }) {
+      const map = mapRef.current;
+      if (!map) return;
+      const key = (name || '').trim().toLowerCase();
+      const features = VINEYARD_ALL_BY_NAME[key] ?? [];
+      // Linked = parcels with a winery association → green selected style
+      // Unlinked = reference-only parcels → white passive-hover style
+      const isLinked = features.some(f => f?.properties?.winery_recid != null);
+
+      if (isLinked) {
+        const src = map.getSource('vineyards-selected');
+        if (src) {
+          src.setData({ type: 'FeatureCollection', features });
+          raiseListingLayers(map);
+        }
+        map.easeTo({ center: [lng, lat], zoom: 15, duration: 1900 });
+        map.once('moveend', () => {
+          if (map.getLayer('vineyards-selected-fill'))
+            map.setLayoutProperty('vineyards-selected-fill', 'visibility', 'visible');
+          if (map.getLayer('vineyards-selected-line'))
+            map.setLayoutProperty('vineyards-selected-line', 'visibility', 'visible');
+          const VINE_FILL = [
+            { delay:   0, value: 0.85 },
+            { delay: 200, value: 0.04 },
+            { delay: 380, value: 0.85 },
+            { delay: 560, value: 0.04 },
+            { delay: 740, value: 0.85 },
+            { delay: 920, value: 0.2  },
+          ];
+          const VINE_LINE = [
+            { delay:   0, value: 1.0 },
+            { delay: 200, value: 0.06 },
+            { delay: 380, value: 1.0 },
+            { delay: 560, value: 0.06 },
+            { delay: 740, value: 1.0 },
+            { delay: 920, value: 0.9 },
+          ];
+          blinkMapLayer(map, 'vineyards-selected-fill', 'fill-opacity', VINE_FILL);
+          blinkMapLayer(map, 'vineyards-selected-line', 'line-opacity', VINE_LINE);
+        });
+      } else {
+        // Non-selectable vineyard: white outline blink matching the passive hover style
+        const src = map.getSource('vineyards-passive-hover');
+        if (src) {
+          src.setData({ type: 'FeatureCollection', features });
+          raiseListingLayers(map);
+        }
+        map.easeTo({ center: [lng, lat], zoom: 15, duration: 1900 });
+        map.once('moveend', () => {
+          const WHITE_LINE = [
+            { delay:   0, value: 1.0 },
+            { delay: 200, value: 0.06 },
+            { delay: 380, value: 1.0 },
+            { delay: 560, value: 0.06 },
+            { delay: 740, value: 1.0 },
+            { delay: 920, value: 0.0 },  // fade out — no persistent selected state
+          ];
+          blinkMapLayer(map, 'vineyards-passive-hover-line', 'line-opacity', WHITE_LINE);
+          // Clear the source after the blink finishes and restore default opacity
+          setTimeout(() => {
+            const passiveSrc = map.getSource('vineyards-passive-hover');
+            if (passiveSrc) passiveSrc.setData({ type: 'FeatureCollection', features: [] });
+            if (map.getLayer('vineyards-passive-hover-line'))
+              map.setPaintProperty('vineyards-passive-hover-line', 'line-opacity', 0.7);
+          }, 1050);
+        });
+      }
+    },
     flyToCoords({ lng, lat, zoom = 14 }) {
       if (mapRef.current) {
         mapRef.current.easeTo({ center: [lng, lat], zoom, duration: 1600 });
@@ -1871,11 +1940,17 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
           : { type: 'FeatureCollection', features: [] };
 
         VINEYARD_BY_RECID = {};
+        VINEYARD_ALL_BY_NAME = {};
         for (const feature of parcelLookupGeoJSON.features || []) {
           const recid = feature?.properties?.winery_recid;
           if (recid != null) {
             if (!VINEYARD_BY_RECID[recid]) VINEYARD_BY_RECID[recid] = [];
             VINEYARD_BY_RECID[recid].push(feature);
+          }
+          const vname = (feature?.properties?.vineyard_name || '').trim().toLowerCase();
+          if (vname) {
+            if (!VINEYARD_ALL_BY_NAME[vname]) VINEYARD_ALL_BY_NAME[vname] = [];
+            VINEYARD_ALL_BY_NAME[vname].push(feature);
           }
         }
         setVineyardRecidSet(new Set(Object.keys(VINEYARD_BY_RECID).map((id) => Number(id)).filter(Number.isFinite)));

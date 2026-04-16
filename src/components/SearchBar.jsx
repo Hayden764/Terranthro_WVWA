@@ -153,7 +153,7 @@ export default function SearchBar({ mapRef, onSelectAva }) {
     }
 
     if (result.type === 'vineyard' && result.lng != null && result.lat != null) {
-      mapRef.current?.flyToCoords({ lng: result.lng, lat: result.lat, zoom: 14 });
+      mapRef.current?.selectVineyardByName(result.label, { lng: result.lng, lat: result.lat });
     }
   }, [mapRef, onSelectAva]);
 

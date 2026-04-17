@@ -47,9 +47,7 @@ const FALLBACK_STYLE = {
   ],
 };
 const MAP_STYLE = MAPTILER_KEY
-  ? (import.meta.env.DEV
-    ? FALLBACK_STYLE
-    : `https://api.maptiler.com/maps/hybrid-v4/style.json?key=${MAPTILER_KEY}`)
+  ? `https://api.maptiler.com/maps/019d98dc-0865-7ac5-a184-a072f37b9509/style.json?key=${MAPTILER_KEY}`
   : FALLBACK_STYLE;
 
 // ── Vineyard parcel data (fetched at map load, indexed here at runtime) ──
@@ -1847,12 +1845,13 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: MAP_STYLE,
-      center: [-98.5795, 39.8283], // geographic center of the contiguous US
-      zoom: 3.5,
+      center: [-90, 20],
+      zoom: 1.8,
       pitch: 0,
       bearing: 0,
       minPitch: 0,
       maxPitch: 85,
+      projection: { type: 'globe' },
     });
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: true, showZoom: false }), 'bottom-right');
@@ -1868,6 +1867,34 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
       });
       map.setTerrain({ source: 'terrainSource', exaggeration: 2.0 });
       map.setMaxPitch(71);
+
+      // Space background + atmospheric halo for globe projection
+      try {
+        map.setFog({
+          'space-color': '#000000',
+          'star-intensity': 0.0,
+          'color': 'rgba(30, 60, 120, 0.6)',
+          'high-color': 'rgba(10, 30, 80, 0.8)',
+          'horizon-blend': 0.08,
+        });
+      } catch (e) {
+        console.warn('setFog not supported:', e);
+      }
+
+      // ── Intro fly-in fires immediately on load, before async data fetches ──
+      setTimeout(() => {
+        map.flyTo({
+          center:   [WV_CAMERA.lng, WV_CAMERA.lat],
+          zoom:     WV_CAMERA.zoom,
+          pitch:    WV_CAMERA.pitch,
+          bearing:  WV_CAMERA.bearing,
+          duration: 10000,
+          curve:    1.3,
+          speed:    0.2,
+          easing:   t => 1 - Math.pow(1 - t, 3)
+        });
+        map.once('moveend', () => setIntroComplete(true));
+      }, 300);
 
       // ── Load WV parent boundary ───────────────────────────────────────
       const wvRes = await fetch('/data/willamette_valley.geojson');
@@ -2585,21 +2612,6 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
         setHoveredListingRef.current?.(null);
       });
 
-      // ── Intro fly-in: single smooth arc from the US into the Willamette Valley ──
-      setTimeout(() => {
-        map.flyTo({
-          center:   [WV_CAMERA.lng, WV_CAMERA.lat],
-          zoom:     WV_CAMERA.zoom,
-          pitch:    WV_CAMERA.pitch,
-          bearing:  WV_CAMERA.bearing,
-          duration: 3600,
-          curve:    1.1,
-          speed:    0.5,
-          easing:   t => t * (2 - t),
-        });
-        map.once('moveend', () => setIntroComplete(true));
-      }, 300);
-
       setMapLoaded(true);
     });
 
@@ -2931,7 +2943,7 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
+      <div ref={mapContainerRef} style={{ width: '100%', height: '100%', background: '#000000' }} />
 
       {introComplete && (
         <DevLayerPanel

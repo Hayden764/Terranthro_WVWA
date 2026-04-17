@@ -90,11 +90,7 @@ export const LISTING_SYMBOLOGY_PRESETS = {
   heritagePremium: 'heritagePremium',
 };
 
-const LISTING_SYMBOLOGY_OPTIONS = [
-  { id: LISTING_SYMBOLOGY_PRESETS.estateMinimal, label: 'Estate Minimal' },
-  { id: LISTING_SYMBOLOGY_PRESETS.topoModern, label: 'Topo Modern' },
-  { id: LISTING_SYMBOLOGY_PRESETS.heritagePremium, label: 'Heritage Premium' },
-];
+const LISTING_SYMBOLOGY_OPTIONS = [];
 
 const LISTING_SYMBOLOGY_CONFIG = {
   [LISTING_SYMBOLOGY_PRESETS.estateMinimal]: {
@@ -168,7 +164,7 @@ const LISTING_SYMBOLOGY_CONFIG = {
   },
 };
 
-const DEFAULT_LISTING_SYMBOLOGY = LISTING_SYMBOLOGY_PRESETS.estateMinimal;
+const DEFAULT_LISTING_SYMBOLOGY = LISTING_SYMBOLOGY_PRESETS.topoModern;
 const LISTING_BASE_LAYER_IDS = [
   'listings-clusters',
   'listings-cluster-count',
@@ -1330,42 +1326,6 @@ function DevLayerPanel({
             <ToggleRow label="Topography Raster" keyName="topography" />
           </div>
 
-          <div style={groupStyle}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', opacity: 0.75, marginBottom: 6 }}>WINERY SYMBOLOGY</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {LISTING_SYMBOLOGY_OPTIONS.map((option) => {
-                const isActive = listingSymbologyPreset === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    onClick={() => onListingSymbologyPresetChange(option.id)}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      background: isActive ? 'rgba(142,21,55,0.2)' : 'rgba(250,247,242,0.06)',
-                      border: isActive ? '1px solid rgba(142,21,55,0.55)' : '1px solid rgba(250,247,242,0.2)',
-                      borderRadius: 8,
-                      color: isActive ? 'rgba(250,247,242,0.96)' : 'rgba(250,247,242,0.74)',
-                      fontSize: 11,
-                      fontWeight: isActive ? 700 : 600,
-                      cursor: 'pointer',
-                      padding: '7px 8px',
-                      letterSpacing: '0.02em',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>{option.label}</span>
-                    <span style={{ fontSize: 10, opacity: isActive ? 0.95 : 0.45 }}>
-                      {isActive ? 'ACTIVE' : 'APPLY'}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           <button
             onClick={onReset}
             style={{
@@ -1398,6 +1358,7 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
   const [listings, setListings]         = useState([]);
   const [mapLoaded, setMapLoaded]       = useState(false);
   const [introComplete, setIntroComplete] = useState(false);
+  const [markersVisible, setMarkersVisible] = useState(false);
   const [activeLayer, setActiveLayer]   = useState(null);
   const [topoStats, setTopoStats]       = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
@@ -1653,15 +1614,15 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
     if (!map.getStyle?.() || !map.isStyleLoaded?.()) return;
     // Keep markers explorable in both modes; use soft-focus instead of full hide.
     setListingVisibilityForVineyardFocus(map, false);
-    setListingVisibilityForIntro(map, introComplete);
+    setListingVisibilityForIntro(map, markersVisible);
     setListingVisualizationVisibility(
       map,
-      introComplete && listingFilterMode !== LISTING_FILTER_MODES.noWineriesVisualized,
+      markersVisible && listingFilterMode !== LISTING_FILTER_MODES.noWineriesVisualized,
     );
     setListingSoftFocus(map, !!selectedListing || vineyardFocusMode);
     setVineyardVisualizationVisibility(map, listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized);
     setVineyardReferenceSoftFocus(map, !!selectedListing);
-  }, [selectedListing, vineyardFocusMode, mapLoaded, introComplete, listingFilterMode]);
+  }, [selectedListing, vineyardFocusMode, mapLoaded, introComplete, markersVisible, listingFilterMode]);
   const listingFilterModeRef = useRef(LISTING_FILTER_MODES.allWineries);
   const vineyardRecidSetRef = useRef(new Set());
 
@@ -1753,16 +1714,16 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
       src.setData({ type: 'FeatureCollection', features: [] });
       return;
     }
-    const cat = LISTING_CATEGORIES[hoveredListing.category];
+    const presetColor = getListingSymbologyConfig(listingSymbologyPreset).markerFillColor;
     src.setData({
       type: 'FeatureCollection',
       features: [{
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [hoveredListing.lng, hoveredListing.lat] },
-        properties: { color: cat.color, num: String(hoveredListing.num) },
+        properties: { color: presetColor, num: String(hoveredListing.num) },
       }],
     });
-  }, [hoveredListing, mapLoaded]);
+  }, [hoveredListing, mapLoaded, listingSymbologyPreset]);
 
   // ── Sync selected-listing source with selectedListing state ──────────
   useEffect(() => {
@@ -1893,7 +1854,7 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
           speed:    0.2,
           easing:   t => 1 - Math.pow(1 - t, 3)
         });
-        map.once('moveend', () => setIntroComplete(true));
+        map.once('moveend', () => { setIntroComplete(true); setMarkersVisible(true); });
       }, 300);
 
       // ── Load WV parent boundary ───────────────────────────────────────
@@ -2382,7 +2343,7 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
             source: `ava-${ava.slug}`,
             paint: {
               'fill-color': ava.color,
-              'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.18, 0.05],
+              'fill-opacity': 0,
             },
           });
           map.addLayer({
@@ -2410,32 +2371,7 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
         }
       }
 
-      // ── Sub-AVA name labels ──────────────────────────────────────────
-      for (const ava of WV_SUB_AVAS) {
-        try {
-          const src = map.getSource(`ava-${ava.slug}`);
-          if (!src) continue;
-          map.addLayer({
-            id: `ava-${ava.slug}-label`,
-            type: 'symbol',
-            source: `ava-${ava.slug}`,
-            layout: {
-              'text-field': ava.name,
-              'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
-              'text-size': 11,
-              'text-max-width': 8,
-              'text-anchor': 'center',
-            },
-            paint: {
-              'text-color': BRAND.eggshell,
-              'text-halo-color': 'rgba(46,34,26,0.7)',
-              'text-halo-width': 1.5,
-              'text-opacity': 0.9,
-            },
-            minzoom: 9,
-          });
-        } catch (e) { /* ignore */ }
-      }
+
 
       // ── Dedicated AVA hover highlight layer (always on top of AVA boundaries) ──
       map.addSource('ava-hover', {
@@ -2646,16 +2582,14 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
         const isSelected = ava.slug === selectedAva;
         try {
           if (map.getLayer(`ava-${ava.slug}-fill`)) {
-            map.setPaintProperty(`ava-${ava.slug}-fill`, 'fill-opacity', isSelected ? 0.14 : 0);
+            map.setPaintProperty(`ava-${ava.slug}-fill`, 'fill-opacity', 0);
           }
           if (map.getLayer(`ava-${ava.slug}-line`)) {
             map.setPaintProperty(`ava-${ava.slug}-line`, 'line-color',   '#EDE2D4');
             map.setPaintProperty(`ava-${ava.slug}-line`, 'line-opacity', isSelected ? 1.0 : 0);
             map.setPaintProperty(`ava-${ava.slug}-line`, 'line-width',   isSelected ? 3.5 : 2.5);
           }
-          if (map.getLayer(`ava-${ava.slug}-label`)) {
-            map.setPaintProperty(`ava-${ava.slug}-label`, 'text-opacity', isSelected ? 1 : 0);
-          }
+
         } catch (e) { /* ignore */ }
       }
 
@@ -2705,7 +2639,7 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
           { delay: 400, value: 0.45 },
           { delay: 600, value: 0.03 },
           { delay: 800, value: 0.45 },
-          { delay: 1000, value: 0.14 },  // settle at normal selected opacity
+          { delay: 1000, value: 0 },  // settle at transparent
         ];
         blinkMapLayer(map, `ava-${_avaSlugForBlink}-fill`, 'fill-opacity', BLINK);
       };
@@ -2746,17 +2680,14 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
       for (const ava of WV_SUB_AVAS) {
         try {
           if (map.getLayer(`ava-${ava.slug}-fill`)) {
-            map.setPaintProperty(`ava-${ava.slug}-fill`, 'fill-opacity',
-              ['case', ['boolean', ['feature-state', 'hover'], false], 0.18, 0.05]);
+            map.setPaintProperty(`ava-${ava.slug}-fill`, 'fill-opacity', 0);
           }
           if (map.getLayer(`ava-${ava.slug}-line`)) {
             map.setPaintProperty(`ava-${ava.slug}-line`, 'line-opacity', 1.0);
             map.setPaintProperty(`ava-${ava.slug}-line`, 'line-width',
               ['case', ['boolean', ['feature-state', 'hover'], false], 3.5, 2.5]);
           }
-          if (map.getLayer(`ava-${ava.slug}-label`)) {
-            map.setPaintProperty(`ava-${ava.slug}-label`, 'text-opacity', 0.9);
-          }
+
         } catch (e) { /* ignore */ }
       }
 
@@ -2789,7 +2720,7 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
     if (!map || !mapLoaded) return;
 
     const shouldShowWineries =
-      introComplete &&
+      markersVisible &&
       devLayerToggles.wineries &&
       listingFilterMode !== LISTING_FILTER_MODES.noWineriesVisualized;
     const data = buildListingsGeoJSON(
@@ -2831,6 +2762,7 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
     listingSymbologyPreset,
     mapLoaded,
     introComplete,
+    markersVisible,
     devLayerToggles.wineries,
     listingFilterMode,
     listings,
@@ -2878,7 +2810,7 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
     for (const ava of WV_SUB_AVAS) {
       setLayerVisibility(map, `ava-${ava.slug}-fill`, devLayerToggles.avaBoundaries);
       setLayerVisibility(map, `ava-${ava.slug}-line`, devLayerToggles.avaBoundaries);
-      setLayerVisibility(map, `ava-${ava.slug}-label`, devLayerToggles.avaBoundaries);
+
     }
 
     const interactiveReferenceFilter = buildInteractiveReferenceVineyardFilter(devLayerToggles);
@@ -2987,20 +2919,6 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
         </div>
       )}
 
-      {/* Willamette logo — top-left map overlay */}
-      {introComplete && (
-      <div style={{
-        position: 'absolute', top: 16, left: 72, zIndex: 10,
-        pointerEvents: 'none',
-      }}>
-        <img
-          src="/willamette-logo.svg"
-          alt="Willamette Valley Wine Country"
-          style={{ height: 40, width: 'auto', display: 'block', filter: 'drop-shadow(0 2px 6px rgba(46,34,26,0.5))' }}
-        />
-      </div>
-      )}
-
       {/* Selected AVA badge — top center focal point when an AVA is selected */}
       {introComplete && selectedAva && (() => {
         const ava = WV_SUB_AVAS.find(a => a.slug === selectedAva);
@@ -3053,6 +2971,43 @@ const WVWAMap = forwardRef(function WVWAMap({ selectedAva, onSelectAva, onMarker
           activeLayer={isTopoActive ? activeLayer : null}
           onStats={setTopoStats}
         />
+      )}
+
+      {/* Winery markers toggle button */}
+      {introComplete && mapLoaded && (
+        <button
+          onClick={() => setMarkersVisible(v => !v)}
+          title={markersVisible ? 'Hide winery markers' : 'Show winery markers'}
+          style={{
+            position: 'absolute',
+            bottom: '88px',
+            right: '16px',
+            zIndex: 30,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '7px 14px',
+            borderRadius: '9999px',
+            border: '1px solid rgba(255,255,255,0.18)',
+            background: markersVisible
+              ? 'rgba(37,90,115,0.85)'
+              : 'rgba(15,23,42,0.72)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            color: markersVisible ? '#e0f2fe' : 'rgba(148,163,184,0.85)',
+            fontSize: '13px',
+            fontWeight: 500,
+            letterSpacing: '0.01em',
+            cursor: 'pointer',
+            transition: 'background 0.2s, color 0.2s',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/>
+          </svg>
+          {markersVisible ? 'Hide Wineries' : 'Show Wineries'}
+        </button>
       )}
 
       {/* Desktop Dock — always visible */}

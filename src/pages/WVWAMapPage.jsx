@@ -11,7 +11,7 @@ export default function WVWAMapPage() {
   const mapRef                                  = useRef(null);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', background: BRAND.eggshell }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', overflow: 'hidden', background: BRAND.eggshell }}>
       {/* Header */}
       <header style={{
         height: 56,
@@ -58,32 +58,6 @@ export default function WVWAMapPage() {
           }}
         />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
-          <button
-            onClick={() => {
-              if (selectedAva) {
-                setSelectedAva(null);
-              } else {
-                setModalOpen(true);
-              }
-            }}
-            style={{
-              background: selectedAva ? BRAND.burgundy : 'rgba(72,55,41,0.07)',
-              color: selectedAva ? BRAND.eggshell : BRAND.brownDark,
-              border: `1px solid ${selectedAva ? BRAND.burgundy : 'rgba(72,55,41,0.18)'}`,
-              borderRadius: 8,
-              padding: '6px 14px',
-              fontSize: 12,
-              fontWeight: 600,
-              fontFamily: 'Inter, sans-serif',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              letterSpacing: '0.02em',
-            }}
-          >
-            {selectedAva ? '← Back to Valley' : 'Explore AVAs'}
-          </button>
-        </div>
       </header>
 
       {/* Map fills remaining height */}

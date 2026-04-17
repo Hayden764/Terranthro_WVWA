@@ -11,8 +11,10 @@
 html, body, #root {
   width: 100%;
   height: 100%;
-  overflow: hidden;
 }
+
+/* Map page needs no overflow; portal/admin pages scroll naturally.
+   The map page applies overflow:hidden locally via its own styles. */
 
 body {
   font-family: 'Inter', 'Helvetica Neue', sans-serif;

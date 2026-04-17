@@ -72,9 +72,14 @@ router.get('/parcels', async (req, res) => {
         vp.source_dataset,
         vp.vineyard_name,
         vp.vineyard_org,
-        vp.acres,
+        vp.owner_name,
+        vp.ava_name,
         vp.nested_ava,
         vp.nested_nested_ava,
+        vp.situs_address,
+        vp.situs_city,
+        vp.situs_zip,
+        vp.acres,
         vp.varietals_list,
         w.recid AS winery_recid,
         w.title AS winery_title,
@@ -102,9 +107,14 @@ router.get('/parcels', async (req, res) => {
           source_dataset:   row.source_dataset,
           vineyard_name:    row.vineyard_name,
           vineyard_org:     row.vineyard_org,
-          acres:            row.acres != null ? Number(row.acres) : null,
+          owner_name:       row.owner_name,
+          ava_name:         row.ava_name,
           nested_ava:       row.nested_ava,
           nested_nested_ava: row.nested_nested_ava,
+          situs_address:    row.situs_address,
+          situs_city:       row.situs_city,
+          situs_zip:        row.situs_zip,
+          acres:            row.acres != null ? Number(row.acres) : null,
           varietals_list:   row.varietals_list,
           winery_recid:     row.winery_recid,
           winery_title:     row.winery_title,
@@ -177,6 +187,102 @@ router.get('/parcels/by-winery/:recid', async (req, res) => {
     });
   } catch (err) {
     console.error('GET /api/vineyards/parcels/by-winery/:recid error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PATCH /api/vineyards/parcels/:id/metadata
+ *
+ * Updates editable text/numeric fields for a vineyard parcel.
+ * Body: any subset of { vineyard_name, vineyard_org, owner_name, ava_name,
+ *   nested_ava, nested_nested_ava, situs_address, situs_city, situs_zip,
+ *   acres, varietals_list, source_dataset, winery_id }
+ */
+router.patch('/parcels/:id/metadata', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ error: 'Invalid parcel id' });
+
+  const ALLOWED = [
+    'vineyard_name', 'vineyard_org', 'owner_name', 'ava_name',
+    'nested_ava', 'nested_nested_ava', 'situs_address', 'situs_city',
+    'situs_zip', 'acres', 'varietals_list', 'source_dataset', 'winery_id',
+  ];
+
+  const updates = {};
+  for (const key of ALLOWED) {
+    if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+      updates[key] = req.body[key] === '' ? null : req.body[key];
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: 'No valid fields to update' });
+  }
+
+  // Validate winery_id if provided
+  if (updates.winery_id !== undefined && updates.winery_id !== null) {
+    const wid = parseInt(updates.winery_id, 10);
+    if (isNaN(wid)) return res.status(400).json({ error: 'winery_id must be an integer' });
+    updates.winery_id = wid;
+  }
+
+  // Validate acres if provided
+  if (updates.acres !== undefined && updates.acres !== null) {
+    const ac = parseFloat(updates.acres);
+    if (isNaN(ac) || ac < 0) return res.status(400).json({ error: 'acres must be a non-negative number' });
+    updates.acres = ac;
+  }
+
+  const setClauses = Object.keys(updates).map((col, i) => `${col} = $${i + 1}`);
+  const values = [...Object.values(updates), id];
+
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE vineyard_parcels SET ${setClauses.join(', ')} WHERE id = $${values.length}`,
+      values
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Parcel not found' });
+    res.json({ success: true, id, updated: Object.keys(updates) });
+  } catch (err) {
+    console.error('PATCH /api/vineyards/parcels/:id/metadata error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PATCH /api/vineyards/parcels/:id/geometry
+ *
+ * Replaces the PostGIS geometry for a specific vineyard parcel.
+ * Body: { "geometry": <GeoJSON Geometry — Polygon or MultiPolygon> }
+ * Protected by requireApiKey via the router-level middleware in app.js.
+ */
+router.patch('/parcels/:id/geometry', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ error: 'Invalid parcel id' });
+
+  const { geometry } = req.body;
+  if (!geometry || typeof geometry !== 'object') {
+    return res.status(400).json({ error: 'Request body must include a geometry object' });
+  }
+  if (!['Polygon', 'MultiPolygon'].includes(geometry.type)) {
+    return res.status(400).json({ error: 'geometry.type must be Polygon or MultiPolygon' });
+  }
+  if (!Array.isArray(geometry.coordinates)) {
+    return res.status(400).json({ error: 'geometry.coordinates is required' });
+  }
+
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE vineyard_parcels
+       SET geometry = ST_SetSRID(ST_GeomFromGeoJSON($1::text), 4326)
+       WHERE id = $2`,
+      [JSON.stringify(geometry), id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Parcel not found' });
+    res.json({ success: true, id });
+  } catch (err) {
+    console.error('PATCH /api/vineyards/parcels/:id/geometry error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 
@@ -10,7 +11,11 @@ import climateRoutes from './routes/climate.js';
 import vineyardRoutes from './routes/vineyards.js';
 import wineryRoutes from './routes/wineries.js';
 import searchRoutes from './routes/search.js';
+import authRoutes from './routes/auth.js';
+import portalRoutes from './routes/portal.js';
+import adminRoutes from './routes/admin.js';
 import { requireApiKey } from './middleware/apiKey.js';
+import { requirePortalAuth } from './middleware/portalAuth.js';
 import { pool } from './db/pool.js';
 
 dotenv.config();
@@ -53,7 +58,9 @@ const DEV_ORIGINS = [
 
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' ? PROD_ORIGINS : DEV_ORIGINS,
+  credentials: true,
 }));
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -65,6 +72,9 @@ app.use('/api/climate', climateRoutes);
 app.use('/api/wineries', requireApiKey, wineryRoutes);
 app.use('/api/vineyards', requireApiKey, vineyardRoutes);
 app.use('/api/search', requireApiKey, searchRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/portal', requirePortalAuth, portalRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check — includes DB connectivity
 app.get('/api/health', async (req, res) => {

@@ -1,14 +1,26 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
-const DEV_API_PROXY_TARGET =
-  process.env.VITE_API_PROXY_TARGET ||
-  process.env.VITE_API_BASE_URL ||
-  'https://terranthrowvwa-production.up.railway.app';
+export default defineConfig(({ mode }) => {
+  // Load .env so VITE_API_PROXY_TARGET is available inside the config file.
+  // Without loadEnv, process.env doesn't see .env values here.
+  const env = loadEnv(mode, process.cwd(), '');
 
-export default defineConfig({
+  const DEV_API_PROXY_TARGET =
+    env.VITE_API_PROXY_TARGET ||
+    env.VITE_API_BASE_URL ||
+    'https://terranthrowvwa-production.up.railway.app';
+
+  return {
   plugins: [react()],
   base: '/',
+  resolve: {
+    // @mapbox/mapbox-gl-draw imports 'mapbox-gl' internally.
+    // Redirect it to maplibre-gl so we don't ship two map libraries.
+    alias: {
+      'mapbox-gl': 'maplibre-gl',
+    },
+  },
   publicDir: 'public',
   build: {
     outDir: 'dist',
@@ -46,4 +58,5 @@ export default defineConfig({
     strictPort: false,
     host: true
   }
+  };
 });

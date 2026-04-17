@@ -25,8 +25,20 @@ export async function apiFetch(path, options = {}) {
 
 export async function apiJson(path, options = {}) {
   const res = await apiFetch(path, options);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+
+  // Safely parse body — empty or non-JSON responses (e.g. Railway 502 during deploy)
+  // should produce a meaningful error rather than crashing with "Unexpected end of JSON".
+  let data;
+  const text = await res.text();
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = {};
+  }
+
+  if (!res.ok) {
+    throw new Error(data.error || `Request failed (${res.status})`);
+  }
   return data;
 }
 

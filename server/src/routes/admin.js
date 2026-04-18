@@ -250,13 +250,42 @@ router.post('/requests/:id/approve', async (req, res) => {
         break;
       }
 
-      // vineyard_blocks, vineyard_new, geometry_update: no auto-apply,
-      // admin handles manually, but status is still updated.
+      // vineyard_blocks, vineyard_new: no auto-apply, admin handles manually.
       case 'vineyard_blocks':
       case 'vineyard_new':
-      case 'geometry_update':
-        // These are noted for manual processing; the payload is stored.
         break;
+
+      case 'geometry_update': {
+        // If the payload contains new_geometry (GeoJSON), apply it now.
+        if (payload.new_geometry && request.target_id) {
+          const geomType = payload.new_geometry.type;
+          if (!['Polygon', 'MultiPolygon'].includes(geomType)) {
+            await client.query('ROLLBACK');
+            return res.status(422).json({ error: `Invalid geometry type: ${geomType}` });
+          }
+          const { rows: oldGeom } = await client.query(
+            `SELECT ST_AsGeoJSON(geometry)::json AS geometry FROM vineyard_parcels WHERE id = $1`,
+            [request.target_id]
+          );
+          await client.query(
+            `UPDATE vineyard_parcels
+             SET geometry = ST_SetSRID(ST_GeomFromGeoJSON($1), 4326),
+                 acres = ROUND((ST_Area(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)::geography) / 4046.856422)::numeric, 3)
+             WHERE id = $2 AND winery_id = $3`,
+            [JSON.stringify(payload.new_geometry), request.target_id, request.winery_id]
+          );
+          await client.query(
+            `INSERT INTO winery_edit_log
+               (winery_id, account_id, admin_id, request_id, table_name, record_id, field_name, old_value, new_value)
+             VALUES ($1, $2, $3, $4, 'vineyard_parcels', $5, 'geometry', $6, $7)`,
+            [request.winery_id, request.account_id, adminId, requestId,
+             request.target_id,
+             oldGeom[0] ? JSON.stringify(oldGeom[0].geometry) : null,
+             JSON.stringify(payload.new_geometry)]
+          );
+        }
+        break;
+      }
 
       default:
         break;
@@ -306,6 +335,40 @@ router.post('/requests/:id/reject', async (req, res) => {
     res.json({ success: true, status: 'rejected' });
   } catch (err) {
     console.error('Reject request error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ─── Single request detail ───────────────────────────────────────
+
+/**
+ * GET /api/admin/requests/:id
+ * Returns a single edit request by ID.
+ */
+router.get('/requests/:id', async (req, res) => {
+  const requestId = parseInt(req.params.id, 10);
+  if (isNaN(requestId)) return res.status(400).json({ error: 'Invalid id' });
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT
+         er.id, er.winery_id, er.account_id, er.request_type,
+         er.target_id, er.payload, er.status, er.admin_notes,
+         er.reviewed_at, er.created_at,
+         w.title AS winery_name,
+         wa.contact_email,
+         aa.display_name AS reviewed_by_name
+       FROM edit_requests er
+       JOIN wineries w ON w.id = er.winery_id
+       JOIN winery_accounts wa ON wa.id = er.account_id
+       LEFT JOIN admin_accounts aa ON aa.id = er.reviewed_by
+       WHERE er.id = $1`,
+      [requestId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Admin get request error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

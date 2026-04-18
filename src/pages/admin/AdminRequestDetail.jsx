@@ -9,8 +9,10 @@
  *   - other types      → formatted JSON payload
  *   - Approve / Reject actions (if pending)
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { apiJson, apiPost } from '../../lib/api';
 import AdminGeometryDiffMap from './AdminGeometryDiffMap';
 
@@ -65,6 +67,13 @@ export default function AdminRequestDetail() {
 
   const payload = request.payload || {};
   const isPending = request.status === 'pending';
+  const parcel = request.parcel || null;
+  const isGeometryUpdate = request.request_type === 'geometry_update';
+
+  // For geometry_update, use parcel.geometry as old_geometry fallback
+  const effectivePayload = isGeometryUpdate
+    ? { ...payload, old_geometry: payload.old_geometry || parcel?.geometry || null }
+    : payload;
 
   return (
     <Shell>
@@ -77,7 +86,7 @@ export default function AdminRequestDetail() {
       </Link>
 
       {/* Header row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 20, color: '#e0e0e0', margin: '0 0 4px' }}>
             {request.request_type.replace(/_/g, ' ')}
@@ -86,14 +95,20 @@ export default function AdminRequestDetail() {
           <p style={{ margin: 0, fontSize: 13, color: '#aaa' }}>
             <strong style={{ color: '#ccc' }}>{request.winery_name}</strong>
             {' · '}{request.contact_email}
-            {request.target_id && <span style={{ color: '#666' }}> · Parcel #{request.target_id}</span>}
+            {parcel && (
+              <span style={{ color: '#888' }}>
+                {' · '}{parcel.vineyard_name || `Parcel #${request.target_id}`}
+                {parcel.acres && ` · ${Number(parcel.acres).toFixed(1)} ac`}
+                {parcel.ava_name && ` · ${parcel.ava_name}`}
+              </span>
+            )}
           </p>
         </div>
         <StatusBadge status={request.status} />
       </div>
 
       {/* Timestamps */}
-      <div style={{ fontSize: 11, color: '#555', marginBottom: 24, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ fontSize: 11, color: '#555', marginBottom: 20, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <span>Submitted {new Date(request.created_at).toLocaleString()}</span>
         {request.reviewed_at && (
           <span>
@@ -106,14 +121,37 @@ export default function AdminRequestDetail() {
 
       {/* Admin notes (if already reviewed) */}
       {request.admin_notes && (
-        <div style={{ ...infoBox, borderColor: 'rgba(255,193,7,0.2)', marginBottom: 24 }}>
+        <div style={{ ...infoBox, borderColor: 'rgba(255,193,7,0.2)', marginBottom: 20 }}>
           <SectionLabel>Admin note</SectionLabel>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>{request.admin_notes}</p>
         </div>
       )}
 
-      {/* ── Payload viewer ── */}
-      <PayloadSection requestType={request.request_type} payload={payload} />
+      {/* ── Two-column layout for requests with a parcel ── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: parcel?.geometry ? '1fr 340px' : '1fr',
+        gap: 24,
+        alignItems: 'start',
+      }}>
+        {/* Left: payload diff */}
+        <div>
+          <PayloadSection requestType={request.request_type} payload={effectivePayload} />
+        </div>
+
+        {/* Right: parcel context map (always shown when geometry exists) */}
+        {parcel?.geometry && !isGeometryUpdate && (
+          <div style={{ position: 'sticky', top: 20 }}>
+            <SectionLabel>Parcel location</SectionLabel>
+            <ParcelContextMap geometry={parcel.geometry} />
+            <div style={{ fontSize: 11, color: '#555', marginTop: 6 }}>
+              {parcel.vineyard_name && <div style={{ color: '#888' }}>{parcel.vineyard_name}</div>}
+              {parcel.ava_name && <div>{parcel.ava_name}</div>}
+              {parcel.acres && <div>{Number(parcel.acres).toFixed(1)} acres</div>}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ── Actions ── */}
       {isPending && (
@@ -172,6 +210,62 @@ export default function AdminRequestDetail() {
         <p style={{ fontSize: 12, color: '#81c784', marginTop: 12 }}>Action applied successfully.</p>
       )}
     </Shell>
+  );
+}
+
+// ── ParcelContextMap ────────────────────────────────────────────────────────
+// A small single-parcel reference map used for non-geometry requests.
+
+const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
+const MAP_STYLE_URL = MAPTILER_KEY
+  ? `https://api.maptiler.com/maps/019d98dc-0865-7ac5-a184-a072f37b9509/style.json?key=${MAPTILER_KEY}`
+  : {
+      version: 8,
+      sources: { esri: { type: 'raster', tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256 } },
+      layers: [{ id: 'esri-bg', type: 'raster', source: 'esri' }],
+    };
+
+function bboxFromGeometry(geometry) {
+  let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+  function proc(coords) {
+    if (typeof coords[0] === 'number') {
+      const [lng, lat] = coords;
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng;
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
+    } else { coords.forEach(proc); }
+  }
+  proc(geometry.coordinates);
+  return [[minLng, minLat], [maxLng, maxLat]];
+}
+
+function ParcelContextMap({ geometry }) {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!containerRef.current || !geometry) return;
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: MAP_STYLE_URL,
+      center: [-123.05, 45.2],
+      zoom: 10,
+      attributionControl: false,
+      interactive: false,
+    });
+    map.on('load', () => {
+      map.addSource('parcel', { type: 'geojson', data: { type: 'Feature', geometry, properties: {} } });
+      map.addLayer({ id: 'parcel-fill', type: 'fill', source: 'parcel', paint: { 'fill-color': '#4CAF50', 'fill-opacity': 0.3 } });
+      map.addLayer({ id: 'parcel-line', type: 'line', source: 'parcel', paint: { 'line-color': '#4CAF50', 'line-width': 2 } });
+      const bbox = bboxFromGeometry(geometry);
+      if (isFinite(bbox[0][0])) map.fitBounds(bbox, { padding: 32, maxZoom: 17 });
+    });
+    return () => { map.remove(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+      <div ref={containerRef} style={{ height: 240 }} />
+    </div>
   );
 }
 

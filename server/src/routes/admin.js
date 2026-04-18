@@ -366,7 +366,23 @@ router.get('/requests/:id', async (req, res) => {
       [requestId]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
-    res.json(rows[0]);
+
+    const request = rows[0];
+
+    // If there's a target_id, fetch the current parcel geometry for map context
+    if (request.target_id) {
+      const { rows: parcelRows } = await pool.query(
+        `SELECT vineyard_name, acres, ava_name,
+                ST_AsGeoJSON(geometry)::json AS geometry
+         FROM vineyard_parcels WHERE id = $1`,
+        [request.target_id]
+      );
+      if (parcelRows.length > 0) {
+        request.parcel = parcelRows[0];
+      }
+    }
+
+    res.json(request);
   } catch (err) {
     console.error('Admin get request error:', err);
     res.status(500).json({ error: 'Server error' });

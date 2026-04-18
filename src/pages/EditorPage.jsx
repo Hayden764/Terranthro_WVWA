@@ -326,14 +326,17 @@ export default function EditorPage() {
         throw new Error(err.error || res.statusText);
       }
 
-      // Update local source so the parcel reflects the new shape immediately
+      const saved = await res.json();
+      const newAcres = saved.acres ?? null;
+
+      // Update local source so the parcel reflects the new shape and recalculated acres immediately
       setParcels((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
           features: prev.features.map((f) =>
             f.properties.id === selectedParcel.properties.id
-              ? { ...f, geometry: edited.geometry }
+              ? { ...f, geometry: edited.geometry, properties: { ...f.properties, acres: newAcres } }
               : f
           ),
         };

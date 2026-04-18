@@ -41,16 +41,6 @@ export default function AdminDashboard() {
     navigate('/admin', { replace: true });
   }
 
-  async function handleAction(id, action) {
-    const notes = action === 'reject' ? prompt('Rejection reason (optional):') : null;
-    try {
-      await apiPost(`/api/admin/requests/${id}/${action}`, { admin_notes: notes || undefined });
-      load();
-    } catch {
-      // ignore
-    }
-  }
-
   async function handleCreateAccount(e) {
     e.preventDefault();
     try {
@@ -131,52 +121,55 @@ export default function AdminDashboard() {
           {requests.length === 0 ? (
             <p style={{ color: '#888', fontSize: 13 }}>No {filter} requests.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {requests.map((r) => (
-                <div key={r.id} style={cardStyle}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <span style={{ fontWeight: 600, fontSize: 14, color: '#e0e0e0' }}>
-                        {r.request_type.replace(/_/g, ' ')}
-                      </span>
-                      <span style={{ color: '#888', fontSize: 12, marginLeft: 8 }}>
-                        #{r.id}
-                      </span>
+                <Link
+                  key={r.id}
+                  to={`/admin/requests/${r.id}`}
+                  style={{ textDecoration: 'none', display: 'block' }}
+                >
+                  <div style={{
+                    ...cardStyle,
+                    transition: 'background 0.15s, border-color 0.15s',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.07)';
+                    e.currentTarget.style.borderColor = 'rgba(74,144,217,0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                  }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <span style={{ fontWeight: 600, fontSize: 14, color: '#e0e0e0' }}>
+                          {r.request_type.replace(/_/g, ' ')}
+                        </span>
+                        <span style={{ color: '#666', fontSize: 12, marginLeft: 8 }}>#{r.id}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <StatusBadge status={r.status} />
+                        <span style={{ fontSize: 11, color: '#4a90d9' }}>View →</span>
+                      </div>
                     </div>
-                    <StatusBadge status={r.status} />
-                  </div>
-                  <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>
-                    <strong>{r.winery_name}</strong> · {r.contact_email}
-                    {r.target_id && ` · target: ${r.target_id}`}
-                  </div>
-                  <pre style={{
-                    fontSize: 11, color: '#999', marginTop: 8, whiteSpace: 'pre-wrap',
-                    background: 'rgba(0,0,0,0.2)', padding: '8px 10px', borderRadius: 6,
-                    overflow: 'auto', maxHeight: 120,
-                  }}>
-                    {JSON.stringify(r.payload, null, 2)}
-                  </pre>
-                  {r.admin_notes && (
-                    <p style={{ fontSize: 12, color: '#aaa', marginTop: 6, fontStyle: 'italic' }}>
-                      Admin: {r.admin_notes}
-                    </p>
-                  )}
-                  <div style={{ fontSize: 11, color: '#666', marginTop: 6 }}>
-                    {new Date(r.created_at).toLocaleString()}
-                    {r.reviewed_at && ` · reviewed ${new Date(r.reviewed_at).toLocaleString()}`}
-                  </div>
-
-                  {r.status === 'pending' && (
-                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                      <button onClick={() => handleAction(r.id, 'approve')} style={approveBtnStyle}>
-                        Approve
-                      </button>
-                      <button onClick={() => handleAction(r.id, 'reject')} style={rejectBtnStyle}>
-                        Reject
-                      </button>
+                    <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>
+                      <strong style={{ color: '#ccc' }}>{r.winery_name}</strong>
+                      {' · '}{r.contact_email}
+                      {r.target_id && <span style={{ color: '#666' }}> · Parcel #{r.target_id}</span>}
                     </div>
-                  )}
-                </div>
+                    <div style={{ fontSize: 11, color: '#555', marginTop: 6 }}>
+                      {new Date(r.created_at).toLocaleString()}
+                      {r.reviewed_at && ` · reviewed ${new Date(r.reviewed_at).toLocaleString()}`}
+                    </div>
+                    {r.admin_notes && (
+                      <p style={{ fontSize: 11, color: '#888', marginTop: 4, fontStyle: 'italic', margin: '4px 0 0' }}>
+                        Note: {r.admin_notes}
+                      </p>
+                    )}
+                  </div>
+                </Link>
               ))}
             </div>
           )}
@@ -296,12 +289,6 @@ const outlineBtn = {
 const approveBtnStyle = {
   padding: '6px 16px', borderRadius: 6, border: 'none',
   background: '#2e7d32', color: '#fff', fontSize: 12,
-  fontWeight: 600, cursor: 'pointer',
-};
-
-const rejectBtnStyle = {
-  padding: '6px 16px', borderRadius: 6, border: 'none',
-  background: '#c62828', color: '#fff', fontSize: 12,
   fontWeight: 600, cursor: 'pointer',
 };
 

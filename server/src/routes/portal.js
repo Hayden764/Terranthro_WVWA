@@ -18,10 +18,11 @@ const REQUEST_SCHEMAS = {
   profile: ['description', 'phone', 'url', 'image_url'],
   vineyard_varietals: ['varietals_list'],
   vineyard_blocks: ['block_name', 'variety', 'clone', 'rootstock', 'rows', 'spacing',
-                     'vines_per_acre', 'vines', 'acres', 'year_planted'],
+                     'vines_per_acre', 'vines', 'acres', 'year_planted',
+                     'block_changes', 'new_blocks'],
   vineyard_claim: ['vineyard_name', 'notes'],
   vineyard_new: ['vineyard_name', 'notes', 'ava_name'],
-  geometry_update: ['notes', 'geometry_description'],
+  geometry_update: ['notes', 'geometry_description', 'old_geometry', 'new_geometry'],
 };
 
 /**

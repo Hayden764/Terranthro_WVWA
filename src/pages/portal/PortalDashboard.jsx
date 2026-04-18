@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { BRAND } from '../../config/brandColors';
 import { apiJson, apiPost } from '../../lib/api';
+import PortalVineyardMap from '../../components/PortalVineyardMap';
 
 export default function PortalDashboard() {
   const navigate = useNavigate();
@@ -64,10 +65,34 @@ export default function PortalDashboard() {
 
       {/* Quick stats */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 32, flexWrap: 'wrap' }}>
-        <StatCard label="Vineyards" value={vineyards.length} />
+        <StatCard label="Vineyards" value={groupVineyardsByName(vineyards).length} />
         <StatCard label="Total Acres" value={vineyards.reduce((s, v) => s + Number(v.acres || 0), 0).toFixed(1)} />
         <StatCard label="Pending Requests" value={pendingRequests.length} />
       </div>
+
+      {/* Vineyard map */}
+      {vineyards.length > 0 && (
+        <Section title="Vineyard Map">
+          <PortalVineyardMap
+            parcels={vineyards}
+            height={360}
+            onParcelClick={(parcel) => {
+              const groups = groupVineyardsByName(vineyards);
+              const group = groups.find((g) =>
+                g.parcels.some((p) => p.id === parcel.id)
+              );
+              if (group && group.parcels.length > 1) {
+                navigate(`/portal/vineyards/group?name=${encodeURIComponent(group.name)}`);
+              } else {
+                navigate(`/portal/vineyards/${parcel.id}`);
+              }
+            }}
+          />
+          <p style={{ fontSize: 12, color: BRAND.textMuted, marginTop: 8 }}>
+            Click a parcel to view details.
+          </p>
+        </Section>
+      )}
 
       {/* Profile section */}
       <Section title="Winery Profile">
@@ -79,29 +104,38 @@ export default function PortalDashboard() {
         </div>
       </Section>
 
-      {/* Vineyards */}
+      {/* Vineyards — grouped by name */}
       <Section title="Linked Vineyards">
         {vineyards.length === 0 ? (
           <p style={{ color: BRAND.textMuted, fontSize: 14 }}>No vineyards linked yet.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {vineyards.map((v) => (
-              <Link
-                key={v.id}
-                to={`/portal/vineyards/${v.id}`}
-                style={{
-                  display: 'block', padding: '14px 16px', borderRadius: 8,
-                  border: `1px solid ${BRAND.border}`, background: BRAND.eggshell,
-                  textDecoration: 'none', color: BRAND.text,
-                }}
-              >
-                <div style={{ fontWeight: 600, fontSize: 15 }}>{v.vineyard_name || 'Unnamed Parcel'}</div>
-                <div style={{ fontSize: 13, color: BRAND.textMuted, marginTop: 4 }}>
-                  {v.nested_ava || v.ava_name || '—'} · {Number(v.acres || 0).toFixed(1)} acres
-                  {v.blocks.length > 0 && ` · ${v.blocks.length} blocks`}
-                </div>
-              </Link>
-            ))}
+            {groupVineyardsByName(vineyards).map((group) => {
+              const totalAcres = group.parcels.reduce((s, v) => s + Number(v.acres || 0), 0);
+              const totalBlocks = group.parcels.reduce((s, v) => s + (v.blocks?.length || 0), 0);
+              const ava = group.parcels[0]?.nested_ava || group.parcels[0]?.ava_name || '—';
+              const href = group.parcels.length === 1
+                ? `/portal/vineyards/${group.parcels[0].id}`
+                : `/portal/vineyards/group?name=${encodeURIComponent(group.name)}`;
+              return (
+                <Link
+                  key={group.name}
+                  to={href}
+                  style={{
+                    display: 'block', padding: '14px 16px', borderRadius: 8,
+                    border: `1px solid ${BRAND.border}`, background: BRAND.eggshell,
+                    textDecoration: 'none', color: BRAND.text,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>{group.name}</div>
+                  <div style={{ fontSize: 13, color: BRAND.textMuted, marginTop: 4 }}>
+                    {ava} · {totalAcres.toFixed(1)} acres
+                    {group.parcels.length > 1 && ` · ${group.parcels.length} parcels`}
+                    {totalBlocks > 0 && ` · ${totalBlocks} blocks`}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
         <div style={{ marginTop: 16 }}>
@@ -228,3 +262,21 @@ const linkBtnStyle = {
   color: BRAND.brownLight,
   cursor: 'pointer',
 };
+
+/* ── Helpers ─────────────────────────────────────── */
+
+/**
+ * Group an array of vineyard parcels by `vineyard_name`.
+ * Returns [{name, parcels}] sorted alphabetically.
+ */
+function groupVineyardsByName(vineyards) {
+  const map = new Map();
+  for (const v of vineyards) {
+    const key = (v.vineyard_name || 'Unnamed Parcel').trim();
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(v);
+  }
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, parcels]) => ({ name, parcels }));
+}

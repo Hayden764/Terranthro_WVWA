@@ -273,14 +273,16 @@ router.patch('/parcels/:id/geometry', async (req, res) => {
   }
 
   try {
-    const { rowCount } = await pool.query(
+    const { rowCount, rows } = await pool.query(
       `UPDATE vineyard_parcels
-       SET geometry = ST_SetSRID(ST_GeomFromGeoJSON($1::text), 4326)
-       WHERE id = $2`,
+       SET geometry = ST_SetSRID(ST_GeomFromGeoJSON($1::text), 4326),
+           acres = ROUND((ST_Area(ST_SetSRID(ST_GeomFromGeoJSON($1::text), 4326)::geography) / 4046.856422)::numeric, 3)
+       WHERE id = $2
+       RETURNING acres`,
       [JSON.stringify(geometry), id]
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Parcel not found' });
-    res.json({ success: true, id });
+    res.json({ success: true, id, acres: rows[0].acres != null ? Number(rows[0].acres) : null });
   } catch (err) {
     console.error('PATCH /api/vineyards/parcels/:id/geometry error:', err);
     res.status(500).json({ error: 'Internal server error' });

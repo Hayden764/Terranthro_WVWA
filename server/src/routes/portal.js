@@ -295,4 +295,58 @@ router.get('/requests', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/portal/vineyards/:id/history
+ * Returns the audit trail + pending/rejected requests for a parcel owned by this winery.
+ */
+router.get('/vineyards/:id/history', async (req, res) => {
+  const { wineryId } = req.portalAccount;
+  const parcelId = parseInt(req.params.id, 10);
+  if (isNaN(parcelId)) return res.status(400).json({ error: 'Invalid id' });
+
+  try {
+    // Verify the parcel belongs to this winery
+    const { rows: check } = await pool.query(
+      `SELECT id FROM vineyard_parcels WHERE id = $1 AND winery_id = $2`,
+      [parcelId, wineryId]
+    );
+    if (check.length === 0) {
+      return res.status(403).json({ error: 'Parcel not found or not linked to your winery' });
+    }
+
+    // Applied changes (audit log)
+    const { rows: log } = await pool.query(
+      `SELECT
+         wel.id, wel.request_id, wel.field_name, wel.old_value, wel.new_value,
+         wel.action, wel.edited_at, wel.entity_type, wel.entity_id,
+         er.request_type, er.admin_notes,
+         aa.display_name AS reviewed_by
+       FROM winery_edit_log wel
+       LEFT JOIN edit_requests er ON er.id = wel.request_id
+       LEFT JOIN admin_accounts aa ON aa.id = wel.admin_id
+       WHERE wel.entity_type = 'vineyard_parcel' AND wel.entity_id = $1
+       ORDER BY wel.edited_at DESC`,
+      [parcelId]
+    );
+
+    // All requests (any status) for this parcel
+    const { rows: requests } = await pool.query(
+      `SELECT
+         er.id AS request_id, er.request_type, er.status,
+         er.payload, er.admin_notes, er.created_at, er.reviewed_at,
+         aa.display_name AS reviewed_by
+       FROM edit_requests er
+       LEFT JOIN admin_accounts aa ON aa.id = er.reviewed_by
+       WHERE er.winery_id = $1 AND er.target_id = $2
+       ORDER BY er.created_at DESC`,
+      [wineryId, parcelId]
+    );
+
+    res.json({ log, requests });
+  } catch (err) {
+    console.error('Portal history error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;

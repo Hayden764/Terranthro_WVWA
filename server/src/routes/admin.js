@@ -199,8 +199,10 @@ router.post('/requests/:id/approve', async (req, res) => {
             if (col in payload && old[0]) {
               await client.query(
                 `INSERT INTO winery_edit_log
-                   (winery_id, account_id, admin_id, request_id, table_name, record_id, field_name, old_value, new_value)
-                 VALUES ($1, $2, $3, $4, 'wineries', $5, $6, $7, $8)`,
+                   (winery_id, account_id, admin_id, request_id,
+                    table_name, record_id, field_name, old_value, new_value,
+                    entity_type, entity_id)
+                 VALUES ($1, $2, $3, $4, 'wineries', $5, $6, $7, $8, 'winery', $5)`,
                 [request.winery_id, request.account_id, adminId, requestId,
                  request.winery_id, col, old[0][col], payload[col]]
               );
@@ -223,8 +225,11 @@ router.post('/requests/:id/approve', async (req, res) => {
           if (old[0]) {
             await client.query(
               `INSERT INTO winery_edit_log
-                 (winery_id, account_id, admin_id, request_id, table_name, record_id, field_name, old_value, new_value)
-               VALUES ($1, $2, $3, $4, 'vineyard_parcels', $5, 'varietals_list', $6, $7)`,
+                 (winery_id, account_id, admin_id, request_id,
+                  table_name, record_id, field_name, old_value, new_value,
+                  entity_type, entity_id)
+               VALUES ($1, $2, $3, $4, 'vineyard_parcels', $5, 'varietals_list', $6, $7,
+                       'vineyard_parcel', $5)`,
               [request.winery_id, request.account_id, adminId, requestId,
                request.target_id, old[0].varietals_list, payload.varietals_list]
             );
@@ -241,8 +246,11 @@ router.post('/requests/:id/approve', async (req, res) => {
           );
           await client.query(
             `INSERT INTO winery_edit_log
-               (winery_id, account_id, admin_id, request_id, table_name, record_id, field_name, old_value, new_value, action)
-             VALUES ($1, $2, $3, $4, 'vineyard_parcels', $5, 'winery_id', NULL, $6, 'update')`,
+               (winery_id, account_id, admin_id, request_id,
+                table_name, record_id, field_name, old_value, new_value, action,
+                entity_type, entity_id)
+             VALUES ($1, $2, $3, $4, 'vineyard_parcels', $5, 'winery_id', NULL, $6, 'update',
+                     'vineyard_parcel', $5)`,
             [request.winery_id, request.account_id, adminId, requestId,
              request.target_id, String(request.winery_id)]
           );
@@ -250,8 +258,82 @@ router.post('/requests/:id/approve', async (req, res) => {
         break;
       }
 
-      // vineyard_blocks, vineyard_new: no auto-apply, admin handles manually.
-      case 'vineyard_blocks':
+      case 'vineyard_blocks': {
+        const blockChanges = Array.isArray(payload.block_changes) ? payload.block_changes : [];
+        const newBlocks    = Array.isArray(payload.new_blocks)    ? payload.new_blocks    : [];
+        const allowedBlockCols = ['block_name', 'variety', 'clone', 'rootstock',
+                                  'rows', 'spacing', 'year_planted'];
+
+        // Apply field-level changes to existing blocks
+        for (const change of blockChanges) {
+          if (!change.id || !Array.isArray(change.field_changes)) continue;
+          for (const fc of change.field_changes) {
+            if (!allowedBlockCols.includes(fc.field)) continue;
+            await client.query(
+              `UPDATE vineyard_blocks SET ${fc.field} = $1 WHERE id = $2`,
+              [fc.new ?? null, change.id]
+            );
+            await client.query(
+              `INSERT INTO winery_edit_log
+                 (winery_id, account_id, admin_id, request_id,
+                  table_name, record_id, field_name, old_value, new_value,
+                  entity_type, entity_id)
+               VALUES ($1, $2, $3, $4, 'vineyard_blocks', $5, $6, $7, $8,
+                       'vineyard_block', $5)`,
+              [request.winery_id, request.account_id, adminId, requestId,
+               change.id, fc.field,
+               fc.old != null ? String(fc.old) : null,
+               fc.new != null ? String(fc.new) : null]
+            );
+            // Also log against the parent parcel for easy parcel-level history
+            if (request.target_id) {
+              await client.query(
+                `INSERT INTO winery_edit_log
+                   (winery_id, account_id, admin_id, request_id,
+                    table_name, record_id, field_name, old_value, new_value,
+                    entity_type, entity_id)
+                 VALUES ($1, $2, $3, $4, 'vineyard_blocks', $5, $6, $7, $8,
+                         'vineyard_parcel', $9)`,
+                [request.winery_id, request.account_id, adminId, requestId,
+                 change.id, `block.${fc.field}`,
+                 fc.old != null ? String(fc.old) : null,
+                 fc.new != null ? String(fc.new) : null,
+                 request.target_id]
+              );
+            }
+          }
+        }
+
+        // Insert new blocks
+        for (const nb of newBlocks) {
+          const cols = allowedBlockCols.filter((c) => nb[c] != null);
+          if (cols.length === 0 || !request.target_id) continue;
+          const vals = cols.map((c) => nb[c]);
+          const placeholders = cols.map((_, i) => `$${i + 2}`).join(', ');
+          const { rows: inserted } = await client.query(
+            `INSERT INTO vineyard_blocks (vineyard_parcel_id, vineyard_name, ${cols.join(', ')})
+             VALUES ($1, (SELECT vineyard_name FROM vineyard_parcels WHERE id = $1), ${placeholders})
+             RETURNING id`,
+            [request.target_id, ...vals]
+          );
+          const newId = inserted[0]?.id;
+          if (newId) {
+            await client.query(
+              `INSERT INTO winery_edit_log
+                 (winery_id, account_id, admin_id, request_id,
+                  table_name, record_id, action,
+                  entity_type, entity_id)
+               VALUES ($1, $2, $3, $4, 'vineyard_blocks', $5, 'insert',
+                       'vineyard_parcel', $6)`,
+              [request.winery_id, request.account_id, adminId, requestId,
+               newId, request.target_id]
+            );
+          }
+        }
+        break;
+      }
+
+      // vineyard_new: no auto-apply, admin creates the parcel manually.
       case 'vineyard_new':
         break;
 
@@ -276,8 +358,11 @@ router.post('/requests/:id/approve', async (req, res) => {
           );
           await client.query(
             `INSERT INTO winery_edit_log
-               (winery_id, account_id, admin_id, request_id, table_name, record_id, field_name, old_value, new_value)
-             VALUES ($1, $2, $3, $4, 'vineyard_parcels', $5, 'geometry', $6, $7)`,
+               (winery_id, account_id, admin_id, request_id,
+                table_name, record_id, field_name, old_value, new_value,
+                entity_type, entity_id)
+             VALUES ($1, $2, $3, $4, 'vineyard_parcels', $5, 'geometry', $6, $7,
+                     'vineyard_parcel', $5)`,
             [request.winery_id, request.account_id, adminId, requestId,
              request.target_id,
              oldGeom[0] ? JSON.stringify(oldGeom[0].geometry) : null,
@@ -523,6 +608,64 @@ router.post('/admins', requireSuperadmin, async (req, res) => {
       return res.status(409).json({ error: 'Email already exists' });
     }
     console.error('Create admin error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ─── Edit history ────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/history/:entityType/:entityId
+ * Returns the full audit trail for a winery, vineyard_parcel, or vineyard_block.
+ * entity_type: 'winery' | 'vineyard_parcel' | 'vineyard_block'
+ */
+router.get('/history/:entityType/:entityId', async (req, res) => {
+  const { entityType, entityId } = req.params;
+  const id = parseInt(entityId, 10);
+  const validTypes = ['winery', 'vineyard_parcel', 'vineyard_block'];
+
+  if (!validTypes.includes(entityType) || isNaN(id)) {
+    return res.status(400).json({ error: 'Invalid entity type or id' });
+  }
+
+  try {
+    // Applied changes from the audit log
+    const { rows: log } = await pool.query(
+      `SELECT
+         wel.id, wel.request_id, wel.field_name, wel.old_value, wel.new_value,
+         wel.action, wel.edited_at,
+         wel.entity_type, wel.entity_id,
+         er.request_type, er.status AS request_status,
+         er.admin_notes,
+         wa.contact_email AS submitted_by,
+         aa.display_name AS reviewed_by
+       FROM winery_edit_log wel
+       LEFT JOIN edit_requests er ON er.id = wel.request_id
+       LEFT JOIN winery_accounts wa ON wa.id = wel.account_id
+       LEFT JOIN admin_accounts aa ON aa.id = wel.admin_id
+       WHERE wel.entity_type = $1 AND wel.entity_id = $2
+       ORDER BY wel.edited_at DESC`,
+      [entityType, id]
+    );
+
+    // Pending and rejected requests referencing this entity (not yet in edit log)
+    const { rows: pending } = await pool.query(
+      `SELECT
+         er.id AS request_id, er.request_type, er.status,
+         er.payload, er.admin_notes, er.created_at, er.reviewed_at,
+         wa.contact_email AS submitted_by,
+         aa.display_name AS reviewed_by
+       FROM edit_requests er
+       LEFT JOIN winery_accounts wa ON wa.id = er.account_id
+       LEFT JOIN admin_accounts aa ON aa.id = er.reviewed_by
+       WHERE er.target_id = $1 AND er.status != 'approved'
+       ORDER BY er.created_at DESC`,
+      [id]
+    );
+
+    res.json({ log, pending });
+  } catch (err) {
+    console.error('Admin history error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

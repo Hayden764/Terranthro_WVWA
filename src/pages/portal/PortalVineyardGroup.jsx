@@ -14,6 +14,7 @@ import { BRAND } from '../../config/brandColors';
 import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import EditableBlocksTable from '../../components/EditableBlocksTable';
+import ParcelHistorySection from '../../components/ParcelHistorySection';
 
 export default function PortalVineyardGroup() {
   const [searchParams] = useSearchParams();
@@ -280,6 +281,11 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
         {isEditing && (
           <span style={{ fontSize: 12, color: BRAND.textMuted, alignSelf: 'center' }}>Editing on map…</span>
         )}
+      </div>
+
+      {/* Edit history — always rendered, lazy-loads on expand */}
+      <div style={{ padding: '0 16px' }}>
+        <ParcelHistorySection parcelId={parcel.id} />
       </div>
 
       {/* Pending geometry confirmation */}

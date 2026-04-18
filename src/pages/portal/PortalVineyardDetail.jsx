@@ -4,6 +4,7 @@ import { BRAND } from '../../config/brandColors';
 import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import EditableBlocksTable from '../../components/EditableBlocksTable';
+import ParcelHistorySection from '../../components/ParcelHistorySection';
 
 export default function PortalVineyardDetail() {
   const { id } = useParams();
@@ -216,6 +217,8 @@ export default function PortalVineyardDetail() {
               </button>
             )}
           </div>
+
+          <ParcelHistorySection parcelId={vineyard.id} />
         </Section>
       </div>
     </div>

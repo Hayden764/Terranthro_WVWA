@@ -16,6 +16,15 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { apiJson, apiPost } from '../../lib/api';
 import AdminGeometryDiffMap from './AdminGeometryDiffMap';
 
+const REQUEST_TYPE_LABELS = {
+  profile:            'Winery Profile',
+  vineyard_varietals: 'Varietals Update',
+  vineyard_blocks:    'Block Info Update',
+  vineyard_claim:     'Vineyard Claim',
+  vineyard_new:       'New Vineyard',
+  geometry_update:    'Boundary Edit',
+};
+
 const BLOCK_FIELDS = ['block_name', 'variety', 'clone', 'rootstock', 'row_orientation', 'vine_spacing', 'row_spacing', 'year_planted', 'trellis'];
 
 export default function AdminRequestDetail() {
@@ -209,7 +218,146 @@ export default function AdminRequestDetail() {
       {actionStatus === 'done' && (
         <p style={{ fontSize: 12, color: '#81c784', marginTop: 12 }}>Action applied successfully.</p>
       )}
+
+      {/* Entity history — shown when this request targets a parcel */}
+      {request.target_id && (
+        <AdminEntityHistory entityType="vineyard_parcel" entityId={request.target_id} currentRequestId={request.id} />
+      )}
     </Shell>
+  );
+}
+
+// ── AdminEntityHistory ───────────────────────────────────────────────────────
+// Shows the full audit trail for the target parcel, grouped by request.
+
+function AdminEntityHistory({ entityType, entityId, currentRequestId }) {
+  const [data, setData] = useState(null);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    if (data) return;
+    setLoading(true);
+    try {
+      const res = await apiJson(`/api/admin/history/${entityType}/${entityId}`);
+      setData(res);
+    } catch (e) {
+      setData({ error: e.message });
+    } finally {
+      setLoading(false);
+    }
+  }, [data, entityType, entityId]);
+
+  const toggle = () => {
+    if (!open) load();
+    setOpen(o => !o);
+  };
+
+  const sectionStyle = {
+    marginTop: 28,
+    borderTop: '1px solid #333',
+    paddingTop: 16,
+  };
+  const headerStyle = {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    cursor: 'pointer', userSelect: 'none',
+  };
+  const titleStyle = { fontSize: 13, fontWeight: 600, color: '#ccc', letterSpacing: '0.04em', textTransform: 'uppercase' };
+  const chevron = open ? '▲' : '▼';
+
+  const fmtDate = iso => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const typeLabel = t => ({
+    profile: 'Winery Profile',
+    vineyard_varietals: 'Varietals Update',
+    vineyard_blocks: 'Block Info Update',
+    vineyard_claim: 'Vineyard Claim',
+    vineyard_new: 'New Vineyard',
+    geometry_update: 'Boundary Edit',
+  }[t] || t);
+
+  const statusColor = s => ({ pending: '#f0a500', approved: '#66bb6a', rejected: '#e57373' }[s] || '#aaa');
+
+  const renderLogEntries = entries => {
+    if (!entries || entries.length === 0) return null;
+    // group by request_id
+    const groups = {};
+    entries.forEach(e => {
+      const key = e.request_id ?? `_${e.id}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(e);
+    });
+    return Object.values(groups).map((rows, gi) => {
+      const first = rows[0];
+      return (
+        <div key={gi} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid #2a2a2a' }}>
+          <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>
+            {fmtDate(first.created_at)} · <span style={{ color: '#aaa' }}>{typeLabel(first.request_type)}</span>
+            {first.changed_by_email && <span> · {first.changed_by_email}</span>}
+          </div>
+          {rows.map((row, ri) => (
+            <div key={ri} style={{ fontSize: 12, color: '#bbb', paddingLeft: 8, marginTop: 2 }}>
+              {row.field_name === 'geometry'
+                ? <span style={{ color: '#90caf9' }}>Boundary geometry updated</span>
+                : <>
+                    <span style={{ color: '#e0e0e0', fontWeight: 500 }}>{row.field_name}</span>
+                    {': '}
+                    <span style={{ color: '#e57373' }}>{String(row.old_value ?? '—')}</span>
+                    {' → '}
+                    <span style={{ color: '#81c784' }}>{String(row.new_value ?? '—')}</span>
+                  </>}
+            </div>
+          ))}
+        </div>
+      );
+    });
+  };
+
+  return (
+    <div style={sectionStyle}>
+      <div style={headerStyle} onClick={toggle}>
+        <span style={titleStyle}>Parcel Edit History</span>
+        <span style={{ fontSize: 11, color: '#666' }}>{chevron}</span>
+      </div>
+
+      {open && (
+        <div style={{ marginTop: 14 }}>
+          {loading && <p style={{ fontSize: 12, color: '#888' }}>Loading…</p>}
+          {data?.error && <p style={{ fontSize: 12, color: '#e57373' }}>{data.error}</p>}
+
+          {data && !data.error && (
+            <>
+              {/* Pending / rejected requests */}
+              {data.pending && data.pending.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <p style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Open Requests</p>
+                  {data.pending.map(r => (
+                    <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 12 }}>
+                      <span style={{ color: statusColor(r.status), fontWeight: 600, minWidth: 64 }}>{r.status}</span>
+                      <span style={{ color: '#aaa' }}>{typeLabel(r.request_type)}</span>
+                      <span style={{ color: '#666' }}>{fmtDate(r.created_at)}</span>
+                      {r.id !== currentRequestId && (
+                        <Link to={`/admin/requests/${r.id}`} style={{ color: '#90caf9', fontSize: 11, marginLeft: 'auto' }}>View →</Link>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Applied log */}
+              {data.log && data.log.length > 0
+                ? renderLogEntries(data.log)
+                : <p style={{ fontSize: 12, color: '#666', fontStyle: 'italic' }}>No applied changes recorded yet.</p>}
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

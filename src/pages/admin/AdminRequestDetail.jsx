@@ -249,8 +249,9 @@ function ParcelContextMap({ geometry }) {
       center: [-123.05, 45.2],
       zoom: 10,
       attributionControl: false,
-      interactive: false,
+      interactive: true,
     });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     map.on('load', () => {
       map.addSource('parcel', { type: 'geojson', data: { type: 'Feature', geometry, properties: {} } });
       map.addLayer({ id: 'parcel-fill', type: 'fill', source: 'parcel', paint: { 'fill-color': '#4CAF50', 'fill-opacity': 0.3 } });

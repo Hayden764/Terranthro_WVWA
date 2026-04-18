@@ -12,7 +12,7 @@
  *   onSubmit   {fn}      Called with the submitted payload (optional, for parent refresh)
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiPost } from '../lib/api';
 import { BRAND } from '../config/brandColors';
 
@@ -48,15 +48,22 @@ function newBlankRow() {
   return COLUMNS.reduce((acc, col) => { acc[col.key] = ''; return acc; }, { _tmpId: `new_${++_tmpSeq}` });
 }
 
-export default function EditableBlocksTable({ parcelId, blocks, onSubmit }) {
+export default function EditableBlocksTable({ parcelId, blocks, editMode = false, onEditCancel, onEditComplete, onSubmit }) {
   // editMap: {blockId: {col: value, ...}} — only tracks dirty existing rows
   const [editMap, setEditMap] = useState({});
-  // activeRow: blockId of existing row currently being edited
-  const [activeRow, setActiveRow] = useState(null);
   // newRows: unsaved rows being added
   const [newRows, setNewRows] = useState([]);
   // submission state
   const [status, setStatus] = useState(null); // null | 'submitting' | 'success' | 'error'
+
+  // Reset dirty state whenever editMode is turned off externally
+  useEffect(() => {
+    if (!editMode) {
+      setEditMap({});
+      setNewRows([]);
+      setStatus(null);
+    }
+  }, [editMode]);
 
   const setCell = useCallback((blockId, colKey, value) => {
     setEditMap((prev) => ({
@@ -68,21 +75,12 @@ export default function EditableBlocksTable({ parcelId, blocks, onSubmit }) {
     }));
   }, [blocks]);
 
-  const initRow = useCallback((block) => {
-    setActiveRow(block.id);
-    setEditMap((prev) => {
-      if (prev[block.id]) return prev; // already dirty
-      return { ...prev, [block.id]: blockToStr(block) };
-    });
-  }, []);
-
   const revertRow = useCallback((blockId) => {
     setEditMap((prev) => {
       const next = { ...prev };
       delete next[blockId];
       return next;
     });
-    setActiveRow(null);
   }, []);
 
   /* ── New-row helpers ── */
@@ -143,9 +141,9 @@ export default function EditableBlocksTable({ parcelId, blocks, onSubmit }) {
 
       setStatus('success');
       setEditMap({});
-      setActiveRow(null);
       setNewRows([]);
       onSubmit?.();
+      onEditComplete?.();
     } catch {
       setStatus('error');
     }
@@ -182,7 +180,7 @@ export default function EditableBlocksTable({ parcelId, blocks, onSubmit }) {
           </thead>
           <tbody>
             {(blocks || []).map((block, idx) => {
-              const isEditing = activeRow === block.id;
+              const isEditing = editMode;
               const isDirty = editMap[block.id] && hasChanged(block, editMap[block.id]);
               const rowData = editMap[block.id] || blockToStr(block);
               const isLast = idx === (blocks || []).length - 1 && newRows.length === 0;
@@ -190,15 +188,12 @@ export default function EditableBlocksTable({ parcelId, blocks, onSubmit }) {
               return (
                 <tr
                   key={rowKey(block)}
-                  onClick={() => !isEditing && initRow(block)}
                   style={{
                     borderBottom: isLast ? 'none' : `1px solid ${BRAND.border}18`,
                     background: isDirty
                       ? 'rgba(142, 21, 55, 0.04)'
-                      : isEditing
-                        ? 'rgba(72, 55, 41, 0.03)'
-                        : 'transparent',
-                    cursor: isEditing ? 'default' : 'pointer',
+                      : 'transparent',
+                    cursor: 'default',
                     transition: 'background 0.15s',
                   }}
                 >
@@ -240,7 +235,7 @@ export default function EditableBlocksTable({ parcelId, blocks, onSubmit }) {
                   ))}
                   {/* Row action */}
                   <td style={{ padding: '0 8px', verticalAlign: 'middle', textAlign: 'center' }}>
-                    {isEditing ? (
+                    {isEditing && isDirty ? (
                       <button
                         onClick={(e) => { e.stopPropagation(); revertRow(block.id); }}
                         title="Discard changes to this row"
@@ -298,35 +293,35 @@ export default function EditableBlocksTable({ parcelId, blocks, onSubmit }) {
         </table>
       </div>
 
-      {/* Footer bar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginTop: 10, flexWrap: 'wrap', gap: 8,
-      }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button onClick={addNewRow} style={addRowBtnStyle}>+ Add Block</button>
-          <p style={{ fontSize: 12, color: BRAND.textMuted, margin: 0 }}>
-            {hasChanges
-              ? `${changedBlocks.length + pendingNewRows.length} pending — submit for admin review`
-              : 'Click any row to edit · Acres are calculated automatically'}
-          </p>
-        </div>
+      {/* Footer bar — only shown in edit mode */}
+      {editMode && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginTop: 10, flexWrap: 'wrap', gap: 8,
+        }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={addNewRow} style={addRowBtnStyle}>+ Add Block</button>
+            <p style={{ fontSize: 12, color: BRAND.textMuted, margin: 0 }}>
+              {hasChanges
+                ? `${changedBlocks.length + pendingNewRows.length} pending — submit for admin review`
+                : 'Edit cells above · Acres are calculated automatically'}
+            </p>
+          </div>
 
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {status === 'success' && (
-            <span style={{ fontSize: 12, color: '#3a5a1f', fontWeight: 600 }}>✓ Submitted</span>
-          )}
-          {status === 'error' && (
-            <span style={{ fontSize: 12, color: BRAND.burgundy }}>Error — try again</span>
-          )}
-          {hasChanges && (
-            <>
-              <button
-                onClick={() => { setEditMap({}); setActiveRow(null); setNewRows([]); setStatus(null); }}
-                style={secondaryBtnStyle}
-              >
-                Discard All
-              </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {status === 'success' && (
+              <span style={{ fontSize: 12, color: '#3a5a1f', fontWeight: 600 }}>✓ Submitted</span>
+            )}
+            {status === 'error' && (
+              <span style={{ fontSize: 12, color: BRAND.burgundy }}>Error — try again</span>
+            )}
+            <button
+              onClick={() => { setEditMap({}); setNewRows([]); setStatus(null); onEditCancel?.(); }}
+              style={secondaryBtnStyle}
+            >
+              Cancel
+            </button>
+            {hasChanges && (
               <button
                 onClick={handleSubmit}
                 disabled={status === 'submitting'}
@@ -334,10 +329,10 @@ export default function EditableBlocksTable({ parcelId, blocks, onSubmit }) {
               >
                 {status === 'submitting' ? 'Saving…' : 'Save Changes'}
               </button>
-            </>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

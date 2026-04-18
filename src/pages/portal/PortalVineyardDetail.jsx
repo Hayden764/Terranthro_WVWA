@@ -11,6 +11,7 @@ export default function PortalVineyardDetail() {
   const [vineyard, setVineyard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editingGeometry, setEditingGeometry] = useState(false);
+  const [editingBlocks, setEditingBlocks] = useState(false);
   const [pendingGeometry, setPendingGeometry] = useState(null); // { geometry, notes }
   const [geoSubmitStatus, setGeoSubmitStatus] = useState(null); // null | 'submitting' | 'success' | 'error'
 
@@ -122,11 +123,17 @@ export default function PortalVineyardDetail() {
         )}
 
         {/* Blocks */}
-        <Section title={`Blocks (${vineyard.blocks.length})`}>
+        <Section title="Blocks">
           {vineyard.blocks.length === 0 ? (
             <p style={{ color: BRAND.textMuted, fontSize: 13 }}>No blocks recorded.</p>
           ) : (
-            <EditableBlocksTable parcelId={vineyard.id} blocks={vineyard.blocks} />
+            <EditableBlocksTable
+              parcelId={vineyard.id}
+              blocks={vineyard.blocks.slice(0, 1)}
+              editMode={editingBlocks}
+              onEditCancel={() => setEditingBlocks(false)}
+              onEditComplete={() => setEditingBlocks(false)}
+            />
           )}
         </Section>
 
@@ -199,7 +206,15 @@ export default function PortalVineyardDetail() {
           )}
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <RequestButton vineyard={vineyard} type="vineyard_varietals" label="Update Varietals" />
+            {editingBlocks ? (
+              <span style={{ fontSize: 13, color: BRAND.textMuted, alignSelf: 'center' }}>
+                Editing block info above…
+              </span>
+            ) : (
+              <button onClick={() => setEditingBlocks(true)} style={smallBtnStyle}>
+                Edit Block Info
+              </button>
+            )}
           </div>
         </Section>
       </div>

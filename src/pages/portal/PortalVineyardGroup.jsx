@@ -174,7 +174,12 @@ export default function PortalVineyardGroup() {
 
 function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditing,
   pendingGeometry, onPendingNotesChange, onPendingSubmit, onPendingDiscard, geoSubmitStatus }) {
-  const [blocksOpen, setBlocksOpen] = useState(false);
+  const [editingBlocks, setEditingBlocks] = useState(false);
+
+  // Cancel block editing if this card loses selection
+  useEffect(() => {
+    if (!highlighted) setEditingBlocks(false);
+  }, [highlighted]);
   const address = [parcel.situs_address, parcel.situs_city, parcel.situs_zip]
     .filter(Boolean).join(', ');
 
@@ -213,7 +218,6 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
           <div style={{ fontSize: 12, color: BRAND.textMuted, marginTop: 2 }}>
             {parcel.acres ? `${Number(parcel.acres).toFixed(1)} acres` : 'Acreage unknown'}
             {parcel.nested_ava && ` · ${parcel.nested_ava}`}
-            {parcel.blocks?.length > 0 && ` · ${parcel.blocks.length} blocks`}
           </div>
         </div>
         {highlighted && (
@@ -240,36 +244,37 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
         </div>
       )}
 
-      {/* Blocks — collapsible editable table */}
-      <div style={{ borderTop: `1px solid ${BRAND.border}` }}>
-          <button
-            onClick={() => setBlocksOpen((o) => !o)}
-            style={{
-              width: '100%', padding: '10px 16px', background: 'none', border: 'none',
-              cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600,
-              color: BRAND.brown, display: 'flex', justifyContent: 'space-between',
-            }}
-          >
-            <span>Blocks{parcel.blocks?.length > 0 ? ` (${parcel.blocks.length})` : ''}</span>
-            <span style={{ color: BRAND.textMuted, fontWeight: 400 }}>{blocksOpen ? '▲' : '▼'}</span>
-          </button>
-          {blocksOpen && (
-            <div style={{ padding: '0 16px 16px' }}>
-              <EditableBlocksTable
-                parcelId={parcel.id}
-                blocks={parcel.blocks || []}
-              />
-            </div>
-          )}
-        </div>
+      {/* Blocks table — always visible */}
+      <div style={{ borderTop: `1px solid ${BRAND.border}`, padding: '0 16px 16px' }}>
+        <EditableBlocksTable
+          parcelId={parcel.id}
+          blocks={(parcel.blocks || []).slice(0, 1)}
+          editMode={editingBlocks}
+          onEditCancel={() => setEditingBlocks(false)}
+          onEditComplete={() => setEditingBlocks(false)}
+        />
+      </div>
 
       {/* Actions */}
       <div style={{
         borderTop: `1px solid ${BRAND.border}`, padding: '10px 16px',
         display: 'flex', gap: 8, flexWrap: 'wrap', background: BRAND.eggshell,
       }}>
-        <RequestButton vineyard={parcel} type="vineyard_varietals" label="Update Varietals" />
-        {onEditGeometry && !isEditing && !pendingGeometry && (
+        {highlighted && (
+          editingBlocks ? (
+            <span style={{ fontSize: 12, color: BRAND.textMuted, alignSelf: 'center' }}>
+              Editing block info above…
+            </span>
+          ) : (
+            <button
+              onClick={() => setEditingBlocks(true)}
+              style={smallBtnStyle}
+            >
+              Edit Block Info
+            </button>
+          )
+        )}
+        {highlighted && onEditGeometry && !isEditing && !pendingGeometry && (
           <button onClick={onEditGeometry} style={smallBtnStyle}>Edit Boundary</button>
         )}
         {isEditing && (

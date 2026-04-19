@@ -279,13 +279,17 @@ export default function EditorPage() {
   }, []);
 
   // ── Push parcel data into map source ────────────────────────────────────
+  // NOTE: mapRef.current.loaded() can return false while tiles are still
+  // fetching, even after our 'load' handler has already fired and added the
+  // 'parcels' source. Using getSource() as the readiness check avoids that
+  // race: if the source exists, our init already ran; if not, wait for 'load'.
   useEffect(() => {
     if (!mapRef.current || !parcels) return;
     const pushData = () => {
       const src = mapRef.current?.getSource('parcels');
       if (src) src.setData(parcels);
     };
-    if (mapRef.current.loaded()) {
+    if (mapRef.current.getSource('parcels')) {
       pushData();
     } else {
       mapRef.current.once('load', pushData);

@@ -146,13 +146,15 @@ router.get('/requests', async (req, res) => {
 
 /**
  * POST /api/admin/requests/:id/approve
- * Body: { admin_notes?: string }
+ * Body: { admin_notes?: string, ops_override?: Op[] }
  *
  * Approves the request and applies the changes to the database.
+ * For admin_batch_edit requests, ops_override (if provided) replaces payload.ops,
+ * allowing the reviewing admin to exclude or edit individual ops before applying.
  */
 router.post('/requests/:id/approve', async (req, res) => {
   const requestId = parseInt(req.params.id, 10);
-  const { admin_notes } = req.body;
+  const { admin_notes, ops_override } = req.body;
   const { adminId } = req.adminAccount;
 
   const client = await pool.connect();
@@ -347,9 +349,12 @@ router.post('/requests/:id/approve', async (req, res) => {
 
       // ── admin_batch_edit ─────────────────────────────────────────────
       // Each op in payload.ops is applied sequentially.
-      // ops: [ { op: 'geometry'|'metadata', parcel_id, geometry?, fields? }, ... ]
+      // ops_override (from request body) replaces payload.ops when provided,
+      // allowing the reviewing admin to edit or exclude individual ops.
+      // ops: [ { op: 'geometry'|'metadata'|'add'|'delete', parcel_id, geometry?, fields? }, ... ]
       case 'admin_batch_edit': {
-        const ops = Array.isArray(payload.ops) ? payload.ops : [];
+        const rawOps = ops_override != null ? ops_override : (Array.isArray(payload.ops) ? payload.ops : []);
+        const ops = Array.isArray(rawOps) ? rawOps : [];
         const ALLOWED_META = [
           'vineyard_name', 'vineyard_org', 'owner_name', 'ava_name',
           'nested_ava', 'nested_nested_ava', 'situs_address', 'situs_city',
@@ -481,39 +486,6 @@ router.post('/requests/:id/approve', async (req, res) => {
                JSON.stringify({ parcel_name: toDelete[0].vineyard_name, winery_id: delWineryId })]
             );
           }
-        }
-        break;
-      }
-        // If the payload contains new_geometry (GeoJSON), apply it now.
-        if (payload.new_geometry && request.target_id) {
-          const geomType = payload.new_geometry.type;
-          if (!['Polygon', 'MultiPolygon'].includes(geomType)) {
-            await client.query('ROLLBACK');
-            return res.status(422).json({ error: `Invalid geometry type: ${geomType}` });
-          }
-          const { rows: oldGeom } = await client.query(
-            `SELECT ST_AsGeoJSON(geometry)::json AS geometry FROM vineyard_parcels WHERE id = $1`,
-            [request.target_id]
-          );
-          await client.query(
-            `UPDATE vineyard_parcels
-             SET geometry = ST_SetSRID(ST_GeomFromGeoJSON($1), 4326),
-                 acres = ROUND((ST_Area(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)::geography) / 4046.856422)::numeric, 3)
-             WHERE id = $2 AND winery_id = $3`,
-            [JSON.stringify(payload.new_geometry), request.target_id, request.winery_id]
-          );
-          await client.query(
-            `INSERT INTO winery_edit_log
-               (winery_id, account_id, admin_id, request_id,
-                table_name, record_id, field_name, old_value, new_value,
-                entity_type, entity_id)
-             VALUES ($1, $2, $3, $4, 'vineyard_parcels', $5, 'geometry', $6, $7,
-                     'vineyard_parcel', $5)`,
-            [request.winery_id, request.account_id, adminId, requestId,
-             request.target_id,
-             oldGeom[0] ? JSON.stringify(oldGeom[0].geometry) : null,
-             JSON.stringify(payload.new_geometry)]
-          );
         }
         break;
       }

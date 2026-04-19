@@ -37,6 +37,8 @@ export default function AdminRequestDetail() {
   const [actionStatus, setActionStatus] = useState(null); // 'working' | 'done' | 'error'
   const [rejectNotes, setRejectNotes] = useState('');
   const [showRejectBox, setShowRejectBox] = useState(false);
+  // For admin_batch_edit: tracks admin-edited ops (null = use server payload as-is)
+  const [editedOps, setEditedOps] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -54,9 +56,10 @@ export default function AdminRequestDetail() {
   async function handleAction(action) {
     setActionStatus('working');
     try {
-      await apiPost(`/api/admin/requests/${id}/${action}`, {
-        admin_notes: action === 'reject' ? (rejectNotes || undefined) : undefined,
-      });
+      const body = {};
+      if (action === 'reject') body.admin_notes = rejectNotes || undefined;
+      if (action === 'approve' && editedOps !== null) body.ops_override = editedOps;
+      await apiPost(`/api/admin/requests/${id}/${action}`, body);
       setActionStatus('done');
       await load();
       setShowRejectBox(false);
@@ -155,7 +158,12 @@ export default function AdminRequestDetail() {
       }}>
         {/* Left: payload diff */}
         <div>
-          <PayloadSection requestType={request.request_type} payload={effectivePayload} />
+          <PayloadSection
+            requestType={request.request_type}
+            payload={effectivePayload}
+            isPending={isPending}
+            onOpsChange={setEditedOps}
+          />
         </div>
 
         {/* Right: parcel context map (always shown when geometry exists) */}
@@ -177,6 +185,24 @@ export default function AdminRequestDetail() {
         <div style={{ marginTop: 28, borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 20 }}>
           {actionStatus === 'error' && (
             <p style={{ fontSize: 12, color: '#ef9a9a', marginBottom: 12 }}>Action failed — please try again.</p>
+          )}
+
+          {/* Edited ops summary */}
+          {editedOps !== null && request.request_type === 'admin_batch_edit' && (
+            <div style={{
+              fontSize: 12, color: '#fbbf24', background: 'rgba(251,191,36,0.08)',
+              border: '1px solid rgba(251,191,36,0.2)', borderRadius: 6,
+              padding: '7px 12px', marginBottom: 12,
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <span>✎ Approving {editedOps.length} of {(request.payload?.ops || []).length} ops (edited)</span>
+              <button
+                onClick={() => setEditedOps(null)}
+                style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontSize: 11, textDecoration: 'underline' }}
+              >
+                Reset to original
+              </button>
+            </div>
           )}
 
           {!showRejectBox ? (
@@ -429,38 +455,100 @@ function ParcelContextMap({ geometry }) {
 }
 
 // ── AdminBatchDiffSection ────────────────────────────────────────────────────
-// Split-panel: shared map on the left, scrollable ops list on the right.
+// Split-panel: shared map on the left, editable ops list on the right.
+// When isPending, each op shows edit/exclude controls.
+// onOpsChange(ops) is called whenever the admin modifies or excludes ops.
 
-function AdminBatchDiffSection({ ops }) {
-  const [activeGeomIndex, setActiveGeomIndex] = useState(null); // index within geomOps
+const EDITABLE_META_FIELDS = [
+  'vineyard_name', 'vineyard_org', 'owner_name', 'source_dataset',
+  'ava_name', 'nested_ava', 'nested_nested_ava',
+  'acres', 'varietals_list', 'winery_id',
+  'situs_address', 'situs_city', 'situs_zip',
+];
+
+function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
+  const [activeGeomIndex, setActiveGeomIndex] = useState(null);
   const [showOld, setShowOld] = useState(true);
   const [showNew, setShowNew] = useState(true);
+
+  // Local editable state: array of { ...op, _excluded: bool, _editedFields: {} }
+  const [localOps, setLocalOps] = useState(() =>
+    ops.map((op) => ({ ...op, _excluded: false, _editedFields: {} }))
+  );
+  const [expandedEdit, setExpandedEdit] = useState(null); // index of op with open edit panel
+
+  // Sync local state when ops prop changes (e.g. on re-load)
+  useEffect(() => {
+    setLocalOps(ops.map((op) => ({ ...op, _excluded: false, _editedFields: {} })));
+    setExpandedEdit(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(ops)]);
+
+  // Notify parent whenever local ops change (if pending)
+  useEffect(() => {
+    if (!isPending) return;
+    const hasAnyEdit = localOps.some((o) => o._excluded || Object.keys(o._editedFields).length > 0);
+    if (!hasAnyEdit) {
+      onOpsChange(null); // null = use original payload
+      return;
+    }
+    // Build cleaned ops for submission
+    const cleaned = localOps
+      .filter((o) => !o._excluded)
+      .map(({ _excluded, _editedFields, ...op }) => {
+        if (Object.keys(_editedFields).length === 0) return op;
+        if (op.op === 'metadata') {
+          return { ...op, fields: { ...(op.fields || {}), ..._editedFields } };
+        }
+        if (op.op === 'add') {
+          return { ...op, fields: { ...(op.fields || {}), ..._editedFields } };
+        }
+        return op;
+      });
+    onOpsChange(cleaned);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localOps, isPending]);
+
+  function toggleExclude(i) {
+    setLocalOps((prev) => prev.map((o, j) => j === i ? { ...o, _excluded: !o._excluded } : o));
+    setExpandedEdit((e) => e === i ? null : e);
+  }
+
+  function setEditField(i, field, value) {
+    setLocalOps((prev) => prev.map((o, j) =>
+      j === i ? { ...o, _editedFields: { ...o._editedFields, [field]: value === '' ? null : value } } : o
+    ));
+  }
+
+  function resetOp(i) {
+    setLocalOps((prev) => prev.map((o, j) => j === i ? { ...o, _excluded: false, _editedFields: {} } : o));
+  }
 
   if (!ops || ops.length === 0) {
     return <p style={{ fontSize: 13, color: '#888', fontStyle: 'italic' }}>No ops in this batch.</p>;
   }
 
   // Geometry ops indexed within the full ops array (geometry + add both have spatial extents)
-  const geomOps = ops.reduce((acc, op, i) => {
-    if (op.op === 'geometry' || op.op === 'add') acc.push({ ...op, opsIndex: i });
+  const geomOps = localOps.reduce((acc, op, i) => {
+    if ((op.op === 'geometry' || op.op === 'add') && !op._excluded) acc.push({ ...op, opsIndex: i });
     return acc;
   }, []);
 
   const toggleBtnStyle = (active) => ({
-    fontSize: 11,
-    fontWeight: 600,
-    padding: '4px 10px',
-    borderRadius: 5,
+    fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 5,
     border: `1px solid ${active ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.07)'}`,
     background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
-    color: active ? '#e0e0e0' : '#555',
-    cursor: 'pointer',
+    color: active ? '#e0e0e0' : '#555', cursor: 'pointer',
   });
+
+  const includedCount = localOps.filter((o) => !o._excluded).length;
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-        <SectionLabel style={{ margin: 0 }}>Batch ops ({ops.length})</SectionLabel>
+        <SectionLabel style={{ margin: 0 }}>
+          Batch ops ({includedCount}/{localOps.length} included)
+        </SectionLabel>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
           <button style={toggleBtnStyle(showOld)} onClick={() => setShowOld((v) => !v)}>
             <span style={{ display: 'inline-block', width: 10, height: 2, background: '#e8a020', marginRight: 5, verticalAlign: 'middle' }} />
@@ -476,11 +564,11 @@ function AdminBatchDiffSection({ ops }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 16, alignItems: 'start' }}>
         {/* Left: shared map */}
         <div style={{ position: 'sticky', top: 24 }}>
           <AdminBatchMap
-            ops={ops}
+            ops={localOps.filter((o) => !o._excluded)}
             activeIndex={activeGeomIndex}
             showOld={showOld}
             showNew={showNew}
@@ -490,15 +578,18 @@ function AdminBatchDiffSection({ ops }) {
 
         {/* Right: ops list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 520, overflowY: 'auto', paddingRight: 2 }}>
-          {ops.map((op, i) => {
+          {localOps.map((op, i) => {
             const isGeom = op.op === 'geometry';
             const isMeta = op.op === 'metadata';
             const isAdd  = op.op === 'add';
             const isDel  = op.op === 'delete';
+            const isExcluded = op._excluded;
+            const hasEdits = Object.keys(op._editedFields).length > 0;
+            const isEditOpen = expandedEdit === i;
+            const canEdit = isPending && (isMeta || isAdd);
 
-            // Map geometry/add ops to their index within geomOps
             const geomIdx = (isGeom || isAdd) ? geomOps.findIndex((g) => g.opsIndex === i) : -1;
-            const isActiveGeom = (isGeom || isAdd) && activeGeomIndex === geomIdx;
+            const isActiveGeom = (isGeom || isAdd) && activeGeomIndex === geomIdx && !isExcluded;
 
             let acreDelta = null;
             if (isGeom && op.before_acres != null && Number(op.before_acres) > 0 && op.after_acres != null) {
@@ -508,127 +599,222 @@ function AdminBatchDiffSection({ ops }) {
 
             const opColor = isGeom ? '#60a5fa' : isAdd ? '#4ade80' : isDel ? '#f87171' : '#a78bfa';
 
-            const borderColor = isDel
-              ? 'rgba(239,68,68,0.30)'
-              : isActiveGeom
-              ? 'rgba(96,165,250,0.45)'
-              : acreDelta != null && Math.abs(acreDelta) >= 5
-              ? 'rgba(234,179,8,0.30)'
+            const borderColor = isExcluded
+              ? 'rgba(255,255,255,0.05)'
+              : isDel ? 'rgba(239,68,68,0.30)'
+              : isActiveGeom ? 'rgba(96,165,250,0.45)'
+              : acreDelta != null && Math.abs(acreDelta) >= 5 ? 'rgba(234,179,8,0.30)'
+              : hasEdits ? 'rgba(251,191,36,0.30)'
               : 'rgba(255,255,255,0.07)';
 
+            // Merged display fields (original + admin edits)
+            const displayFields = isMeta || isAdd
+              ? { ...(op.fields || {}), ...op._editedFields }
+              : {};
+
             return (
-              <div
-                key={i}
-                onClick={(isGeom || isAdd) ? () => setActiveGeomIndex(isActiveGeom ? null : geomIdx) : undefined}
-                style={{
-                  background: isDel
-                    ? 'rgba(239,68,68,0.05)'
-                    : isActiveGeom ? 'rgba(96,165,250,0.06)' : 'rgba(0,0,0,0.18)',
-                  borderRadius: 8,
-                  border: `1px solid ${borderColor}`,
-                  padding: '10px 13px',
-                  cursor: (isGeom || isAdd) ? 'pointer' : 'default',
-                  transition: 'border-color 0.15s, background 0.15s',
-                }}
-              >
-                {/* Op header */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: (isMeta || isAdd) ? 8 : 6 }}>
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-                    color: opColor, minWidth: 52,
-                  }}>{op.op}</span>
-                  <span style={{ fontSize: 13, color: '#e0e0e0', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {op.parcel_name || `Parcel #${op.parcel_id}`}
-                  </span>
-                  {op.parcel_id && <span style={{ fontSize: 10, color: '#444' }}>#{op.parcel_id}</span>}
-                  {(isGeom || isAdd) && (
-                    <span style={{ fontSize: 10, color: '#666' }}>{isActiveGeom ? '◉' : '○'}</span>
-                  )}
-                </div>
-
-                {/* Delete warning */}
-                {isDel && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12 }}>
-                    <span style={{ fontSize: 14 }}>⚠</span>
-                    <span style={{ color: '#fca5a5' }}>This block will be permanently deleted from the database.</span>
-                  </div>
-                )}
-
-                {/* Geometry: before/after acres */}
-                {isGeom && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                    <span style={{ color: '#888' }}>
-                      {op.before_acres != null
-                        ? <><span style={{ color: '#e8a020' }}>{Number(op.before_acres).toFixed(2)} ac</span> → </>
-                        : '— → '
-                      }
-                      {op.after_acres != null
-                        ? <span style={{ color: acreDelta != null && Math.abs(acreDelta) >= 5 ? '#eab308' : '#4ade80' }}>
-                            {Number(op.after_acres).toFixed(2)} ac
-                          </span>
-                        : '—'
-                      }
+              <div key={i} style={{ opacity: isExcluded ? 0.38 : 1, transition: 'opacity 0.15s' }}>
+                <div
+                  style={{
+                    background: isExcluded ? 'rgba(0,0,0,0.10)'
+                      : isDel ? 'rgba(239,68,68,0.05)'
+                      : isActiveGeom ? 'rgba(96,165,250,0.06)' : 'rgba(0,0,0,0.18)',
+                    borderRadius: isEditOpen ? '8px 8px 0 0' : 8,
+                    border: `1px solid ${borderColor}`,
+                    padding: '10px 13px',
+                    cursor: (isGeom || isAdd) && !isExcluded ? 'pointer' : 'default',
+                    transition: 'border-color 0.15s, background 0.15s',
+                  }}
+                  onClick={(isGeom || isAdd) && !isExcluded ? () => setActiveGeomIndex(isActiveGeom ? null : geomIdx) : undefined}
+                >
+                  {/* Op header */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: (isMeta || isAdd) ? 8 : 6 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: isExcluded ? '#444' : opColor, minWidth: 52 }}>
+                      {op.op}
                     </span>
-                    {acreDelta != null && Math.abs(acreDelta) >= 5 && (
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, color: '#eab308',
-                        background: 'rgba(234,179,8,0.10)', borderRadius: 4,
-                        padding: '1px 5px', border: '1px solid rgba(234,179,8,0.2)',
-                      }}>
-                        ⚠ {acreDelta > 0 ? '+' : ''}{Math.round(acreDelta * 10) / 10}%
-                      </span>
+                    <span style={{ fontSize: 13, color: isExcluded ? '#555' : '#e0e0e0', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {isExcluded ? <s>{op.parcel_name || `Parcel #${op.parcel_id}`}</s> : (op.parcel_name || `Parcel #${op.parcel_id}`)}
+                    </span>
+                    {op.parcel_id && <span style={{ fontSize: 10, color: '#444' }}>#{op.parcel_id}</span>}
+                    {hasEdits && !isExcluded && (
+                      <span style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24', background: 'rgba(251,191,36,0.10)', borderRadius: 3, padding: '1px 5px' }}>EDITED</span>
                     )}
-                    {acreDelta != null && Math.abs(acreDelta) < 5 && (
-                      <span style={{ fontSize: 10, color: '#555' }}>
-                        ({acreDelta > 0 ? '+' : ''}{Math.round(acreDelta * 10) / 10}%)
-                      </span>
+                    {(isGeom || isAdd) && !isExcluded && (
+                      <span style={{ fontSize: 10, color: '#666' }}>{isActiveGeom ? '◉' : '○'}</span>
                     )}
-                  </div>
-                )}
 
-                {/* Add: show new acreage estimate + key fields */}
-                {isAdd && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {op.after_acres != null && (
-                      <div style={{ fontSize: 12, color: '#4ade80' }}>
-                        New area: {Number(op.after_acres).toFixed(2)} ac
+                    {/* Action buttons — stop propagation so they don't trigger map focus */}
+                    {isPending && (
+                      <div style={{ display: 'flex', gap: 4 }} onClick={(e) => e.stopPropagation()}>
+                        {canEdit && !isExcluded && (
+                          <button
+                            onClick={() => setExpandedEdit(isEditOpen ? null : i)}
+                            title="Edit fields"
+                            style={{
+                              background: isEditOpen ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.05)',
+                              border: `1px solid ${isEditOpen ? 'rgba(251,191,36,0.3)' : 'rgba(255,255,255,0.10)'}`,
+                              borderRadius: 4, color: isEditOpen ? '#fbbf24' : '#666',
+                              cursor: 'pointer', fontSize: 11, padding: '2px 6px',
+                            }}
+                          >✎</button>
+                        )}
+                        {hasEdits && !isExcluded && (
+                          <button
+                            onClick={() => resetOp(i)}
+                            title="Reset to original"
+                            style={{
+                              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)',
+                              borderRadius: 4, color: '#666', cursor: 'pointer', fontSize: 11, padding: '2px 6px',
+                            }}
+                          >↺</button>
+                        )}
+                        <button
+                          onClick={() => toggleExclude(i)}
+                          title={isExcluded ? 'Include this op' : 'Exclude this op'}
+                          style={{
+                            background: isExcluded ? 'rgba(74,222,128,0.10)' : 'rgba(239,68,68,0.08)',
+                            border: `1px solid ${isExcluded ? 'rgba(74,222,128,0.25)' : 'rgba(239,68,68,0.25)'}`,
+                            borderRadius: 4, color: isExcluded ? '#4ade80' : '#f87171',
+                            cursor: 'pointer', fontSize: 11, padding: '2px 6px',
+                          }}
+                        >{isExcluded ? '+ Include' : '✕ Skip'}</button>
                       </div>
                     )}
-                    {op.fields && (
+                  </div>
+
+                  {/* Delete warning */}
+                  {isDel && !isExcluded && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12 }}>
+                      <span style={{ fontSize: 14 }}>⚠</span>
+                      <span style={{ color: '#fca5a5' }}>This block will be permanently deleted from the database.</span>
+                    </div>
+                  )}
+
+                  {/* Geometry: before/after acres */}
+                  {isGeom && !isExcluded && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                      <span style={{ color: '#888' }}>
+                        {op.before_acres != null
+                          ? <><span style={{ color: '#e8a020' }}>{Number(op.before_acres).toFixed(2)} ac</span> → </>
+                          : '— → '
+                        }
+                        {op.after_acres != null
+                          ? <span style={{ color: acreDelta != null && Math.abs(acreDelta) >= 5 ? '#eab308' : '#4ade80' }}>
+                              {Number(op.after_acres).toFixed(2)} ac
+                            </span>
+                          : '—'
+                        }
+                      </span>
+                      {acreDelta != null && Math.abs(acreDelta) >= 5 && (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#eab308', background: 'rgba(234,179,8,0.10)', borderRadius: 4, padding: '1px 5px', border: '1px solid rgba(234,179,8,0.2)' }}>
+                          ⚠ {acreDelta > 0 ? '+' : ''}{Math.round(acreDelta * 10) / 10}%
+                        </span>
+                      )}
+                      {acreDelta != null && Math.abs(acreDelta) < 5 && (
+                        <span style={{ fontSize: 10, color: '#555' }}>({acreDelta > 0 ? '+' : ''}{Math.round(acreDelta * 10) / 10}%)</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Add: show acreage + key fields (merged with edits) */}
+                  {isAdd && !isExcluded && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {op.after_acres != null && (
+                        <div style={{ fontSize: 12, color: '#4ade80' }}>New area: {Number(op.after_acres).toFixed(2)} ac</div>
+                      )}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         {['vineyard_name', 'ava_name', 'nested_ava', 'varietals_list', 'source_dataset'].map((key) => {
-                          const val = op.fields[key];
+                          const val = displayFields[key];
                           if (!val) return null;
+                          const isEdited = key in op._editedFields;
                           return (
                             <div key={key} style={{ fontSize: 11, display: 'flex', gap: 6, alignItems: 'baseline' }}>
                               <span style={{ color: '#64748b', minWidth: 100, textTransform: 'uppercase', fontSize: 9, fontWeight: 600, flexShrink: 0 }}>
                                 {key.replace(/_/g, ' ')}
                               </span>
-                              <span style={{ color: '#4ade80' }}>{String(val)}</span>
+                              <span style={{ color: isEdited ? '#fbbf24' : '#4ade80' }}>{String(val)}</span>
                             </div>
                           );
                         })}
                       </div>
-                    )}
-                  </div>
-                )}
+                    </div>
+                  )}
 
-                {/* Metadata: inline field diffs */}
-                {isMeta && op.fields && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    {Object.entries(op.fields).map(([key, val]) => {
-                      const oldVal = op.before?.[key];
-                      if (String(oldVal ?? '') === String(val ?? '') && oldVal == null && val == null) return null;
-                      if (String(oldVal ?? '') === String(val ?? '')) return null;
+                  {/* Metadata: inline field diffs (merged with edits) */}
+                  {isMeta && !isExcluded && op.fields && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      {Object.entries({ ...(op.fields || {}), ...op._editedFields }).map(([key, val]) => {
+                        const oldVal = op.before?.[key];
+                        const isEdited = key in op._editedFields;
+                        const effectiveNew = isEdited ? op._editedFields[key] : val;
+                        if (String(oldVal ?? '') === String(effectiveNew ?? '') && oldVal == null && effectiveNew == null) return null;
+                        if (String(oldVal ?? '') === String(effectiveNew ?? '')) return null;
+                        return (
+                          <div key={key} style={{ fontSize: 11, display: 'flex', gap: 6, alignItems: 'baseline', padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                            <span style={{ color: '#64748b', minWidth: 100, textTransform: 'uppercase', fontSize: 9, fontWeight: 600, flexShrink: 0 }}>{key.replace(/_/g, ' ')}</span>
+                            <span style={{ color: '#e57373', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 90 }}>{String(oldVal ?? '—')}</span>
+                            <span style={{ color: '#475569' }}>→</span>
+                            <span style={{ color: isEdited ? '#fbbf24' : '#4ade80', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 90 }}>{String(effectiveNew ?? '—')}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Inline edit panel */}
+                {isEditOpen && canEdit && !isExcluded && (
+                  <div style={{
+                    background: 'rgba(0,0,0,0.35)', border: `1px solid ${borderColor}`, borderTop: 'none',
+                    borderRadius: '0 0 8px 8px', padding: '12px 14px',
+                    display: 'flex', flexDirection: 'column', gap: 8,
+                  }}>
+                    <div style={{ fontSize: 10, color: '#fbbf24', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>
+                      Edit fields — overrides staged values
+                    </div>
+                    {EDITABLE_META_FIELDS.map((field) => {
+                      const original = (op.fields || {})[field];
+                      const edited = op._editedFields[field];
+                      const current = edited !== undefined ? edited : original;
+                      const isEdited = edited !== undefined;
                       return (
-                        <div key={key} style={{ fontSize: 11, display: 'flex', gap: 6, alignItems: 'baseline', padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                          <span style={{ color: '#64748b', minWidth: 100, textTransform: 'uppercase', fontSize: 9, fontWeight: 600, flexShrink: 0 }}>{key.replace(/_/g, ' ')}</span>
-                          <span style={{ color: '#e57373', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 90 }}>{String(oldVal ?? '—')}</span>
-                          <span style={{ color: '#475569' }}>→</span>
-                          <span style={{ color: '#4ade80', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 90 }}>{String(val ?? '—')}</span>
+                        <div key={field} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <label style={{ fontSize: 9, color: isEdited ? '#fbbf24' : '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', gap: 6 }}>
+                            {field.replace(/_/g, ' ')}
+                            {isEdited && <span style={{ color: '#fbbf24' }}>• edited</span>}
+                          </label>
+                          <input
+                            type={field === 'acres' || field === 'winery_id' ? 'number' : 'text'}
+                            value={current ?? ''}
+                            onChange={(e) => setEditField(i, field, e.target.value)}
+                            placeholder={original != null ? String(original) : '—'}
+                            style={{
+                              background: isEdited ? 'rgba(251,191,36,0.06)' : 'rgba(255,255,255,0.04)',
+                              border: `1px solid ${isEdited ? 'rgba(251,191,36,0.3)' : 'rgba(255,255,255,0.10)'}`,
+                              borderRadius: 4, color: isEdited ? '#fbbf24' : '#ccc',
+                              fontSize: 12, padding: '5px 8px', outline: 'none',
+                              width: '100%', boxSizing: 'border-box', fontFamily: 'inherit',
+                            }}
+                          />
                         </div>
                       );
                     })}
+                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                      <button
+                        onClick={() => setExpandedEdit(null)}
+                        style={{ ...outlineBtn, fontSize: 11, padding: '5px 12px', color: '#94a3b8' }}
+                      >
+                        Done
+                      </button>
+                      {hasEdits && (
+                        <button
+                          onClick={() => resetOp(i)}
+                          style={{ ...outlineBtn, fontSize: 11, padding: '5px 12px', color: '#f87171', borderColor: 'rgba(239,68,68,0.25)' }}
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -642,9 +828,9 @@ function AdminBatchDiffSection({ ops }) {
 
 // ── PayloadSection ──────────────────────────────────────────────────────────
 
-function PayloadSection({ requestType, payload }) {
+function PayloadSection({ requestType, payload, isPending, onOpsChange }) {
   if (requestType === 'admin_batch_edit') {
-    return <AdminBatchDiffSection ops={payload.ops || []} />;
+    return <AdminBatchDiffSection ops={payload.ops || []} isPending={isPending} onOpsChange={onOpsChange} />;
   }
 
   if (requestType === 'geometry_update') {

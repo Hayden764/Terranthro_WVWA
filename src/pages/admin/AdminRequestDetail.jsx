@@ -15,6 +15,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { apiJson, apiPost } from '../../lib/api';
 import AdminGeometryDiffMap from './AdminGeometryDiffMap';
+import AdminBatchMap from './AdminBatchMap';
 
 const REQUEST_TYPE_LABELS = {
   profile:            'Winery Profile',
@@ -428,99 +429,171 @@ function ParcelContextMap({ geometry }) {
 }
 
 // ── AdminBatchDiffSection ────────────────────────────────────────────────────
-// Renders each op in an admin_batch_edit payload as a collapsible diff row.
+// Split-panel: shared map on the left, scrollable ops list on the right.
 
 function AdminBatchDiffSection({ ops }) {
-  const [openIndex, setOpenIndex] = useState(null);
+  const [activeGeomIndex, setActiveGeomIndex] = useState(null); // index within geomOps
+  const [showOld, setShowOld] = useState(true);
+  const [showNew, setShowNew] = useState(true);
 
   if (!ops || ops.length === 0) {
     return <p style={{ fontSize: 13, color: '#888', fontStyle: 'italic' }}>No ops in this batch.</p>;
   }
 
+  // Geometry ops indexed within the full ops array
+  const geomOps = ops.reduce((acc, op, i) => {
+    if (op.op === 'geometry') acc.push({ ...op, opsIndex: i });
+    return acc;
+  }, []);
+
+  const toggleBtnStyle = (active) => ({
+    fontSize: 11,
+    fontWeight: 600,
+    padding: '4px 10px',
+    borderRadius: 5,
+    border: `1px solid ${active ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.07)'}`,
+    background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+    color: active ? '#e0e0e0' : '#555',
+    cursor: 'pointer',
+  });
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <SectionLabel>Batch ops ({ops.length})</SectionLabel>
-      {ops.map((op, i) => {
-        const isOpen = openIndex === i;
-        const isGeom = op.op === 'geometry';
-        const isMeta = op.op === 'metadata';
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+        <SectionLabel style={{ margin: 0 }}>Batch ops ({ops.length})</SectionLabel>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          <button style={toggleBtnStyle(showOld)} onClick={() => setShowOld((v) => !v)}>
+            <span style={{ display: 'inline-block', width: 10, height: 2, background: '#e8a020', marginRight: 5, verticalAlign: 'middle' }} />
+            Old
+          </button>
+          <button style={toggleBtnStyle(showNew)} onClick={() => setShowNew((v) => !v)}>
+            <span style={{ display: 'inline-block', width: 10, height: 2, background: '#64b5f6', marginRight: 5, verticalAlign: 'middle' }} />
+            New
+          </button>
+          {activeGeomIndex !== null && (
+            <button style={toggleBtnStyle(false)} onClick={() => setActiveGeomIndex(null)}>Show all</button>
+          )}
+        </div>
+      </div>
 
-        // Acreage flag for this specific op
-        let acreDelta = null;
-        if (isGeom && op.before_acres != null && op.before_acres > 0 && op.after_acres != null) {
-          const pct = ((op.after_acres - op.before_acres) / op.before_acres) * 100;
-          if (Math.abs(pct) >= 5) acreDelta = pct;
-        }
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16, alignItems: 'start' }}>
+        {/* Left: shared map */}
+        <div style={{ position: 'sticky', top: 24 }}>
+          <AdminBatchMap
+            ops={ops}
+            activeIndex={activeGeomIndex}
+            showOld={showOld}
+            showNew={showNew}
+            height={520}
+          />
+        </div>
 
-        return (
-          <div key={i} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, border: `1px solid ${acreDelta != null ? 'rgba(234,179,8,0.35)' : 'rgba(255,255,255,0.06)'}`, overflow: 'hidden' }}>
-            <div
-              onClick={() => setOpenIndex(isOpen ? null : i)}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', background: 'rgba(255,255,255,0.03)', borderBottom: isOpen ? '1px solid rgba(255,255,255,0.06)' : 'none' }}
-            >
-              <span style={{ fontSize: 11, fontWeight: 700, color: isGeom ? '#60a5fa' : '#a78bfa', textTransform: 'uppercase', minWidth: 60 }}>
-                {op.op}
-              </span>
-              <span style={{ fontSize: 13, color: '#e0e0e0', fontWeight: 500 }}>
-                {op.parcel_name || `Parcel #${op.parcel_id}`}
-              </span>
-              <span style={{ fontSize: 11, color: '#555', marginLeft: 2 }}>#{op.parcel_id}</span>
-              {acreDelta != null && (
-                <span style={{ marginLeft: 4, fontSize: 10, fontWeight: 700, color: '#eab308', background: 'rgba(234,179,8,0.12)', borderRadius: 4, padding: '1px 6px', border: '1px solid rgba(234,179,8,0.2)' }}>
-                  ⚠ Acreage {acreDelta > 0 ? '+' : ''}{Math.round(acreDelta * 10) / 10}%
-                </span>
-              )}
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: '#555' }}>{isOpen ? '▲' : '▼'}</span>
-            </div>
+        {/* Right: ops list */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 520, overflowY: 'auto', paddingRight: 2 }}>
+          {ops.map((op, i) => {
+            const isGeom = op.op === 'geometry';
+            const isMeta = op.op === 'metadata';
 
-            {isOpen && (
-              <div style={{ padding: '12px 14px' }}>
+            // Map geometry ops to their index within geomOps
+            const geomIdx = isGeom ? geomOps.findIndex((g) => g.opsIndex === i) : -1;
+            const isActiveGeom = isGeom && activeGeomIndex === geomIdx;
+
+            let acreDelta = null;
+            if (isGeom && op.before_acres != null && Number(op.before_acres) > 0 && op.after_acres != null) {
+              const pct = ((Number(op.after_acres) - Number(op.before_acres)) / Number(op.before_acres)) * 100;
+              acreDelta = pct; // always show; highlight if |pct| >= 5
+            }
+
+            const borderColor = isActiveGeom
+              ? 'rgba(96,165,250,0.45)'
+              : acreDelta != null && Math.abs(acreDelta) >= 5
+              ? 'rgba(234,179,8,0.30)'
+              : 'rgba(255,255,255,0.07)';
+
+            return (
+              <div
+                key={i}
+                onClick={isGeom ? () => setActiveGeomIndex(isActiveGeom ? null : geomIdx) : undefined}
+                style={{
+                  background: isActiveGeom ? 'rgba(96,165,250,0.06)' : 'rgba(0,0,0,0.18)',
+                  borderRadius: 8,
+                  border: `1px solid ${borderColor}`,
+                  padding: '10px 13px',
+                  cursor: isGeom ? 'pointer' : 'default',
+                  transition: 'border-color 0.15s, background 0.15s',
+                }}
+              >
+                {/* Op header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: isMeta ? 8 : 6 }}>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                    color: isGeom ? '#60a5fa' : '#a78bfa',
+                    minWidth: 52,
+                  }}>{op.op}</span>
+                  <span style={{ fontSize: 13, color: '#e0e0e0', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {op.parcel_name || `Parcel #${op.parcel_id}`}
+                  </span>
+                  <span style={{ fontSize: 10, color: '#444' }}>#{op.parcel_id}</span>
+                  {isGeom && (
+                    <span style={{ fontSize: 10, color: '#666' }}>{isActiveGeom ? '◉' : '○'}</span>
+                  )}
+                </div>
+
+                {/* Geometry: before/after acres */}
                 {isGeom && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {(op.before_geom || op.geometry) ? (
-                      <>
-                        <AdminGeometryDiffMap
-                          oldGeometry={op.before_geom || null}
-                          newGeometry={op.geometry || null}
-                          height={320}
-                        />
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 12, color: '#888' }}>
-                          {op.before_acres != null && (
-                            <span>Before: <strong style={{ color: '#e0e0e0' }}>{Number(op.before_acres).toFixed(2)} ac</strong></span>
-                          )}
-                          {op.after_acres != null && (
-                            <span>After: <strong style={{ color: acreDelta != null ? '#eab308' : '#e0e0e0' }}>{Number(op.after_acres).toFixed(2)} ac</strong></span>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <p style={{ fontSize: 12, color: '#888' }}>Geometry stored — no before/after preview available.</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                    <span style={{ color: '#888' }}>
+                      {op.before_acres != null
+                        ? <><span style={{ color: '#e8a020' }}>{Number(op.before_acres).toFixed(2)} ac</span> → </>
+                        : '— → '
+                      }
+                      {op.after_acres != null
+                        ? <span style={{ color: acreDelta != null && Math.abs(acreDelta) >= 5 ? '#eab308' : '#4ade80' }}>
+                            {Number(op.after_acres).toFixed(2)} ac
+                          </span>
+                        : '—'
+                      }
+                    </span>
+                    {acreDelta != null && Math.abs(acreDelta) >= 5 && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, color: '#eab308',
+                        background: 'rgba(234,179,8,0.10)', borderRadius: 4,
+                        padding: '1px 5px', border: '1px solid rgba(234,179,8,0.2)',
+                      }}>
+                        ⚠ {acreDelta > 0 ? '+' : ''}{Math.round(acreDelta * 10) / 10}%
+                      </span>
+                    )}
+                    {acreDelta != null && Math.abs(acreDelta) < 5 && (
+                      <span style={{ fontSize: 10, color: '#555' }}>
+                        ({acreDelta > 0 ? '+' : ''}{Math.round(acreDelta * 10) / 10}%)
+                      </span>
                     )}
                   </div>
                 )}
 
+                {/* Metadata: inline field diffs */}
                 {isMeta && op.fields && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     {Object.entries(op.fields).map(([key, val]) => {
                       const oldVal = op.before?.[key];
-                      const changed = String(oldVal ?? '') !== String(val ?? '');
-                      if (!changed && oldVal == null && val == null) return null;
+                      if (String(oldVal ?? '') === String(val ?? '') && oldVal == null && val == null) return null;
+                      if (String(oldVal ?? '') === String(val ?? '')) return null;
                       return (
-                        <div key={key} style={{ fontSize: 12, display: 'flex', gap: 8, alignItems: 'baseline', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                          <span style={{ color: '#64748b', minWidth: 120, textTransform: 'uppercase', fontSize: 10, fontWeight: 600 }}>{key.replace(/_/g, ' ')}</span>
-                          <span style={{ color: '#e57373' }}>{String(oldVal ?? '—')}</span>
+                        <div key={key} style={{ fontSize: 11, display: 'flex', gap: 6, alignItems: 'baseline', padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <span style={{ color: '#64748b', minWidth: 100, textTransform: 'uppercase', fontSize: 9, fontWeight: 600, flexShrink: 0 }}>{key.replace(/_/g, ' ')}</span>
+                          <span style={{ color: '#e57373', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 90 }}>{String(oldVal ?? '—')}</span>
                           <span style={{ color: '#475569' }}>→</span>
-                          <span style={{ color: '#4ade80' }}>{String(val ?? '—')}</span>
+                          <span style={{ color: '#4ade80', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 90 }}>{String(val ?? '—')}</span>
                         </div>
                       );
                     })}
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

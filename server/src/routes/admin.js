@@ -62,7 +62,7 @@ router.post('/login', async (req, res) => {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? 'strict' : 'lax',
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 12 * 60 * 60 * 1000,
       path: '/',
     });
 
@@ -550,11 +550,35 @@ router.post('/requests/batch', async (req, res) => {
   );
   if (wineryRows.length === 0) return res.status(404).json({ error: 'Winery not found' });
 
+  // ── Enrich geometry ops with server-computed acres ────────────────────────
+  // after_acres: PostGIS ST_Area on the submitted geometry (authoritative)
+  // before_acres: fetched from DB to ensure accuracy
+  const enrichedOps = await Promise.all(ops.map(async (op) => {
+    if (op.op !== 'geometry' || !op.geometry) return op;
+
+    const [afterRes, beforeRes] = await Promise.all([
+      pool.query(
+        `SELECT ROUND((ST_Area(ST_GeomFromGeoJSON($1)::geography) / 4046.856422)::numeric, 3) AS after_acres`,
+        [JSON.stringify(op.geometry)]
+      ),
+      pool.query(
+        `SELECT ROUND(COALESCE(acres, 0)::numeric, 3) AS before_acres FROM vineyard_parcels WHERE id = $1`,
+        [op.parcel_id]
+      ),
+    ]);
+
+    return {
+      ...op,
+      before_acres: beforeRes.rows[0]?.before_acres ?? op.before_acres,
+      after_acres: afterRes.rows[0]?.after_acres ?? null,
+    };
+  }));
+
   // ── Compute acreage flag across all geometry ops ─────────────────────────
   let flag = null;
   let flag_detail = null;
 
-  for (const opItem of ops) {
+  for (const opItem of enrichedOps) {
     if (opItem.op !== 'geometry') continue;
     const before = opItem.before_acres != null ? Number(opItem.before_acres) : null;
     const after  = opItem.after_acres  != null ? Number(opItem.after_acres)  : null;
@@ -581,7 +605,7 @@ router.post('/requests/batch', async (req, res) => {
          (winery_id, request_type, payload, origin, submitted_by_admin, flag, flag_detail)
        VALUES ($1, 'admin_batch_edit', $2, 'admin', $3, $4, $5)
        RETURNING id, request_type, status, created_at`,
-      [wineryIdInt, JSON.stringify({ ops }), adminId,
+      [wineryIdInt, JSON.stringify({ ops: enrichedOps }), adminId,
        flag, flag_detail ? JSON.stringify(flag_detail) : null]
     );
 

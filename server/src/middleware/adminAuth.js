@@ -17,7 +17,7 @@ export function signAdminToken(adminId, email, role) {
   return jwt.sign(
     { sub: adminId, email, role, scope: 'admin' },
     JWT_SECRET(),
-    { expiresIn: '24h' }
+    { expiresIn: '12h' }
   );
 }
 

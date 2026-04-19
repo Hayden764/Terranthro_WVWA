@@ -473,6 +473,13 @@ export default function EditorPage() {
         headers: { 'Content-Type': 'application/json', ...API_HEADERS },
         body: JSON.stringify({ winery_id: wineryId, ops: stagedOps }),
       });
+      if (res.status === 401) {
+        // Session expired — staged ops are safe in localStorage, redirect to login
+        setPushStatus('error');
+        setPushMessage('Session expired. Your staged changes are saved. Re-login and come back to push them.');
+        setTimeout(() => navigate('/admin', { replace: true }), 2500);
+        return;
+      }
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }));
         throw new Error(err.error || res.statusText);

@@ -380,10 +380,10 @@ router.post('/requests/:id/approve', async (req, res) => {
             );
             await client.query(
               `INSERT INTO winery_edit_log
-                 (admin_id, request_id, table_name, record_id, field_name,
+                 (winery_id, admin_id, request_id, table_name, record_id, field_name,
                   old_value, new_value, entity_type, entity_id)
-               VALUES ($1, $2, 'vineyard_parcels', $3, 'geometry', $4, $5, 'vineyard_parcel', $3)`,
-              [adminId, requestId,
+               VALUES ($1, $2, $3, 'vineyard_parcels', $4, 'geometry', $5, $6, 'vineyard_parcel', $4)`,
+              [request.winery_id, adminId, requestId,
                pid,
                oldRow[0].geom ? JSON.stringify(oldRow[0].geom) : null,
                JSON.stringify(opItem.geometry)]
@@ -414,10 +414,10 @@ router.post('/requests/:id/approve', async (req, res) => {
               for (const col of Object.keys(updates)) {
                 await client.query(
                   `INSERT INTO winery_edit_log
-                     (admin_id, request_id, table_name, record_id, field_name,
+                     (winery_id, admin_id, request_id, table_name, record_id, field_name,
                       old_value, new_value, entity_type, entity_id)
-                   VALUES ($1, $2, 'vineyard_parcels', $3, $4, $5, $6, 'vineyard_parcel', $3)`,
-                  [adminId, requestId, pid, col,
+                   VALUES ($1, $2, $3, 'vineyard_parcels', $4, $5, $6, $7, 'vineyard_parcel', $4)`,
+                  [request.winery_id, adminId, requestId, pid, col,
                    oldMeta[0][col] != null ? String(oldMeta[0][col]) : null,
                    updates[col]    != null ? String(updates[col])    : null]
                 );

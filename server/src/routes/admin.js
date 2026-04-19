@@ -423,12 +423,67 @@ router.post('/requests/:id/approve', async (req, res) => {
                 );
               }
             }
+          } else if (op === 'add' && opItem.geometry) {
+            const geomType = opItem.geometry.type;
+            if (!['Polygon', 'MultiPolygon'].includes(geomType)) continue;
+            const wineryId = opItem.winery_id ? parseInt(opItem.winery_id, 10) : request.winery_id;
+            if (!wineryId) continue;
+
+            const fields = opItem.fields || {};
+            const sanitized = {};
+            for (const col of ALLOWED_META) {
+              sanitized[col] = Object.prototype.hasOwnProperty.call(fields, col)
+                ? (fields[col] === '' ? null : fields[col])
+                : null;
+            }
+
+            const { rows: newParcel } = await client.query(
+              `INSERT INTO vineyard_parcels
+                 (winery_id, geometry, acres, vineyard_name, vineyard_org, owner_name,
+                  ava_name, nested_ava, nested_nested_ava, situs_address, situs_city,
+                  situs_zip, varietals_list, source_dataset)
+               VALUES ($1,
+                 ST_SetSRID(ST_GeomFromGeoJSON($2), 4326),
+                 ROUND((ST_Area(ST_SetSRID(ST_GeomFromGeoJSON($2), 4326)::geography) / 4046.856422)::numeric, 3),
+                 $3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+               RETURNING id`,
+              [wineryId, JSON.stringify(opItem.geometry),
+               sanitized.vineyard_name, sanitized.vineyard_org, sanitized.owner_name,
+               sanitized.ava_name, sanitized.nested_ava, sanitized.nested_nested_ava,
+               sanitized.situs_address, sanitized.situs_city, sanitized.situs_zip,
+               sanitized.varietals_list, sanitized.source_dataset]
+            );
+            await client.query(
+              `INSERT INTO winery_edit_log
+                 (winery_id, admin_id, request_id, table_name, record_id, field_name,
+                  old_value, new_value, entity_type, entity_id)
+               VALUES ($1, $2, $3, 'vineyard_parcels', $4, 'add', NULL,
+                 $5, 'vineyard_parcel', $4)`,
+              [wineryId, adminId, requestId, newParcel[0].id,
+               JSON.stringify({ parcel_name: sanitized.vineyard_name, winery_id: wineryId })]
+            );
+
+          } else if (op === 'delete') {
+            const { rows: toDelete } = await client.query(
+              `SELECT vineyard_name, winery_id FROM vineyard_parcels WHERE id = $1`,
+              [pid]
+            );
+            if (toDelete.length === 0) continue;
+            const delWineryId = toDelete[0].winery_id ?? request.winery_id;
+            await client.query(`DELETE FROM vineyard_parcels WHERE id = $1`, [pid]);
+            await client.query(
+              `INSERT INTO winery_edit_log
+                 (winery_id, admin_id, request_id, table_name, record_id, field_name,
+                  old_value, new_value, entity_type, entity_id)
+               VALUES ($1, $2, $3, 'vineyard_parcels', $4, 'delete',
+                 $5, NULL, 'vineyard_parcel', $4)`,
+              [delWineryId, adminId, requestId, pid,
+               JSON.stringify({ parcel_name: toDelete[0].vineyard_name, winery_id: delWineryId })]
+            );
           }
         }
         break;
       }
-
-      case 'geometry_update': {
         // If the payload contains new_geometry (GeoJSON), apply it now.
         if (payload.new_geometry && request.target_id) {
           const geomType = payload.new_geometry.type;

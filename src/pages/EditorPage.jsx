@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
@@ -45,21 +46,53 @@ const DRAW_STYLES = [
 ];
 
 export default function EditorPage() {
+  const navigate = useNavigate();
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const drawRef = useRef(null);
 
+  const [authChecked, setAuthChecked] = useState(false);
   const [parcels, setParcels] = useState(null);
   const [selectedParcel, setSelectedParcel] = useState(null);
   const [activeTab, setActiveTab] = useState('geometry'); // 'geometry' | 'metadata'
   const [isEditing, setIsEditing] = useState(false);
-  const [saveStatus, setSaveStatus] = useState('idle'); // idle | saving | saved | error
+  const [saveStatus, setSaveStatus] = useState('idle'); // idle | staging | staged | error
   const [statusMessage, setStatusMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   // Metadata form state — populated when a parcel is selected
   const [metaForm, setMetaForm] = useState({});
   const [metaSaveStatus, setMetaSaveStatus] = useState('idle');
   const [metaStatusMessage, setMetaStatusMessage] = useState('');
+  // Staged operations — accumulated until "Push for Review"
+  // Initialised from localStorage so a page refresh doesn't lose staged work.
+  const [stagedOps, setStagedOpsRaw] = useState(() => {
+    try {
+      const stored = localStorage.getItem('editor_staged_ops');
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+  // Wrap setter so every update is also persisted to localStorage
+  const setStagedOps = useCallback((updater) => {
+    setStagedOpsRaw((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      try { localStorage.setItem('editor_staged_ops', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
+  const [pushStatus, setPushStatus] = useState('idle'); // idle | pushing | done | error
+  const [pushMessage, setPushMessage] = useState('');
+  // winery_id for the batch request — always inferred from the first parcel that has one
+  const batchWineryId = useMemo(() => {
+    for (const op of stagedOps) {
+      if (op.winery_id) return op.winery_id;
+    }
+    // Fallback: try any parcel
+    if (parcels) {
+      const linked = parcels.features.find((f) => f.properties.winery_id);
+      if (linked) return linked.properties.winery_id;
+    }
+    return null;
+  }, [stagedOps, parcels]);
 
   // Refs for use inside event handlers
   const selectedParcelRef = useRef(null);
@@ -69,13 +102,24 @@ export default function EditorPage() {
   selectedParcelRef.current = selectedParcel;
   isEditingRef.current = isEditing;
 
+  // ── Admin auth guard ─────────────────────────────────────────────────────
+  useEffect(() => {
+    fetch(`${API_BASE}/api/admin/me`, { credentials: 'include', headers: API_HEADERS })
+      .then((r) => {
+        if (!r.ok) navigate('/admin', { replace: true });
+        else setAuthChecked(true);
+      })
+      .catch(() => navigate('/admin', { replace: true }));
+  }, [navigate]);
+
   // ── Fetch all parcels ────────────────────────────────────────────────────
   useEffect(() => {
+    if (!authChecked) return;
     fetch(`${API_BASE}/api/vineyards/parcels`, { headers: API_HEADERS })
       .then((r) => r.json())
       .then((data) => setParcels(data))
       .catch((err) => console.error('Failed to load parcels:', err));
-  }, []);
+  }, [authChecked]);
 
   // ── Initialize map ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -299,7 +343,7 @@ export default function EditorPage() {
     setStatusMessage('Drag vertices to reshape. Click a vertex then press Delete/Backspace to remove it.');
   }, [selectedParcel, parcels]);
 
-  // ── Save ─────────────────────────────────────────────────────────────────
+  // ── Stage geometry change ────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
     if (!drawRef.current || !selectedParcel) return;
     const all = drawRef.current.getAll();
@@ -309,93 +353,140 @@ export default function EditorPage() {
     }
 
     const edited = all.features[0];
-    setSaveStatus('saving');
-    setStatusMessage('Saving…');
+    const parcelId = selectedParcel.properties.id;
+    const beforeGeom = selectedParcel.geometry;
+    const beforeAcres = selectedParcel.properties.acres != null
+      ? Number(selectedParcel.properties.acres) : null;
 
-    try {
-      const res = await fetch(
-        `${API_BASE}/api/vineyards/parcels/${selectedParcel.properties.id}/geometry`,
+    // Compute approximate after_acres client-side so the flag can be previewed
+    // (server will recompute exactly on approval)
+    // We just store the geometry; the server computes authoritative acres.
+    setSaveStatus('staging');
+    setStatusMessage('Staged.');
+
+    setStagedOps((prev) => {
+      // Replace any existing geometry op for this parcel
+      const without = prev.filter((o) => !(o.op === 'geometry' && o.parcel_id === parcelId));
+      return [
+        ...without,
         {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...API_HEADERS },
-          body: JSON.stringify({ geometry: edited.geometry }),
-        }
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(err.error || res.statusText);
-      }
+          op: 'geometry',
+          parcel_id: parcelId,
+          parcel_name: selectedParcel.properties.vineyard_name || `Parcel #${parcelId}`,
+          winery_id: selectedParcel.properties.winery_id,
+          geometry: edited.geometry,
+          before_geom: beforeGeom,
+          before_acres: beforeAcres,
+          // after_acres will be null until the server computes it on approval
+          after_acres: null,
+        },
+      ];
+    });
 
-      const saved = await res.json();
-      const newAcres = saved.acres ?? null;
+    // Update local source so map reflects the staged shape immediately
+    setParcels((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        features: prev.features.map((f) =>
+          f.properties.id === parcelId
+            ? { ...f, geometry: edited.geometry }
+            : f
+        ),
+      };
+    });
 
-      // Update local source so the parcel reflects the new shape and recalculated acres immediately
-      setParcels((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          features: prev.features.map((f) =>
-            f.properties.id === selectedParcel.properties.id
-              ? { ...f, geometry: edited.geometry, properties: { ...f.properties, acres: newAcres } }
-              : f
-          ),
-        };
-      });
-
-      drawRef.current.deleteAll();
-      drawRef.current.changeMode('simple_select');
-      setIsEditing(false);
-      setSelectedParcel(null);
-      setSaveStatus('saved');
-      setStatusMessage('Saved. Parcel geometry updated.');
-      setTimeout(() => setSaveStatus('idle'), 4000);
-    } catch (err) {
-      setSaveStatus('error');
-      setStatusMessage(`Save failed: ${err.message}`);
-    }
+    drawRef.current.deleteAll();
+    drawRef.current.changeMode('simple_select');
+    setIsEditing(false);
+    setSelectedParcel(null);
+    setSaveStatus('staged');
+    setTimeout(() => setSaveStatus('idle'), 3000);
   }, [selectedParcel]);
 
-  // ── Save metadata ─────────────────────────────────────────────────────────
+  // ── Stage metadata change ─────────────────────────────────────────────────
   const handleSaveMeta = useCallback(async () => {
     if (!selectedParcel) return;
-    setMetaSaveStatus('saving');
-    setMetaStatusMessage('Saving…');
-    try {
-      const res = await fetch(
-        `${API_BASE}/api/vineyards/parcels/${selectedParcel.properties.id}/metadata`,
+    const parcelId = selectedParcel.properties.id;
+
+    // Capture before values for the fields that changed
+    const before = {};
+    const META_KEYS = [
+      'vineyard_name', 'vineyard_org', 'owner_name', 'ava_name',
+      'nested_ava', 'nested_nested_ava', 'situs_address', 'situs_city',
+      'situs_zip', 'acres', 'varietals_list', 'source_dataset', 'winery_id',
+    ];
+    for (const k of META_KEYS) {
+      before[k] = selectedParcel.properties[k] ?? null;
+    }
+
+    setStagedOps((prev) => {
+      const without = prev.filter((o) => !(o.op === 'metadata' && o.parcel_id === parcelId));
+      return [
+        ...without,
         {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...API_HEADERS },
-          body: JSON.stringify(metaForm),
-        }
-      );
+          op: 'metadata',
+          parcel_id: parcelId,
+          parcel_name: selectedParcel.properties.vineyard_name || `Parcel #${parcelId}`,
+          winery_id: selectedParcel.properties.winery_id,
+          fields: { ...metaForm },
+          before,
+        },
+      ];
+    });
+
+    // Merge into local parcels state for immediate UI feedback
+    setParcels((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        features: prev.features.map((f) => {
+          if (f.properties.id !== parcelId) return f;
+          return { ...f, properties: { ...f.properties, ...metaForm, acres: metaForm.acres ? parseFloat(metaForm.acres) : null } };
+        }),
+      };
+    });
+    setSelectedParcel((prev) => ({
+      ...prev,
+      properties: { ...prev.properties, ...metaForm, acres: metaForm.acres ? parseFloat(metaForm.acres) : null },
+    }));
+    setMetaSaveStatus('staged');
+    setMetaStatusMessage('Staged for review.');
+    setTimeout(() => setMetaSaveStatus('idle'), 3000);
+  }, [selectedParcel, metaForm]);
+
+  // ── Push for Review ────────────────────────────────────────────────────────
+  const handlePushForReview = useCallback(async () => {
+    if (stagedOps.length === 0) return;
+    const wineryId = batchWineryId;
+    if (!wineryId) {
+      setPushMessage('Cannot submit: no winery_id found on any staged parcel. Ensure parcels are linked to a winery first.');
+      setPushStatus('error');
+      return;
+    }
+    setPushStatus('pushing');
+    setPushMessage('Submitting…');
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/requests/batch`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...API_HEADERS },
+        body: JSON.stringify({ winery_id: wineryId, ops: stagedOps }),
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }));
         throw new Error(err.error || res.statusText);
       }
-      // Merge updated fields back into parcels state
-      setParcels((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          features: prev.features.map((f) => {
-            if (f.properties.id !== selectedParcel.properties.id) return f;
-            return { ...f, properties: { ...f.properties, ...metaForm, acres: metaForm.acres ? parseFloat(metaForm.acres) : null } };
-          }),
-        };
-      });
-      setSelectedParcel((prev) => ({
-        ...prev,
-        properties: { ...prev.properties, ...metaForm, acres: metaForm.acres ? parseFloat(metaForm.acres) : null },
-      }));
-      setMetaSaveStatus('saved');
-      setMetaStatusMessage('Metadata saved.');
-      setTimeout(() => setMetaSaveStatus('idle'), 4000);
+      const result = await res.json();
+      setStagedOps([]);
+      try { localStorage.removeItem('editor_staged_ops'); } catch {}
+      setPushStatus('done');
+      setPushMessage(`Submitted as request #${result.id} — pending second approval.`);
     } catch (err) {
-      setMetaSaveStatus('error');
-      setMetaStatusMessage(`Save failed: ${err.message}`);
+      setPushStatus('error');
+      setPushMessage(`Submit failed: ${err.message}`);
     }
-  }, [selectedParcel, metaForm]);
+  }, [stagedOps, batchWineryId]);
 
   // ── Discard ──────────────────────────────────────────────────────────────
   const handleDiscard = useCallback(() => {
@@ -492,12 +583,12 @@ export default function EditorPage() {
           <h1 style={{ color: '#f1f5f9', fontSize: 16, fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>
             Parcel Editor
           </h1>
-          <a
-            href="#/"
+          <Link
+            to="/admin/dashboard"
             style={{ color: '#475569', fontSize: 12, textDecoration: 'none' }}
           >
-            ← Map
-          </a>
+            ← Dashboard
+          </Link>
         </div>
 
         {/* Parcel count */}
@@ -630,8 +721,8 @@ export default function EditorPage() {
                     <div style={{ fontSize: 12, color: '#fbbf24', background: '#1e293b', border: '1px solid #92400e', borderRadius: 6, padding: '7px 10px' }}>
                       ✏ Editing active — drag vertices to reshape
                     </div>
-                    <button onClick={handleSave} disabled={saveStatus === 'saving'} style={btnStyle(saveStatus === 'saving' ? '#166534' : '#16a34a', '#15803d')}>
-                      {saveStatus === 'saving' ? 'Saving…' : 'Save Geometry'}
+                    <button onClick={handleSave} disabled={saveStatus === 'staging'} style={btnStyle(saveStatus === 'staging' ? '#166534' : '#16a34a', '#15803d')}>
+                      {saveStatus === 'staging' ? 'Staging…' : 'Stage Geometry'}
                     </button>
                     <button onClick={handleDiscard} style={{ background: 'transparent', color: '#94a3b8', border: '1px solid #334155', borderRadius: 6, padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
                       Discard
@@ -639,7 +730,7 @@ export default function EditorPage() {
                   </>
                 )}
                 {statusMessage && (
-                  <div style={{ color: saveStatus === 'error' ? '#f87171' : saveStatus === 'saved' ? '#4ade80' : '#94a3b8', fontSize: 12, padding: '6px 10px', background: '#1e293b', borderRadius: 6, lineHeight: 1.5 }}>
+                  <div style={{ color: saveStatus === 'error' ? '#f87171' : saveStatus === 'staged' ? '#4ade80' : '#94a3b8', fontSize: 12, padding: '6px 10px', background: '#1e293b', borderRadius: 6, lineHeight: 1.5 }}>
                     {statusMessage}
                   </div>
                 )}
@@ -647,7 +738,7 @@ export default function EditorPage() {
                   1. Click "Edit Geometry"<br />
                   2. Drag vertices to reshape<br />
                   3. Trash icon removes selected vertices<br />
-                  4. Save writes directly to the DB
+                  4. Stage queues the change; push all at once
                 </div>
               </div>
             )}
@@ -678,14 +769,60 @@ export default function EditorPage() {
                   disabled={metaSaveStatus === 'saving'}
                   style={{ ...btnStyle(metaSaveStatus === 'saving' ? '#166534' : '#16a34a', '#15803d'), marginTop: 4 }}
                 >
-                  {metaSaveStatus === 'saving' ? 'Saving…' : 'Save Metadata'}
+                  {metaSaveStatus === 'saving' ? 'Staging…' : 'Stage Metadata'}
                 </button>
 
                 {metaStatusMessage && (
-                  <div style={{ color: metaSaveStatus === 'error' ? '#f87171' : metaSaveStatus === 'saved' ? '#4ade80' : '#94a3b8', fontSize: 12, padding: '6px 10px', background: '#1e293b', borderRadius: 6, lineHeight: 1.5 }}>
+                  <div style={{ color: metaSaveStatus === 'error' ? '#f87171' : metaSaveStatus === 'staged' ? '#4ade80' : '#94a3b8', fontSize: 12, padding: '6px 10px', background: '#1e293b', borderRadius: 6, lineHeight: 1.5 }}>
                     {metaStatusMessage}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Staged changes panel ──────────────────────────────────────── */}
+        {stagedOps.length > 0 && (
+          <div style={{ borderTop: '1px solid #1e293b', paddingTop: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+              Staged ({stagedOps.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 10, maxHeight: 160, overflowY: 'auto' }}>
+              {stagedOps.map((op, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b', borderRadius: 5, padding: '5px 8px' }}>
+                  <div>
+                    <span style={{ fontSize: 11, color: op.op === 'geometry' ? '#60a5fa' : '#a78bfa', fontWeight: 600, textTransform: 'uppercase' }}>{op.op}</span>
+                    <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 6 }}>{op.parcel_name}</span>
+                  </div>
+                  <button
+                    onClick={() => setStagedOps((prev) => prev.filter((_, j) => j !== i))}
+                    style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1 }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={handlePushForReview}
+              disabled={pushStatus === 'pushing'}
+              style={{
+                ...btnStyle(pushStatus === 'pushing' ? '#78350f' : '#d97706', '#b45309'),
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              {pushStatus === 'pushing' ? 'Submitting…' : `↑ Push ${stagedOps.length} Change${stagedOps.length !== 1 ? 's' : ''} for Review`}
+            </button>
+            {pushMessage && (
+              <div style={{
+                marginTop: 6,
+                fontSize: 11,
+                color: pushStatus === 'error' ? '#f87171' : pushStatus === 'done' ? '#4ade80' : '#94a3b8',
+                background: '#1e293b', borderRadius: 5, padding: '5px 8px', lineHeight: 1.5,
+              }}>
+                {pushMessage}
               </div>
             )}
           </div>
@@ -695,7 +832,8 @@ export default function EditorPage() {
         <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid #1e293b', color: '#334155', fontSize: 11, lineHeight: 1.7 }}>
           <span style={{ color: '#475569', fontWeight: 600 }}>Editing station</span><br />
           Click a parcel → Geometry tab to reshape,<br />
-          Metadata tab to edit fields.
+          Metadata tab to edit fields.<br />
+          Stage changes, then push as one batch.
         </div>
       </div>
 

@@ -247,11 +247,39 @@ router.post('/requests', async (req, res) => {
   }
 
   try {
+    // ── Acreage-change flagging for geometry_update requests ──────────────
+    // If the winery is submitting a new geometry, compute Δ% acreage and flag
+    // if the change is ≥ 5 % (absolute).
+    let flag = null;
+    let flag_detail = null;
+
+    if (request_type === 'geometry_update' && sanitizedPayload.new_geometry && target_id) {
+      const { rows: acreRows } = await pool.query(
+        `SELECT
+           acres AS before_acres,
+           ROUND((ST_Area(ST_SetSRID(ST_GeomFromGeoJSON($1::text), 4326)::geography) / 4046.856422)::numeric, 3) AS after_acres
+         FROM vineyard_parcels WHERE id = $2`,
+        [JSON.stringify(sanitizedPayload.new_geometry), target_id]
+      );
+      if (acreRows.length > 0) {
+        const before = acreRows[0].before_acres != null ? Number(acreRows[0].before_acres) : null;
+        const after  = acreRows[0].after_acres  != null ? Number(acreRows[0].after_acres)  : null;
+        if (before != null && before > 0 && after != null) {
+          const pct = Math.abs((after - before) / before) * 100;
+          if (pct >= 5) {
+            flag = 'acreage_change';
+            flag_detail = { before_acres: before, after_acres: after, pct_change: Math.round(pct * 10) / 10 };
+          }
+        }
+      }
+    }
+
     const { rows } = await pool.query(
-      `INSERT INTO edit_requests (winery_id, account_id, request_type, target_id, payload)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO edit_requests (winery_id, account_id, request_type, target_id, payload, origin, flag, flag_detail)
+       VALUES ($1, $2, $3, $4, $5, 'winery', $6, $7)
        RETURNING id, request_type, status, created_at`,
-      [wineryId, accountId, request_type, target_id || null, JSON.stringify(sanitizedPayload)]
+      [wineryId, accountId, request_type, target_id || null, JSON.stringify(sanitizedPayload),
+       flag, flag_detail ? JSON.stringify(flag_detail) : null]
     );
 
     res.status(201).json(rows[0]);

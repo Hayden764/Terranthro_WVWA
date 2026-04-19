@@ -95,6 +95,7 @@ router.get('/me', (req, res) => {
 router.get('/requests', async (req, res) => {
   const status = req.query.status || null;
   const type = req.query.type || null;
+  const flag = req.query.flag || null;
 
   try {
     const params = [];
@@ -108,6 +109,10 @@ router.get('/requests', async (req, res) => {
       params.push(type);
       conditions.push(`er.request_type = $${params.length}`);
     }
+    if (flag) {
+      params.push(flag);
+      conditions.push(`er.flag = $${params.length}`);
+    }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
@@ -116,13 +121,16 @@ router.get('/requests', async (req, res) => {
          er.id, er.winery_id, er.account_id, er.request_type,
          er.target_id, er.payload, er.status, er.admin_notes,
          er.reviewed_at, er.created_at,
+         er.origin, er.flag, er.flag_detail,
          w.title AS winery_name,
          wa.contact_email,
-         aa.display_name AS reviewed_by_name
+         aa.display_name AS reviewed_by_name,
+         sa.display_name AS submitted_by_admin_name
        FROM edit_requests er
        JOIN wineries w ON w.id = er.winery_id
-       JOIN winery_accounts wa ON wa.id = er.account_id
+       LEFT JOIN winery_accounts wa ON wa.id = er.account_id
        LEFT JOIN admin_accounts aa ON aa.id = er.reviewed_by
+       LEFT JOIN admin_accounts sa ON sa.id = er.submitted_by_admin
        ${where}
        ORDER BY er.created_at DESC
        LIMIT 200`,
@@ -337,6 +345,89 @@ router.post('/requests/:id/approve', async (req, res) => {
       case 'vineyard_new':
         break;
 
+      // ── admin_batch_edit ─────────────────────────────────────────────
+      // Each op in payload.ops is applied sequentially.
+      // ops: [ { op: 'geometry'|'metadata', parcel_id, geometry?, fields? }, ... ]
+      case 'admin_batch_edit': {
+        const ops = Array.isArray(payload.ops) ? payload.ops : [];
+        const ALLOWED_META = [
+          'vineyard_name', 'vineyard_org', 'owner_name', 'ava_name',
+          'nested_ava', 'nested_nested_ava', 'situs_address', 'situs_city',
+          'situs_zip', 'acres', 'varietals_list', 'source_dataset', 'winery_id',
+        ];
+
+        for (const opItem of ops) {
+          const { op, parcel_id } = opItem;
+          if (!parcel_id || isNaN(parseInt(parcel_id, 10))) continue;
+          const pid = parseInt(parcel_id, 10);
+
+          if (op === 'geometry' && opItem.geometry) {
+            const geomType = opItem.geometry.type;
+            if (!['Polygon', 'MultiPolygon'].includes(geomType)) continue;
+
+            const { rows: oldRow } = await client.query(
+              `SELECT ST_AsGeoJSON(geometry)::json AS geom, acres FROM vineyard_parcels WHERE id = $1`,
+              [pid]
+            );
+            if (oldRow.length === 0) continue;
+
+            await client.query(
+              `UPDATE vineyard_parcels
+               SET geometry = ST_SetSRID(ST_GeomFromGeoJSON($1), 4326),
+                   acres = ROUND((ST_Area(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)::geography) / 4046.856422)::numeric, 3)
+               WHERE id = $2`,
+              [JSON.stringify(opItem.geometry), pid]
+            );
+            await client.query(
+              `INSERT INTO winery_edit_log
+                 (admin_id, request_id, table_name, record_id, field_name,
+                  old_value, new_value, entity_type, entity_id)
+               VALUES ($1, $2, 'vineyard_parcels', $3, 'geometry', $4, $5, 'vineyard_parcel', $3)`,
+              [adminId, requestId,
+               pid,
+               oldRow[0].geom ? JSON.stringify(oldRow[0].geom) : null,
+               JSON.stringify(opItem.geometry)]
+            );
+
+          } else if (op === 'metadata' && opItem.fields && typeof opItem.fields === 'object') {
+            const updates = {};
+            for (const col of ALLOWED_META) {
+              if (Object.prototype.hasOwnProperty.call(opItem.fields, col)) {
+                updates[col] = opItem.fields[col] === '' ? null : opItem.fields[col];
+              }
+            }
+            if (Object.keys(updates).length === 0) continue;
+
+            const { rows: oldMeta } = await client.query(
+              `SELECT ${Object.keys(updates).join(', ')} FROM vineyard_parcels WHERE id = $1`,
+              [pid]
+            );
+
+            const setClauses = Object.keys(updates).map((col, i) => `${col} = $${i + 1}`);
+            const vals = [...Object.values(updates), pid];
+            await client.query(
+              `UPDATE vineyard_parcels SET ${setClauses.join(', ')} WHERE id = $${vals.length}`,
+              vals
+            );
+
+            if (oldMeta.length > 0) {
+              for (const col of Object.keys(updates)) {
+                await client.query(
+                  `INSERT INTO winery_edit_log
+                     (admin_id, request_id, table_name, record_id, field_name,
+                      old_value, new_value, entity_type, entity_id)
+                   VALUES ($1, $2, 'vineyard_parcels', $3, $4, $5, $6, 'vineyard_parcel', $3)`,
+                  [adminId, requestId, pid, col,
+                   oldMeta[0][col] != null ? String(oldMeta[0][col]) : null,
+                   updates[col]    != null ? String(updates[col])    : null]
+                );
+              }
+            }
+          }
+        }
+        break;
+      }
+
       case 'geometry_update': {
         // If the payload contains new_geometry (GeoJSON), apply it now.
         if (payload.new_geometry && request.target_id) {
@@ -424,6 +515,83 @@ router.post('/requests/:id/reject', async (req, res) => {
   }
 });
 
+// ─── Admin batch edit submit ─────────────────────────────────────
+
+/**
+ * POST /api/admin/requests/batch
+ *
+ * Submits a batch of admin-authored parcel edits as a single edit_requests row
+ * of type 'admin_batch_edit' so it appears in the approval queue for a second
+ * review pass.
+ *
+ * Body: {
+ *   winery_id: number,          — which winery "owns" these parcels (for display)
+ *   ops: [
+ *     { op: 'geometry', parcel_id: number, geometry: GeoJSON,
+ *       before_geom?: GeoJSON, before_acres?: number, after_acres?: number },
+ *     { op: 'metadata', parcel_id: number, fields: { ...cols }, before: { ...cols } },
+ *   ]
+ * }
+ */
+router.post('/requests/batch', async (req, res) => {
+  const { adminId } = req.adminAccount;
+  const { winery_id, ops } = req.body;
+
+  if (!winery_id || !Array.isArray(ops) || ops.length === 0) {
+    return res.status(400).json({ error: 'winery_id and a non-empty ops array are required' });
+  }
+
+  const wineryIdInt = parseInt(winery_id, 10);
+  if (isNaN(wineryIdInt)) return res.status(400).json({ error: 'Invalid winery_id' });
+
+  // Validate winery exists
+  const { rows: wineryRows } = await pool.query(
+    `SELECT id FROM wineries WHERE id = $1`, [wineryIdInt]
+  );
+  if (wineryRows.length === 0) return res.status(404).json({ error: 'Winery not found' });
+
+  // ── Compute acreage flag across all geometry ops ─────────────────────────
+  let flag = null;
+  let flag_detail = null;
+
+  for (const opItem of ops) {
+    if (opItem.op !== 'geometry') continue;
+    const before = opItem.before_acres != null ? Number(opItem.before_acres) : null;
+    const after  = opItem.after_acres  != null ? Number(opItem.after_acres)  : null;
+    if (before != null && before > 0 && after != null) {
+      const pct = Math.abs((after - before) / before) * 100;
+      if (pct >= 5) {
+        // Flag on the most significant change if multiple ops qualify
+        if (flag_detail === null || pct > flag_detail.pct_change) {
+          flag = 'acreage_change';
+          flag_detail = {
+            parcel_id: opItem.parcel_id,
+            before_acres: before,
+            after_acres: after,
+            pct_change: Math.round(pct * 10) / 10,
+          };
+        }
+      }
+    }
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO edit_requests
+         (winery_id, request_type, payload, origin, submitted_by_admin, flag, flag_detail)
+       VALUES ($1, 'admin_batch_edit', $2, 'admin', $3, $4, $5)
+       RETURNING id, request_type, status, created_at`,
+      [wineryIdInt, JSON.stringify({ ops }), adminId,
+       flag, flag_detail ? JSON.stringify(flag_detail) : null]
+    );
+
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error('Admin batch submit error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ─── Single request detail ───────────────────────────────────────
 
 /**
@@ -440,13 +608,16 @@ router.get('/requests/:id', async (req, res) => {
          er.id, er.winery_id, er.account_id, er.request_type,
          er.target_id, er.payload, er.status, er.admin_notes,
          er.reviewed_at, er.created_at,
+         er.origin, er.flag, er.flag_detail,
          w.title AS winery_name,
          wa.contact_email,
-         aa.display_name AS reviewed_by_name
+         aa.display_name AS reviewed_by_name,
+         sa.display_name AS submitted_by_admin_name
        FROM edit_requests er
        JOIN wineries w ON w.id = er.winery_id
-       JOIN winery_accounts wa ON wa.id = er.account_id
+       LEFT JOIN winery_accounts wa ON wa.id = er.account_id
        LEFT JOIN admin_accounts aa ON aa.id = er.reviewed_by
+       LEFT JOIN admin_accounts sa ON sa.id = er.submitted_by_admin
        WHERE er.id = $1`,
       [requestId]
     );

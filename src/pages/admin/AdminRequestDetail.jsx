@@ -23,6 +23,7 @@ const REQUEST_TYPE_LABELS = {
   vineyard_claim:     'Vineyard Claim',
   vineyard_new:       'New Vineyard',
   geometry_update:    'Boundary Edit',
+  admin_batch_edit:   'Admin Batch Edit',
 };
 
 const BLOCK_FIELDS = ['block_name', 'variety', 'clone', 'rootstock', 'row_orientation', 'vine_spacing', 'row_spacing', 'year_planted', 'trellis'];
@@ -97,13 +98,21 @@ export default function AdminRequestDetail() {
       {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ fontSize: 20, color: '#e0e0e0', margin: '0 0 4px' }}>
-            {request.request_type.replace(/_/g, ' ')}
-            <span style={{ fontSize: 14, fontWeight: 400, color: '#666', marginLeft: 8 }}>#{request.id}</span>
+          <h1 style={{ fontSize: 20, color: '#e0e0e0', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {REQUEST_TYPE_LABELS[request.request_type] || request.request_type.replace(/_/g, ' ')}
+            <span style={{ fontSize: 14, fontWeight: 400, color: '#666' }}>#{request.id}</span>
+            {request.origin === 'admin' && (
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#818cf8', background: 'rgba(99,102,241,0.12)', borderRadius: 4, padding: '2px 7px' }}>ADMIN</span>
+            )}
+            {request.flag === 'acreage_change' && (
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#eab308', background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.25)', borderRadius: 4, padding: '2px 7px' }}>
+                ⚠ Acreage Δ{request.flag_detail?.pct_change != null ? ` ${request.flag_detail.pct_change > 0 ? '+' : ''}${request.flag_detail.pct_change}%` : ''}
+              </span>
+            )}
           </h1>
           <p style={{ margin: 0, fontSize: 13, color: '#aaa' }}>
             <strong style={{ color: '#ccc' }}>{request.winery_name}</strong>
-            {' · '}{request.contact_email}
+            {request.contact_email ? `· ${request.contact_email}` : request.submitted_by_admin_name ? `· by admin: ${request.submitted_by_admin_name}` : ''}
             {parcel && (
               <span style={{ color: '#888' }}>
                 {' · '}{parcel.vineyard_name || `Parcel #${request.target_id}`}
@@ -418,9 +427,111 @@ function ParcelContextMap({ geometry }) {
   );
 }
 
+// ── AdminBatchDiffSection ────────────────────────────────────────────────────
+// Renders each op in an admin_batch_edit payload as a collapsible diff row.
+
+function AdminBatchDiffSection({ ops }) {
+  const [openIndex, setOpenIndex] = useState(null);
+
+  if (!ops || ops.length === 0) {
+    return <p style={{ fontSize: 13, color: '#888', fontStyle: 'italic' }}>No ops in this batch.</p>;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <SectionLabel>Batch ops ({ops.length})</SectionLabel>
+      {ops.map((op, i) => {
+        const isOpen = openIndex === i;
+        const isGeom = op.op === 'geometry';
+        const isMeta = op.op === 'metadata';
+
+        // Acreage flag for this specific op
+        let acreDelta = null;
+        if (isGeom && op.before_acres != null && op.before_acres > 0 && op.after_acres != null) {
+          const pct = ((op.after_acres - op.before_acres) / op.before_acres) * 100;
+          if (Math.abs(pct) >= 5) acreDelta = pct;
+        }
+
+        return (
+          <div key={i} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, border: `1px solid ${acreDelta != null ? 'rgba(234,179,8,0.35)' : 'rgba(255,255,255,0.06)'}`, overflow: 'hidden' }}>
+            <div
+              onClick={() => setOpenIndex(isOpen ? null : i)}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', background: 'rgba(255,255,255,0.03)', borderBottom: isOpen ? '1px solid rgba(255,255,255,0.06)' : 'none' }}
+            >
+              <span style={{ fontSize: 11, fontWeight: 700, color: isGeom ? '#60a5fa' : '#a78bfa', textTransform: 'uppercase', minWidth: 60 }}>
+                {op.op}
+              </span>
+              <span style={{ fontSize: 13, color: '#e0e0e0', fontWeight: 500 }}>
+                {op.parcel_name || `Parcel #${op.parcel_id}`}
+              </span>
+              <span style={{ fontSize: 11, color: '#555', marginLeft: 2 }}>#{op.parcel_id}</span>
+              {acreDelta != null && (
+                <span style={{ marginLeft: 4, fontSize: 10, fontWeight: 700, color: '#eab308', background: 'rgba(234,179,8,0.12)', borderRadius: 4, padding: '1px 6px', border: '1px solid rgba(234,179,8,0.2)' }}>
+                  ⚠ Acreage {acreDelta > 0 ? '+' : ''}{Math.round(acreDelta * 10) / 10}%
+                </span>
+              )}
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: '#555' }}>{isOpen ? '▲' : '▼'}</span>
+            </div>
+
+            {isOpen && (
+              <div style={{ padding: '12px 14px' }}>
+                {isGeom && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {(op.before_geom || op.geometry) ? (
+                      <>
+                        <AdminGeometryDiffMap
+                          oldGeometry={op.before_geom || null}
+                          newGeometry={op.geometry || null}
+                          height={320}
+                        />
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 12, color: '#888' }}>
+                          {op.before_acres != null && (
+                            <span>Before: <strong style={{ color: '#e0e0e0' }}>{Number(op.before_acres).toFixed(2)} ac</strong></span>
+                          )}
+                          {op.after_acres != null && (
+                            <span>After: <strong style={{ color: acreDelta != null ? '#eab308' : '#e0e0e0' }}>{Number(op.after_acres).toFixed(2)} ac</strong></span>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <p style={{ fontSize: 12, color: '#888' }}>Geometry stored — no before/after preview available.</p>
+                    )}
+                  </div>
+                )}
+
+                {isMeta && op.fields && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {Object.entries(op.fields).map(([key, val]) => {
+                      const oldVal = op.before?.[key];
+                      const changed = String(oldVal ?? '') !== String(val ?? '');
+                      if (!changed && oldVal == null && val == null) return null;
+                      return (
+                        <div key={key} style={{ fontSize: 12, display: 'flex', gap: 8, alignItems: 'baseline', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <span style={{ color: '#64748b', minWidth: 120, textTransform: 'uppercase', fontSize: 10, fontWeight: 600 }}>{key.replace(/_/g, ' ')}</span>
+                          <span style={{ color: '#e57373' }}>{String(oldVal ?? '—')}</span>
+                          <span style={{ color: '#475569' }}>→</span>
+                          <span style={{ color: '#4ade80' }}>{String(val ?? '—')}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── PayloadSection ──────────────────────────────────────────────────────────
 
 function PayloadSection({ requestType, payload }) {
+  if (requestType === 'admin_batch_edit') {
+    return <AdminBatchDiffSection ops={payload.ops || []} />;
+  }
+
   if (requestType === 'geometry_update') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

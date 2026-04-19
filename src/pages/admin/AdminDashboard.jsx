@@ -21,8 +21,12 @@ export default function AdminDashboard() {
     try {
       const me = await apiJson('/api/admin/me');
       setAdmin(me);
+      // 'flagged' is a pseudo-filter \u2014 query all statuses but filter by flag presence
+      const requestUrl = filter === 'flagged'
+        ? '/api/admin/requests?flag=acreage_change'
+        : `/api/admin/requests?status=${filter}`;
       const [reqs, accts] = await Promise.all([
-        apiJson(`/api/admin/requests?status=${filter}`),
+        apiJson(requestUrl),
         apiJson('/api/admin/accounts'),
       ]);
       setRequests(reqs);
@@ -80,7 +84,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, alignItems: 'center' }}>
         {['requests', 'accounts'].map((t) => (
           <button
             key={t}
@@ -96,24 +100,39 @@ export default function AdminDashboard() {
             {t}
           </button>
         ))}
+        {/* Editor shortcut — navigates to the full-screen parcel editor */}
+        <Link
+          to="/admin/editor"
+          style={{
+            marginLeft: 'auto',
+            padding: '7px 18px', borderRadius: 6,
+            background: 'rgba(99,102,241,0.15)',
+            color: '#818cf8',
+            fontSize: 13, fontWeight: 600,
+            textDecoration: 'none',
+            border: '1px solid rgba(99,102,241,0.25)',
+          }}
+        >
+          ✎ Parcel Editor
+        </Link>
       </div>
 
       {/* Requests tab */}
       {tab === 'requests' && (
         <>
           <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-            {['pending', 'approved', 'rejected'].map((s) => (
+            {['pending', 'approved', 'rejected', 'flagged'].map((s) => (
               <button
                 key={s}
                 onClick={() => setFilter(s)}
                 style={{
                   padding: '4px 14px', borderRadius: 12, border: 'none',
-                  background: filter === s ? 'rgba(74,144,217,0.2)' : 'transparent',
-                  color: filter === s ? '#4a90d9' : '#888',
+                  background: filter === s ? (s === 'flagged' ? 'rgba(234,179,8,0.2)' : 'rgba(74,144,217,0.2)') : 'transparent',
+                  color: filter === s ? (s === 'flagged' ? '#eab308' : '#4a90d9') : '#888',
                   fontSize: 12, cursor: 'pointer', textTransform: 'capitalize',
                 }}
               >
-                {s}
+                {s === 'flagged' ? '⚑ flagged' : s}
               </button>
             ))}
           </div>
@@ -148,8 +167,16 @@ export default function AdminDashboard() {
                           {r.request_type.replace(/_/g, ' ')}
                         </span>
                         <span style={{ color: '#666', fontSize: 12, marginLeft: 8 }}>#{r.id}</span>
+                        {r.origin === 'admin' && (
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#818cf8', background: 'rgba(99,102,241,0.12)', borderRadius: 4, padding: '1px 5px' }}>ADMIN</span>
+                        )}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {r.flag === 'acreage_change' && (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#eab308', background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.25)', borderRadius: 4, padding: '2px 6px' }}>
+                            ⚠ Acreage Δ{r.flag_detail?.pct_change != null ? ` ${r.flag_detail.pct_change > 0 ? '+' : ''}${r.flag_detail.pct_change}%` : ''}
+                          </span>
+                        )}
                         <StatusBadge status={r.status} />
                         <span style={{ fontSize: 11, color: '#4a90d9' }}>View →</span>
                       </div>

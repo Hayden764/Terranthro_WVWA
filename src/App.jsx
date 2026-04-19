@@ -16,19 +16,12 @@ import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminRequestDetail from './pages/admin/AdminRequestDetail';
 
-// Gate the editor behind VITE_EDITOR_ENABLED=true so production
-// users can't navigate to it accidentally.
-const EDITOR_ENABLED = import.meta.env.VITE_EDITOR_ENABLED === 'true';
-
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         {/* Main map */}
         <Route path="/" element={<WVWAMapPage />} />
-
-        {/* Editor (guarded) */}
-        {EDITOR_ENABLED && <Route path="/editor" element={<EditorPage />} />}
 
         {/* Winery portal */}
         <Route path="/portal" element={<PortalLogin />} />
@@ -43,6 +36,8 @@ export default function App() {
         <Route path="/admin" element={<AdminLogin />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/requests/:id" element={<AdminRequestDetail />} />
+        {/* Parcel editor — admin-only, full-screen */}
+        <Route path="/admin/editor" element={<EditorPage />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

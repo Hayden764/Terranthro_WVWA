@@ -55,9 +55,9 @@ export default function AdminBatchMap({ ops = [], activeIndex = null, showOld = 
   const mapRef = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  // geometry ops only (indexed within the full ops list by their original index)
+  // geometry + add ops (both have spatial extents to display)
   const geomOps = ops.reduce((acc, op, i) => {
-    if (op.op === 'geometry') acc.push({ ...op, opsIndex: i });
+    if (op.op === 'geometry' || op.op === 'add') acc.push({ ...op, opsIndex: i });
     return acc;
   }, []);
 
@@ -98,6 +98,9 @@ export default function AdminBatchMap({ ops = [], activeIndex = null, showOld = 
         }
 
         if (op.geometry) {
+          const isAdd = op.op === 'add';
+          const fillColor = isAdd ? '#22c55e' : '#2196f3';
+          const lineColor = isAdd ? '#22c55e' : '#2196f3';
           map.addSource(`new-src-${gi}`, {
             type: 'geojson',
             data: { type: 'Feature', geometry: op.geometry, properties: {} },
@@ -106,16 +109,16 @@ export default function AdminBatchMap({ ops = [], activeIndex = null, showOld = 
             id: `new-fill-${gi}`,
             type: 'fill',
             source: `new-src-${gi}`,
-            paint: { 'fill-color': '#2196f3', 'fill-opacity': 0.2 },
+            paint: { 'fill-color': fillColor, 'fill-opacity': 0.25 },
           });
           map.addLayer({
             id: `new-line-${gi}`,
             type: 'line',
             source: `new-src-${gi}`,
             paint: {
-              'line-color': '#2196f3',
+              'line-color': lineColor,
               'line-width': 2.5,
-              'line-dasharray': ['literal', [3, 2]],
+              'line-dasharray': isAdd ? undefined : ['literal', [3, 2]],
               'line-opacity': 0.95,
             },
           });
@@ -180,9 +183,10 @@ export default function AdminBatchMap({ ops = [], activeIndex = null, showOld = 
     if (!mapLoaded || !mapRef.current) return;
     const map = mapRef.current;
 
-    geomOps.forEach((_, gi) => {
+    geomOps.forEach((op, gi) => {
       const oldVis = showOld ? 'visible' : 'none';
-      const newVis = showNew ? 'visible' : 'none';
+      // add ops have no "old" — always show their new polygon
+      const newVis = (showNew || op.op === 'add') ? 'visible' : 'none';
       if (map.getLayer(`old-fill-${gi}`)) map.setLayoutProperty(`old-fill-${gi}`, 'visibility', oldVis);
       if (map.getLayer(`old-line-${gi}`)) map.setLayoutProperty(`old-line-${gi}`, 'visibility', oldVis);
       if (map.getLayer(`new-fill-${gi}`)) map.setLayoutProperty(`new-fill-${gi}`, 'visibility', newVis);

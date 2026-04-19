@@ -440,9 +440,9 @@ function AdminBatchDiffSection({ ops }) {
     return <p style={{ fontSize: 13, color: '#888', fontStyle: 'italic' }}>No ops in this batch.</p>;
   }
 
-  // Geometry ops indexed within the full ops array
+  // Geometry ops indexed within the full ops array (geometry + add both have spatial extents)
   const geomOps = ops.reduce((acc, op, i) => {
-    if (op.op === 'geometry') acc.push({ ...op, opsIndex: i });
+    if (op.op === 'geometry' || op.op === 'add') acc.push({ ...op, opsIndex: i });
     return acc;
   }, []);
 
@@ -493,18 +493,24 @@ function AdminBatchDiffSection({ ops }) {
           {ops.map((op, i) => {
             const isGeom = op.op === 'geometry';
             const isMeta = op.op === 'metadata';
+            const isAdd  = op.op === 'add';
+            const isDel  = op.op === 'delete';
 
-            // Map geometry ops to their index within geomOps
-            const geomIdx = isGeom ? geomOps.findIndex((g) => g.opsIndex === i) : -1;
-            const isActiveGeom = isGeom && activeGeomIndex === geomIdx;
+            // Map geometry/add ops to their index within geomOps
+            const geomIdx = (isGeom || isAdd) ? geomOps.findIndex((g) => g.opsIndex === i) : -1;
+            const isActiveGeom = (isGeom || isAdd) && activeGeomIndex === geomIdx;
 
             let acreDelta = null;
             if (isGeom && op.before_acres != null && Number(op.before_acres) > 0 && op.after_acres != null) {
               const pct = ((Number(op.after_acres) - Number(op.before_acres)) / Number(op.before_acres)) * 100;
-              acreDelta = pct; // always show; highlight if |pct| >= 5
+              acreDelta = pct;
             }
 
-            const borderColor = isActiveGeom
+            const opColor = isGeom ? '#60a5fa' : isAdd ? '#4ade80' : isDel ? '#f87171' : '#a78bfa';
+
+            const borderColor = isDel
+              ? 'rgba(239,68,68,0.30)'
+              : isActiveGeom
               ? 'rgba(96,165,250,0.45)'
               : acreDelta != null && Math.abs(acreDelta) >= 5
               ? 'rgba(234,179,8,0.30)'
@@ -513,31 +519,40 @@ function AdminBatchDiffSection({ ops }) {
             return (
               <div
                 key={i}
-                onClick={isGeom ? () => setActiveGeomIndex(isActiveGeom ? null : geomIdx) : undefined}
+                onClick={(isGeom || isAdd) ? () => setActiveGeomIndex(isActiveGeom ? null : geomIdx) : undefined}
                 style={{
-                  background: isActiveGeom ? 'rgba(96,165,250,0.06)' : 'rgba(0,0,0,0.18)',
+                  background: isDel
+                    ? 'rgba(239,68,68,0.05)'
+                    : isActiveGeom ? 'rgba(96,165,250,0.06)' : 'rgba(0,0,0,0.18)',
                   borderRadius: 8,
                   border: `1px solid ${borderColor}`,
                   padding: '10px 13px',
-                  cursor: isGeom ? 'pointer' : 'default',
+                  cursor: (isGeom || isAdd) ? 'pointer' : 'default',
                   transition: 'border-color 0.15s, background 0.15s',
                 }}
               >
                 {/* Op header */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: isMeta ? 8 : 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: (isMeta || isAdd) ? 8 : 6 }}>
                   <span style={{
                     fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-                    color: isGeom ? '#60a5fa' : '#a78bfa',
-                    minWidth: 52,
+                    color: opColor, minWidth: 52,
                   }}>{op.op}</span>
                   <span style={{ fontSize: 13, color: '#e0e0e0', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {op.parcel_name || `Parcel #${op.parcel_id}`}
                   </span>
-                  <span style={{ fontSize: 10, color: '#444' }}>#{op.parcel_id}</span>
-                  {isGeom && (
+                  {op.parcel_id && <span style={{ fontSize: 10, color: '#444' }}>#{op.parcel_id}</span>}
+                  {(isGeom || isAdd) && (
                     <span style={{ fontSize: 10, color: '#666' }}>{isActiveGeom ? '◉' : '○'}</span>
                   )}
                 </div>
+
+                {/* Delete warning */}
+                {isDel && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12 }}>
+                    <span style={{ fontSize: 14 }}>⚠</span>
+                    <span style={{ color: '#fca5a5' }}>This block will be permanently deleted from the database.</span>
+                  </div>
+                )}
 
                 {/* Geometry: before/after acres */}
                 {isGeom && (
@@ -567,6 +582,33 @@ function AdminBatchDiffSection({ ops }) {
                       <span style={{ fontSize: 10, color: '#555' }}>
                         ({acreDelta > 0 ? '+' : ''}{Math.round(acreDelta * 10) / 10}%)
                       </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Add: show new acreage estimate + key fields */}
+                {isAdd && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {op.after_acres != null && (
+                      <div style={{ fontSize: 12, color: '#4ade80' }}>
+                        New area: {Number(op.after_acres).toFixed(2)} ac
+                      </div>
+                    )}
+                    {op.fields && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {['vineyard_name', 'ava_name', 'nested_ava', 'varietals_list', 'source_dataset'].map((key) => {
+                          const val = op.fields[key];
+                          if (!val) return null;
+                          return (
+                            <div key={key} style={{ fontSize: 11, display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                              <span style={{ color: '#64748b', minWidth: 100, textTransform: 'uppercase', fontSize: 9, fontWeight: 600, flexShrink: 0 }}>
+                                {key.replace(/_/g, ' ')}
+                              </span>
+                              <span style={{ color: '#4ade80' }}>{String(val)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 )}

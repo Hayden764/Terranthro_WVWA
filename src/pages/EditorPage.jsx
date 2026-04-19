@@ -261,6 +261,25 @@ export default function EditorPage() {
           setIsEditing(false);
           setSaveStatus('idle');
           setStatusMessage('');
+          // Also refresh metaForm for the newly focused block
+          const props = feature.properties;
+          setMetaForm({
+            vineyard_name:     props.vineyard_name     ?? '',
+            vineyard_org:      props.vineyard_org      ?? '',
+            owner_name:        props.owner_name        ?? '',
+            ava_name:          props.ava_name          ?? '',
+            nested_ava:        props.nested_ava        ?? '',
+            nested_nested_ava: props.nested_nested_ava ?? '',
+            situs_address:     props.situs_address     ?? '',
+            situs_city:        props.situs_city        ?? '',
+            situs_zip:         props.situs_zip         ?? '',
+            acres:             props.acres != null ? String(props.acres) : '',
+            varietals_list:    props.varietals_list    ?? '',
+            source_dataset:    props.source_dataset    ?? '',
+            winery_id:         props.winery_id != null ? String(props.winery_id) : '',
+          });
+          setMetaSaveStatus('idle');
+          setMetaStatusMessage('');
           e.stopPropagation?.();
           return;
         }

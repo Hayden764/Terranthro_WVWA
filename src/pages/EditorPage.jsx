@@ -54,29 +54,8 @@ export default function EditorPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [parcels, setParcels] = useState(null);
 
-  // ── Vineyard-group selection ──────────────────────────────────────────────
-  // selectedWinery: { id: number|null, title: string, parcels: Feature[] }
-  // null id = the "Unlinked" bucket
-  const [selectedWinery, setSelectedWinery] = useState(null);
-  // focusedParcelId: which block within the selected vineyard has its edit panel open
-  const [focusedParcelId, setFocusedParcelId] = useState(null);
-
-  // Keep the old selectedParcel shape as a derived value so edit handlers work unchanged
-  const selectedParcel = useMemo(() => {
-    if (!selectedWinery || focusedParcelId == null) return null;
-    return selectedWinery.parcels.find((f) => f.properties.id === focusedParcelId) ?? null;
-  }, [selectedWinery, focusedParcelId]);
-  const setSelectedParcel = useCallback((updater) => {
-    // Allow edit handlers to update the feature in-place (used by handleSaveMeta)
-    setSelectedWinery((prev) => {
-      if (!prev) return prev;
-      const next = typeof updater === 'function' ? updater(
-        prev.parcels.find((f) => f.properties.id === focusedParcelId) ?? null
-      ) : updater;
-      if (!next) return prev;
-      return { ...prev, parcels: prev.parcels.map((f) => f.properties.id === next.properties?.id ? next : f) };
-    });
-  }, [focusedParcelId]);
+  // ── Single-parcel selection ───────────────────────────────────────────────
+  const [selectedParcel, setSelectedParcel] = useState(null);
 
   // Drawing-a-new-block state
   const [isDrawingNew, setIsDrawingNew] = useState(false);
@@ -84,7 +63,7 @@ export default function EditorPage() {
   const newBlockGeomRef = useRef(null); // stores drawn GeoJSON geometry
 
   // Confirm-delete state
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [activeTab, setActiveTab] = useState('geometry'); // 'geometry' | 'metadata'
   const [isEditing, setIsEditing] = useState(false);
@@ -113,23 +92,21 @@ export default function EditorPage() {
   }, []);
   const [pushStatus, setPushStatus] = useState('idle'); // idle | pushing | done | error
   const [pushMessage, setPushMessage] = useState('');
-  // winery_id for the batch request — prefer selected winery, then first staged op
+  // winery_id for the batch request — prefer selected parcel, then first staged op
   const batchWineryId = useMemo(() => {
-    if (selectedWinery?.id) return selectedWinery.id;
+    if (selectedParcel?.properties?.winery_id) return selectedParcel.properties.winery_id;
     for (const op of stagedOps) {
       if (op.winery_id) return op.winery_id;
     }
     return null;
-  }, [selectedWinery, stagedOps]);
+  }, [selectedParcel, stagedOps]);
 
   // Refs for use inside event handlers
   const selectedParcelRef = useRef(null);
-  const selectedWineryRef = useRef(null);
   const isEditingRef = useRef(false);
   const hoveredIdRef = useRef(null);
 
   selectedParcelRef.current = selectedParcel;
-  selectedWineryRef.current = selectedWinery;
   isEditingRef.current = isEditing;
 
   // ── Admin auth guard ─────────────────────────────────────────────────────
@@ -246,68 +223,30 @@ export default function EditorPage() {
         }
       });
 
-      // ── Click to select vineyard group ───────────────────────────────
+      // ── Click to select a single parcel ─────────────────────────────
       map.on('click', 'parcels-fill', (e) => {
         if (isEditingRef.current || !e.features?.length) return;
         const feature = e.features[0];
-        const clickedWineryId = feature.properties?.winery_id ?? null;
-        const clickedParcelId = feature.properties?.id;
 
-        // If same winery already selected, focus the specific parcel that was clicked
-        if (selectedWineryRef.current &&
-            String(selectedWineryRef.current.id ?? '') === String(clickedWineryId ?? '')) {
-          setFocusedParcelId(clickedParcelId);
-          setActiveTab('geometry');
-          setIsEditing(false);
-          setSaveStatus('idle');
-          setStatusMessage('');
-          // Also refresh metaForm for the newly focused block
-          const props = feature.properties;
-          setMetaForm({
-            vineyard_name:     props.vineyard_name     ?? '',
-            vineyard_org:      props.vineyard_org      ?? '',
-            owner_name:        props.owner_name        ?? '',
-            ava_name:          props.ava_name          ?? '',
-            nested_ava:        props.nested_ava        ?? '',
-            nested_nested_ava: props.nested_nested_ava ?? '',
-            situs_address:     props.situs_address     ?? '',
-            situs_city:        props.situs_city        ?? '',
-            situs_zip:         props.situs_zip         ?? '',
-            acres:             props.acres != null ? String(props.acres) : '',
-            varietals_list:    props.varietals_list    ?? '',
-            source_dataset:    props.source_dataset    ?? '',
-            winery_id:         props.winery_id != null ? String(props.winery_id) : '',
-          });
-          setMetaSaveStatus('idle');
-          setMetaStatusMessage('');
-          e.stopPropagation?.();
-          return;
-        }
-
-        // Select the vineyard group from the loaded parcels
-        // (parcelsRef needed — use the source directly)
-        const allFeatures = map.getSource('parcels')?._data?.features ?? [];
-        const groupFeatures = allFeatures.filter(
-          (f) => String(f.properties?.winery_id ?? '') === String(clickedWineryId ?? '')
-        );
-
-        const wineryTitle = feature.properties?.winery_title ||
-          (clickedWineryId ? `Winery #${clickedWineryId}` : 'Unlinked Parcels');
-
-        // Clear old feature-state selection
+        // Clear previous selection highlight
         if (selectedParcelRef.current?._mapId != null) {
           map.setFeatureState({ source: 'parcels', id: selectedParcelRef.current._mapId }, { selected: false });
         }
-        // Highlight the clicked feature
         map.setFeatureState({ source: 'parcels', id: feature.id }, { selected: true });
 
-        setSelectedWinery({ id: clickedWineryId, title: wineryTitle, parcels: groupFeatures });
-        setFocusedParcelId(clickedParcelId);
+        // Look up full geometry from source
+        const allFeatures = map.getSource('parcels')?._data?.features ?? [];
+        const full = allFeatures.find((f) => f.properties.id === feature.properties.id) ?? feature;
+        // Attach internal map ID so we can clear feature-state later
+        full._mapId = feature.id;
+
+        setSelectedParcel(full);
+        setConfirmDelete(false);
         setIsEditing(false);
         setSaveStatus('idle');
         setStatusMessage('');
         setActiveTab('geometry');
-        const props = feature.properties;
+        const props = full.properties;
         setMetaForm({
           vineyard_name:     props.vineyard_name     ?? '',
           vineyard_org:      props.vineyard_org      ?? '',
@@ -339,8 +278,8 @@ export default function EditorPage() {
               { selected: false }
             );
           }
-          setSelectedWinery(null);
-          setFocusedParcelId(null);
+          setSelectedParcel(null);
+          setConfirmDelete(false);
           setStatusMessage('');
         }
       });
@@ -527,8 +466,7 @@ export default function EditorPage() {
     setSelectedParcel((prev) => ({
       ...prev,
       properties: { ...prev.properties, ...metaForm, acres: metaForm.acres ? parseFloat(metaForm.acres) : null },
-    }));
-    setMetaSaveStatus('staged');
+    }));    setMetaSaveStatus('staged');
     setMetaStatusMessage('Staged for review.');
     setTimeout(() => setMetaSaveStatus('idle'), 3000);
   }, [selectedParcel, metaForm]);
@@ -583,15 +521,101 @@ export default function EditorPage() {
     setStatusMessage('');
   }, []);
 
-  // ── Select a block within the active vineyard ─────────────────────────────
-  const handleSelectBlock = useCallback((feature) => {
+  // ── Stage a delete op for the currently selected parcel ──────────────────
+  const handleDeleteBlock = useCallback((feature) => {
+    const parcelId = feature.properties.id;
+    setStagedOps((prev) => {
+      const without = prev.filter((o) => o.parcel_id !== parcelId);
+      return [...without, {
+        op: 'delete',
+        parcel_id: parcelId,
+        parcel_name: feature.properties.vineyard_name || `Parcel #${parcelId}`,
+        winery_id: feature.properties.winery_id,
+      }];
+    });
+    // Deselect so the parcel panel closes
+    if (selectedParcelRef.current?._mapId != null) {
+      mapRef.current?.setFeatureState({ source: 'parcels', id: selectedParcelRef.current._mapId }, { selected: false });
+    }
+    setSelectedParcel(null);
+    setConfirmDelete(false);
+  }, []);
+
+  // ── Start drawing a new block ──────────────────────────────────────────────
+  const handleStartDrawNew = useCallback(() => {
+    if (!drawRef.current) return;
+    drawRef.current.deleteAll();
+    drawRef.current.changeMode('draw_polygon');
+    setIsDrawingNew(true);
+    setSelectedParcel(null);
+    setConfirmDelete(false);
+    setStatusMessage('Draw the new block boundary on the map. Click to place vertices, double-click to finish.');
+    newBlockGeomRef.current = null;
+    setNewBlockForm({ vineyard_name: '', source_dataset: 'admin', winery_id: '' });
+  }, []);
+
+  // ── Listen for draw.create to capture the new polygon ────────────────────
+  const isDrawingNewRef = useRef(false);
+  isDrawingNewRef.current = isDrawingNew;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const onDrawCreate = (e) => {
+      if (!isDrawingNewRef.current) return;
+      const geom = e.features?.[0]?.geometry;
+      if (!geom) return;
+      newBlockGeomRef.current = geom;
+      drawRef.current?.changeMode('simple_select');
+      setIsDrawingNew(false);
+      setStatusMessage('Polygon drawn. Fill in the block details and click "Stage New Block".');
+    };
+    map.on('draw.create', onDrawCreate);
+    return () => map.off('draw.create', onDrawCreate);
+  }, []);
+
+  // ── Stage a new-block add op ───────────────────────────────────────────────
+  const handleSaveNewBlock = useCallback(() => {
+    const geom = newBlockGeomRef.current;
+    if (!geom) { setStatusMessage('No polygon drawn yet.'); return; }
+    const wineryId = newBlockForm.winery_id ? parseInt(newBlockForm.winery_id, 10) : null;
+    setStagedOps((prev) => [...prev, {
+      op: 'add',
+      temp_id: `new_${Date.now()}`,
+      parcel_name: newBlockForm.vineyard_name || 'New Block',
+      winery_id: wineryId,
+      geometry: geom,
+      fields: { ...newBlockForm, winery_id: wineryId },
+    }]);
+    drawRef.current?.deleteAll();
+    newBlockGeomRef.current = null;
+    setNewBlockForm({ vineyard_name: '', source_dataset: 'admin', winery_id: '' });
+    setStatusMessage('New block staged for review.');
+    setTimeout(() => setStatusMessage(''), 3000);
+  }, [newBlockForm]);
+
+  // ── Cancel drawing ─────────────────────────────────────────────────────────
+  const handleCancelDraw = useCallback(() => {
+    drawRef.current?.deleteAll();
+    drawRef.current?.changeMode('simple_select');
+    setIsDrawingNew(false);
+    newBlockGeomRef.current = null;
+    setStatusMessage('');
+  }, []);
+
+  // ── Select from flat search list ──────────────────────────────────────────
+  const handleSelectFromList = useCallback((feature) => {
     if (isEditing) return;
-    const pid = feature.properties.id;
-    setFocusedParcelId(pid);
-    setActiveTab('geometry');
+    if (selectedParcelRef.current?._mapId != null) {
+      mapRef.current?.setFeatureState({ source: 'parcels', id: selectedParcelRef.current._mapId }, { selected: false });
+    }
+    feature._mapId = undefined; // no map ID from search
+    setSelectedParcel(feature);
+    setConfirmDelete(false);
     setIsEditing(false);
     setSaveStatus('idle');
     setStatusMessage('');
+    setActiveTab('geometry');
+    setSearchQuery('');
     const props = feature.properties;
     setMetaForm({
       vineyard_name:     props.vineyard_name     ?? '',
@@ -610,192 +634,28 @@ export default function EditorPage() {
     });
     setMetaSaveStatus('idle');
     setMetaStatusMessage('');
-    // Fly to block
+    // Fly to parcel
     const map = mapRef.current;
     if (map && feature.geometry?.coordinates) {
       const flat = [];
-      const flatten = (arr) => {
-        if (typeof arr[0] === 'number') { flat.push(arr); return; }
-        arr.forEach(flatten);
-      };
-      flatten(feature.geometry.coordinates);
+      const fl = (arr) => { if (typeof arr[0] === 'number') { flat.push(arr); return; } arr.forEach(fl); };
+      fl(feature.geometry.coordinates);
       if (flat.length) {
         const lngs = flat.map((c) => c[0]);
         const lats = flat.map((c) => c[1]);
-        map.fitBounds(
-          [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-          { padding: 100, maxZoom: 17, duration: 600 }
-        );
+        map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 100, maxZoom: 17, duration: 600 });
       }
     }
   }, [isEditing]);
 
-  // ── Stage a delete op ─────────────────────────────────────────────────────
-  const handleDeleteBlock = useCallback((feature) => {
-    const parcelId = feature.properties.id;
-    setStagedOps((prev) => {
-      // Remove any existing ops for this parcel (superseded by delete)
-      const without = prev.filter((o) => o.parcel_id !== parcelId);
-      return [...without, {
-        op: 'delete',
-        parcel_id: parcelId,
-        parcel_name: feature.properties.vineyard_name || `Parcel #${parcelId}`,
-        winery_id: feature.properties.winery_id,
-      }];
-    });
-    // Remove from local winery parcels immediately so the list updates
-    setSelectedWinery((prev) => prev
-      ? { ...prev, parcels: prev.parcels.filter((f) => f.properties.id !== parcelId) }
-      : prev
-    );
-    if (focusedParcelId === parcelId) setFocusedParcelId(null);
-    setConfirmDeleteId(null);
-  }, [focusedParcelId]);
-
-  // ── Start drawing a new block ──────────────────────────────────────────────
-  const handleStartDrawNew = useCallback(() => {
-    if (!drawRef.current) return;
-    drawRef.current.deleteAll();
-    drawRef.current.changeMode('draw_polygon');
-    setIsDrawingNew(true);
-    setFocusedParcelId(null);
-    setStatusMessage('Draw the new block boundary on the map. Click to place vertices, double-click to finish.');
-    newBlockGeomRef.current = null;
-    setNewBlockForm({ vineyard_name: '', source_dataset: 'admin', winery_id: selectedWinery?.id ? String(selectedWinery.id) : '' });
-  }, [selectedWinery]);
-
-  // ── Listen for draw.create to capture the new polygon ────────────────────
-  // Wired once after draw is initialised — uses a stable ref pattern
-  const isDrawingNewRef = useRef(false);
-  isDrawingNewRef.current = isDrawingNew;
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const onDrawCreate = (e) => {
-      if (!isDrawingNewRef.current) return;
-      const geom = e.features?.[0]?.geometry;
-      if (!geom) return;
-      newBlockGeomRef.current = geom;
-      drawRef.current?.changeMode('simple_select');
-      setIsDrawingNew(false);
-      setStatusMessage('Polygon drawn. Fill in the block details below and click "Stage New Block".');
-    };
-    map.on('draw.create', onDrawCreate);
-    return () => map.off('draw.create', onDrawCreate);
-  }, []);
-
-  // ── Stage a new-block add op ───────────────────────────────────────────────
-  const handleSaveNewBlock = useCallback(() => {
-    const geom = newBlockGeomRef.current;
-    if (!geom) { setStatusMessage('No polygon drawn yet.'); return; }
-    const wineryId = selectedWinery?.id ?? (newBlockForm.winery_id ? parseInt(newBlockForm.winery_id, 10) : null);
-    const tempId = `new_${Date.now()}`;
-    setStagedOps((prev) => [...prev, {
-      op: 'add',
-      temp_id: tempId,
-      parcel_name: newBlockForm.vineyard_name || 'New Block',
-      winery_id: wineryId,
-      geometry: geom,
-      fields: { ...newBlockForm, winery_id: wineryId },
-    }]);
-    drawRef.current?.deleteAll();
-    newBlockGeomRef.current = null;
-    setNewBlockForm({ vineyard_name: '', source_dataset: 'admin' });
-    setStatusMessage('New block staged for review.');
-    setTimeout(() => setStatusMessage(''), 3000);
-  }, [selectedWinery, newBlockForm]);
-
-  // ── Cancel drawing ─────────────────────────────────────────────────────────
-  const handleCancelDraw = useCallback(() => {
-    drawRef.current?.deleteAll();
-    drawRef.current?.changeMode('simple_select');
-    setIsDrawingNew(false);
-    newBlockGeomRef.current = null;
-    setStatusMessage('');
-  }, []);
-
-  // ── Select winery group from search list ──────────────────────────────────
-  const handleSelectFromList = useCallback(
-    (wineryId, wineryTitle) => {
-      if (isEditing) return;
-      if (!parcels) return;
-
-      const groupFeatures = parcels.features.filter(
-        (f) => String(f.properties?.winery_id ?? '') === String(wineryId ?? '')
-      );
-      setSelectedWinery({ id: wineryId, title: wineryTitle, parcels: groupFeatures });
-      setFocusedParcelId(groupFeatures[0]?.properties?.id ?? null);
-      setIsEditing(false);
-      setSaveStatus('idle');
-      setStatusMessage('');
-      setActiveTab('geometry');
-      setSearchQuery('');
-
-      // Fly to bounding box of all blocks in the group
-      const map = mapRef.current;
-      if (map && groupFeatures.length > 0) {
-        const flat = [];
-        const fl = (arr) => { if (typeof arr[0] === 'number') { flat.push(arr); return; } arr.forEach(fl); };
-        groupFeatures.forEach((f) => f.geometry?.coordinates && fl(f.geometry.coordinates));
-        if (flat.length) {
-          const lngs = flat.map((c) => c[0]);
-          const lats = flat.map((c) => c[1]);
-          map.fitBounds(
-            [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-            { padding: 80, maxZoom: 17, duration: 700 }
-          );
-        }
-      }
-
-      if (groupFeatures[0]) {
-        const props = groupFeatures[0].properties;
-        setMetaForm({
-          vineyard_name:     props.vineyard_name     ?? '',
-          vineyard_org:      props.vineyard_org      ?? '',
-          owner_name:        props.owner_name        ?? '',
-          ava_name:          props.ava_name          ?? '',
-          nested_ava:        props.nested_ava        ?? '',
-          nested_nested_ava: props.nested_nested_ava ?? '',
-          situs_address:     props.situs_address     ?? '',
-          situs_city:        props.situs_city        ?? '',
-          situs_zip:         props.situs_zip         ?? '',
-          acres:             props.acres != null ? String(props.acres) : '',
-          varietals_list:    props.varietals_list    ?? '',
-          source_dataset:    props.source_dataset    ?? '',
-          winery_id:         props.winery_id != null ? String(props.winery_id) : '',
-        });
-      }
-    },
-    [isEditing, parcels]
-  );
-
-  // ── Build search results — grouped by winery ──────────────────────────────
-  const searchResults = useMemo(() => {
+  // ── Flat search results ────────────────────────────────────────────────────
+  const filteredParcels = useMemo(() => {
     if (!parcels || !searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase();
-    const map = new Map(); // wineryKey -> { id, title, count, acres, sample }
-
-    for (const f of parcels.features) {
-      const p = f.properties;
-      const matches =
-        p.vineyard_name?.toLowerCase().includes(q) ||
-        p.winery_title?.toLowerCase().includes(q);
-      if (!matches) continue;
-
-      const key = String(p.winery_id ?? '__unlinked__');
-      if (!map.has(key)) {
-        map.set(key, {
-          id: p.winery_id ?? null,
-          title: p.winery_title || (p.winery_id ? `Winery #${p.winery_id}` : 'Unlinked Parcels'),
-          count: 0,
-          acres: 0,
-        });
-      }
-      const entry = map.get(key);
-      entry.count++;
-      entry.acres += Number(p.acres || 0);
-    }
-    return [...map.values()].sort((a, b) => (a.title > b.title ? 1 : -1));
+    return parcels.features.filter((f) =>
+      f.properties.vineyard_name?.toLowerCase().includes(q) ||
+      f.properties.winery_title?.toLowerCase().includes(q)
+    ).slice(0, 40);
   }, [parcels, searchQuery]);
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -830,6 +690,13 @@ export default function EditorPage() {
           {parcels ? `${parcels.features.length.toLocaleString()} parcels loaded` : 'Loading parcels…'}
         </p>
 
+        {/* Add New Block button — always visible */}
+        {!isDrawingNew && !isEditing && (
+          <button onClick={handleStartDrawNew} style={{ ...btnStyle('#0f766e', '#0d9488'), fontSize: 12 }}>
+            + Add New Block
+          </button>
+        )}
+
         {/* Search */}
         <div style={{ position: 'relative' }}>
           <input
@@ -846,26 +713,24 @@ export default function EditorPage() {
           />
         </div>
 
-        {/* ── Search results (grouped by winery) ── */}
+        {/* ── Search results (flat) ── */}
         {searchQuery.trim() && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 240, overflowY: 'auto' }}>
-            {searchResults.length === 0 && (
+            {filteredParcels.length === 0 && (
               <div style={{ color: '#475569', fontSize: 12, padding: '6px 0' }}>No matches</div>
             )}
-            {searchResults.map((entry) => (
+            {filteredParcels.map((f) => (
               <button
-                key={String(entry.id ?? '__unlinked__')}
-                onClick={() => handleSelectFromList(entry.id, entry.title)}
+                key={f.properties.id ?? f._mapId}
+                onClick={() => handleSelectFromList(f)}
                 style={{
                   background: '#1e293b', border: '1px solid #334155', borderRadius: 5,
                   color: '#e2e8f0', fontSize: 12, padding: '7px 10px',
                   cursor: 'pointer', textAlign: 'left', lineHeight: 1.4,
                 }}
               >
-                <div style={{ fontWeight: 500 }}>{entry.title}</div>
-                <div style={{ color: '#64748b', fontSize: 11 }}>
-                  {entry.count} block{entry.count !== 1 ? 's' : ''} · {entry.acres.toFixed(1)} ac
-                </div>
+                <div style={{ fontWeight: 500 }}>{f.properties.vineyard_name || `Block #${f.properties.id}`}</div>
+                <div style={{ color: '#64748b', fontSize: 11 }}>{f.properties.winery_title || '—'}</div>
               </button>
             ))}
           </div>
@@ -873,196 +738,154 @@ export default function EditorPage() {
 
         <div style={{ height: 1, background: '#1e293b' }} />
 
-        {/* ── No selection state ── */}
-        {!selectedWinery && !searchQuery && (
+        {/* ── No selection hint ── */}
+        {!selectedParcel && !searchQuery && !isDrawingNew && (
           <div style={{ color: '#64748b', fontSize: 12, background: '#1e293b', borderRadius: 8, padding: '12px', lineHeight: 1.7 }}>
-            Click any parcel on the map to select its vineyard, or search by name above.
+            Click any parcel on the map to select it.
           </div>
         )}
 
-        {/* ── Vineyard group panel ── */}
-        {selectedWinery && !searchQuery && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* ── Selected parcel panel ── */}
+        {selectedParcel && !isDrawingNew && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-            {/* Vineyard header */}
+            {/* Identity strip */}
             <div style={{ background: '#1e293b', borderRadius: 8, padding: '10px 12px', border: '1px solid #334155' }}>
               <div style={{ color: '#f1f5f9', fontWeight: 600, fontSize: 13 }}>
-                {selectedWinery.title}
+                {selectedParcel.properties.vineyard_name || `Block #${selectedParcel.properties.id}`}
               </div>
               <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
-                {selectedWinery.parcels.length} block{selectedWinery.parcels.length !== 1 ? 's' : ''} ·{' '}
-                {selectedWinery.parcels.reduce((s, f) => s + Number(f.properties.acres || 0), 0).toFixed(1)} ac total
+                {selectedParcel.properties.winery_title || '—'}
               </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                {selectedParcel.properties.id && <Tag>id {selectedParcel.properties.id}</Tag>}
+                {selectedParcel.properties.source_dataset && <Tag>{selectedParcel.properties.source_dataset}</Tag>}
+                {selectedParcel.properties.nested_ava && <Tag>{selectedParcel.properties.nested_ava}</Tag>}
+                {selectedParcel.properties.acres && <Tag>{Number(selectedParcel.properties.acres).toFixed(1)} ac</Tag>}
+              </div>
+            </div>
+
+            {/* Delete button */}
+            {!stagedOps.some((o) => o.op === 'delete' && o.parcel_id === selectedParcel.properties.id) && (
               <button
-                onClick={() => { setSelectedWinery(null); setFocusedParcelId(null); setIsEditing(false); setIsDrawingNew(false); drawRef.current?.deleteAll(); }}
-                style={{ background: 'none', border: 'none', color: '#475569', fontSize: 11, cursor: 'pointer', padding: '4px 0 0 0', display: 'block' }}
+                onClick={() => setConfirmDelete((v) => !v)}
+                style={{ ...btnStyle('rgba(239,68,68,0.15)', 'rgba(239,68,68,0.25)'), color: '#f87171', fontSize: 12, border: '1px solid rgba(239,68,68,0.3)' }}
               >
-                ← Back
-              </button>
-            </div>
-
-            {/* Block list */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {selectedWinery.parcels.map((f) => {
-                const pid = f.properties.id;
-                const isFocused = focusedParcelId === pid;
-                const isDeletePending = stagedOps.some((o) => o.op === 'delete' && o.parcel_id === pid);
-                return (
-                  <div key={pid}>
-                    {/* Block row */}
-                    <div
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        background: isFocused ? 'rgba(34,211,238,0.08)' : '#1e293b',
-                        border: `1px solid ${isFocused ? '#22d3ee' : '#334155'}`,
-                        borderRadius: confirmDeleteId === pid ? '6px 6px 0 0' : 6,
-                        padding: '7px 10px', cursor: 'pointer',
-                      }}
-                      onClick={() => { if (confirmDeleteId === pid) return; handleSelectBlock(f); }}
-                    >
-                      <span style={{ fontSize: 9, color: isFocused ? '#22d3ee' : '#475569' }}>{isFocused ? '●' : '○'}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ color: '#e2e8f0', fontSize: 12, fontWeight: isFocused ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {f.properties.vineyard_name || `Block #${pid}`}
-                        </div>
-                        <div style={{ color: '#64748b', fontSize: 10 }}>
-                          {f.properties.acres ? `${Number(f.properties.acres).toFixed(1)} ac` : 'no area'}{' '}
-                          {f.properties.nested_ava ? `· ${f.properties.nested_ava}` : ''}
-                        </div>
-                      </div>
-                      {!isDeletePending && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(pid === confirmDeleteId ? null : pid); }}
-                          title="Delete block"
-                          style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 13, padding: '2px 4px', lineHeight: 1, flexShrink: 0 }}
-                        >✕</button>
-                      )}
-                      {isDeletePending && (
-                        <span style={{ fontSize: 9, fontWeight: 700, color: '#ef4444', background: 'rgba(239,68,68,0.12)', padding: '1px 5px', borderRadius: 3 }}>DEL</span>
-                      )}
-                    </div>
-
-                    {/* Inline delete confirm */}
-                    {confirmDeleteId === pid && (
-                      <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderTop: 'none', borderRadius: '0 0 6px 6px', padding: '8px 10px', display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <span style={{ color: '#fca5a5', fontSize: 11, flex: 1 }}>Delete this block?</span>
-                        <button onClick={() => handleDeleteBlock(f)} style={{ background: '#ef4444', border: 'none', color: '#fff', borderRadius: 4, fontSize: 11, padding: '3px 8px', cursor: 'pointer', fontWeight: 600 }}>Yes</button>
-                        <button onClick={() => setConfirmDeleteId(null)} style={{ background: 'none', border: '1px solid #475569', color: '#94a3b8', borderRadius: 4, fontSize: 11, padding: '3px 8px', cursor: 'pointer' }}>No</button>
-                      </div>
-                    )}
-
-                    {/* Block edit panel (only when focused) */}
-                    {isFocused && !isDrawingNew && (
-                      <div style={{ background: '#0f172a', border: '1px solid #334155', borderTop: 'none', borderRadius: '0 0 6px 6px', padding: '10px 10px 12px' }}>
-                        {/* Tab switcher */}
-                        <div style={{ display: 'flex', borderRadius: 5, overflow: 'hidden', border: '1px solid #334155', marginBottom: 10 }}>
-                          {['geometry', 'metadata'].map((tab) => (
-                            <button
-                              key={tab}
-                              onClick={() => { if (!isEditing) setActiveTab(tab); }}
-                              style={{
-                                flex: 1, padding: '6px 0',
-                                background: activeTab === tab ? '#3b82f6' : '#1e293b',
-                                color: activeTab === tab ? '#fff' : '#64748b',
-                                border: 'none', cursor: isEditing ? 'not-allowed' : 'pointer',
-                                fontSize: 11, fontWeight: 600, textTransform: 'capitalize',
-                                opacity: isEditing && tab !== 'geometry' ? 0.4 : 1,
-                              }}
-                            >
-                              {tab === 'geometry' ? '⬡ Geometry' : '✎ Metadata'}
-                            </button>
-                          ))}
-                        </div>
-
-                        {/* Geometry tab */}
-                        {activeTab === 'geometry' && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {!isEditing ? (
-                              <button onClick={handleStartEdit} style={btnStyle('#3b82f6', '#2563eb')}>Edit Geometry</button>
-                            ) : (
-                              <>
-                                <div style={{ fontSize: 11, color: '#fbbf24', background: '#1e293b', border: '1px solid #92400e', borderRadius: 5, padding: '6px 9px' }}>
-                                  ✏ Editing — drag vertices to reshape
-                                </div>
-                                <button onClick={handleSave} disabled={saveStatus === 'staging'} style={btnStyle(saveStatus === 'staging' ? '#166534' : '#16a34a', '#15803d')}>
-                                  {saveStatus === 'staging' ? 'Staging…' : 'Stage Geometry'}
-                                </button>
-                                <button onClick={handleDiscard} style={{ background: 'transparent', color: '#94a3b8', border: '1px solid #334155', borderRadius: 6, padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Discard</button>
-                              </>
-                            )}
-                            {statusMessage && (
-                              <div style={{ color: saveStatus === 'error' ? '#f87171' : saveStatus === 'staged' ? '#4ade80' : '#94a3b8', fontSize: 11, padding: '5px 9px', background: '#1e293b', borderRadius: 5, lineHeight: 1.5 }}>
-                                {statusMessage}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Metadata tab */}
-                        {activeTab === 'metadata' && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                            <MetaField label="Vineyard Name"       field="vineyard_name"     form={metaForm} setForm={setMetaForm} />
-                            <MetaField label="Organization"        field="vineyard_org"      form={metaForm} setForm={setMetaForm} />
-                            <MetaField label="Owner Name"          field="owner_name"        form={metaForm} setForm={setMetaForm} />
-                            <MetaField label="Source Dataset"      field="source_dataset"    form={metaForm} setForm={setMetaForm} />
-                            <div style={{ height: 1, background: '#1e293b' }} />
-                            <MetaField label="AVA Name"            field="ava_name"          form={metaForm} setForm={setMetaForm} />
-                            <MetaField label="Nested AVA"          field="nested_ava"        form={metaForm} setForm={setMetaForm} />
-                            <MetaField label="Nested-Nested AVA"   field="nested_nested_ava" form={metaForm} setForm={setMetaForm} />
-                            <div style={{ height: 1, background: '#1e293b' }} />
-                            <MetaField label="Acres"               field="acres"             form={metaForm} setForm={setMetaForm} type="number" />
-                            <MetaField label="Varietals"           field="varietals_list"    form={metaForm} setForm={setMetaForm} multiline />
-                            <div style={{ height: 1, background: '#1e293b' }} />
-                            <MetaField label="Winery ID"           field="winery_id"         form={metaForm} setForm={setMetaForm} type="number" />
-                            <div style={{ height: 1, background: '#1e293b' }} />
-                            <MetaField label="Situs Address"       field="situs_address"     form={metaForm} setForm={setMetaForm} />
-                            <MetaField label="Situs City"          field="situs_city"        form={metaForm} setForm={setMetaForm} />
-                            <MetaField label="Situs ZIP"           field="situs_zip"         form={metaForm} setForm={setMetaForm} />
-                            <button onClick={handleSaveMeta} disabled={metaSaveStatus === 'saving'} style={{ ...btnStyle(metaSaveStatus === 'saving' ? '#166534' : '#16a34a', '#15803d'), marginTop: 4, fontSize: 12 }}>
-                              {metaSaveStatus === 'saving' ? 'Staging…' : 'Stage Metadata'}
-                            </button>
-                            {metaStatusMessage && (
-                              <div style={{ color: metaSaveStatus === 'error' ? '#f87171' : '#4ade80', fontSize: 11, padding: '5px 9px', background: '#1e293b', borderRadius: 5, lineHeight: 1.5 }}>
-                                {metaStatusMessage}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* ── Add new block ── */}
-            {!isDrawingNew && !isEditing && (
-              <button onClick={handleStartDrawNew} style={{ ...btnStyle('#0f766e', '#0d9488'), fontSize: 12 }}>
-                + Add New Block
+                🗑 Delete Block
               </button>
             )}
+            {stagedOps.some((o) => o.op === 'delete' && o.parcel_id === selectedParcel.properties.id) && (
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', background: 'rgba(239,68,68,0.12)', padding: '4px 8px', borderRadius: 4, textAlign: 'center' }}>
+                Staged for deletion
+              </span>
+            )}
 
-            {/* ── Draw-new-block panel ── */}
-            {isDrawingNew && (
-              <div style={{ background: '#1e293b', borderRadius: 8, border: '1px solid #334155', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ color: '#22d3ee', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>New Block</div>
-                {statusMessage && (
-                  <div style={{ color: '#94a3b8', fontSize: 11, lineHeight: 1.5 }}>{statusMessage}</div>
-                )}
-                <MetaField label="Block Name" field="vineyard_name" form={newBlockForm} setForm={setNewBlockForm} />
-                <MetaField label="Source Dataset" field="source_dataset" form={newBlockForm} setForm={setNewBlockForm} />
-                <MetaField label="AVA Name" field="ava_name" form={newBlockForm} setForm={setNewBlockForm} />
-                <MetaField label="Varietals" field="varietals_list" form={newBlockForm} setForm={setNewBlockForm} multiline />
-                <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
-                  <button onClick={handleSaveNewBlock} disabled={!newBlockGeomRef.current} style={{ ...btnStyle(newBlockGeomRef.current ? '#16a34a' : '#1e293b', '#15803d'), flex: 1, fontSize: 12, opacity: newBlockGeomRef.current ? 1 : 0.5 }}>
-                    Stage New Block
-                  </button>
-                  <button onClick={handleCancelDraw} style={{ background: 'transparent', color: '#94a3b8', border: '1px solid #334155', borderRadius: 6, padding: '8px 10px', cursor: 'pointer', fontSize: 12 }}>
-                    Cancel
-                  </button>
-                </div>
+            {/* Inline delete confirm */}
+            {confirmDelete && (
+              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 6, padding: '8px 10px', display: 'flex', gap: 6, alignItems: 'center' }}>
+                <span style={{ color: '#fca5a5', fontSize: 11, flex: 1 }}>Permanently delete this block?</span>
+                <button onClick={() => handleDeleteBlock(selectedParcel)} style={{ background: '#ef4444', border: 'none', color: '#fff', borderRadius: 4, fontSize: 11, padding: '3px 8px', cursor: 'pointer', fontWeight: 600 }}>Yes, Delete</button>
+                <button onClick={() => setConfirmDelete(false)} style={{ background: 'none', border: '1px solid #475569', color: '#94a3b8', borderRadius: 4, fontSize: 11, padding: '3px 8px', cursor: 'pointer' }}>Cancel</button>
               </div>
             )}
+
+            {/* Tab switcher */}
+            <div style={{ display: 'flex', borderRadius: 5, overflow: 'hidden', border: '1px solid #334155' }}>
+              {['geometry', 'metadata'].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => { if (!isEditing) setActiveTab(tab); }}
+                  style={{
+                    flex: 1, padding: '6px 0',
+                    background: activeTab === tab ? '#3b82f6' : '#1e293b',
+                    color: activeTab === tab ? '#fff' : '#64748b',
+                    border: 'none', cursor: isEditing ? 'not-allowed' : 'pointer',
+                    fontSize: 11, fontWeight: 600, textTransform: 'capitalize',
+                    opacity: isEditing && tab !== 'geometry' ? 0.4 : 1,
+                  }}
+                >
+                  {tab === 'geometry' ? '⬡ Geometry' : '✎ Metadata'}
+                </button>
+              ))}
+            </div>
+
+            {/* Geometry tab */}
+            {activeTab === 'geometry' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {!isEditing ? (
+                  <button onClick={handleStartEdit} style={btnStyle('#3b82f6', '#2563eb')}>Edit Geometry</button>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 11, color: '#fbbf24', background: '#1e293b', border: '1px solid #92400e', borderRadius: 5, padding: '6px 9px' }}>
+                      ✏ Editing — drag vertices to reshape
+                    </div>
+                    <button onClick={handleSave} disabled={saveStatus === 'staging'} style={btnStyle(saveStatus === 'staging' ? '#166534' : '#16a34a', '#15803d')}>
+                      {saveStatus === 'staging' ? 'Staging…' : 'Stage Geometry'}
+                    </button>
+                    <button onClick={handleDiscard} style={{ background: 'transparent', color: '#94a3b8', border: '1px solid #334155', borderRadius: 6, padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Discard</button>
+                  </>
+                )}
+                {statusMessage && (
+                  <div style={{ color: saveStatus === 'error' ? '#f87171' : saveStatus === 'staged' ? '#4ade80' : '#94a3b8', fontSize: 11, padding: '5px 9px', background: '#1e293b', borderRadius: 5, lineHeight: 1.5 }}>
+                    {statusMessage}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Metadata tab */}
+            {activeTab === 'metadata' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <MetaField label="Vineyard Name"       field="vineyard_name"     form={metaForm} setForm={setMetaForm} />
+                <MetaField label="Organization"        field="vineyard_org"      form={metaForm} setForm={setMetaForm} />
+                <MetaField label="Owner Name"          field="owner_name"        form={metaForm} setForm={setMetaForm} />
+                <MetaField label="Source Dataset"      field="source_dataset"    form={metaForm} setForm={setMetaForm} />
+                <div style={{ height: 1, background: '#1e293b' }} />
+                <MetaField label="AVA Name"            field="ava_name"          form={metaForm} setForm={setMetaForm} />
+                <MetaField label="Nested AVA"          field="nested_ava"        form={metaForm} setForm={setMetaForm} />
+                <MetaField label="Nested-Nested AVA"   field="nested_nested_ava" form={metaForm} setForm={setMetaForm} />
+                <div style={{ height: 1, background: '#1e293b' }} />
+                <MetaField label="Acres"               field="acres"             form={metaForm} setForm={setMetaForm} type="number" />
+                <MetaField label="Varietals"           field="varietals_list"    form={metaForm} setForm={setMetaForm} multiline />
+                <div style={{ height: 1, background: '#1e293b' }} />
+                <MetaField label="Winery ID"           field="winery_id"         form={metaForm} setForm={setMetaForm} type="number" />
+                <div style={{ height: 1, background: '#1e293b' }} />
+                <MetaField label="Situs Address"       field="situs_address"     form={metaForm} setForm={setMetaForm} />
+                <MetaField label="Situs City"          field="situs_city"        form={metaForm} setForm={setMetaForm} />
+                <MetaField label="Situs ZIP"           field="situs_zip"         form={metaForm} setForm={setMetaForm} />
+                <button onClick={handleSaveMeta} disabled={metaSaveStatus === 'saving'} style={{ ...btnStyle(metaSaveStatus === 'saving' ? '#166534' : '#16a34a', '#15803d'), marginTop: 4, fontSize: 12 }}>
+                  {metaSaveStatus === 'saving' ? 'Staging…' : 'Stage Metadata'}
+                </button>
+                {metaStatusMessage && (
+                  <div style={{ color: metaSaveStatus === 'error' ? '#f87171' : '#4ade80', fontSize: 11, padding: '5px 9px', background: '#1e293b', borderRadius: 5, lineHeight: 1.5 }}>
+                    {metaStatusMessage}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Draw-new-block panel ── */}
+        {isDrawingNew && (
+          <div style={{ background: '#1e293b', borderRadius: 8, border: '1px solid #334155', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ color: '#22d3ee', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>New Block</div>
+            {statusMessage && (
+              <div style={{ color: '#94a3b8', fontSize: 11, lineHeight: 1.5 }}>{statusMessage}</div>
+            )}
+            <MetaField label="Block Name" field="vineyard_name" form={newBlockForm} setForm={setNewBlockForm} />
+            <MetaField label="Winery ID" field="winery_id" form={newBlockForm} setForm={setNewBlockForm} type="number" />
+            <MetaField label="Source Dataset" field="source_dataset" form={newBlockForm} setForm={setNewBlockForm} />
+            <MetaField label="AVA Name" field="ava_name" form={newBlockForm} setForm={setNewBlockForm} />
+            <MetaField label="Varietals" field="varietals_list" form={newBlockForm} setForm={setNewBlockForm} multiline />
+            <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+              <button onClick={handleSaveNewBlock} disabled={!newBlockGeomRef.current} style={{ ...btnStyle(newBlockGeomRef.current ? '#16a34a' : '#1e293b', '#15803d'), flex: 1, fontSize: 12, opacity: newBlockGeomRef.current ? 1 : 0.5 }}>
+                Stage New Block
+              </button>
+              <button onClick={handleCancelDraw} style={{ background: 'transparent', color: '#94a3b8', border: '1px solid #334155', borderRadius: 6, padding: '8px 10px', cursor: 'pointer', fontSize: 12 }}>
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 
@@ -1104,8 +927,8 @@ export default function EditorPage() {
         {/* Help text */}
         <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid #1e293b', color: '#334155', fontSize: 11, lineHeight: 1.7 }}>
           <span style={{ color: '#475569', fontWeight: 600 }}>Editing station</span><br />
-          Click a parcel → see all blocks for that vineyard.<br />
-          Edit geometry, metadata, add or delete blocks.<br />
+          Click a parcel on the map to select it.<br />
+          Edit geometry or metadata, add or delete blocks.<br />
           Stage changes, then push as one batch.
         </div>
       </div>

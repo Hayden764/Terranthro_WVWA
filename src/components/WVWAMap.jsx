@@ -235,11 +235,12 @@ function addListingsSourceAndBaseLayers(map, geojsonData, preset, isVisible) {
     filter: ['!', ['has', 'point_count']],
     layout: { visibility: isVisible ? 'visible' : 'none' },
     paint: {
-      'circle-color': config.dotColor,
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 5, 14, 8],
+      'circle-color': config.markerFillColor,
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3.5, 14, 5.5],
       'circle-stroke-width': 1.5,
       'circle-stroke-color': '#ffffff',
-      'circle-opacity': 0.92,
+      'circle-opacity': 0.2,
+      'circle-stroke-opacity': 0.85,
     },
   });
 
@@ -351,6 +352,29 @@ const DEV_LAYER_DEFAULTS = {
 };
 
 const VINEYARD_HATCH_PATTERN_ID = 'vineyard-diagonal-hatch';
+
+// ── World wine region callout data (shown on rotating globe entrance) ────────
+// offset: [x, y] in ems — diagonal values spread labels apart vertically.
+// anchor: MapLibre text-anchor — positions the text box edge at the offset point.
+const WORLD_WINE_REGIONS = [
+  // Europe — stagger vertically so clustered regions don't collide
+  { id: 'bordeaux',     name: 'Bordeaux',       country: 'France',        lng: -0.57,  lat: 44.84,  offset: [-2.0, -0.6], anchor: 'right'  },
+  { id: 'champagne',    name: 'Champagne',      country: 'France',        lng: 4.03,   lat: 49.05,  offset: [2.0,  0.6],  anchor: 'left'   },
+  { id: 'tuscany',      name: 'Tuscany',        country: 'Italy',         lng: 11.25,  lat: 43.45,  offset: [2.0,  0.0],  anchor: 'left'   },
+  { id: 'rioja',        name: 'Rioja',          country: 'Spain',         lng: -2.44,  lat: 42.47,  offset: [-2.0, 0.6],  anchor: 'right'  },
+  { id: 'douro',        name: 'Douro Valley',   country: 'Portugal',      lng: -7.67,  lat: 41.18,  offset: [-2.0, -0.6], anchor: 'right'  },
+  { id: 'mosel',        name: 'Mosel',          country: 'Germany',       lng: 7.05,   lat: 50.00,  offset: [2.0,  -0.6], anchor: 'left'   },
+  // North America
+  { id: 'napa',         name: 'Napa Valley',    country: 'California',    lng: -122.3, lat: 38.5,   offset: [-2.0, 0.6],  anchor: 'right'  },
+  { id: 'walla_walla',  name: 'Walla Walla',    country: 'Washington',    lng: -118.3, lat: 46.1,   offset: [2.0,  0.0],  anchor: 'left'   },
+  { id: 'finger_lakes', name: 'Finger Lakes',   country: 'New York',      lng: -76.9,  lat: 42.7,   offset: [2.0,  0.6],  anchor: 'left'   },
+  // South America
+  { id: 'mendoza',      name: 'Mendoza',        country: 'Argentina',     lng: -68.83, lat: -32.89, offset: [2.0,  0.0],  anchor: 'left'   },
+  // Southern Hemisphere
+  { id: 'barossa',      name: 'Barossa Valley', country: 'Australia',     lng: 138.90, lat: -34.52, offset: [-2.0, 0.0],  anchor: 'right'  },
+  { id: 'capewine',     name: 'Cape Winelands', country: 'South Africa',  lng: 18.97,  lat: -33.92, offset: [2.0,  0.0],  anchor: 'left'   },
+  { id: 'marlborough',  name: 'Marlborough',    country: 'New Zealand',   lng: 173.95, lat: -41.51, offset: [-2.0, 0.0],  anchor: 'right'  },
+];
 
 function setLayerVisibility(map, layerId, isVisible) {
   if (!map.getLayer(layerId)) return;
@@ -1336,6 +1360,7 @@ const WVWAMap = forwardRef(function WVWAMap({
   onSelectedVineyardsChange,
   onInsideIdsChange,
   onVineyardRecidSetChange,
+  onMapReady,
 }, externalRef) {
   const mapContainerRef = useRef(null);
   const mapRef          = useRef(null);
@@ -1381,6 +1406,7 @@ const WVWAMap = forwardRef(function WVWAMap({
   useEffect(() => { onInsideIdsChange?.(insideIds); }, [insideIds]);       // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { onVineyardRecidSetChange?.(vineyardRecidSet); }, [vineyardRecidSet]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const rotationAnimRef        = useRef(null);
   const listingsRef           = useRef([]);
   const missingParcelTopoStatsIdsRef = useRef(new Set());
   const selectedListingRef    = useRef(null);
@@ -1391,6 +1417,60 @@ const WVWAMap = forwardRef(function WVWAMap({
 
   // Expose imperative methods for the SearchBar (and any external consumer)
   useImperativeHandle(externalRef, () => ({
+    startEntranceAnimation() {
+      // Stop globe rotation
+      if (rotationAnimRef.current) {
+        cancelAnimationFrame(rotationAnimRef.current);
+        rotationAnimRef.current = null;
+      }
+      const map = mapRef.current;
+      if (!map) return;
+
+      // Fade out wine region callouts via paint opacity transition
+      if (map.getLayer('wine-region-dots')) {
+        map.setPaintProperty('wine-region-dots', 'circle-opacity-transition', { duration: 450 });
+        map.setPaintProperty('wine-region-dots', 'circle-opacity', 0);
+      }
+      if (map.getLayer('wine-region-labels')) {
+        map.setPaintProperty('wine-region-labels', 'text-opacity-transition', { duration: 450 });
+        map.setPaintProperty('wine-region-labels', 'text-opacity', 0);
+      }
+      if (map.getLayer('wine-region-leader-lines')) {
+        map.setPaintProperty('wine-region-leader-lines', 'line-opacity-transition', { duration: 450 });
+        map.setPaintProperty('wine-region-leader-lines', 'line-opacity', 0);
+      }
+
+      // ── Leg 1: fly from globe to Oregon state overview ─────────────
+      // Centered over Oregon's geographic center so the user can read
+      // the state's shape, the coast, and the Cascades before zooming in.
+      map.flyTo({
+        center:   [-120.5, 44.0],
+        zoom:     5.0,
+        pitch:    12,
+        bearing:  0,
+        duration: 3500,
+        curve:    1.6,
+        easing:   t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2,
+        essential: true,
+      });
+
+      // ── Leg 2: after a brief pause, fly into the Willamette Valley ────
+      map.once('moveend', () => {
+        setTimeout(() => {
+          map.flyTo({
+            center:   [WV_CAMERA.lng, WV_CAMERA.lat],
+            zoom:     WV_CAMERA.zoom,
+            pitch:    WV_CAMERA.pitch,
+            bearing:  WV_CAMERA.bearing,
+            duration: 2800,
+            curve:    1.2,
+            easing:   t => 1 - Math.pow(1 - t, 3),
+            essential: true,
+          });
+          map.once('moveend', () => { setIntroComplete(true); setMarkersVisible(true); });
+        }, 1000);
+      });
+    },
     clearSelectedListing() {
       setSelectedListingRef.current?.(null);
       setHoveredListingRef.current?.(null);
@@ -1923,20 +2003,100 @@ const WVWAMap = forwardRef(function WVWAMap({
         console.warn('setFog not supported:', e);
       }
 
-      // ── Intro fly-in fires immediately on load, before async data fetches ──
-      setTimeout(() => {
-        map.flyTo({
-          center:   [WV_CAMERA.lng, WV_CAMERA.lat],
-          zoom:     WV_CAMERA.zoom,
-          pitch:    WV_CAMERA.pitch,
-          bearing:  WV_CAMERA.bearing,
-          duration: 10000,
-          curve:    1.3,
-          speed:    0.2,
-          easing:   t => 1 - Math.pow(1 - t, 3)
-        });
-        map.once('moveend', () => { setIntroComplete(true); setMarkersVisible(true); });
-      }, 300);
+      // ── Globe rotation during entrance screen ──────────────────────────
+      // Rotate around Earth's polar axis: keep bearing=0 (north-up) and
+      // advance the center longitude westward — prograde (west-to-east) rotation.
+      let rotateLng = -90;
+      const rotateGlobe = () => {
+        rotateLng = ((rotateLng + 0.3 + 180) % 360) - 180;
+        map.setCenter([rotateLng, 20]);
+        rotationAnimRef.current = requestAnimationFrame(rotateGlobe);
+      };
+      rotationAnimRef.current = requestAnimationFrame(rotateGlobe);
+      onMapReady?.();
+
+      // ── World wine region callouts (Option A — minimal cartographic) ───
+      const wineGeoJSON = {
+        type: 'FeatureCollection',
+        features: WORLD_WINE_REGIONS.map(r => ({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [r.lng, r.lat] },
+          properties: { name: r.name, country: r.country, offset: r.offset, anchor: r.anchor },
+        })),
+      };
+      map.addSource('wine-regions', { type: 'geojson', data: wineGeoJSON });
+
+      // Small white dot at each region
+      map.addLayer({
+        id: 'wine-region-dots',
+        type: 'circle',
+        source: 'wine-regions',
+        paint: {
+          'circle-radius': 3,
+          'circle-color': '#FAF7F2',
+          'circle-opacity': 0.85,
+          'circle-stroke-width': 0,
+        },
+      });
+
+      // Region name label — per-feature offset and anchor via case expressions
+      // so each label floats in a unique diagonal direction to avoid collisions.
+      const textOffsetExpr = ['case',
+        ...WORLD_WINE_REGIONS.flatMap(r => [['==', ['get', 'id'], r.id], ['literal', r.offset]]),
+        ['literal', [1.4, 0]],
+      ];
+      const textAnchorExpr = ['case',
+        ...WORLD_WINE_REGIONS.flatMap(r => [['==', ['get', 'id'], r.id], r.anchor]),
+        'left',
+      ];
+      map.addLayer({
+        id: 'wine-region-labels',
+        type: 'symbol',
+        source: 'wine-regions',
+        layout: {
+          'text-field': ['get', 'name'],
+          'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+          'text-size': 11,
+          'text-anchor': textAnchorExpr,
+          'text-offset': textOffsetExpr,
+          'text-justify': 'auto',
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+          'symbol-placement': 'point',
+        },
+        paint: {
+          'text-color': '#FAF7F2',
+          'text-opacity': 0.9,
+          'text-halo-color': 'rgba(0,0,0,0.5)',
+          'text-halo-width': 1,
+        },
+      });
+
+      // Diagonal leader lines — endpoint computed from each region's 2D offset
+      const degPerEmX = 2.2; // approximate degrees per em at globe zoom ~1.8
+      const degPerEmY = 1.8;
+      const lineFeatures = WORLD_WINE_REGIONS.map(r => ({
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [r.lng, r.lat],
+            [r.lng + r.offset[0] * degPerEmX * 0.6, r.lat + r.offset[1] * degPerEmY * 0.6],
+          ],
+        },
+        properties: {},
+      }));
+      map.addSource('wine-region-lines', { type: 'geojson', data: { type: 'FeatureCollection', features: lineFeatures } });
+      map.addLayer({
+        id: 'wine-region-leader-lines',
+        type: 'line',
+        source: 'wine-region-lines',
+        paint: {
+          'line-color': '#FAF7F2',
+          'line-opacity': 0.35,
+          'line-width': 1,
+        },
+      }, 'wine-region-dots'); // insert below dots so dots render on top
 
       // ── Load WV parent boundary ───────────────────────────────────────
       const wvRes = await fetch('/data/willamette_valley.geojson');
@@ -1975,6 +2135,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         id: 'wv-mask-fill',
         type: 'fill',
         source: 'wv-mask',
+        layout: { visibility: 'none' }, // hidden until intro flyTo completes
         paint: {
           'fill-color': '#1a1a1a',
           'fill-opacity': 0.38,
@@ -2846,11 +3007,23 @@ const WVWAMap = forwardRef(function WVWAMap({
   // Keep setHoveredListingRef in sync so the map's [] closure can call it
   useEffect(() => { setHoveredListingRef.current = handleHoverListing; }, [handleHoverListing]);
 
+  // Reveal the WV mask only once the entrance flyTo has landed
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || !introComplete) return;
+    if (devLayerToggles.wvMask) {
+      setLayerVisibility(map, 'wv-mask-fill', true);
+    }
+  }, [introComplete, mapLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    setLayerVisibility(map, 'wv-mask-fill', devLayerToggles.wvMask);
+    // Only toggle the mask if intro is already done; otherwise leave it hidden
+    if (introComplete) {
+      setLayerVisibility(map, 'wv-mask-fill', devLayerToggles.wvMask);
+    }
     setLayerVisibility(map, 'wv-boundary-line', devLayerToggles.wvBoundary);
 
     for (const ava of WV_SUB_AVAS) {
@@ -2923,6 +3096,7 @@ const WVWAMap = forwardRef(function WVWAMap({
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div ref={mapContainerRef} style={{ width: '100%', height: '100%', background: '#000000' }} />
 
+      {/* Dev layer panel — hidden; re-enable by uncommenting
       {introComplete && (
         <DevLayerPanel
           devPanelOpen={devPanelOpen}
@@ -2934,6 +3108,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           onListingSymbologyPresetChange={handleListingSymbologyPresetChange}
         />
       )}
+      */}
 
       {/* Winery marker hover label */}
       {introComplete && hoveredListing && (

@@ -3,8 +3,116 @@ import WVWAMap, { LISTING_FILTER_MODES } from '../components/WVWAMap';
 import ExplorerSidebar from '../components/ExplorerSidebar';
 import { BRAND } from '../config/brandColors';
 
+// ── Entrance Panel (Option B — Dark Cinematic) ───────────────────────────
+function EntrancePanel({ onEnter, mapReady }) {
+  return (
+    <div style={{
+      width: 300,
+      height: '100%',
+      flexShrink: 0,
+      background: BRAND.brownDark,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '40px 32px',
+      boxSizing: 'border-box',
+      gap: 0,
+    }}>
+      {/* Logo */}
+      <img
+        src="/willamette-logo.svg"
+        alt="Willamette Valley Wine Country"
+        style={{ height: 48, width: 'auto', marginBottom: 36, filter: 'brightness(0) invert(1)', opacity: 0.92 }}
+      />
+
+      {/* Headline */}
+      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <div style={{
+          fontSize: 28,
+          fontWeight: 700,
+          color: BRAND.eggshell,
+          letterSpacing: '-0.01em',
+          lineHeight: 1.15,
+          fontFamily: 'Georgia, "Times New Roman", serif',
+        }}>
+          Willamette Valley
+        </div>
+        <div style={{
+          fontSize: 20,
+          fontWeight: 400,
+          color: BRAND.eggshell,
+          letterSpacing: '0.04em',
+          lineHeight: 1.3,
+          fontFamily: 'Georgia, "Times New Roman", serif',
+          opacity: 0.8,
+          marginTop: 4,
+        }}>
+          Wine Country
+        </div>
+      </div>
+
+      {/* Burgundy rule */}
+      <div style={{ width: 40, height: 2, background: BRAND.burgundy, borderRadius: 1, marginBottom: 20 }} />
+
+      {/* Tagline */}
+      <div style={{
+        fontSize: 12,
+        color: 'rgba(250,247,242,0.5)',
+        fontStyle: 'italic',
+        letterSpacing: '0.06em',
+        textAlign: 'center',
+        marginBottom: 48,
+        lineHeight: 1.7,
+      }}>
+        18 AVAs&nbsp;&nbsp;·&nbsp;&nbsp;700+ Wineries<br />
+        Willamette Valley, Oregon
+      </div>
+
+      {/* Enter button */}
+      <button
+        onClick={onEnter}
+        disabled={!mapReady}
+        style={{
+          width: '100%',
+          padding: '13px 0',
+          background: 'transparent',
+          border: `1.5px solid ${mapReady ? BRAND.eggshell : 'rgba(250,247,242,0.25)'}`,
+          borderRadius: 4,
+          color: mapReady ? BRAND.eggshell : 'rgba(250,247,242,0.35)',
+          fontSize: 13,
+          fontWeight: 600,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          cursor: mapReady ? 'pointer' : 'default',
+          fontFamily: 'Inter, sans-serif',
+          transition: 'background 0.2s, color 0.2s, border-color 0.2s',
+        }}
+        onMouseEnter={e => {
+          if (!mapReady) return;
+          e.currentTarget.style.background = 'rgba(250,247,242,0.1)';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = 'transparent';
+        }}
+      >
+        {mapReady ? 'Begin Exploring' : 'Loading map\u2026'}
+      </button>
+    </div>
+  );
+}
+
 export default function WVWAMapPage() {
   const mapRef = useRef(null);
+
+  // ── Entrance state ───────────────────────────────────────────────────
+  const [isIntro, setIsIntro]     = useState(true);
+  const [mapReady, setMapReady]   = useState(false);
+
+  function handleEnter() {
+    mapRef.current?.startEntranceAnimation?.();
+    setIsIntro(false);
+  }
 
   // ── AVA selection ────────────────────────────────────────────────────
   const [selectedAva, setSelectedAva]         = useState(null);
@@ -60,28 +168,35 @@ export default function WVWAMapPage() {
       {/* ── Body: sidebar + map ─────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-        {/* Explorer Sidebar */}
-        <ExplorerSidebar
-          mapRef={mapRef}
-          selectedAva={selectedAva}
-          onSelectAva={setSelectedAva}
-          listings={listings}
-          selectedListing={selectedListing}
-          onListingSelect={setSelectedListing}
-          insideIds={insideIds}
-          vineyardRecidSet={vineyardRecidSet}
-          activeLayer={activeLayer}
-          onLayerChange={(layer) => { setActiveLayer(layer); setTopoStats(null); }}
-          currentMonth={currentMonth}
-          onMonthChange={setCurrentMonth}
-          topoStats={topoStats}
-          listingFilterMode={listingFilterMode}
-          onListingFilterModeChange={setListingFilterMode}
-          selectedVineyards={selectedVineyards}
-          parcelTopoStats={parcelTopoStats}
-          onVineyardHover={(features) => mapRef.current?.hoverVineyards?.(features)}
-          onViewAllVineyards={(features) => mapRef.current?.viewAllVineyards?.(features)}
-        />
+        {/* Entrance panel (shown during intro) */}
+        {isIntro && (
+          <EntrancePanel onEnter={handleEnter} mapReady={mapReady} />
+        )}
+
+        {/* Explorer Sidebar (hidden during intro) */}
+        {!isIntro && (
+          <ExplorerSidebar
+            mapRef={mapRef}
+            selectedAva={selectedAva}
+            onSelectAva={setSelectedAva}
+            listings={listings}
+            selectedListing={selectedListing}
+            onListingSelect={setSelectedListing}
+            insideIds={insideIds}
+            vineyardRecidSet={vineyardRecidSet}
+            activeLayer={activeLayer}
+            onLayerChange={(layer) => { setActiveLayer(layer); setTopoStats(null); }}
+            currentMonth={currentMonth}
+            onMonthChange={setCurrentMonth}
+            topoStats={topoStats}
+            listingFilterMode={listingFilterMode}
+            onListingFilterModeChange={setListingFilterMode}
+            selectedVineyards={selectedVineyards}
+            parcelTopoStats={parcelTopoStats}
+            onVineyardHover={(features) => mapRef.current?.hoverVineyards?.(features)}
+            onViewAllVineyards={(features) => mapRef.current?.viewAllVineyards?.(features)}
+          />
+        )}
 
         {/* Map */}
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -109,6 +224,7 @@ export default function WVWAMapPage() {
             onSelectedVineyardsChange={setSelectedVineyards}
             onInsideIdsChange={setInsideIds}
             onVineyardRecidSetChange={setVineyardRecidSet}
+            onMapReady={() => setMapReady(true)}
           />
         </div>
       </div>

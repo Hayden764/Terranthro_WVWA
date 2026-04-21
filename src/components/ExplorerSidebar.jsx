@@ -19,7 +19,9 @@ const T = {
   activeBg:     'rgba(142,21,55,0.08)',
 };
 
-const SIDEBAR_W = 300;
+const SIDEBAR_W = '25vw';
+const SIDEBAR_MIN_W = 260;
+const SIDEBAR_MAX_W = 420;
 
 // ── Colormap gradients (matching WVWAMap / ScalePanel) ───────────────────
 const COLORMAP_CSS = {
@@ -903,6 +905,8 @@ export default function ExplorerSidebar({
   }, [mapRef]);
 
   const isOnHome = currentView === 'home';
+  const wineryCount = listings.filter(l => l.category === 'winery').length;
+  const mappedCount = vineyardRecidSet ? vineyardRecidSet.size : 0;
   const viewTitle = currentView === 'ava-list' ? 'Nested AVAs'
     : currentView === 'winery-list' ? 'Wineries'
     : currentView === 'ava-detail' ? (detailAva?.name ?? '')
@@ -912,7 +916,8 @@ export default function ExplorerSidebar({
   return (
     <div style={{
       width: SIDEBAR_W,
-      minWidth: SIDEBAR_W,
+      minWidth: SIDEBAR_MIN_W,
+      maxWidth: SIDEBAR_MAX_W,
       height: '100%',
       background: T.sidebarBg,
       borderRight: `1px solid ${BRAND.border}`,
@@ -970,52 +975,121 @@ export default function ExplorerSidebar({
 
           {/* ── Panel 0: Home menu ── */}
           <div style={{ width: '33.333%', height: '100%', overflowY: 'auto', flexShrink: 0 }}>
-            {/* Nested AVAs nav row */}
+
+            {/* Hero welcome card */}
+            <div style={{
+              background: `linear-gradient(155deg, ${BRAND.brownDark} 0%, ${BRAND.brown} 55%, #5C3D2E 100%)`,
+              padding: '18px 16px 16px',
+              borderBottom: `1px solid ${BRAND.border}`,
+              position: 'relative',
+              overflow: 'hidden',
+            }}>
+              {/* Decorative background circles */}
+              <div style={{ position: 'absolute', top: -28, right: -28, width: 110, height: 110, borderRadius: '50%', background: 'rgba(142,21,55,0.20)', pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', bottom: -18, right: 18, width: 65, height: 65, borderRadius: '50%', background: 'rgba(142,21,55,0.13)', pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', top: 10, right: 55, width: 28, height: 28, borderRadius: '50%', background: 'rgba(250,247,242,0.05)', pointerEvents: 'none' }} />
+
+              <p style={{ fontSize: 12, color: 'rgba(250,247,242,0.68)', margin: '0 0 14px', lineHeight: 1.65, position: 'relative', paddingRight: 24 }}>
+                Explore 11 nested American Viticultural Areas across Oregon's Northern Willamette Valley — with vineyard mapping, topographic analysis, and 30-year climate data.
+              </p>
+
+              {/* Stat chips grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, position: 'relative' }}>
+                <div style={{ background: 'rgba(250,247,242,0.10)', borderRadius: 8, padding: '9px 12px', border: '1px solid rgba(250,247,242,0.12)' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: BRAND.eggshell, fontFamily: 'Georgia, serif', lineHeight: 1 }}>{WV_SUB_AVAS.length}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(250,247,242,0.52)', marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Nested AVAs</div>
+                </div>
+                <div style={{ background: 'rgba(250,247,242,0.10)', borderRadius: 8, padding: '9px 12px', border: '1px solid rgba(250,247,242,0.12)' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: BRAND.eggshell, fontFamily: 'Georgia, serif', lineHeight: 1 }}>{wineryCount > 0 ? wineryCount : '—'}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(250,247,242,0.52)', marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Wineries</div>
+                </div>
+                <div style={{ background: 'rgba(63,175,121,0.14)', borderRadius: 8, padding: '9px 12px', border: '1px solid rgba(63,175,121,0.30)' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#3FAF79', fontFamily: 'Georgia, serif', lineHeight: 1 }}>{mappedCount > 0 ? mappedCount : '—'}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(250,247,242,0.52)', marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Mapped Parcels</div>
+                </div>
+                <div style={{ background: 'rgba(250,247,242,0.10)', borderRadius: 8, padding: '9px 12px', border: '1px solid rgba(250,247,242,0.12)' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: BRAND.eggshell, fontFamily: 'Georgia, serif', lineHeight: 1 }}>26k+</div>
+                  <div style={{ fontSize: 10, color: 'rgba(250,247,242,0.52)', marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Vineyard Acres</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Enhanced: Nested AVAs nav row */}
             <button
               onClick={() => setViewStack(prev => prev[prev.length - 1] === 'home' ? [...prev, 'ava-list'] : prev)}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                width: '100%', padding: '12px 16px', background: 'none', border: 'none',
+                width: '100%', padding: '13px 16px', background: 'none', border: 'none',
                 borderBottom: `1px solid ${BRAND.border}`, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
               }}
               onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
               onMouseLeave={e => e.currentTarget.style.background = 'none'}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={T.sectionLabel}>Nested AVAs</span>
-                <span style={{ fontSize: 10, background: BRAND.cream, borderRadius: 10, padding: '1px 7px', color: BRAND.textMuted, fontWeight: 600 }}>
-                  {WV_SUB_AVAS.length}
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                  background: 'rgba(72,55,41,0.08)', border: `1px solid ${BRAND.border}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
+                }}>🗺</div>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.brown }}>Nested AVAs</div>
+                  <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 2 }}>{WV_SUB_AVAS.length} viticultural areas</div>
+                </div>
               </div>
               <span style={{ fontSize: 16, color: BRAND.textMuted }}>›</span>
             </button>
 
-            {/* Wineries nav row */}
+            {/* Enhanced: Wineries nav row */}
             <button
               onClick={() => setViewStack(prev => prev[prev.length - 1] === 'home' ? [...prev, 'winery-list'] : prev)}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                width: '100%', padding: '12px 16px', background: 'none', border: 'none',
+                width: '100%', padding: '13px 16px', background: 'none', border: 'none',
                 borderBottom: `1px solid ${BRAND.border}`, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
               }}
               onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
               onMouseLeave={e => e.currentTarget.style.background = 'none'}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={T.sectionLabel}>Wineries</span>
-                {listings.filter(l => l.category === 'winery').length > 0 && (
-                  <span style={{ fontSize: 10, background: BRAND.cream, borderRadius: 10, padding: '1px 7px', color: BRAND.textMuted, fontWeight: 600 }}>
-                    {listings.filter(l => l.category === 'winery').length}
-                  </span>
-                )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                  background: 'rgba(142,21,55,0.08)', border: `1px solid rgba(142,21,55,0.15)`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
+                }}>🍷</div>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.brown }}>Wineries</div>
+                  <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 2 }}>{wineryCount > 0 ? `${wineryCount} in the valley` : 'Browse all wineries'}</div>
+                </div>
               </div>
               <span style={{ fontSize: 16, color: BRAND.textMuted }}>›</span>
             </button>
 
-            {/* Data Layers accordion */}
-            <div style={{ borderBottom: `1px solid ${BRAND.border}` }}>
-              <SectionHeader label="Data Layers" open={sections.layers} onToggle={() => toggleSection('layers')} />
-              {sections.layers && (
+            {/* Enhanced: Data Layers nav row */}
+            <button
+              onClick={() => toggleSection('layers')}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                width: '100%', padding: '13px 16px', background: 'none', border: 'none',
+                borderBottom: `1px solid ${BRAND.border}`, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                  background: 'rgba(30,100,160,0.08)', border: `1px solid rgba(30,100,160,0.15)`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
+                }}>📊</div>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.brown }}>Data Layers</div>
+                  <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 2 }}>Climate &amp; topography overlays</div>
+                </div>
+              </div>
+              <Chevron open={sections.layers} size={13} />
+            </button>
+            {sections.layers && (
+              <div style={{ borderBottom: `1px solid ${BRAND.border}` }}>
                 <LayerSection
                   activeLayer={activeLayer}
                   onLayerChange={onLayerChange}
@@ -1023,12 +1097,35 @@ export default function ExplorerSidebar({
                   onMonthChange={onMonthChange}
                   topoStats={topoStats}
                 />
-              )}
-            </div>
+              </div>
+            )}
 
             {/* About accordion */}
             <div>
-              <SectionHeader label="About & Legend" open={sections.about} onToggle={() => toggleSection('about')} />
+              <button
+                onClick={() => toggleSection('about')}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  width: '100%', padding: '13px 16px', background: 'none', border: 'none',
+                  borderBottom: sections.about ? `1px solid ${BRAND.border}` : 'none',
+                  cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                    background: 'rgba(72,55,41,0.06)', border: `1px solid ${BRAND.border}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
+                  }}>ℹ️</div>
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.brown }}>About &amp; Legend</div>
+                    <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 2 }}>Data sources &amp; map key</div>
+                  </div>
+                </div>
+                <Chevron open={sections.about} size={13} />
+              </button>
               {sections.about && <AboutSection />}
             </div>
           </div>

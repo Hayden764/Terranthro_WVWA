@@ -50,7 +50,7 @@ function groupResults(results) {
   return { avas, wineries, vineyards };
 }
 
-export default function SearchBar({ mapRef, onSelectAva }) {
+export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
   const [query, setQuery]           = useState('');
   const [results, setResults]       = useState([]);
   const [open, setOpen]             = useState(false);
@@ -258,7 +258,12 @@ export default function SearchBar({ mapRef, onSelectAva }) {
   return (
     <div
       ref={containerRef}
-      style={{
+      style={inline ? {
+        position: 'relative',
+        width: '100%',
+        zIndex: 30,
+        fontFamily: 'Inter, sans-serif',
+      } : {
         position: 'absolute',
         left: '50%',
         transform: 'translateX(-50%)',

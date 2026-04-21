@@ -2,15 +2,21 @@
  * PortalVineyardMap — lightweight MapLibre map for the winery portal.
  *
  * Props:
- *   parcels       {Array}    Array of parcel objects with a `.geometry` GeoJSON field
- *                            and `.id`, `.vineyard_name` properties.
- *   highlightId   {number}   Optional parcel id to emphasise (fill is brighter).
- *   height        {number}   CSS height in px (default 340).
- *   onParcelClick {fn}       Called with the parcel object when a user clicks a polygon.
- *   editParcelId  {number}   When set, activates draw-edit mode for that parcel.
- *   onGeometrySave {fn}      Called with (parcelId, geoJSONGeometry) when user saves edits.
- *   onEditCancel  {fn}       Called when user cancels edit mode.
- *   style         {Object}   Extra style overrides on the wrapper div.
+ *   parcels        {Array}    Array of parcel objects with a `.geometry` GeoJSON field
+ *                             and `.id`, `.vineyard_name` properties.
+ *   highlightId    {number}   Optional parcel id to emphasise (fill is brighter).
+ *   height         {number}   CSS height in px (default 340).
+ *   onParcelClick  {fn}       Called with the parcel object when a user clicks a polygon.
+ *   editParcelId   {number}   When set, activates vertex-edit mode for that parcel.
+ *   onGeometrySave {fn}       Called with (parcelId, geoJSONGeometry) when user saves edits.
+ *   onEditCancel   {fn}       Called when user cancels edit mode.
+ *   splitParcelId  {number}   When set, activates draw-line mode to split that parcel.
+ *   onSplitLineSave {fn}      Called with (parcelId, lineGeoJSON) when user saves split line.
+ *   onSplitCancel  {fn}       Called when user cancels split mode.
+ *   addMode        {boolean}  When true, activates draw-polygon mode for a new parcel.
+ *   onAddSave      {fn}       Called with (geoJSONGeometry) when user saves new polygon.
+ *   onAddCancel    {fn}       Called when user cancels add mode.
+ *   style          {Object}   Extra style overrides on the wrapper div.
  */
 import { useEffect, useRef, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
@@ -93,6 +99,12 @@ export default function PortalVineyardMap({
   editParcelId = null,
   onGeometrySave,
   onEditCancel,
+  splitParcelId = null,
+  onSplitLineSave,
+  onSplitCancel,
+  addMode = false,
+  onAddSave,
+  onAddCancel,
   style: wrapperStyle,
 }) {
   const containerRef = useRef(null);
@@ -348,6 +360,100 @@ export default function PortalVineyardMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editParcelId]);
 
+  // ── Split line draw mode ───────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const activate = () => {
+      if (!splitParcelId) return;
+      const parcel = parcels.find((p) => p.id === splitParcelId);
+      if (!parcel?.geometry) return;
+
+      if (drawRef.current) {
+        try { map.removeControl(drawRef.current); } catch (_) {}
+        drawRef.current = null;
+      }
+
+      const draw = new MapboxDraw({
+        displayControlsDefault: false,
+        controls: { line_string: true, trash: true },
+        defaultMode: 'draw_line_string',
+        styles: DRAW_STYLES,
+      });
+      map.addControl(draw, 'top-left');
+      drawRef.current = draw;
+
+      map.fitBounds(bboxFromGeometries([parcel.geometry]), { padding: 80, maxZoom: 17 });
+    };
+
+    const deactivate = () => {
+      if (drawRef.current) {
+        try { map.removeControl(drawRef.current); } catch (_) {}
+        drawRef.current = null;
+      }
+    };
+
+    if (splitParcelId) {
+      if (map.isStyleLoaded()) {
+        activate();
+      } else {
+        map.once('load', activate);
+      }
+    } else {
+      deactivate();
+    }
+
+    return () => {
+      map.off('load', activate);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [splitParcelId]);
+
+  // ── Add parcel draw mode ───────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const activate = () => {
+      if (drawRef.current) {
+        try { map.removeControl(drawRef.current); } catch (_) {}
+        drawRef.current = null;
+      }
+
+      const draw = new MapboxDraw({
+        displayControlsDefault: false,
+        controls: { polygon: true, trash: true },
+        defaultMode: 'draw_polygon',
+        styles: DRAW_STYLES,
+      });
+      map.addControl(draw, 'top-left');
+      drawRef.current = draw;
+    };
+
+    const deactivate = () => {
+      if (drawRef.current) {
+        try { map.removeControl(drawRef.current); } catch (_) {}
+        drawRef.current = null;
+      }
+    };
+
+    if (addMode) {
+      if (map.isStyleLoaded()) {
+        activate();
+      } else {
+        map.once('load', activate);
+      }
+    } else {
+      deactivate();
+    }
+
+    return () => {
+      map.off('load', activate);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addMode]);
+
   const hasData = parcels.some((p) => p.geometry);
 
   if (!hasData) {
@@ -375,7 +481,7 @@ export default function PortalVineyardMap({
         ref={containerRef}
         style={{
           height: '100%',
-          borderRadius: editParcelId ? 0 : 8,
+          borderRadius: (editParcelId || splitParcelId || addMode) ? 0 : 8,
           overflow: 'hidden',
           border: '1px solid #E0D8CE',
         }}
@@ -410,6 +516,78 @@ export default function PortalVineyardMap({
                 const fc = draw.getAll();
                 const feature = fc.features[0];
                 if (feature) onGeometrySave(editParcelId, feature.geometry);
+              }}
+              style={editSaveBtnStyle}
+            >
+              Save for Review →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Split mode overlay bar */}
+      {splitParcelId && (
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          background: 'rgba(20, 30, 50, 0.88)',
+          backdropFilter: 'blur(4px)',
+          padding: '12px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          zIndex: 10,
+        }}>
+          <span style={{ color: '#cce0ff', fontSize: 12, lineHeight: 1.4 }}>
+            <strong style={{ color: '#fff' }}>Draw split line</strong> — click to draw a line across the parcel, then click again to finish
+          </span>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button
+              onClick={() => { if (onSplitCancel) onSplitCancel(); }}
+              style={editCancelBtnStyle}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                const draw = drawRef.current;
+                if (!draw || !onSplitLineSave) return;
+                const fc = draw.getAll();
+                const line = fc.features.find((f) => f.geometry.type === 'LineString');
+                if (line) onSplitLineSave(splitParcelId, line.geometry);
+              }}
+              style={editSaveBtnStyle}
+            >
+              Confirm Split →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add parcel overlay bar */}
+      {addMode && (
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          background: 'rgba(20, 50, 20, 0.88)',
+          backdropFilter: 'blur(4px)',
+          padding: '12px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          zIndex: 10,
+        }}>
+          <span style={{ color: '#ccffcc', fontSize: 12, lineHeight: 1.4 }}>
+            <strong style={{ color: '#fff' }}>Draw new parcel</strong> — click to place corners, double-click to close the polygon
+          </span>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button
+              onClick={() => { if (onAddCancel) onAddCancel(); }}
+              style={editCancelBtnStyle}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                const draw = drawRef.current;
+                if (!draw || !onAddSave) return;
+                const fc = draw.getAll();
+                const polygon = fc.features.find((f) => f.geometry.type === 'Polygon');
+                if (polygon) onAddSave(polygon.geometry);
               }}
               style={editSaveBtnStyle}
             >

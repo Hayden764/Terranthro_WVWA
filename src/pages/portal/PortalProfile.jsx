@@ -120,6 +120,10 @@ export default function PortalProfile() {
           </button>
         </form>
       )}
+
+      {/* ── Password ── */}
+      <hr style={{ margin: '36px 0', border: 'none', borderTop: `1px solid ${BRAND.border}` }} />
+      <PasswordSection hasPassword={profile.has_password} />
     </Shell>
   );
 }
@@ -175,4 +179,106 @@ function btnStyle(disabled) {
     cursor: disabled ? 'wait' : 'pointer',
     opacity: disabled ? 0.7 : 1,
   };
+}
+
+function PasswordSection({ hasPassword }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setPwError('');
+    setPwSuccess(false);
+
+    if (newPassword.length < 8) {
+      setPwError('Password must be at least 8 characters');
+      return;
+    }
+    if (newPassword !== confirm) {
+      setPwError('Passwords do not match');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const body = { password: newPassword };
+      if (hasPassword) body.currentPassword = currentPassword;
+      await apiPost('/api/auth/set-password', body);
+      setPwSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirm('');
+    } catch (err) {
+      setPwError(err.message || 'Failed to update password');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <h2 style={{ fontFamily: "'Georgia', serif", fontSize: 18, color: BRAND.brown, marginBottom: 6 }}>
+        {hasPassword ? 'Change Password' : 'Set a Password'}
+      </h2>
+      <p style={{ color: BRAND.textMuted, fontSize: 13, marginBottom: 20 }}>
+        {hasPassword
+          ? 'Update your portal login password.'
+          : 'Set a password so you can log in without an email link.'}
+      </p>
+
+      {pwSuccess ? (
+        <div style={{
+          background: '#f0f9e8', border: '1px solid #b5d89a', borderRadius: 8,
+          padding: '14px 16px', color: '#3a5a1f', fontSize: 14,
+        }}>
+          Password {hasPassword ? 'updated' : 'set'} successfully.
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} style={{ maxWidth: 340 }}>
+          {hasPassword && (
+            <Field label="Current password">
+              <input
+                type="password"
+                required
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="••••••••"
+                style={inputStyle}
+              />
+            </Field>
+          )}
+          <Field label="New password">
+            <input
+              type="password"
+              required
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Min. 8 characters"
+              style={inputStyle}
+            />
+          </Field>
+          <Field label="Confirm new password">
+            <input
+              type="password"
+              required
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder="••••••••"
+              style={inputStyle}
+            />
+          </Field>
+
+          {pwError && <p style={{ color: BRAND.burgundy, fontSize: 13, marginBottom: 12 }}>{pwError}</p>}
+
+          <button type="submit" disabled={saving} style={btnStyle(saving)}>
+            {saving ? 'Saving…' : hasPassword ? 'Update Password' : 'Set Password'}
+          </button>
+        </form>
+      )}
+    </div>
+  );
 }

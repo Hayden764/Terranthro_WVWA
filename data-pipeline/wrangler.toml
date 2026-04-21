@@ -4,4 +4,4 @@ account_id = "96e85f10dcee27dcd62d571f5f51fee8"
 
 [[r2_buckets]]
 binding = "TOPO"
-bucket_name = "terranthro-topography"
+bucket_name = "terranthro-cogs"

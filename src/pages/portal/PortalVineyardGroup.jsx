@@ -10,6 +10,8 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import lineSplit from '@turf/line-split';
+import { feature as turfFeature } from '@turf/helpers';
 import { BRAND } from '../../config/brandColors';
 import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
@@ -26,6 +28,22 @@ export default function PortalVineyardGroup() {
   const [editingParcelId, setEditingParcelId] = useState(null);
   const [pendingGeometry, setPendingGeometry] = useState(null); // { parcelId, geometry, notes }
   const [geoSubmitStatus, setGeoSubmitStatus] = useState(null);
+
+  // Split parcel
+  const [splittingParcelId, setSplittingParcelId] = useState(null);
+  const [pendingSplit, setPendingSplit] = useState(null); // { parcelId, polygon_a, polygon_b, split_line, notes }
+  const [splitSubmitStatus, setSplitSubmitStatus] = useState(null);
+
+  // Remove / unlink
+  const [removingParcelId, setRemovingParcelId] = useState(null);
+  const [removeAction, setRemoveAction] = useState('unlink');
+  const [removeNotes, setRemoveNotes] = useState('');
+  const [removeSubmitStatus, setRemoveSubmitStatus] = useState(null);
+
+  // Add parcel
+  const [addingParcel, setAddingParcel] = useState(false);
+  const [pendingAdd, setPendingAdd] = useState(null); // { geometry, vineyard_name, notes }
+  const [addSubmitStatus, setAddSubmitStatus] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -84,6 +102,71 @@ export default function PortalVineyardGroup() {
     }
   }
 
+  function handleSplitLineSave(parcelId, lineGeometry) {
+    setSplittingParcelId(null);
+    const parcel = parcels.find((p) => p.id === parcelId);
+    try {
+      const result = lineSplit(turfFeature(parcel.geometry), turfFeature(lineGeometry));
+      if (result.features.length >= 2) {
+        setPendingSplit({ parcelId, polygon_a: result.features[0].geometry, polygon_b: result.features[1].geometry, split_line: lineGeometry, notes: '' });
+      } else {
+        setPendingSplit({ parcelId, polygon_a: null, polygon_b: null, split_line: lineGeometry, notes: '' });
+      }
+    } catch {
+      setPendingSplit({ parcelId, polygon_a: null, polygon_b: null, split_line: lineGeometry, notes: '' });
+    }
+  }
+
+  async function submitSplit() {
+    if (!pendingSplit) return;
+    setSplitSubmitStatus('submitting');
+    try {
+      const parcel = parcels.find((p) => p.id === pendingSplit.parcelId);
+      await apiPost('/api/portal/requests', {
+        request_type: 'vineyard_split',
+        target_id: pendingSplit.parcelId,
+        payload: { original_geometry: parcel?.geometry, polygon_a: pendingSplit.polygon_a, polygon_b: pendingSplit.polygon_b, split_line: pendingSplit.split_line, notes: pendingSplit.notes || 'Parcel split requested via portal' },
+      });
+      setSplitSubmitStatus('success');
+      setPendingSplit(null);
+    } catch {
+      setSplitSubmitStatus('error');
+    }
+  }
+
+  async function submitRemove() {
+    if (!removingParcelId) return;
+    setRemoveSubmitStatus('submitting');
+    try {
+      await apiPost('/api/portal/requests', {
+        request_type: 'vineyard_remove',
+        target_id: removingParcelId,
+        payload: { action: removeAction, notes: removeNotes || (removeAction === 'delete' ? 'Vines pulled up' : 'No longer owned') },
+      });
+      setRemoveSubmitStatus('success');
+      setRemovingParcelId(null);
+    } catch {
+      setRemoveSubmitStatus('error');
+    }
+  }
+
+  async function submitAdd() {
+    if (!pendingAdd?.geometry) return;
+    setAddSubmitStatus('submitting');
+    try {
+      await apiPost('/api/portal/requests', {
+        request_type: 'vineyard_new',
+        target_id: parcels[0]?.winery_id,
+        payload: { geometry: pendingAdd.geometry, vineyard_name: pendingAdd.vineyard_name || '', ava_name: parcels[0]?.ava_name || '', notes: pendingAdd.notes || 'New parcel requested via portal' },
+      });
+      setAddSubmitStatus('success');
+      setPendingAdd(null);
+      setAddingParcel(false);
+    } catch {
+      setAddSubmitStatus('error');
+    }
+  }
+
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: "'Inter', sans-serif", background: BRAND.eggshell }}>
 
@@ -97,7 +180,7 @@ export default function PortalVineyardGroup() {
           parcels={parcels}
           highlightId={highlightId}
           height="100%"
-          onParcelClick={editingParcelId ? undefined : (parcel) => {
+          onParcelClick={(editingParcelId || splittingParcelId || addingParcel) ? undefined : (parcel) => {
             setHighlightId((prev) => prev === parcel.id ? null : parcel.id);
             document.getElementById(`parcel-${parcel.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }}
@@ -108,8 +191,14 @@ export default function PortalVineyardGroup() {
             setGeoSubmitStatus(null);
           }}
           onEditCancel={() => setEditingParcelId(null)}
+          splitParcelId={splittingParcelId}
+          onSplitLineSave={handleSplitLineSave}
+          onSplitCancel={() => setSplittingParcelId(null)}
+          addMode={addingParcel}
+          onAddSave={(geometry) => { setAddingParcel(false); setPendingAdd({ geometry, vineyard_name: '', notes: '' }); }}
+          onAddCancel={() => setAddingParcel(false)}
         />
-        {!editingParcelId && (
+        {!editingParcelId && !splittingParcelId && !addingParcel && (
           <p style={{ fontSize: 11, color: BRAND.textMuted, padding: '6px 12px', margin: 0, borderTop: `1px solid ${BRAND.border}`, background: BRAND.white }}>
             Click a parcel to highlight it →
           </p>
@@ -163,8 +252,68 @@ export default function PortalVineyardGroup() {
               onPendingSubmit={submitGeometry}
               onPendingDiscard={() => { setPendingGeometry(null); setGeoSubmitStatus(null); }}
               geoSubmitStatus={pendingGeometry?.parcelId === parcel.id ? geoSubmitStatus : null}
+              onSplitParcel={parcel.geometry ? () => { setSplittingParcelId(parcel.id); setHighlightId(parcel.id); setSplitSubmitStatus(null); } : undefined}
+              isSplitting={splittingParcelId === parcel.id}
+              pendingSplit={pendingSplit?.parcelId === parcel.id ? pendingSplit : null}
+              onSplitNotesChange={(notes) => setPendingSplit((p) => ({ ...p, notes }))}
+              onSplitSubmit={submitSplit}
+              onSplitDiscard={() => { setPendingSplit(null); setSplitSubmitStatus(null); }}
+              splitSubmitStatus={pendingSplit?.parcelId === parcel.id ? splitSubmitStatus : null}
+              onRemoveParcel={() => { setRemovingParcelId(parcel.id); setHighlightId(parcel.id); setRemoveSubmitStatus(null); setRemoveNotes(''); }}
+              isRemoving={removingParcelId === parcel.id}
+              removeAction={removeAction}
+              onRemoveActionChange={setRemoveAction}
+              removeNotes={removeNotes}
+              onRemoveNotesChange={setRemoveNotes}
+              onRemoveSubmit={submitRemove}
+              onRemoveCancel={() => { setRemovingParcelId(null); setRemoveSubmitStatus(null); setRemoveNotes(''); }}
+              removeSubmitStatus={removingParcelId === parcel.id ? removeSubmitStatus : null}
             />
           ))}
+
+        {/* Add Parcel — group-level (not per-parcel) */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', paddingTop: 8 }}>
+          {addingParcel ? (
+            <span style={{ fontSize: 13, color: BRAND.textMuted }}>Drawing new parcel on map…</span>
+          ) : addSubmitStatus === 'success' ? (
+            <span style={{ fontSize: 13, color: '#3a5a1f', fontWeight: 500 }}>✓ New parcel submitted for review</span>
+          ) : (
+            <button onClick={() => { setAddingParcel(true); setAddSubmitStatus(null); }} style={smallBtnStyle}>
+              + Add Parcel
+            </button>
+          )}
+        </div>
+
+        {/* Pending add confirmation */}
+        {pendingAdd && (
+          <div style={{ background: '#fff8f0', border: '1px solid #e8c97a', borderRadius: 8, padding: '14px 16px' }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: BRAND.brown, marginBottom: 6 }}>+ Review new parcel</p>
+            <p style={{ fontSize: 12, color: BRAND.textMuted, marginBottom: 10 }}>Give the new parcel a name and any notes for the admin.</p>
+            <input
+              type="text"
+              placeholder="Parcel / vineyard name"
+              value={pendingAdd.vineyard_name}
+              onChange={(e) => setPendingAdd((p) => ({ ...p, vineyard_name: e.target.value }))}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, border: `1px solid ${BRAND.border}`, fontSize: 12, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}
+            />
+            <textarea
+              placeholder="Optional: variety, location notes, etc."
+              value={pendingAdd.notes}
+              onChange={(e) => setPendingAdd((p) => ({ ...p, notes: e.target.value }))}
+              rows={2}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, border: `1px solid ${BRAND.border}`, fontSize: 12, fontFamily: "'Inter', sans-serif", resize: 'vertical', marginBottom: 10 }}
+            />
+            {addSubmitStatus === 'error' && <p style={{ fontSize: 12, color: BRAND.burgundy, marginBottom: 8 }}>Submission failed — try again.</p>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={submitAdd} disabled={addSubmitStatus === 'submitting' || !pendingAdd.vineyard_name.trim()} style={smallBtnStyle}>
+                {addSubmitStatus === 'submitting' ? 'Submitting…' : 'Submit for Review'}
+              </button>
+              <button onClick={() => { setPendingAdd(null); setAddSubmitStatus(null); }} style={{ ...smallBtnStyle, background: 'transparent', color: BRAND.textMuted, border: `1px solid ${BRAND.border}` }}>
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
         </div>
       </div>
     </div>
@@ -174,7 +323,10 @@ export default function PortalVineyardGroup() {
 /* ── ParcelCard ─────────────────────────────────── */
 
 function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditing,
-  pendingGeometry, onPendingNotesChange, onPendingSubmit, onPendingDiscard, geoSubmitStatus }) {
+  pendingGeometry, onPendingNotesChange, onPendingSubmit, onPendingDiscard, geoSubmitStatus,
+  onSplitParcel, isSplitting, pendingSplit, onSplitNotesChange, onSplitSubmit, onSplitDiscard, splitSubmitStatus,
+  onRemoveParcel, isRemoving, removeAction, onRemoveActionChange, removeNotes, onRemoveNotesChange, onRemoveSubmit, onRemoveCancel, removeSubmitStatus,
+}) {
   const [editingBlocks, setEditingBlocks] = useState(false);
 
   // Cancel block editing if this card loses selection
@@ -261,27 +413,109 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
         borderTop: `1px solid ${BRAND.border}`, padding: '10px 16px',
         display: 'flex', gap: 8, flexWrap: 'wrap', background: BRAND.eggshell,
       }}>
-        {highlighted && (
-          editingBlocks ? (
-            <span style={{ fontSize: 12, color: BRAND.textMuted, alignSelf: 'center' }}>
-              Editing block info above…
-            </span>
-          ) : (
-            <button
-              onClick={() => setEditingBlocks(true)}
-              style={smallBtnStyle}
-            >
-              Edit Block Info
-            </button>
-          )
+        {/* Edit Block Info */}
+        {editingBlocks ? (
+          <span style={{ fontSize: 12, color: BRAND.textMuted, alignSelf: 'center' }}>
+            Editing block info above…
+          </span>
+        ) : (
+          <button onClick={() => setEditingBlocks(true)} style={smallBtnStyle}>
+            Edit Block Info
+          </button>
         )}
-        {highlighted && onEditGeometry && !isEditing && !pendingGeometry && (
+
+        {/* Edit Boundary */}
+        {onEditGeometry && !isEditing && !pendingGeometry && geoSubmitStatus !== 'success' && (
           <button onClick={onEditGeometry} style={smallBtnStyle}>Edit Boundary</button>
         )}
         {isEditing && (
           <span style={{ fontSize: 12, color: BRAND.textMuted, alignSelf: 'center' }}>Editing on map…</span>
         )}
+        {geoSubmitStatus === 'success' && (
+          <span style={{ fontSize: 12, color: '#3a5a1f', fontWeight: 500 }}>✓ Boundary submitted</span>
+        )}
+
+        {/* Split Parcel */}
+        {onSplitParcel && !pendingSplit && splitSubmitStatus !== 'success' && (
+          isSplitting ? (
+            <span style={{ fontSize: 12, color: BRAND.textMuted, alignSelf: 'center' }}>Drawing split line…</span>
+          ) : (
+            <button onClick={onSplitParcel} style={smallBtnStyle}>Split Parcel</button>
+          )
+        )}
+        {splitSubmitStatus === 'success' && (
+          <span style={{ fontSize: 12, color: '#3a5a1f', fontWeight: 500 }}>✓ Split submitted</span>
+        )}
+
+        {/* Remove / Unlink */}
+        {!isRemoving && removeSubmitStatus !== 'success' && (
+          <button
+            onClick={onRemoveParcel}
+            style={{ ...smallBtnStyle, background: 'transparent', color: BRAND.burgundy, border: `1px solid ${BRAND.burgundy}` }}
+          >
+            Remove / Unlink
+          </button>
+        )}
+        {removeSubmitStatus === 'success' && (
+          <span style={{ fontSize: 12, color: '#3a5a1f', fontWeight: 500 }}>✓ Removal submitted</span>
+        )}
       </div>
+
+      {/* Remove / unlink confirmation */}
+      {isRemoving && (
+        <div style={{ margin: '0 16px 16px', background: '#fff5f5', border: '1px solid #e8a0a0', borderRadius: 8, padding: '14px 16px' }}>
+          <p style={{ fontSize: 13, fontWeight: 600, color: BRAND.burgundy, marginBottom: 8 }}>Remove this parcel</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+            {[
+              { value: 'delete', label: 'Delete — vines have been pulled up or parcel no longer exists' },
+              { value: 'unlink', label: 'Unlink — parcel was sold or is no longer associated with my winery' },
+            ].map(({ value, label }) => (
+              <label key={value} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                <input type="radio" name={`removeAction-${parcel.id}`} value={value} checked={removeAction === value} onChange={() => onRemoveActionChange(value)} style={{ marginTop: 2, accentColor: BRAND.burgundy }} />
+                <span style={{ color: BRAND.text }}>{label}</span>
+              </label>
+            ))}
+          </div>
+          <textarea
+            placeholder="Optional: additional notes for the admin"
+            value={removeNotes}
+            onChange={(e) => onRemoveNotesChange(e.target.value)}
+            rows={2}
+            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, border: `1px solid ${BRAND.border}`, fontSize: 12, fontFamily: "'Inter', sans-serif", resize: 'vertical', marginBottom: 10 }}
+          />
+          {removeSubmitStatus === 'error' && <p style={{ fontSize: 12, color: BRAND.burgundy, marginBottom: 8 }}>Submission failed — try again.</p>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={onRemoveSubmit} disabled={removeSubmitStatus === 'submitting'} style={{ ...smallBtnStyle, background: BRAND.burgundy }}>
+              {removeSubmitStatus === 'submitting' ? 'Submitting…' : 'Submit Request'}
+            </button>
+            <button onClick={onRemoveCancel} style={{ ...smallBtnStyle, background: 'transparent', color: BRAND.textMuted, border: `1px solid ${BRAND.border}` }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Split confirmation */}
+      {pendingSplit && (
+        <div style={{ margin: '0 16px 16px', background: '#fff8f0', border: '1px solid #e8c97a', borderRadius: 8, padding: '14px 16px' }}>
+          <p style={{ fontSize: 13, fontWeight: 600, color: BRAND.brown, marginBottom: 6 }}>✂ Confirm parcel split</p>
+          <p style={{ fontSize: 12, color: BRAND.textMuted, marginBottom: 10 }}>
+            {pendingSplit.polygon_a ? 'Two sub-parcels were computed from your split line.' : 'Split line recorded — admin will apply manually.'}
+          </p>
+          <textarea
+            placeholder="Optional: e.g. 'Left half is Pinot Noir, right half is Chardonnay'"
+            value={pendingSplit.notes}
+            onChange={(e) => onSplitNotesChange(e.target.value)}
+            rows={2}
+            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, border: `1px solid ${BRAND.border}`, fontSize: 12, fontFamily: "'Inter', sans-serif", resize: 'vertical', marginBottom: 10 }}
+          />
+          {splitSubmitStatus === 'error' && <p style={{ fontSize: 12, color: BRAND.burgundy, marginBottom: 8 }}>Submission failed — try again.</p>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={onSplitSubmit} disabled={splitSubmitStatus === 'submitting'} style={smallBtnStyle}>
+              {splitSubmitStatus === 'submitting' ? 'Submitting…' : 'Submit Split Request'}
+            </button>
+            <button onClick={onSplitDiscard} style={{ ...smallBtnStyle, background: 'transparent', color: BRAND.textMuted, border: `1px solid ${BRAND.border}` }}>Discard</button>
+          </div>
+        </div>
+      )}
 
       {/* Edit history — always rendered, lazy-loads on expand */}
       <div style={{ padding: '0 16px' }}>

@@ -9,6 +9,10 @@
   },
   "dependencies": {
     "@mapbox/mapbox-gl-draw": "^1.5.1",
+    "@turf/bbox": "^7.3.5",
+    "@turf/boolean-point-in-polygon": "^7.3.5",
+    "@turf/helpers": "^7.3.5",
+    "@turf/line-split": "^7.3.5",
     "@vitejs/plugin-react": "^4.2.1",
     "maplibre-gl": "^5.16.0",
     "pmtiles": "^4.4.1",

@@ -8,6 +8,7 @@
  */
 import express from 'express';
 import crypto from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import { pool } from '../db/pool.js';
 import { sendMagicLinkEmail } from '../services/email.js';
 import { signPortalToken, requirePortalAuth } from '../middleware/portalAuth.js';
@@ -144,6 +145,124 @@ router.get('/verify', async (req, res) => {
   } catch (err) {
     console.error('Token verify error:', err);
     res.status(500).json({ error: 'Verification failed' });
+  }
+});
+
+// Rate limit password login: 10 attempts per 15 min per IP
+const passwordLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many login attempts. Try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
+ * POST /api/auth/login
+ * Body: { email: string, password: string }
+ *
+ * Password-based login for winery portal accounts that have a password set.
+ */
+router.post('/login', passwordLoginLimiter, async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT wa.id AS account_id, wa.winery_id, wa.password_hash
+       FROM winery_accounts wa
+       WHERE LOWER(wa.contact_email) = $1`,
+      [normalizedEmail]
+    );
+
+    // Use a dummy compare to prevent timing attacks even when account not found
+    const dummyHash = '$2a$12$invalidhashpaddingtomakethissafefromtiming00000000000000';
+    const storedHash = rows[0]?.password_hash ?? dummyHash;
+
+    if (!rows[0]?.password_hash) {
+      await bcrypt.compare(password, dummyHash);
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const valid = await bcrypt.compare(password, storedHash);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const account = rows[0];
+
+    await pool.query(
+      `UPDATE winery_accounts SET last_login = NOW() WHERE id = $1`,
+      [account.account_id]
+    );
+
+    const jwt = signPortalToken(account.account_id, account.winery_id);
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    res.cookie('portal_token', jwt, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'strict' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/',
+    });
+
+    res.json({ success: true, wineryId: account.winery_id });
+  } catch (err) {
+    console.error('Password login error:', err);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+/**
+ * POST /api/auth/set-password
+ * Requires portal session. Body: { password: string, currentPassword?: string }
+ *
+ * Sets or changes the portal account password.
+ * If a password is already set, currentPassword must be provided and valid.
+ */
+router.post('/set-password', requirePortalAuth, async (req, res) => {
+  const { password, currentPassword } = req.body;
+
+  if (!password || typeof password !== 'string' || password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT password_hash FROM winery_accounts WHERE id = $1`,
+      [req.portalAccount.accountId]
+    );
+
+    if (!rows[0]) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    // If a password is already set, require the current one
+    if (rows[0].password_hash) {
+      if (!currentPassword || typeof currentPassword !== 'string') {
+        return res.status(400).json({ error: 'Current password is required to set a new one' });
+      }
+      const valid = await bcrypt.compare(currentPassword, rows[0].password_hash);
+      if (!valid) {
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
+    }
+
+    const hash = await bcrypt.hash(password, 12);
+    await pool.query(
+      `UPDATE winery_accounts SET password_hash = $1 WHERE id = $2`,
+      [hash, req.portalAccount.accountId]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Set-password error:', err);
+    res.status(500).json({ error: 'Failed to update password' });
   }
 });
 

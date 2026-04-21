@@ -117,6 +117,15 @@ export default function PortalDashboard() {
               const href = group.parcels.length === 1
                 ? `/portal/vineyards/${group.parcels[0].id}`
                 : `/portal/vineyards/group?name=${encodeURIComponent(group.name)}`;
+
+              // Aggregate topo stats across parcels that have data
+              const topoList = group.parcels.map((p) => p.topo_stats).filter(Boolean);
+              const topo = topoList.length > 0 ? {
+                elevation_mean_ft: topoList.reduce((s, t) => s + Number(t.elevation_mean_ft), 0) / topoList.length,
+                slope_mean_deg: topoList.reduce((s, t) => s + Number(t.slope_mean_deg), 0) / topoList.length,
+                aspect_dominant_deg: topoList[0].aspect_dominant_deg,
+              } : null;
+
               return (
                 <Link
                   key={group.name}
@@ -129,9 +138,19 @@ export default function PortalDashboard() {
                 >
                   <div style={{ fontWeight: 600, fontSize: 15 }}>{group.name}</div>
                   <div style={{ fontSize: 13, color: BRAND.textMuted, marginTop: 4 }}>
-                    {ava} · {totalAcres.toFixed(1)} acres
+                    {ava}
                     {group.parcels.length > 1 && ` · ${group.parcels.length} parcels`}
                     {totalBlocks > 0 && ` · ${totalBlocks} blocks`}
+                  </div>
+                  <div style={{ fontSize: 12, color: BRAND.brownLight, marginTop: 6, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                    <span>{totalAcres.toFixed(1)} ac</span>
+                    {topo && (
+                      <>
+                        <span>{Math.round(topo.elevation_mean_ft)} ft elev</span>
+                        <span>{topo.slope_mean_deg.toFixed(1)}° slope</span>
+                        <span>{degToCardinal(topo.aspect_dominant_deg)} aspect</span>
+                      </>
+                    )}
                   </div>
                 </Link>
               );
@@ -279,4 +298,9 @@ function groupVineyardsByName(vineyards) {
   return Array.from(map.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([name, parcels]) => ({ name, parcels }));
+}
+
+function degToCardinal(deg) {
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  return dirs[Math.round(Number(deg) / 45) % 8];
 }

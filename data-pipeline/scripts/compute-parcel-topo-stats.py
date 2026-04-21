@@ -205,6 +205,7 @@ def compute_parcel_stats(
     elev_src: rasterio.DatasetReader,
     slope_src: rasterio.DatasetReader,
     aspect_src: rasterio.DatasetReader,
+    data_source_label: str = "3DEP 1m",
 ) -> Optional[dict]:
     """
     Clip the three COGs to one parcel and compute statistics.
@@ -232,17 +233,25 @@ def compute_parcel_stats(
         elev_data, _ = rasterio_mask(
             elev_src, shapes, crop=True, nodata=NODATA, all_touched=False
         )
+        # 1) Remove fill nodata (pixels outside the polygon set to NODATA by rasterio_mask)
         elev_vals = elev_data[0][elev_data[0] != NODATA]
+        # 2) Remove the dataset's native nodata value if it differs (TNM tiles often use
+        #    a large negative like -999999.0 or -1000000.0 rather than -9999)
+        src_nodata = elev_src.nodata
+        if src_nodata is not None and src_nodata != NODATA:
+            elev_vals = elev_vals[elev_vals != src_nodata]
+        # 3) Convert meters → feet, then apply a physical sanity range.
+        #    Oregon elevations span sea level (~0 ft) to Mt. Hood (~11,239 ft).
+        #    Anything outside −500…15,000 ft is a nodata artefact.
+        elev_ft = elev_vals * METERS_TO_FEET
+        elev_ft = elev_ft[(elev_ft > -500) & (elev_ft < 15_000)]
     except Exception as e:
         logger.warning(f"Parcel {parcel_id}: elevation mask failed: {e}")
         return None
 
-    if len(elev_vals) == 0:
-        logger.debug(f"Parcel {parcel_id}: no valid elevation pixels (parcel may be outside WV COG)")
+    if len(elev_ft) == 0:
+        logger.debug(f"Parcel {parcel_id}: no valid elevation pixels (outside COG extent or all nodata)")
         return None
-
-    # Convert meters → feet
-    elev_ft = elev_vals * METERS_TO_FEET
 
     # --- Slope ---
     try:
@@ -250,7 +259,10 @@ def compute_parcel_stats(
             slope_src, shapes, crop=True, nodata=NODATA, all_touched=False
         )
         slope_vals = slope_data[0][slope_data[0] != NODATA]
-        slope_vals = slope_vals[slope_vals >= 0]  # drop edge artifacts
+        src_slope_nodata = slope_src.nodata
+        if src_slope_nodata is not None and src_slope_nodata != NODATA:
+            slope_vals = slope_vals[slope_vals != src_slope_nodata]
+        slope_vals = slope_vals[(slope_vals >= 0) & (slope_vals <= 90)]  # physical range
     except Exception as e:
         logger.warning(f"Parcel {parcel_id}: slope mask failed: {e}")
         slope_vals = np.array([])
@@ -261,6 +273,10 @@ def compute_parcel_stats(
             aspect_src, shapes, crop=True, nodata=NODATA, all_touched=False
         )
         aspect_vals = aspect_data[0][aspect_data[0] != NODATA]
+        src_aspect_nodata = aspect_src.nodata
+        if src_aspect_nodata is not None and src_aspect_nodata != NODATA:
+            aspect_vals = aspect_vals[aspect_vals != src_aspect_nodata]
+        aspect_vals = aspect_vals[(aspect_vals >= -1) & (aspect_vals <= 360)]  # GDAL: -1=flat, 0–360=direction
     except Exception as e:
         logger.warning(f"Parcel {parcel_id}: aspect mask failed: {e}")
         aspect_vals = np.array([])
@@ -278,8 +294,8 @@ def compute_parcel_stats(
         "slope_p90_deg":       round(float(np.percentile(slope_vals, 90)), 4) if len(slope_vals) > 0 else None,
         "aspect_dominant_deg": None,
         "aspect_mean_deg":     None,
-        "pixel_count":         int(len(elev_vals)),
-        "data_source":         "3DEP 1m",
+        "pixel_count":         int(len(elev_ft)),
+        "data_source":         data_source_label,
     }
 
     if len(aspect_vals) > 0:
@@ -295,21 +311,30 @@ def compute_parcel_stats(
 
 def process_parcel_worker(args) -> Tuple[int, Optional[dict], Optional[str]]:
     """
-    Worker function for thread pool. Opens COG files per-call (rasterio is not thread-safe
-    when sharing DatasetReader objects, so we open in each worker).
+    Worker function for thread pool. Tries the primary COG source first (USGS
+    TNM 1m); if that returns no valid pixels, falls back to DOGAMI 3ft. Each
+    call opens its own DatasetReader (rasterio is not thread-safe).
     Returns (parcel_id, stats_row_or_None, error_msg_or_None).
     """
-    parcel, elev_path, slope_path, aspect_path = args
+    parcel, sources = args
     parcel_id = parcel["id"]
 
-    try:
-        with rasterio.open(elev_path) as elev_src, \
-             rasterio.open(slope_path) as slope_src, \
-             rasterio.open(aspect_path) as aspect_src:
-            row = compute_parcel_stats(parcel, elev_src, slope_src, aspect_src)
-            return parcel_id, row, None
-    except Exception as e:
-        return parcel_id, None, str(e)
+    last_err = None
+    for label, elev_path, slope_path, aspect_path in sources:
+        try:
+            with rasterio.open(elev_path) as elev_src, \
+                 rasterio.open(slope_path) as slope_src, \
+                 rasterio.open(aspect_path) as aspect_src:
+                row = compute_parcel_stats(
+                    parcel, elev_src, slope_src, aspect_src,
+                    data_source_label=label,
+                )
+                if row is not None:
+                    return parcel_id, row, None
+        except Exception as e:
+            last_err = str(e)
+
+    return parcel_id, None, last_err
 
 
 # ---------------------------------------------------------------------------
@@ -361,18 +386,32 @@ def main(cog_dir, parcel_ids, workers, dry_run, verbose):
         cog_dir = script_dir / ".." / "data" / "topography" / "OR"
     cog_dir = Path(cog_dir).resolve()
 
-    elev_path  = cog_dir / "willamette_valley_1m" / "elevation.tif"
-    slope_path = cog_dir / "willamette_valley_1m" / "slope.tif"
-    aspect_path = cog_dir / "willamette_valley_1m" / "aspect.tif"
+    # Primary source: USGS 3DEP 1m (willamette_valley_1m/)
+    # Fallback:       DOGAMI 3ft (willamette_valley_dogami/) — covers AVAs
+    #                 where TNM has no tiles (Dundee Hills, Yamhill-Carlton).
+    primary_dir  = cog_dir / "willamette_valley_1m"
+    fallback_dir = cog_dir / "willamette_valley_dogami"
 
-    for p in [elev_path, slope_path, aspect_path]:
-        if not p.exists():
-            click.echo(f"Error: COG not found: {p}", err=True)
-            click.echo("Run download-1m-dem.py first.", err=True)
-            sys.exit(1)
+    sources: List[Tuple[str, Path, Path, Path]] = []
+    if (primary_dir / "elevation.tif").exists():
+        sources.append(("3DEP 1m",
+                        primary_dir / "elevation.tif",
+                        primary_dir / "slope.tif",
+                        primary_dir / "aspect.tif"))
+    if (fallback_dir / "elevation.tif").exists():
+        sources.append(("DOGAMI 3ft",
+                        fallback_dir / "elevation.tif",
+                        fallback_dir / "slope.tif",
+                        fallback_dir / "aspect.tif"))
+
+    if not sources:
+        click.echo(f"Error: no COGs found under {cog_dir}", err=True)
+        click.echo("Run download-1m-dem.py and/or download-dogami-dem.py first.", err=True)
+        sys.exit(1)
 
     click.echo(f"\nPer-Parcel Topography Stats")
-    click.echo(f"  COGs:     {cog_dir / 'willamette_valley_1m'}")
+    for label, elev, _, _ in sources:
+        click.echo(f"  Source:   {label} ({elev.parent})")
     click.echo(f"  Workers:  {workers}")
     click.echo(f"  Dry run:  {dry_run}\n")
 
@@ -402,8 +441,10 @@ def main(cog_dir, parcel_ids, workers, dry_run, verbose):
         conn.close()
         sys.exit(0)
 
-    # Process parcels in parallel
-    work_args = [(p, str(elev_path), str(slope_path), str(aspect_path)) for p in parcels]
+    # Process parcels in parallel — pass the ordered sources list so the
+    # worker tries primary (USGS) first, then falls back to DOGAMI.
+    source_tuples = [(label, str(e), str(s), str(a)) for (label, e, s, a) in sources]
+    work_args = [(p, source_tuples) for p in parcels]
 
     completed = 0
     failed = 0

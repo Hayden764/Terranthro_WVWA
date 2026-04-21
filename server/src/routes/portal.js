@@ -21,8 +21,10 @@ const REQUEST_SCHEMAS = {
                      'vines_per_acre', 'vines', 'acres', 'year_planted',
                      'block_changes', 'new_blocks'],
   vineyard_claim: ['vineyard_name', 'notes'],
-  vineyard_new: ['vineyard_name', 'notes', 'ava_name'],
+  vineyard_new: ['vineyard_name', 'notes', 'ava_name', 'geometry'],
   geometry_update: ['notes', 'geometry_description', 'old_geometry', 'new_geometry'],
+  vineyard_split: ['original_geometry', 'polygon_a', 'polygon_b', 'split_line', 'notes'],
+  vineyard_remove: ['action', 'notes'],
 };
 
 /**
@@ -30,7 +32,7 @@ const REQUEST_SCHEMAS = {
  * Full winery profile with parcel count.
  */
 router.get('/profile', async (req, res) => {
-  const { wineryId } = req.portalAccount;
+  const { wineryId, accountId } = req.portalAccount;
 
   try {
     const { rows } = await pool.query(
@@ -38,10 +40,11 @@ router.get('/profile', async (req, res) => {
          w.id, w.recid, w.title, w.description, w.phone, w.url,
          w.image_url, w.category,
          ST_AsGeoJSON(w.location)::json AS location,
-         (SELECT COUNT(*) FROM vineyard_parcels vp WHERE vp.winery_id = w.id) AS parcel_count
+         (SELECT COUNT(*) FROM vineyard_parcels vp WHERE vp.winery_id = w.id) AS parcel_count,
+         (SELECT password_hash IS NOT NULL FROM winery_accounts WHERE id = $2) AS has_password
        FROM wineries w
        WHERE w.id = $1`,
-      [wineryId]
+      [wineryId, accountId]
     );
 
     if (rows.length === 0) {
@@ -175,7 +178,8 @@ router.get('/vineyards/available', async (req, res) => {
  *
  * Body: {
  *   request_type: 'profile' | 'vineyard_varietals' | 'vineyard_blocks' |
- *                 'vineyard_claim' | 'vineyard_new' | 'geometry_update',
+ *                 'vineyard_claim' | 'vineyard_new' | 'geometry_update' |
+ *                 'vineyard_split' | 'vineyard_remove',
  *   target_id?: number,   // parcel or block id (required for vineyard/geometry edits)
  *   payload: { ...fields }
  * }

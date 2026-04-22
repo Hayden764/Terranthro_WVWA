@@ -479,17 +479,13 @@ function setListingSoftFocus(map, isSoftFocused) {
   const unclusteredOpacity = isSoftFocused ? 0.24 : 0.92;
   const unclusteredStrokeOpacity = isSoftFocused ? 0.3 : 0.55;
   const unclusteredNumOpacity = isSoftFocused ? 0.32 : 1;
-  const hoveredGlowOpacity = isSoftFocused ? 0.3 : 0.45;
-  const hoveredDotOpacity = isSoftFocused ? 0.35 : 1;
+  const hoveredGlowOpacity = isSoftFocused ? 0.22 : 0.22;
+  const hoveredDotOpacity = isSoftFocused ? 0.3 : 0.3;
   const hoveredNumOpacity = isSoftFocused ? 0.38 : 1;
-  const hoveredGlowRadius = isSoftFocused
-    ? ['interpolate', ['linear'], ['zoom'], 10, 10, 14, 13]
-    : ['interpolate', ['linear'], ['zoom'], 10, 18, 14, 25];
-  const hoveredGlowStrokeWidth = isSoftFocused ? 1.5 : 2.5;
-  const hoveredDotRadius = isSoftFocused
-    ? ['interpolate', ['linear'], ['zoom'], 10, 6, 14, 8]
-    : ['interpolate', ['linear'], ['zoom'], 10, 11, 14, 15];
-  const hoveredDotStrokeWidth = isSoftFocused ? 1.8 : 3;
+  const hoveredGlowRadius = ['interpolate', ['linear'], ['zoom'], 10, 10, 14, 14];
+  const hoveredGlowStrokeWidth = 1.5;
+  const hoveredDotRadius = ['interpolate', ['linear'], ['zoom'], 9, 4, 14, 6];
+  const hoveredDotStrokeWidth = 1;
 
   if (map.getLayer('listings-clusters')) {
     map.setPaintProperty('listings-clusters', 'circle-opacity', clusterOpacity);
@@ -1480,13 +1476,14 @@ const WVWAMap = forwardRef(function WVWAMap({
       if (!map || !slug) return;
       const cam = AVA_CAMERA[slug];
       if (cam) {
-        map.flyTo({
+        map.easeTo({
           center:   [cam.lng, cam.lat],
           zoom:     cam.zoom,
           pitch:    cam.pitch   ?? 40,
           bearing:  cam.bearing ?? 0,
           duration: 1800,
           essential: true,
+          freezeElevation: true,
         });
       } else {
         const avaSource = map.getSource(`ava-${slug}`);
@@ -1499,7 +1496,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             };
             const features = avaSource._data.features || [avaSource._data];
             features.forEach(f => addCoords(f.geometry.coordinates));
-            map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, pitch: 40, duration: 1800 });
+            map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, pitch: 40, duration: 1800, freezeElevation: true, linear: true });
           } catch (e) { /* ignore */ }
         }
       }
@@ -1780,10 +1777,10 @@ const WVWAMap = forwardRef(function WVWAMap({
       map,
       markersVisible && listingFilterMode !== LISTING_FILTER_MODES.noWineriesVisualized,
     );
-    setListingSoftFocus(map, !!selectedListing || vineyardFocusMode);
+    setListingSoftFocus(map, !!selectedListing);
     setVineyardVisualizationVisibility(map, listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized);
     setVineyardReferenceSoftFocus(map, !!selectedListing);
-  }, [selectedListing, vineyardFocusMode, mapLoaded, introComplete, markersVisible, listingFilterMode]);
+  }, [selectedListing, mapLoaded, introComplete, markersVisible, listingFilterMode]);
   const listingFilterModeRef = useRef(LISTING_FILTER_MODES.allWineries);
   const vineyardRecidSetRef = useRef(new Set());
 
@@ -1976,7 +1973,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       projection: { type: 'globe' },
     });
 
-    map.addControl(new maplibregl.NavigationControl({ showCompass: true, showZoom: false }), 'bottom-right');
+    // Compass is rendered by the custom MapControls component
 
     map.on('load', async () => {
       // 3D terrain
@@ -1991,16 +1988,19 @@ const WVWAMap = forwardRef(function WVWAMap({
       map.setMaxPitch(71);
 
       // Space background + atmospheric halo for globe projection
-      try {
-        map.setFog({
-          'space-color': '#000000',
-          'star-intensity': 0.0,
-          'color': 'rgba(30, 60, 120, 0.6)',
-          'high-color': 'rgba(10, 30, 80, 0.8)',
-          'horizon-blend': 0.08,
-        });
-      } catch (e) {
-        console.warn('setFog not supported:', e);
+      // setFog was removed in MapLibre GL JS v5 — guard to avoid TypeError
+      if (typeof map.setFog === 'function') {
+        try {
+          map.setFog({
+            'space-color': '#000000',
+            'star-intensity': 0.0,
+            'color': 'rgba(30, 60, 120, 0.6)',
+            'high-color': 'rgba(10, 30, 80, 0.8)',
+            'horizon-blend': 0.08,
+          });
+        } catch (e) {
+          // ignore — unsupported in this MapLibre version
+        }
       }
 
       // ── Globe rotation during entrance screen ──────────────────────────
@@ -2159,7 +2159,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       try {
         // Fetch Adelsheim parcels from API (replaces the 3.7MB public GeoJSON file)
         const vineyardRes = await fetch(`${API_BASE}/api/vineyards/parcels?dataset=adelsheim`, { headers: API_HEADERS });
-        const vineyardRaw = await vineyardRes.json();
+        const vineyardRaw = vineyardRes.ok ? await vineyardRes.json() : { features: [] };
         const vineyardFeatures = vineyardRaw?.features || [];
 
         // Build winery → parcel lookup from the full parcel dataset so selection,
@@ -2652,12 +2652,12 @@ const WVWAMap = forwardRef(function WVWAMap({
         source: 'selected-listing',
         paint: {
           'circle-color': 'transparent',
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 13, 14, 18],
-          'circle-stroke-width': 2,
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 10, 14, 14],
+          'circle-stroke-width': 1.5,
           'circle-stroke-color': '#38BDF8',
-          'circle-stroke-opacity': 0.5,
+          'circle-stroke-opacity': 0.25,
           'circle-opacity': 0,
-          'circle-blur': 0.6,
+          'circle-blur': 0.5,
         },
       });
       // Selected dot (accent-coloured circle)
@@ -2667,10 +2667,10 @@ const WVWAMap = forwardRef(function WVWAMap({
         source: 'selected-listing',
         paint: {
           'circle-color': '#38BDF8',
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 6, 14, 10],
-          'circle-stroke-width': 2,
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 4, 14, 6],
+          'circle-stroke-width': 1,
           'circle-stroke-color': '#ffffff',
-          'circle-opacity': 1,
+          'circle-opacity': 0.35,
         },
       });
 
@@ -2686,12 +2686,12 @@ const WVWAMap = forwardRef(function WVWAMap({
         source: 'hovered-listing',
         paint: {
           'circle-color': 'transparent',
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 18, 14, 25],
-          'circle-stroke-width': 2.5,
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 10, 14, 14],
+          'circle-stroke-width': 1.5,
           'circle-stroke-color': '#38BDF8',
-          'circle-stroke-opacity': 0.45,
+          'circle-stroke-opacity': 0.22,
           'circle-opacity': 0,
-          'circle-blur': 0.5,
+          'circle-blur': 0.4,
         },
       });
       // Hovered dot (accent-coloured circle)
@@ -2701,10 +2701,10 @@ const WVWAMap = forwardRef(function WVWAMap({
         source: 'hovered-listing',
         paint: {
           'circle-color': '#38BDF8',
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 6, 14, 10],
-          'circle-stroke-width': 2,
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 4, 14, 6],
+          'circle-stroke-width': 1,
           'circle-stroke-color': '#ffffff',
-          'circle-opacity': 0.85,
+          'circle-opacity': 0.3,
         },
       });
 
@@ -2848,13 +2848,14 @@ const WVWAMap = forwardRef(function WVWAMap({
         blinkMapLayer(map, `ava-${_avaSlugForBlink}-fill`, 'fill-opacity', BLINK);
       };
       if (cam) {
-        map.flyTo({
+        map.easeTo({
           center:   [cam.lng, cam.lat],
           zoom:     cam.zoom,
           pitch:    cam.pitch   ?? 40,
           bearing:  cam.bearing ?? 0,
           duration: 1800,
           essential: true,
+          freezeElevation: true,
         });
         map.once('moveend', _onAvaMoveEnd);
       } else {
@@ -2869,7 +2870,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             };
             const features = avaSource._data.features || [avaSource._data];
             features.forEach(f => addCoords(f.geometry.coordinates));
-            map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, pitch: 40, duration: 1800 });
+            map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, pitch: 40, duration: 1800, freezeElevation: true, linear: true });
             map.once('moveend', _onAvaMoveEnd);
           } catch (e) { /* ignore */ }
         }
@@ -2897,13 +2898,14 @@ const WVWAMap = forwardRef(function WVWAMap({
 
       // ── Restore all listings layers — handled by listing filter effect ──
 
-      map.flyTo({
+      map.easeTo({
         center:   [WV_CAMERA.lng, WV_CAMERA.lat],
         zoom:     WV_CAMERA.zoom,
         pitch:    WV_CAMERA.pitch   ?? 35,
         bearing:  WV_CAMERA.bearing ?? 0,
         duration: 1500,
         essential: true,
+        freezeElevation: true,
       });
     }
   }, [selectedAva, mapLoaded]);
@@ -2942,7 +2944,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         const didAdd = addListingsSourceAndBaseLayers(map, data, listingSymbologyPreset, shouldShowWineries);
         if (!didAdd) return;
         applyListingFocusAccent(map, listingSymbologyPreset);
-        setListingSoftFocus(map, !!selectedListing || vineyardFocusMode);
+        setListingSoftFocus(map, !!selectedListing);
         raiseListingLayers(map);
       } catch (error) {
         // Style transitions can briefly make addSource/addLayer unavailable.
@@ -3092,6 +3094,31 @@ const WVWAMap = forwardRef(function WVWAMap({
     }));
   }, []);
 
+  const handleResetView = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (selectedListing?.lat != null && selectedListing?.lng != null) {
+      map.flyTo({ center: [selectedListing.lng, selectedListing.lat], zoom: 13, pitch: 30, bearing: 0, duration: 1200, essential: true });
+    } else if (selectedAva) {
+      const cam = AVA_CAMERA[selectedAva];
+      if (cam) {
+        map.flyTo({ center: [cam.lng, cam.lat], zoom: cam.zoom, pitch: cam.pitch ?? 40, bearing: cam.bearing ?? 0, duration: 1800, essential: true });
+      } else {
+        const avaSource = map.getSource(`ava-${selectedAva}`);
+        if (avaSource?._data) {
+          try {
+            const bounds = new maplibregl.LngLatBounds();
+            const addCoords = (c) => { if (typeof c[0] === 'number') bounds.extend(c); else c.forEach(addCoords); };
+            (avaSource._data.features || [avaSource._data]).forEach(f => addCoords(f.geometry.coordinates));
+            map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, pitch: 40, duration: 1800 });
+          } catch (e) { /* ignore */ }
+        }
+      }
+    } else {
+      map.fitBounds(WV_BOUNDS, { padding: 40, duration: 1200, pitch: 30, bearing: 0 });
+    }
+  }, [selectedAva, selectedListing]);
+
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div ref={mapContainerRef} style={{ width: '100%', height: '100%', background: '#000000' }} />
@@ -3160,13 +3187,6 @@ const WVWAMap = forwardRef(function WVWAMap({
             gap: 10,
             whiteSpace: 'nowrap',
           }}>
-            <div style={{
-              width: 10, height: 10, borderRadius: '50%',
-              background: ava.color,
-              border: '1.5px solid rgba(250,247,242,0.4)',
-              flexShrink: 0,
-              boxShadow: `0 0 6px ${ava.color}88`,
-            }} />
             <span style={{ fontSize: 14, fontWeight: 700, color: BRAND.eggshell, letterSpacing: '0.01em' }}>
               {ava.name}
             </span>
@@ -3196,13 +3216,14 @@ const WVWAMap = forwardRef(function WVWAMap({
 
       // ...Show Wineries button removed...
 
-      {/* Map controls — floating bottom-right */}
+      {/* Map controls — floating left-center */}
       {introComplete && mapLoaded && (
         <MapControls
           map={mapRef.current}
           mapLoaded={mapLoaded}
           selectedAva={selectedAva}
           onSelectAva={onSelectAva}
+          onResetView={handleResetView}
         />
       )}
     </div>

@@ -1,13 +1,14 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import WVWAMap, { LISTING_FILTER_MODES } from '../components/WVWAMap';
 import ExplorerSidebar from '../components/ExplorerSidebar';
 import { BRAND } from '../config/brandColors';
+import { useIsMobile } from '../lib/useIsMobile';
 
 // ── Entrance Panel (Option B — Dark Cinematic) ───────────────────────────
-function EntrancePanel({ onEnter, mapReady }) {
+function EntrancePanel({ onEnter, mapReady, isMobile }) {
   return (
     <div style={{
-      width: 300,
+      width: isMobile ? '100%' : 300,
       height: '100%',
       flexShrink: 0,
       background: BRAND.brownDark,
@@ -105,6 +106,9 @@ function EntrancePanel({ onEnter, mapReady }) {
 export default function WVWAMapPage() {
   const mapRef = useRef(null);
 
+  const isMobile = useIsMobile();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   // ── Entrance state ───────────────────────────────────────────────────
   const [isIntro, setIsIntro]     = useState(true);
   const [mapReady, setMapReady]   = useState(false);
@@ -132,6 +136,10 @@ export default function WVWAMapPage() {
   const [selectedVineyards, setSelectedVineyards]   = useState([]);
   const [insideIds, setInsideIds]                   = useState(null);
   const [vineyardRecidSet, setVineyardRecidSet]     = useState(() => new Set());
+
+  // Auto-open sidebar on mobile when a map interaction selects content
+  useEffect(() => { if (isMobile && selectedListing) setSidebarOpen(true); }, [isMobile, selectedListing]);
+  useEffect(() => { if (isMobile && selectedAva) setSidebarOpen(true); }, [isMobile, selectedAva]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', overflow: 'hidden', background: BRAND.eggshell, fontFamily: 'Inter, sans-serif' }}>
@@ -170,12 +178,15 @@ export default function WVWAMapPage() {
 
         {/* Entrance panel (shown during intro) */}
         {isIntro && (
-          <EntrancePanel onEnter={handleEnter} mapReady={mapReady} />
+          <EntrancePanel onEnter={handleEnter} mapReady={mapReady} isMobile={isMobile} />
         )}
 
         {/* Explorer Sidebar (hidden during intro) */}
         {!isIntro && (
           <ExplorerSidebar
+            isMobile={isMobile}
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
             mapRef={mapRef}
             selectedAva={selectedAva}
             onSelectAva={setSelectedAva}
@@ -198,8 +209,38 @@ export default function WVWAMapPage() {
           />
         )}
 
+        {/* Mobile scrim — tap outside drawer to close */}
+        {isMobile && sidebarOpen && (
+          <div
+            onClick={() => setSidebarOpen(false)}
+            style={{
+              position: 'fixed', inset: 0,
+              background: 'rgba(0,0,0,0.45)',
+              zIndex: 199,
+            }}
+          />
+        )}
+
         {/* Map */}
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          {/* Mobile hamburger FAB */}
+          {isMobile && !isIntro && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open menu"
+              style={{
+                position: 'absolute', top: 12, left: 12, zIndex: 100,
+                width: 42, height: 42,
+                background: BRAND.brown, border: 'none', borderRadius: 10,
+                color: BRAND.eggshell, fontSize: 20,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.28)',
+                fontFamily: 'Inter, sans-serif', lineHeight: 1,
+              }}
+            >
+              ☰
+            </button>
+          )}
           <WVWAMap
             ref={mapRef}
             selectedAva={selectedAva}

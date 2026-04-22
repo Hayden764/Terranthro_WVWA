@@ -793,6 +793,9 @@ export default function ExplorerSidebar({
   parcelTopoStats,
   onVineyardHover,
   onViewAllVineyards,
+  isMobile = false,
+  isOpen = false,
+  onClose,
 }) {
   const [sections, setSections] = useState({ layers: false, about: false });
 
@@ -915,17 +918,22 @@ export default function ExplorerSidebar({
 
   return (
     <div style={{
-      width: SIDEBAR_W,
-      minWidth: SIDEBAR_MIN_W,
-      maxWidth: SIDEBAR_MAX_W,
+      width: isMobile ? '85vw' : SIDEBAR_W,
+      minWidth: isMobile ? 'unset' : SIDEBAR_MIN_W,
+      maxWidth: isMobile ? 360 : SIDEBAR_MAX_W,
       height: '100%',
       background: T.sidebarBg,
       borderRight: `1px solid ${BRAND.border}`,
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      position: 'relative',
-      zIndex: 10,
+      position: isMobile ? 'fixed' : 'relative',
+      top: isMobile ? 0 : undefined,
+      left: isMobile ? 0 : undefined,
+      zIndex: isMobile ? 200 : 10,
+      transform: isMobile ? (isOpen ? 'translateX(0)' : 'translateX(-100%)') : undefined,
+      transition: isMobile ? 'transform 220ms cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
+      boxShadow: isMobile && isOpen ? '4px 0 24px rgba(0,0,0,0.22)' : undefined,
     }}>
 
       {/* Sidebar header */}
@@ -944,7 +952,7 @@ export default function ExplorerSidebar({
               ‹
             </button>
           )}
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ fontSize: isOnHome ? 15 : 14, fontWeight: 700, color: T.headerText, fontFamily: 'Georgia, serif', lineHeight: 1.2 }}>
               {isOnHome ? 'Willamette Valley' : viewTitle}
             </div>
@@ -954,6 +962,20 @@ export default function ExplorerSidebar({
               </div>
             )}
           </div>
+          {isMobile && (
+            <button
+              onClick={onClose}
+              aria-label="Close menu"
+              style={{
+                background: 'rgba(250,247,242,0.12)', border: '1px solid rgba(250,247,242,0.2)',
+                borderRadius: 7, color: T.headerText, cursor: 'pointer',
+                width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 20, flexShrink: 0, lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+          )}
         </div>
         <SearchBar inline mapRef={mapRef} onSelectAva={(slug) => {
           const ava = WV_SUB_AVAS.find(a => a.slug === slug);

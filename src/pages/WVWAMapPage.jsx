@@ -66,7 +66,7 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
         marginBottom: 48,
         lineHeight: 1.7,
       }}>
-        18 AVAs&nbsp;&nbsp;·&nbsp;&nbsp;700+ Wineries<br />
+        11 AVAs&nbsp;&nbsp;·&nbsp;&nbsp;500+ Wineries<br />
         Willamette Valley, Oregon
       </div>
 

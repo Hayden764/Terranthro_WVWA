@@ -135,11 +135,11 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, onL
             </div>
           )}
           <div style={{ background: BRAND.cream, borderRadius: 8, padding: '10px 12px' }}>
-            <div style={T.sectionLabel}>Wineries</div>
+            <div style={T.sectionLabel}>Member Wineries</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.brown, marginTop: 3 }}>{inside.length}</div>
           </div>
           <div style={{ background: BRAND.cream, borderRadius: 8, padding: '10px 12px' }}>
-            <div style={T.sectionLabel}>Mapped Vineyards</div>
+            <div style={T.sectionLabel}>Mapped Wineries</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.brown, marginTop: 3 }}>{withPolygons.length}</div>
           </div>
         </div>
@@ -1027,7 +1027,7 @@ export default function ExplorerSidebar({
                 </div>
                 <div style={{ background: 'rgba(63,175,121,0.14)', borderRadius: 8, padding: '9px 12px', border: '1px solid rgba(63,175,121,0.30)' }}>
                   <div style={{ fontSize: 20, fontWeight: 700, color: '#3FAF79', fontFamily: 'Georgia, serif', lineHeight: 1 }}>{mappedCount > 0 ? mappedCount : '—'}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(250,247,242,0.52)', marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Mapped Parcels</div>
+                  <div style={{ fontSize: 10, color: 'rgba(250,247,242,0.52)', marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Wineries Mapped</div>
                 </div>
                 <div style={{ background: 'rgba(250,247,242,0.10)', borderRadius: 8, padding: '9px 12px', border: '1px solid rgba(250,247,242,0.12)' }}>
                   <div style={{ fontSize: 20, fontWeight: 700, color: BRAND.eggshell, fontFamily: 'Georgia, serif', lineHeight: 1 }}>26k+</div>
@@ -1051,8 +1051,10 @@ export default function ExplorerSidebar({
                 <div style={{
                   width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                   background: 'rgba(72,55,41,0.08)', border: `1px solid ${BRAND.border}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
-                }}>🗺</div>
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={BRAND.brown} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                </div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.brown }}>Nested AVAs</div>
                   <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 2 }}>{WV_SUB_AVAS.length} viticultural areas</div>
@@ -1076,8 +1078,10 @@ export default function ExplorerSidebar({
                 <div style={{
                   width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                   background: 'rgba(142,21,55,0.08)', border: `1px solid rgba(142,21,55,0.15)`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
-                }}>🍷</div>
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="rgba(142,21,55,0.75)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="M6 2h12l-3 9a5 5 0 0 1-6 0L6 2z"/></svg>
+                </div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.brown }}>Wineries</div>
                   <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 2 }}>{wineryCount > 0 ? `${wineryCount} in the valley` : 'Browse all wineries'}</div>
@@ -1101,8 +1105,10 @@ export default function ExplorerSidebar({
                 <div style={{
                   width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                   background: 'rgba(30,100,160,0.08)', border: `1px solid rgba(30,100,160,0.15)`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
-                }}>📊</div>
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="rgba(30,100,160,0.75)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                </div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.brown }}>Data Layers</div>
                   <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 2 }}>Climate &amp; topography overlays</div>

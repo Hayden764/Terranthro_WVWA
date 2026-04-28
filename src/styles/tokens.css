@@ -1,0 +1,37 @@
+:root {
+  /* Base */
+  --color-ink:            #080A0F;
+  --color-surface:        #0F1219;
+  --color-surface-raised: #13161F;
+  --color-border:         #1A1D28;
+  --color-parchment:      #E8E2D6;
+  --color-muted:          #404558;
+  --color-ghost:          #2A2E3C;
+
+  /* Accent */
+  --color-electric-blue:  #2E9BFF;
+  --color-vivid-green:    #00C44F;
+  --color-crimson:        #E03040;
+  --color-amber:          #C87D4A;
+  --color-violet:         #8A7AE8;
+
+  /* Semantic status */
+  --color-success:        #00C44F;
+  --color-success-dim:    rgba(0, 196, 79, 0.12);
+  --color-warning:        #C87D4A;
+  --color-warning-dim:    rgba(200, 125, 74, 0.12);
+  --color-danger:         #E03040;
+  --color-danger-dim:     rgba(224, 48, 64, 0.12);
+
+  /* Glow shadows */
+  --glow-blue:    0 0 20px rgba(46, 155, 255, 0.45), 0 0 5px rgba(46, 155, 255, 0.3);
+  --glow-green:   0 0 18px rgba(0, 196, 79, 0.4),    0 0 4px rgba(0, 196, 79, 0.3);
+  --glow-crimson: 0 0 18px rgba(224, 48, 64, 0.4),   0 0 4px rgba(224, 48, 64, 0.3);
+  --glow-amber:   0 0 14px rgba(200, 125, 74, 0.3);
+  --glow-violet:  0 0 16px rgba(138, 122, 232, 0.35);
+
+  /* Typography */
+  --font-display: 'Cormorant Garamond', serif;
+  --font-sans:    'Inter', sans-serif;
+  --font-mono:    ui-monospace, monospace;
+}

@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "audit:colors": "node scripts/audit-hardcoded-colors.mjs",
+    "audit:colors:strict": "node scripts/audit-hardcoded-colors.mjs --strict"
   },
   "dependencies": {
     "@mapbox/mapbox-gl-draw": "^1.5.1",

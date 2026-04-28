@@ -1,3 +1,4 @@
+@import './tokens.css';
 @import 'tailwindcss/base';
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
@@ -17,9 +18,10 @@ html, body, #root {
    The map page applies overflow:hidden locally via its own styles. */
 
 body {
-  font-family: 'Inter', 'Helvetica Neue', sans-serif;
-  background: #FAF7F2;
-  color: #2E221A;
+  font-family: var(--font-sans);
+  background: var(--color-parchment);
+  color: var(--color-ink);
+  font-synthesis: none;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -28,19 +30,19 @@ body {
   padding: 0 !important;
   border-radius: 10px !important;
   overflow: hidden !important;
-  box-shadow: 0 8px 32px rgba(46,34,26,0.18), 0 2px 8px rgba(46,34,26,0.10) !important;
-  border: 1px solid #E0D8CE !important;
-  background: #FAF7F2 !important;
+  box-shadow: 0 8px 32px rgba(8, 10, 15, 0.18), 0 2px 8px rgba(8, 10, 15, 0.10) !important;
+  border: 1px solid var(--color-ghost) !important;
+  background: var(--color-parchment) !important;
 }
 
 .maplibregl-popup-close-button {
   font-size: 18px !important;
-  color: #8A7968 !important;
+  color: var(--color-muted) !important;
   padding: 4px 8px !important;
   top: 4px !important;
   right: 4px !important;
   z-index: 1;
-  background: rgba(250,247,242,0.85) !important;
+  background: rgba(232, 226, 214, 0.85) !important;
   border-radius: 50% !important;
   width: 24px !important;
   height: 24px !important;
@@ -51,22 +53,22 @@ body {
 }
 
 .maplibregl-popup-close-button:hover {
-  background: #F0EBE3 !important;
-  color: #2E221A !important;
+  background: var(--color-surface-raised) !important;
+  color: var(--color-parchment) !important;
 }
 
 /* NavControl — warm style */
 .maplibregl-ctrl-group {
-  background: rgba(250,247,242,0.92) !important;
-  border: 1px solid #E0D8CE !important;
+  background: rgba(232, 226, 214, 0.92) !important;
+  border: 1px solid var(--color-ghost) !important;
   border-radius: 8px !important;
-  box-shadow: 0 2px 8px rgba(46,34,26,0.12) !important;
+  box-shadow: 0 2px 8px rgba(8, 10, 15, 0.12) !important;
   overflow: hidden;
 }
 
 .maplibregl-ctrl-group button {
   background-color: transparent !important;
-  border-bottom: 1px solid #F0EBE3 !important;
+  border-bottom: 1px solid var(--color-ghost) !important;
 }
 
 .maplibregl-ctrl-group button:last-child {
@@ -74,7 +76,7 @@ body {
 }
 
 .maplibregl-ctrl-group button:hover {
-  background-color: #F0EBE3 !important;
+  background-color: var(--color-surface-raised) !important;
 }
 
 /* Attribution */

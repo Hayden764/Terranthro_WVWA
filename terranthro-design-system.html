@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terranthro — Design System</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink:            #080A0F;
+    --surface:        #0F1219;
+    --surface-raised: #13161F;
+    --border:         #1A1D28;
+    --parchment:      #E8E2D6;
+    --muted:          #404558;
+    --ghost:          #2A2E3C;
+    --electric-blue:  #2E9BFF;
+    --vivid-green:    #00C44F;
+    --crimson:        #E03040;
+    --amber:          #C87D4A;
+    --violet:         #8A7AE8;
+    --glow-blue:   0 0 20px rgba(46,155,255,0.45), 0 0 5px rgba(46,155,255,0.3);
+    --glow-green:  0 0 18px rgba(0,196,79,0.4),    0 0 4px rgba(0,196,79,0.3);
+    --glow-crimson:0 0 18px rgba(224,48,64,0.4),   0 0 4px rgba(224,48,64,0.3);
+    --glow-amber:  0 0 14px rgba(200,125,74,0.3);
+    --glow-violet: 0 0 16px rgba(138,122,232,0.35);
+  }
+
+  html {
+    background: var(--ink);
+    color: var(--parchment);
+    font-family: 'Inter', sans-serif;
+    font-weight: 300;
+    line-height: 1.7;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page { max-width: 920px; margin: 0 auto; padding: 80px 48px 120px; }
+
+  .section { margin-bottom: 100px; animation: fadeUp 0.6s ease both; }
+  .section-label {
+    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--ghost); margin-bottom: 36px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 0.5px; background: var(--border); }
+
+  .hero { padding: 80px 0 96px; border-bottom: 0.5px solid var(--border); margin-bottom: 100px; animation: fadeUp 0.9s ease both; }
+  .wordmark { font-family: 'Cormorant Garamond', serif; font-size: clamp(56px, 9vw, 104px); font-weight: 400; letter-spacing: 0.1em; line-height: 1; color: var(--parchment); margin-bottom: 18px; }
+  .tagline  { font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--muted); margin-bottom: 52px; }
+  .descriptor { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 300; font-style: italic; color: var(--muted); max-width: 500px; line-height: 1.6; }
+
+  .color-group-label { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ghost); padding-bottom: 16px; }
+  .color-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 2px; margin-bottom: 28px; }
+  .color-card { background: var(--surface); padding: 24px 18px 18px; display: flex; flex-direction: column; gap: 7px; border: 0.5px solid var(--border); }
+  .color-swatch { width: 36px; height: 36px; border-radius: 50%; margin-bottom: 6px; }
+  .color-name  { font-size: 12px; font-weight: 500; color: var(--parchment); }
+  .color-token { font-family: monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.04em; }
+  .color-hex   { font-family: monospace; font-size: 10px; color: var(--ghost); }
+  .color-role  { font-size: 10px; color: var(--ghost); line-height: 1.5; margin-top: 2px; }
+
+  .glow-grid { display: flex; flex-direction: column; gap: 2px; }
+  .glow-row  { background: var(--surface); border: 0.5px solid var(--border); padding: 16px 20px; display: grid; grid-template-columns: 36px 180px 1fr; align-items: center; gap: 20px; }
+  .glow-dot  { width: 14px; height: 14px; border-radius: 50%; }
+  .glow-token { font-family: monospace; font-size: 11px; color: var(--muted); }
+  .glow-value { font-family: monospace; font-size: 10px; color: var(--ghost); line-height: 1.6; }
+
+  .type-row  { display: grid; grid-template-columns: 190px 1fr; gap: 40px; align-items: start; padding: 32px 0; border-bottom: 0.5px solid var(--border); }
+  .type-row:last-child { border-bottom: none; }
+  .type-meta-name   { font-size: 11px; font-weight: 500; color: var(--parchment); margin-bottom: 5px; }
+  .type-meta-detail { font-size: 10px; color: var(--ghost); line-height: 1.7; }
+  .t-display { font-family: 'Cormorant Garamond', serif; font-size: 68px; font-weight: 400; color: var(--parchment); letter-spacing: 0.04em; line-height: 1; }
+  .t-sub     { font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 500; color: var(--parchment); letter-spacing: 0.04em; line-height: 1.2; }
+  .t-italic  { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 300; font-style: italic; color: var(--muted); line-height: 1.5; }
+  .t-label   { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--electric-blue); text-shadow: var(--glow-blue); }
+  .t-body    { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 300; color: var(--muted); line-height: 1.8; max-width: 460px; }
+  .t-mono    { font-family: monospace; font-size: 13px; color: var(--electric-blue); letter-spacing: 0.06em; }
+
+  .space-grid { display: flex; flex-direction: column; gap: 2px; }
+  .space-row  { background: var(--surface); border: 0.5px solid var(--border); padding: 14px 20px; display: grid; grid-template-columns: 80px 120px 1fr; align-items: center; gap: 24px; }
+  .space-bar  { background: var(--electric-blue); height: 4px; border-radius: 2px; opacity: 0.5; }
+  .space-token { font-family: monospace; font-size: 11px; color: var(--muted); }
+  .space-val   { font-family: monospace; font-size: 11px; color: var(--ghost); }
+
+  .component-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+  .component-cell { background: var(--surface); padding: 32px 28px; border: 0.5px solid var(--border); }
+  .component-cell-label { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ghost); margin-bottom: 22px; }
+
+  .nav-preview { background: var(--ink); border: 0.5px solid var(--border); border-radius: 8px; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+  .nav-wordmark { font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 400; letter-spacing: 0.12em; color: var(--parchment); }
+  .nav-items { display: flex; gap: 24px; }
+  .nav-item  { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ghost); }
+  .nav-item.active { color: var(--electric-blue); text-shadow: var(--glow-blue); }
+
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .btn { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; padding: 10px 22px; border-radius: 6px; cursor: pointer; transition: box-shadow 0.2s; border: none; }
+  .btn-primary { background: var(--electric-blue); color: var(--ink); }
+  .btn-primary:hover { box-shadow: var(--glow-blue); }
+  .btn-ghost   { background: transparent; color: var(--electric-blue); border: 0.5px solid var(--electric-blue); }
+  .btn-ghost:hover { box-shadow: var(--glow-blue); }
+  .btn-danger  { background: transparent; color: var(--crimson); border: 0.5px solid var(--crimson); }
+  .btn-danger:hover { box-shadow: var(--glow-crimson); }
+
+  .chip-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { background: var(--surface-raised); border: 0.5px solid var(--border); border-radius: 6px; padding: 8px 12px; }
+  .chip-label { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ghost); margin-bottom: 3px; }
+  .chip-value { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 500; }
+
+  .glass-card { background: rgba(255,255,255,0.025); border: 0.5px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 20px 22px; }
+  .glass-card-ava   { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--electric-blue); margin-bottom: 6px; text-shadow: var(--glow-blue); }
+  .glass-card-title { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 500; color: var(--parchment); margin-bottom: 8px; }
+  .glass-card-body  { font-size: 12px; color: var(--muted); line-height: 1.7; }
+  .legend { margin-top: 14px; padding-top: 12px; border-top: 0.5px solid rgba(255,255,255,0.05); }
+  .legend-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+  .legend-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+  .input-label   { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ghost); margin-bottom: 8px; }
+  .input-preview { background: var(--surface); border: 0.5px solid var(--border); border-radius: 6px; padding: 10px 14px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 300; color: var(--parchment); width: 100%; outline: none; transition: border-color 0.2s; }
+  .input-preview:focus { border-color: var(--electric-blue); }
+
+  .map-preview { background: #080A12; border-radius: 6px; height: 200px; position: relative; overflow: hidden; }
+  .map-pin     { position: absolute; width: 7px; height: 7px; border-radius: 50%; }
+  .map-lbl     { position: absolute; font-size: 9px; font-family: 'Inter', sans-serif; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 640px) {
+    .page { padding: 48px 24px 80px; }
+    .type-row { grid-template-columns: 1fr; gap: 12px; }
+    .component-grid { grid-template-columns: 1fr; }
+    .color-grid { grid-template-columns: repeat(2, 1fr); }
+    .glow-row { grid-template-columns: 32px 1fr; }
+    .glow-value { display: none; }
+    .space-row { grid-template-columns: 60px 100px 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hero">
+    <div class="wordmark">TERRANTHRO</div>
+    <div class="tagline">Terroir Atlas</div>
+    <div class="descriptor">New wave cartography — the authority of historical mapping tradition, rendered in a medium that glows.</div>
+  </div>
+
+  <!-- Colors -->
+  <div class="section">
+    <div class="section-label">Color system</div>
+
+    <div class="color-group-label">Base</div>
+    <div class="color-grid">
+      <div class="color-card"><div class="color-swatch" style="background:#080A0F; border:0.5px solid #1A1D28;"></div><div class="color-name">Deep Ink</div><div class="color-token">--ink</div><div class="color-hex">#080A0F</div><div class="color-role">Primary background</div></div>
+      <div class="color-card"><div class="color-swatch" style="background:#0F1219; border:0.5px solid #1A1D28;"></div><div class="color-name">Surface</div><div class="color-token">--surface</div><div class="color-hex">#0F1219</div><div class="color-role">Panels, cards, sidebars</div></div>
+      <div class="color-card"><div class="color-swatch" style="background:#13161F; border:0.5px solid #1A1D28;"></div><div class="color-name">Surface Raised</div><div class="color-token">--surface-raised</div><div class="color-hex">#13161F</div><div class="color-role">Elevated cards, dropdowns</div></div>
+      <div class="color-card"><div class="color-swatch" style="background:#1A1D28;"></div><div class="color-name">Border</div><div class="color-token">--border</div><div class="color-hex">#1A1D28</div><div class="color-role">All borders, dividers</div></div>
+      <div class="color-card"><div class="color-swatch" style="background:#E8E2D6;"></div><div class="color-name">Parchment</div><div class="color-token">--parchment</div><div class="color-hex">#E8E2D6</div><div class="color-role">Primary text, wordmark</div></div>
+      <div class="color-card"><div class="color-swatch" style="background:#404558;"></div><div class="color-name">Muted</div><div class="color-token">--muted</div><div class="color-hex">#404558</div><div class="color-role">Secondary text, body</div></div>
+      <div class="color-card"><div class="color-swatch" style="background:#2A2E3C;"></div><div class="color-name">Ghost</div><div class="color-token">--ghost</div><div class="color-hex">#2A2E3C</div><div class="color-role">Tertiary, placeholders</div></div>
+    </div>
+
+    <div class="color-group-label">Accent</div>
+    <div class="color-grid">
+      <div class="color-card"><div class="color-swatch" style="background:#2E9BFF; box-shadow:var(--glow-blue);"></div><div class="color-name">Electric Blue</div><div class="color-token">--electric-blue</div><div class="color-hex">#2E9BFF</div><div class="color-role">Primary accent, active states, CTAs</div></div>
+      <div class="color-card"><div class="color-swatch" style="background:#00C44F; box-shadow:var(--glow-green);"></div><div class="color-name">Vivid Green</div><div class="color-token">--vivid-green</div><div class="color-hex">#00C44F</div><div class="color-role">Vegetation, terroir data layers</div></div>
+      <div class="color-card"><div class="color-swatch" style="background:#E03040; box-shadow:var(--glow-crimson);"></div><div class="color-name">Crimson</div><div class="color-token">--crimson</div><div class="color-hex">#E03040</div><div class="color-role">Wine, volcanic soil, alerts</div></div>
+      <div class="color-card"><div class="color-swatch" style="background:#C87D4A; box-shadow:var(--glow-amber);"></div><div class="color-name">Terroir Amber</div><div class="color-token">--amber</div><div class="color-hex">#C87D4A</div><div class="color-role">Soil, geology data layers</div></div>
+      <div class="color-card"><div class="color-swatch" style="background:#8A7AE8; box-shadow:var(--glow-violet);"></div><div class="color-name">Vintage Violet</div><div class="color-token">--violet</div><div class="color-hex">#8A7AE8</div><div class="color-role">AVA boundaries, hydrology</div></div>
+    </div>
+
+    <div class="color-group-label" style="margin-top:8px;">Glow values</div>
+    <div class="glow-grid">
+      <div class="glow-row"><div class="glow-dot" style="background:#2E9BFF; box-shadow:var(--glow-blue);"></div><div class="glow-token">--glow-blue</div><div class="glow-value">0 0 20px rgba(46,155,255,0.45), 0 0 5px rgba(46,155,255,0.3)</div></div>
+      <div class="glow-row"><div class="glow-dot" style="background:#00C44F; box-shadow:var(--glow-green);"></div><div class="glow-token">--glow-green</div><div class="glow-value">0 0 18px rgba(0,196,79,0.4), 0 0 4px rgba(0,196,79,0.3)</div></div>
+      <div class="glow-row"><div class="glow-dot" style="background:#E03040; box-shadow:var(--glow-crimson);"></div><div class="glow-token">--glow-crimson</div><div class="glow-value">0 0 18px rgba(224,48,64,0.4), 0 0 4px rgba(224,48,64,0.3)</div></div>
+      <div class="glow-row"><div class="glow-dot" style="background:#C87D4A; box-shadow:var(--glow-amber);"></div><div class="glow-token">--glow-amber</div><div class="glow-value">0 0 14px rgba(200,125,74,0.3)</div></div>
+      <div class="glow-row"><div class="glow-dot" style="background:#8A7AE8; box-shadow:var(--glow-violet);"></div><div class="glow-token">--glow-violet</div><div class="glow-value">0 0 16px rgba(138,122,232,0.35)</div></div>
+    </div>
+  </div>
+
+  <!-- Typography -->
+  <div class="section">
+    <div class="section-label">Typography</div>
+    <div>
+      <div class="type-row">
+        <div><div class="type-meta-name">Display</div><div class="type-meta-detail">Cormorant Garamond 400<br>Wordmark, hero text,<br>vineyard names</div></div>
+        <div class="t-display">Terroir Atlas</div>
+      </div>
+      <div class="type-row">
+        <div><div class="type-meta-name">Display Medium</div><div class="type-meta-detail">Cormorant Garamond 500<br>Card titles, AVA headings</div></div>
+        <div class="t-sub">Dundee Hills · Chehalem Mountains</div>
+      </div>
+      <div class="type-row">
+        <div><div class="type-meta-name">Display Italic</div><div class="type-meta-detail">Cormorant Garamond 300 italic<br>Descriptors, taglines,<br>pull quotes</div></div>
+        <div class="t-italic">A visual terroir atlas for the Willamette Valley and beyond.</div>
+      </div>
+      <div class="type-row">
+        <div><div class="type-meta-name">UI Label</div><div class="type-meta-detail">Inter 500, all-caps, tracked<br>Map labels, nav items,<br>data chip labels</div></div>
+        <div class="t-label">Winkler Index · Growing Degree Days · GST</div>
+      </div>
+      <div class="type-row">
+        <div><div class="type-meta-name">Body</div><div class="type-meta-detail">Inter 300<br>Card descriptions,<br>prose, UI copy</div></div>
+        <div class="t-body">Soil parent material, elevation, and aspect converge to define the block-level expression of this vineyard. Jory series over basalt, southwest aspect, 412 ft.</div>
+      </div>
+      <div class="type-row">
+        <div><div class="type-meta-name">Data / Coordinates</div><div class="type-meta-detail">System monospace 400<br>Coordinates, values,<br>technical strings</div></div>
+        <div class="t-mono">45.3418° N · 123.1854° W · 412 ft · GDD 2847</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spacing -->
+  <div class="section">
+    <div class="section-label">Spacing</div>
+    <div class="space-grid">
+      <div class="space-row"><div class="space-bar" style="width:8px;"></div><div class="space-token">--space-1</div><div class="space-val">8px</div></div>
+      <div class="space-row"><div class="space-bar" style="width:16px;"></div><div class="space-token">--space-2</div><div class="space-val">16px</div></div>
+      <div class="space-row"><div class="space-bar" style="width:24px;"></div><div class="space-token">--space-3</div><div class="space-val">24px</div></div>
+      <div class="space-row"><div class="space-bar" style="width:32px;"></div><div class="space-token">--space-4</div><div class="space-val">32px</div></div>
+      <div class="space-row"><div class="space-bar" style="width:48px;"></div><div class="space-token">--space-6</div><div class="space-val">48px</div></div>
+      <div class="space-row"><div class="space-bar" style="width:60px;"></div><div class="space-token">--space-8</div><div class="space-val">64px</div></div>
+    </div>
+  </div>
+
+  <!-- Components -->
+  <div class="section">
+    <div class="section-label">Components</div>
+    <div class="component-grid">
+
+      <div class="component-cell">
+        <div class="component-cell-label">Navigation</div>
+        <div class="nav-preview">
+          <div class="nav-wordmark">TERRANTHRO</div>
+          <div class="nav-items">
+            <span class="nav-item">National</span>
+            <span class="nav-item">Oregon</span>
+            <span class="nav-item active">Willamette Valley</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="component-cell">
+        <div class="component-cell-label">Buttons</div>
+        <div class="btn-row">
+          <button class="btn btn-primary">View Atlas</button>
+          <button class="btn btn-ghost">Export</button>
+          <button class="btn btn-danger">Remove</button>
+        </div>
+      </div>
+
+      <div class="component-cell">
+        <div class="component-cell-label">Data chips</div>
+        <div class="chip-row">
+          <div class="chip"><div class="chip-label">Winkler</div><div class="chip-value" style="color:var(--electric-blue); text-shadow:var(--glow-blue);">2,847</div></div>
+          <div class="chip"><div class="chip-label">GST</div><div class="chip-value" style="color:var(--vivid-green); text-shadow:var(--glow-green);">57.4°F</div></div>
+          <div class="chip"><div class="chip-label">Soil</div><div class="chip-value" style="color:var(--amber);">Jory</div></div>
+          <div class="chip"><div class="chip-label">Elev</div><div class="chip-value" style="color:var(--parchment);">412 ft</div></div>
+        </div>
+      </div>
+
+      <div class="component-cell">
+        <div class="component-cell-label">Input</div>
+        <div class="input-label">Search vineyards</div>
+        <input class="input-preview" type="text" placeholder="Adelsheim, Dundee Hills…" />
+      </div>
+
+      <div class="component-cell" style="grid-column: 1 / -1;">
+        <div class="component-cell-label">Vineyard card</div>
+        <div style="max-width:360px;">
+          <div class="glass-card">
+            <div class="glass-card-ava">Dundee Hills AVA · Block 4</div>
+            <div class="glass-card-title">Adelsheim Vineyard</div>
+            <div class="glass-card-body">Volcanic Jory soils over basalt parent material. Southwest aspect at 412 ft. Class II Winkler. Planted 1972.</div>
+            <div class="legend">
+              <div class="legend-row"><div class="legend-dot" style="background:var(--electric-blue); box-shadow:var(--glow-blue);"></div>Climate overlay active</div>
+              <div class="legend-row"><div class="legend-dot" style="background:var(--amber);"></div>Soil: Jory series</div>
+              <div class="legend-row"><div class="legend-dot" style="background:var(--violet);"></div>Hydrology layer</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="component-cell" style="grid-column: 1 / -1;">
+        <div class="component-cell-label">Map surface</div>
+        <div class="map-preview">
+          <svg width="100%" height="200" viewBox="0 0 860 200" preserveAspectRatio="xMidYMid slice">
+            <path d="M0,100 Q215,60 430,100 Q645,140 860,100" stroke="#00C44F" stroke-width="0.8" fill="none" opacity="0.2"/>
+            <path d="M0,120 Q215,80 430,120 Q645,160 860,120" stroke="#00C44F" stroke-width="0.8" fill="none" opacity="0.17"/>
+            <path d="M0,80  Q215,40 430,80  Q645,120 860,80"  stroke="#00C44F" stroke-width="0.8" fill="none" opacity="0.17"/>
+            <path d="M0,60  Q215,20 430,60  Q645,100 860,60"  stroke="#2E9BFF" stroke-width="0.5" fill="none" opacity="0.12"/>
+            <path d="M0,140 Q215,100 430,140 Q645,180 860,140" stroke="#2E9BFF" stroke-width="0.5" fill="none" opacity="0.12"/>
+            <path d="M120,0 Q130,60 124,100 Q116,145 128,200" stroke="#8A7AE8" stroke-width="0.5" fill="none" opacity="0.15"/>
+            <path d="M400,0 Q415,60 405,100 Q393,145 408,200" stroke="#8A7AE8" stroke-width="0.5" fill="none" opacity="0.15"/>
+            <path d="M660,0 Q675,60 665,100 Q653,145 668,200" stroke="#8A7AE8" stroke-width="0.5" fill="none" opacity="0.15"/>
+          </svg>
+          <div class="map-pin" style="top:58px; left:148px; background:#00C44F; box-shadow:0 0 10px rgba(0,196,79,0.8);"></div>
+          <div class="map-pin" style="top:88px; left:310px; background:#C87D4A; box-shadow:0 0 10px rgba(200,125,74,0.7);"></div>
+          <div class="map-pin" style="top:44px; left:490px; background:#2E9BFF; box-shadow:0 0 10px rgba(46,155,255,0.8);"></div>
+          <div class="map-pin" style="top:72px; left:660px; background:#E03040; box-shadow:0 0 10px rgba(224,48,64,0.7);"></div>
+          <div class="map-lbl" style="top:40px;  left:100px; color:#00C44F;">Adelsheim</div>
+          <div class="map-lbl" style="top:70px;  left:262px; color:#C87D4A;">Fairsing</div>
+          <div class="map-lbl" style="top:28px;  left:444px; color:#2E9BFF;">J. Christopher</div>
+          <div class="map-lbl" style="top:56px;  left:610px; color:#E03040;">Willamette Valley AVA</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="padding-top:52px; border-top:0.5px solid var(--border); display:flex; justify-content:space-between; align-items:baseline;">
+    <div style="font-family:'Cormorant Garamond',serif; font-size:15px; font-weight:400; letter-spacing:0.12em; color:var(--parchment);">TERRANTHRO</div>
+    <div style="font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--ghost);">Design System · 2026</div>
+  </div>
+
+</div>
+</body>
+</html>

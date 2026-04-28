@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { alpha, border, crimson, ink, parchment, TOKENS } from '../../styles/tokens';
+import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '../../styles/tokens';
 import { apiPost } from '../../lib/api';
 
 const TAB = { MAGIC: 'magic', PASSWORD: 'password' };
@@ -65,7 +65,7 @@ export default function PortalLogin() {
     display: 'block',
     fontSize: 13,
     fontWeight: 500,
-    color: inkLight,
+    color: muted,
     marginBottom: 6,
   };
 
@@ -95,7 +95,7 @@ export default function PortalLogin() {
         }}>
           Winery Portal
         </h1>
-        <p style={{ color: inkMuted, fontSize: 14, marginBottom: 24 }}>
+        <p style={{ color: muted, fontSize: 14, marginBottom: 24 }}>
           Sign in to your winery account
         </p>
 
@@ -121,7 +121,7 @@ export default function PortalLogin() {
                 marginBottom: -1,
                 fontSize: 14,
                 fontWeight: tab === key ? 600 : 400,
-                color: tab === key ? ink : inkMuted,
+                color: tab === key ? ink : muted,
                 cursor: 'pointer',
               }}
             >
@@ -176,7 +176,7 @@ export default function PortalLogin() {
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
 
-            <p style={{ marginTop: 14, fontSize: 12, color: inkMuted, textAlign: 'center' }}>
+            <p style={{ marginTop: 14, fontSize: 12, color: muted, textAlign: 'center' }}>
               No password yet? Use the <button onClick={() => setTab(TAB.MAGIC)} style={{ background: 'none', border: 'none', color: crimson, fontSize: 12, cursor: 'pointer', padding: 0 }}>email link</button> tab to log in, then set one in your profile.
             </p>
           </form>
@@ -239,7 +239,7 @@ export default function PortalLogin() {
         <p style={{
           marginTop: 32,
           fontSize: 12,
-          color: inkMuted,
+          color: muted,
           textAlign: 'center',
         }}>
           Don't have access?{' '}

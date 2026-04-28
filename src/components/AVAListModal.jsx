@@ -1,4 +1,4 @@
-import { alpha, border, crimson, ink, parchment, TOKENS } from '../styles/tokens';
+import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '../styles/tokens';
 import { WV_SUB_AVAS } from '../config/topographyConfig';
 
 // UI constants for modal styling
@@ -145,7 +145,7 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
               </div>
               {/* Arrow */}
               <div style={{
-                color: inkMuted,
+                color: muted,
                 fontSize: 16,
                 flexShrink: 0,
               }}>

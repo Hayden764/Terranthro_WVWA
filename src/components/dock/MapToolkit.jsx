@@ -1,4 +1,4 @@
-import { alpha, border, crimson, parchment, TOKENS } from '../../styles/tokens';
+import { alpha, border, crimson, parchment, TOKENS, TYPE } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { WV_SUB_AVAS } from '../../config/topographyConfig';
 
@@ -21,10 +21,8 @@ const CARD = {
 };
 
 const LABEL = {
+  ...TYPE.uiLabel,
   fontSize: 10,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.08em',
   color: GLASS.textDim,
   marginBottom: 6,
 };
@@ -197,10 +195,9 @@ export default function MapToolkit({
                 >
                   <span>{option.label}</span>
                   <span style={{
+                    ...TYPE.uiLabel,
                     fontSize: 10,
                     opacity: active ? 0.95 : 0.45,
-                    letterSpacing: '0.04em',
-                    textTransform: 'uppercase',
                   }}>
                     {active ? 'Active' : 'Apply'}
                   </span>

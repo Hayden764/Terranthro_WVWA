@@ -1,6 +1,11 @@
 import { MONTH_ABBR } from '../config/climateConfig';
 import { TOPO_LAYER_TYPES } from '../config/topographyConfig';
-import { border, crimson, ink, parchment } from '../styles/tokens';
+import { border, crimson, ink, muted, parchment, TYPE } from '../styles/tokens';
+
+const UI_LABEL = {
+  ...TYPE.uiLabel,
+  fontSize: 10,
+};
 
 const CLIMATE_LAYERS = [
   { id: 'tdmean', label: 'Mean Temperature', sub: 'PRISM 30-yr normals' },
@@ -37,7 +42,7 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
         alignItems: 'center',
         justifyContent: 'space-between',
       }}>
-        <span style={{ color: parchment, fontWeight: 600, fontSize: 13, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+        <span style={{ ...TYPE.uiLabel, color: parchment, fontWeight: 600, fontSize: 13 }}>
           Data Layers
         </span>
       </div>
@@ -45,7 +50,7 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
       <div style={{ padding: '12px 0' }}>
         {/* Climate section */}
         <div style={{ padding: '4px 16px 8px' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: inkMuted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
+          <div style={{ ...UI_LABEL, color: muted, marginBottom: 6 }}>
             Climate
           </div>
           {CLIMATE_LAYERS.map(layer => (
@@ -65,7 +70,7 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
               }}
             >
               <div style={{ fontSize: 13, fontWeight: 500, color: ink }}>{layer.label}</div>
-              <div style={{ fontSize: 11, color: inkMuted, marginTop: 1 }}>{layer.sub}</div>
+              <div style={{ fontSize: 11, color: muted, marginTop: 1 }}>{layer.sub}</div>
             </button>
           ))}
 
@@ -73,7 +78,7 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
           {isClimate && (
             <div style={{ marginTop: 8, padding: '0 2px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 11, color: inkMuted }}>Month</span>
+                <span style={{ fontSize: 11, color: muted }}>Month</span>
                 <span style={{ fontSize: 12, fontWeight: 600, color: crimson }}>{MONTH_ABBR[currentMonth - 1]}</span>
               </div>
               <input
@@ -84,7 +89,7 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
                 onChange={e => onMonthChange(Number(e.target.value))}
                 style={{ width: '100%', accentColor: crimson, cursor: 'pointer' }}
               />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: inkMuted, marginTop: 2 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: muted, marginTop: 2 }}>
                 <span>Jan</span><span>Apr</span><span>Jul</span><span>Oct</span><span>Dec</span>
               </div>
             </div>
@@ -95,7 +100,7 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
 
         {/* Topography section */}
         <div style={{ padding: '8px 16px 4px' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: inkMuted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
+          <div style={{ ...UI_LABEL, color: muted, marginBottom: 6 }}>
             Topography
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -113,7 +118,7 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
                   cursor: 'pointer',
                   fontSize: 11,
                   fontWeight: 500,
-                  color: activeLayer === layer.id ? crimson : inkLight,
+                  color: activeLayer === layer.id ? crimson : muted,
                   transition: 'all 0.15s',
                   textAlign: 'center',
                 }}

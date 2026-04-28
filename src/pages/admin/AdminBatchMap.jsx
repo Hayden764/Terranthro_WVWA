@@ -14,7 +14,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
-import { TOKENS, alpha } from '../../styles/tokens';
+import { alpha, ink, TOKENS } from '../../styles/tokens';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
@@ -208,7 +208,7 @@ export default function AdminBatchMap({ ops = [], activeIndex = null, showOld = 
         background: alpha(TOKENS.ink, 0.82), backdropFilter: 'blur(4px)',
         borderRadius: 6, padding: '7px 11px',
         display: 'flex', flexDirection: 'column', gap: 5,
-        fontSize: 11, fontFamily: "'Inter', sans-serif",
+        fontSize: 11, fontFamily: 'var(--font-sans)',
         pointerEvents: 'none',
       }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: showOld ? TOKENS.warning : alpha(TOKENS.parchment, 0.35) }}>

@@ -11,7 +11,7 @@ import TopographyLayer from './TopographyLayer';
 import MapControls from './MapControls';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { AVA_CAMERA, WV_CAMERA } from '../config/avaCameraConfig';
-import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '../styles/tokens';
+import { alpha, border, crimson, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 // In dev, always use relative API paths through the Vite proxy.
 // In production, use VITE_API_BASE_URL if provided.
@@ -73,7 +73,7 @@ export const LISTING_CATEGORIES = {
   restaurant: { label: 'Restaurant / Dining', color: TOKENS.vividGreen, icon: '🍽️', emoji: '🍽️' },
   tasting:    { label: 'Tasting Room',        color: TOKENS.violet, icon: '🍷', emoji: '🍷' },
   winery:     { label: 'Winery / Vineyard',   color: crimson, icon: '🍇', emoji: '🍇' },
-  other:      { label: 'Other',               color: inkLight, icon: '📍', emoji: '📍' },
+  other:      { label: 'Other',               color: muted, icon: '📍', emoji: '📍' },
 };
 
 const UI = {
@@ -776,7 +776,7 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
                 {resolvedTab === 'listing' ? (cat?.icon ?? '📍') : getLayerIcon(activeLayer)}
               </span>
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: UI.tabIdleText, lineHeight: 1, marginBottom: 2 }}>
+                <div style={{ ...TYPE.uiLabel, fontSize: 10, color: UI.tabIdleText, lineHeight: 1, marginBottom: 2 }}>
                   {resolvedTab === 'listing' ? cat?.label : 'Active Layer'}
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: UI.tabActiveText, lineHeight: 1.2 }}>
@@ -827,7 +827,7 @@ function getLayerLabel(id) { return LAYER_META[id]?.label ?? id; }
 /* ── Listing tab ──────────────────────────────────────────────────────── */
 function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyardHover, onViewAllVineyards }) {
   const CARD = { background: UI.cardBg, border: `1px solid ${UI.cardBorder}`, borderRadius: 10, padding: '12px 14px', marginBottom: 8 };
-  const LBL  = { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: UI.labelText, marginBottom: 4 };
+  const LBL  = { ...TYPE.uiLabel, fontSize: 10, color: UI.labelText, marginBottom: 4 };
   const VAL  = { fontSize: 12, color: UI.valueText, lineHeight: 1.5 };
 
   const [hoveredIdx, setHoveredIdx] = useState(null);
@@ -917,7 +917,7 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
         {vineyards && vineyards.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: UI.sectionLabel }}>
+              <div style={{ ...TYPE.uiLabel, fontSize: 10, color: UI.sectionLabel }}>
                 🍇 Estate Vineyard{vineyards.length > 1 ? 's' : ''}
               </div>
               {vineyards.length > 1 && (
@@ -1180,7 +1180,7 @@ function LayerTabContent({ activeLayer, topoStats }) {
   const topoConfig = TOPO_LAYER_TYPES[activeLayer];
 
   const CARD = { background: UI.cardBg, border: `1px solid ${UI.cardBorder}`, borderRadius: 10, padding: '12px 14px', marginBottom: 8 };
-  const LBL  = { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: UI.labelText, marginBottom: 4 };
+  const LBL  = { ...TYPE.uiLabel, fontSize: 10, color: UI.labelText, marginBottom: 4 };
   const VAL  = { fontSize: 13, color: UI.cardTextStrong, lineHeight: 1.55 };
   const fmt  = (v) => typeof v === 'number' ? v.toFixed(1) : '—';
 

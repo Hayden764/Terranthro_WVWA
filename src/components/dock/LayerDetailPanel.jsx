@@ -1,4 +1,4 @@
-import { TOKENS, alpha } from '../../styles/tokens';
+import { alpha, TOKENS, TYPE } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../../config/topographyConfig';
 
@@ -59,10 +59,8 @@ const CARD = {
 };
 
 const LBL = {
+  ...TYPE.uiLabel,
   fontSize: 10,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.08em',
   color: GLASS.textDim,
   marginBottom: 4,
 };
@@ -135,10 +133,8 @@ export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, 
           <span style={{ fontSize: 18 }}>{layerInfo.icon}</span>
           <div>
             <div style={{
+              ...TYPE.uiLabel,
               fontSize: 11,
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
               color: GLASS.textDim,
               lineHeight: 1,
               marginBottom: 2,

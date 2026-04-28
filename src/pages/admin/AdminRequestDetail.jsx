@@ -13,7 +13,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { TOKENS, alpha } from '../../styles/tokens';
+import { alpha, TOKENS, TYPE } from '../../styles/tokens';
 import { apiJson, apiPost } from '../../lib/api';
 import AdminGeometryDiffMap from './AdminGeometryDiffMap';
 import AdminBatchMap from './AdminBatchMap';
@@ -300,7 +300,7 @@ function AdminEntityHistory({ entityType, entityId, currentRequestId }) {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     cursor: 'pointer', userSelect: 'none',
   };
-  const titleStyle = { fontSize: 13, fontWeight: 600, color: '#ccc', letterSpacing: '0.04em', textTransform: 'uppercase' };
+  const titleStyle = { ...TYPE.uiLabel, fontSize: 13, fontWeight: 600, color: '#ccc' };
   const chevron = open ? '▲' : '▼';
 
   const fmtDate = iso => {
@@ -373,7 +373,7 @@ function AdminEntityHistory({ entityType, entityId, currentRequestId }) {
               {/* Pending / rejected requests */}
               {data.pending && data.pending.length > 0 && (
                 <div style={{ marginBottom: 16 }}>
-                  <p style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Open Requests</p>
+                  <p style={{ ...TYPE.uiLabel, fontSize: 11, color: '#888', marginBottom: 8 }}>Open Requests</p>
                   {data.pending.map(r => (
                     <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 12 }}>
                       <span style={{ color: statusColor(r.status), fontWeight: 600, minWidth: 64 }}>{r.status}</span>
@@ -631,7 +631,7 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                 >
                   {/* Op header */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: (isMeta || isAdd) ? 8 : 6 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: isExcluded ? '#444' : opColor, minWidth: 52 }}>
+                    <span style={{ ...TYPE.uiLabel, fontSize: 10, color: isExcluded ? '#444' : opColor, minWidth: 52 }}>
                       {op.op}
                     </span>
                     <span style={{ fontSize: 13, color: isExcluded ? '#555' : '#e0e0e0', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -731,7 +731,7 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                           const isEdited = key in op._editedFields;
                           return (
                             <div key={key} style={{ fontSize: 11, display: 'flex', gap: 6, alignItems: 'baseline' }}>
-                              <span style={{ color: '#64748b', minWidth: 100, textTransform: 'uppercase', fontSize: 9, fontWeight: 600, flexShrink: 0 }}>
+                              <span style={{ ...TYPE.uiLabel, color: '#64748b', minWidth: 100, fontSize: 9, fontWeight: 600, flexShrink: 0 }}>
                                 {key.replace(/_/g, ' ')}
                               </span>
                               <span style={{ color: isEdited ? '#fbbf24' : '#4ade80' }}>{String(val)}</span>
@@ -753,7 +753,7 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                         if (String(oldVal ?? '') === String(effectiveNew ?? '')) return null;
                         return (
                           <div key={key} style={{ fontSize: 11, display: 'flex', gap: 6, alignItems: 'baseline', padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                            <span style={{ color: '#64748b', minWidth: 100, textTransform: 'uppercase', fontSize: 9, fontWeight: 600, flexShrink: 0 }}>{key.replace(/_/g, ' ')}</span>
+                            <span style={{ ...TYPE.uiLabel, color: '#64748b', minWidth: 100, fontSize: 9, fontWeight: 600, flexShrink: 0 }}>{key.replace(/_/g, ' ')}</span>
                             <span style={{ color: '#e57373', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 90 }}>{String(oldVal ?? '—')}</span>
                             <span style={{ color: '#475569' }}>→</span>
                             <span style={{ color: isEdited ? '#fbbf24' : '#4ade80', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 90 }}>{String(effectiveNew ?? '—')}</span>
@@ -771,7 +771,7 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                     borderRadius: '0 0 8px 8px', padding: '12px 14px',
                     display: 'flex', flexDirection: 'column', gap: 8,
                   }}>
-                    <div style={{ fontSize: 10, color: '#fbbf24', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>
+                    <div style={{ ...TYPE.uiLabel, fontSize: 10, color: '#fbbf24', marginBottom: 2 }}>
                       Edit fields — overrides staged values
                     </div>
                     {EDITABLE_META_FIELDS.map((field) => {
@@ -781,7 +781,7 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                       const isEdited = edited !== undefined;
                       return (
                         <div key={field} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <label style={{ fontSize: 9, color: isEdited ? '#fbbf24' : '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', gap: 6 }}>
+                          <label style={{ ...TYPE.uiLabel, fontSize: 9, color: isEdited ? '#fbbf24' : '#555', display: 'flex', gap: 6 }}>
                             {field.replace(/_/g, ' ')}
                             {isEdited && <span style={{ color: '#fbbf24' }}>• edited</span>}
                           </label>
@@ -1003,7 +1003,7 @@ function GeoJsonDownload({ label, geometry }) {
 
 function Shell({ children }) {
   return (
-    <div style={{ minHeight: '100vh', background: TOKENS.ink, fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: TOKENS.ink, fontFamily: 'var(--font-sans)' }}>
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '32px 20px' }}>
         {children}
       </div>
@@ -1013,7 +1013,7 @@ function Shell({ children }) {
 
 function SectionLabel({ children }) {
   return (
-    <div style={{ fontSize: 11, color: alpha(TOKENS.parchment, 0.35), textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, fontWeight: 600 }}>
+    <div style={{ ...TYPE.uiLabel, fontSize: 11, color: alpha(TOKENS.parchment, 0.35), marginBottom: 8, fontWeight: 600 }}>
       {children}
     </div>
   );

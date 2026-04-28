@@ -70,6 +70,38 @@ export const FONTS = {
   mono:    v('--font-mono'),
 };
 
+export const TYPE = {
+  display: {
+    fontFamily: FONTS.display,
+    fontSize: 68,
+  },
+  displayMedium: {
+    fontFamily: FONTS.display,
+    fontSize: 30,
+  },
+  displayItalic: {
+    fontFamily: FONTS.display,
+    fontStyle: 'italic',
+    fontSize: 22,
+  },
+  uiLabel: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.2em',
+  },
+  body: {
+    fontFamily: FONTS.sans,
+    fontSize: 14,
+    fontWeight: 300,
+  },
+  mono: {
+    fontFamily: FONTS.mono,
+    fontSize: 13,
+  },
+};
+
 export const alpha = (color, opacity) => (
   `color-mix(in srgb, ${color} ${toPercent(opacity)}%, transparent)`
 );

@@ -23,7 +23,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
-import { alpha, border, crimson, ink, mix, parchment, TOKENS } from '../styles/tokens';
+import { alpha, border, crimson, ink, mix, muted, parchment, TOKENS } from '../styles/tokens';
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 
@@ -35,7 +35,7 @@ const UI = {
   parcelLabelText: parchment,
   parcelLabelHalo: alpha('black', 0.65),
   popupTitle: TOKENS.ink,
-  popupSub: inkMuted,
+  popupSub: muted,
   popupMeta: ink,
   editOverlayBg: alpha(TOKENS.ink, 0.88),
   editOverlayText: alpha(TOKENS.parchment, 0.88),
@@ -285,7 +285,7 @@ export default function PortalVineyardMap({
         const popup = new maplibregl.Popup({ closeButton: true, closeOnClick: false })
           .setLngLat(e.lngLat)
           .setHTML(`
-            <div style="font-family:'Inter',sans-serif;min-width:160px;">
+            <div style="font-family:var(--font-sans);min-width:160px;">
               <div style="font-weight:500;font-size:13px;color:${UI.popupTitle};margin-bottom:2px;">${name}</div>
               ${showSub ? `<div style="font-size:11px;color:${UI.popupSub};margin-bottom:4px;">${parcelLabel}</div>` : ''}
               ${acres ? `<div style="font-size:12px;color:${UI.popupMeta};">${acres} acres</div>` : ''}
@@ -487,7 +487,7 @@ export default function PortalVineyardMap({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: inkMuted,
+        color: muted,
         fontSize: 13,
         border: `1px solid ${border}`,
         ...wrapperStyle,

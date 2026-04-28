@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { alpha, border, crimson, ink, parchment, TOKENS } from '../styles/tokens';
+import { alpha, border, crimson, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
@@ -11,9 +11,9 @@ const T = {
   headerBg:     ink,
   headerText:   parchment,
   border:       border,
-  sectionLabel: { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.09em', color: inkMuted },
+  sectionLabel: { ...TYPE.uiLabel, fontSize: 10, color: muted },
   itemText:     { fontSize: 13, color: ink, lineHeight: 1.45 },
-  itemTextMuted:{ fontSize: 12, color: inkMuted, lineHeight: 1.4 },
+  itemTextMuted:{ fontSize: 12, color: muted, lineHeight: 1.4 },
   accent:       crimson,
   hoverBg:      parchment,
   activeBg:     TOKENS.dangerDim,
@@ -78,12 +78,12 @@ const BackBtn = ({ onClick }) => (
     style={{
       display: 'flex', alignItems: 'center', gap: 6,
       background: 'none', border: 'none', cursor: 'pointer',
-      color: inkMuted, fontSize: 12, padding: '8px 16px',
+      color: muted, fontSize: 12, padding: '8px 16px',
       fontFamily: 'var(--font-sans)', width: '100%', textAlign: 'left',
       borderBottom: `1px solid ${border}`,
     }}
     onMouseEnter={e => e.currentTarget.style.color = ink}
-    onMouseLeave={e => e.currentTarget.style.color = inkMuted}
+    onMouseLeave={e => e.currentTarget.style.color = muted}
   >
     <span style={{ fontSize: 14, lineHeight: 1 }}>‹</span> Back
   </button>
@@ -103,7 +103,7 @@ function SectionHeader({ label, open, onToggle, count }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={T.sectionLabel}>{label}</span>
         {count != null && (
-          <span style={{ fontSize: 10, background: parchment, borderRadius: 10, padding: '1px 7px', color: inkMuted, fontWeight: 600 }}>
+          <span style={{ fontSize: 10, background: parchment, borderRadius: 10, padding: '1px 7px', color: muted, fontWeight: 600 }}>
             {count}
           </span>
         )}
@@ -204,10 +204,10 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, onL
                 >
                   <span style={{
                     width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                    background: vineyardRecidSet.has(l.id) ? UI.mapped : inkMuted,
+                    background: vineyardRecidSet.has(l.id) ? UI.mapped : muted,
                   }} />
                   <span style={{ fontSize: 13, color: ink, flex: 1 }}>{l.title}</span>
-                  <span style={{ fontSize: 10, color: inkMuted }}>›</span>
+                  <span style={{ fontSize: 10, color: muted }}>›</span>
                 </button>
               ))}
             </div>
@@ -322,7 +322,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
       <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         {listing.desc && (
-          <p style={{ fontSize: 13, color: inkMuted, lineHeight: 1.65, margin: 0 }}>
+          <p style={{ fontSize: 13, color: muted, lineHeight: 1.65, margin: 0 }}>
             {listing.desc.slice(0, 280)}{listing.desc.length > 280 ? '…' : ''}
           </p>
         )}
@@ -411,8 +411,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                     lastAvaLabel = avaLabel;
                     rendered.push(
                       <div key={`ava-divider-${avaLabel || i}`} style={{
-                        fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-                        textTransform: 'uppercase', color: inkMuted,
+                        ...TYPE.uiLabel, fontSize: 10, color: muted,
                         padding: i === 0 ? '0 2px 6px' : '12px 2px 6px',
                         borderTop: i === 0 ? 'none' : `1px solid ${border}`,
                         marginTop: i === 0 ? 0 : 6,
@@ -442,13 +441,13 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                             {group.name}
                           </div>
                           {acres && (
-                            <div style={{ fontSize: 11, color: inkMuted, marginTop: 2 }}>
+                            <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>
                               {acres} ac
                               {blockRows.length > 0 && ` · ${blockRows.length} block${blockRows.length !== 1 ? 's' : ''}`}
                             </div>
                           )}
                         </div>
-                        <span style={{ fontSize: 11, color: inkMuted, flexShrink: 0 }}>{isExpanded ? '▾' : '▸'}</span>
+                        <span style={{ fontSize: 11, color: muted, flexShrink: 0 }}>{isExpanded ? '▾' : '▸'}</span>
                       </div>
 
                       {/* Expanded content */}
@@ -494,7 +493,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                               {blockRows.map((b, bi) => (
                                 <div key={`${b.name}-${bi}`} style={{ border: `1px solid ${border}`, borderRadius: 7, padding: '7px 10px', background: parchment }}>
                                   <div style={{ fontSize: 12, fontWeight: 700, color: ink }}>{b.name}</div>
-                                  <div style={{ fontSize: 11, color: inkMuted, marginTop: 2 }}>
+                                  <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>
                                     {[
                                       b.varieties.size > 0 ? Array.from(b.varieties).slice(0, 2).join(', ') : null,
                                       b.clones.size > 0 ? `Clone ${Array.from(b.clones).slice(0, 2).join('/')}` : null,
@@ -518,7 +517,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
         )}
 
         {(!selectedVineyards || selectedVineyards.length === 0) && (
-          <div style={{ textAlign: 'center', padding: '16px 0', color: inkMuted, fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: '16px 0', color: muted, fontSize: 13 }}>
             No mapped vineyard parcels
           </div>
         )}
@@ -575,7 +574,7 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
                   >
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
-                      <div style={{ fontSize: 11, color: inkMuted, marginTop: 1 }}>{layer.sub}</div>
+                      <div style={{ fontSize: 11, color: muted, marginTop: 1 }}>{layer.sub}</div>
                     </div>
                     <div style={{
                       width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
@@ -597,7 +596,7 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
                         onChange={e => onMonthChange(Number(e.target.value))}
                         style={{ width: '100%', accentColor: crimson, cursor: 'pointer' }}
                       />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: inkMuted, marginTop: 2 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: muted, marginTop: 2 }}>
                         <span>Jan</span><span>Jun</span><span>Dec</span>
                       </div>
                     </div>
@@ -637,7 +636,7 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
                 >
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
-                    <div style={{ fontSize: 11, color: inkMuted, marginTop: 1 }}>{layer.sub}</div>
+                    <div style={{ fontSize: 11, color: muted, marginTop: 1 }}>{layer.sub}</div>
                   </div>
                   <div style={{
                     width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
@@ -656,7 +655,7 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
                 <div style={{ height: 8, borderRadius: 6, background: COLORMAP_CSS[topoConfig.colormap] || TOKENS.ghost, marginBottom: 4, border: `1px solid ${border}` }} />
                 {topoStats && (
                   <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: inkMuted, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: muted, marginBottom: 8 }}>
                       <span>{topoStats.min?.toFixed(1)}{topoConfig.unit}</span>
                       <span>{topoStats.max?.toFixed(1)}{topoConfig.unit}</span>
                     </div>
@@ -671,7 +670,7 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
                 {!topoStats && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 2 }}>
                     <div style={{ width: 12, height: 12, borderRadius: '50%', border: `2px solid ${border}`, borderTopColor: ink, animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-                    <span style={{ fontSize: 11, color: inkMuted }}>Loading statistics…</span>
+                    <span style={{ fontSize: 11, color: muted }}>Loading statistics…</span>
                     <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
                   </div>
                 )}
@@ -681,7 +680,7 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
               <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
                 <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Scale — Mean Temperature</div>
                 <div style={{ height: 8, borderRadius: 6, background: COLORMAP_CSS.plasma, marginBottom: 4, border: `1px solid ${border}` }} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: inkMuted }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: muted }}>
                   <span>−22°C</span><span>26°C</span>
                 </div>
               </div>
@@ -726,7 +725,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
                 padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600,
                 border: `1px solid ${isActive ? crimson + '90' : border}`,
                 background: isActive ? TOKENS.dangerDim : parchment,
-                color: isActive ? crimson : inkMuted,
+                color: isActive ? crimson : muted,
                 cursor: 'pointer', fontFamily: 'var(--font-sans)',
                 transition: 'all 0.15s',
               }}
@@ -746,7 +745,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
       {/* Winery list */}
       <div style={{ overflowY: 'auto', maxHeight: 340 }}>
         {visible.length === 0 && (
-          <div style={{ padding: '20px 16px', textAlign: 'center', color: inkMuted, fontSize: 13 }}>
+          <div style={{ padding: '20px 16px', textAlign: 'center', color: muted, fontSize: 13 }}>
             {listings.length === 0 ? 'Loading…' : 'No wineries match this filter.'}
           </div>
         )}
@@ -765,10 +764,10 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
           >
             <span style={{
               width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-              background: vineyardRecidSet.has(l.id) ? UI.mapped : inkMuted,
+              background: vineyardRecidSet.has(l.id) ? UI.mapped : muted,
             }} />
             <span style={{ fontSize: 13, color: ink, flex: 1, lineHeight: 1.3 }}>{l.title}</span>
-            <span style={{ fontSize: 10, color: inkMuted }}>›</span>
+            <span style={{ fontSize: 10, color: muted }}>›</span>
           </button>
         ))}
       </div>
@@ -779,7 +778,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
 // ── About section ─────────────────────────────────────────────────────────
 function AboutSection() {
   return (
-    <div style={{ padding: '14px 16px', fontSize: 13, color: inkMuted, lineHeight: 1.75 }}>
+    <div style={{ padding: '14px 16px', fontSize: 13, color: muted, lineHeight: 1.75 }}>
       <p style={{ margin: '0 0 12px' }}>
         <strong style={{ color: ink }}>Willamette Valley Wine Country</strong> encompasses over 500 wineries and 26,000+ acres of vineyard across eleven American Viticultural Areas in Oregon's Northern Willamette Valley.
       </p>
@@ -796,7 +795,7 @@ function AboutSection() {
           <span style={{ fontSize: 12 }}>Reference parcels (no winery link)</span>
         </div>
       </div>
-      <p style={{ margin: '14px 0 0', fontSize: 11, color: inkMuted }}>
+      <p style={{ margin: '14px 0 0', fontSize: 11, color: muted }}>
         Data: WVWA, PRISM Climate Group, USGS.<br />
         Boundary data: TTB (Tax &amp; Trade Bureau).
       </p>
@@ -1032,7 +1031,7 @@ export default function ExplorerSidebar({
 
             {/* Hero welcome card */}
             <div style={{
-              background: `linear-gradient(155deg, ${inkDark} 0%, ${ink} 55%, ${TOKENS.surfaceRaised} 100%)`,
+              background: `linear-gradient(155deg, ${ink} 0%, ${ink} 55%, ${TOKENS.surfaceRaised} 100%)`,
               padding: '18px 16px 16px',
               borderBottom: `1px solid ${border}`,
               position: 'relative',
@@ -1051,19 +1050,19 @@ export default function ExplorerSidebar({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, position: 'relative' }}>
                 <div style={{ background: UI.parchment10, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.parchment12}` }}>
                   <div style={{ fontSize: 20, fontWeight: 700, color: parchment, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{WV_SUB_AVAS.length}</div>
-                  <div style={{ fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Nested AVAs</div>
+                  <div style={{ ...T.sectionLabel, fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600 }}>Nested AVAs</div>
                 </div>
                 <div style={{ background: UI.parchment10, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.parchment12}` }}>
                   <div style={{ fontSize: 20, fontWeight: 700, color: parchment, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{wineryCount > 0 ? wineryCount : '—'}</div>
-                  <div style={{ fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Wineries</div>
+                  <div style={{ ...T.sectionLabel, fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600 }}>Wineries</div>
                 </div>
                 <div style={{ background: UI.mappedChipBg, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.mappedChipBorder}` }}>
                   <div style={{ fontSize: 20, fontWeight: 700, color: UI.mapped, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{mappedCount > 0 ? mappedCount : '—'}</div>
-                  <div style={{ fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Wineries Mapped</div>
+                  <div style={{ ...T.sectionLabel, fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600 }}>Wineries Mapped</div>
                 </div>
                 <div style={{ background: UI.parchment10, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.parchment12}` }}>
                   <div style={{ fontSize: 20, fontWeight: 700, color: parchment, fontFamily: 'var(--font-display)', lineHeight: 1 }}>26k+</div>
-                  <div style={{ fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Vineyard Acres</div>
+                  <div style={{ ...T.sectionLabel, fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600 }}>Vineyard Acres</div>
                 </div>
               </div>
             </div>
@@ -1089,10 +1088,10 @@ export default function ExplorerSidebar({
                 </div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>Nested AVAs</div>
-                  <div style={{ fontSize: 11, color: inkMuted, marginTop: 2 }}>{WV_SUB_AVAS.length} viticultural areas</div>
+                  <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>{WV_SUB_AVAS.length} viticultural areas</div>
                 </div>
               </div>
-              <span style={{ fontSize: 16, color: inkMuted }}>›</span>
+              <span style={{ fontSize: 16, color: muted }}>›</span>
             </button>
 
             {/* Enhanced: Wineries nav row */}
@@ -1116,10 +1115,10 @@ export default function ExplorerSidebar({
                 </div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>Wineries</div>
-                  <div style={{ fontSize: 11, color: inkMuted, marginTop: 2 }}>{wineryCount > 0 ? `${wineryCount} in the valley` : 'Browse all wineries'}</div>
+                  <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>{wineryCount > 0 ? `${wineryCount} in the valley` : 'Browse all wineries'}</div>
                 </div>
               </div>
-              <span style={{ fontSize: 16, color: inkMuted }}>›</span>
+              <span style={{ fontSize: 16, color: muted }}>›</span>
             </button>
 
             {/* Enhanced: Data Layers nav row */}
@@ -1143,7 +1142,7 @@ export default function ExplorerSidebar({
                 </div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>Data Layers</div>
-                  <div style={{ fontSize: 11, color: inkMuted, marginTop: 2 }}>Climate &amp; topography overlays</div>
+                  <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>Climate &amp; topography overlays</div>
                 </div>
               </div>
               <Chevron open={sections.layers} size={13} />
@@ -1181,7 +1180,7 @@ export default function ExplorerSidebar({
                   }}>ℹ️</div>
                   <div style={{ textAlign: 'left' }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>About &amp; Legend</div>
-                    <div style={{ fontSize: 11, color: inkMuted, marginTop: 2 }}>Data sources &amp; map key</div>
+                    <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>Data sources &amp; map key</div>
                   </div>
                 </div>
                 <Chevron open={sections.about} size={13} />
@@ -1224,12 +1223,12 @@ export default function ExplorerSidebar({
                       onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'none'; mapRef.current?.hoverAva(null); }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {ava.parentAva && <span style={{ width: 8, fontSize: 9, color: inkMuted }}>└</span>}
+                        {ava.parentAva && <span style={{ width: 8, fontSize: 9, color: muted }}>└</span>}
                         <span style={{ fontSize: 13, color: isSelected ? crimson : ink, fontWeight: isSelected ? 600 : 400 }}>
                           {ava.name}
                         </span>
                       </div>
-                      <span style={{ fontSize: 11, color: inkMuted }}>›</span>
+                      <span style={{ fontSize: 11, color: muted }}>›</span>
                     </button>
                   );
                 })}

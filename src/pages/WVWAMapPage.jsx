@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import WVWAMap, { LISTING_FILTER_MODES } from '../components/WVWAMap';
 import ExplorerSidebar from '../components/ExplorerSidebar';
-import { alpha, border, crimson, ink, parchment, TOKENS } from '../styles/tokens';
+import { alpha, border, crimson, ink, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 const UI = {
   taglineText:      alpha(TOKENS.parchment, 0.5),
@@ -21,7 +21,7 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
       width: isMobile ? '100%' : 300,
       height: '100%',
       flexShrink: 0,
-      background: inkDark,
+      background: ink,
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -91,10 +91,9 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
           border: `1.5px solid ${mapReady ? parchment : UI.btnBorderIdle}`,
           borderRadius: 4,
           color: mapReady ? parchment : UI.btnTextIdle,
+          ...TYPE.uiLabel,
           fontSize: 13,
           fontWeight: 600,
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
           cursor: mapReady ? 'pointer' : 'default',
           fontFamily: 'var(--font-sans)',
           transition: 'background 0.2s, color 0.2s, border-color 0.2s',

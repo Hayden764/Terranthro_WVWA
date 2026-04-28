@@ -1,5 +1,5 @@
 import React from 'react';
-import { TOKENS, alpha } from '../../styles/tokens';
+import { alpha, TOKENS, TYPE } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { WV_SUB_AVAS } from '../../config/topographyConfig';
 
@@ -18,10 +18,8 @@ const CARD = {
 };
 
 const LBL = {
+  ...TYPE.uiLabel,
   fontSize: 10,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.08em',
   color: GLASS.textDim,
   marginBottom: 4,
 };
@@ -183,13 +181,11 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
             {/* Nesting badge */}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
               <div style={{
+                ...TYPE.uiLabel,
                 display: 'inline-block',
                 padding: '3px 10px',
                 borderRadius: 20,
                 fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
                 background: GLASS.accentDim,
                 border: `1px solid ${UI.nestedBadgeBorder}`,
                 color: GLASS.text,
@@ -198,13 +194,11 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
               </div>
               {isChehalemParent && (
                 <div style={{
+                  ...TYPE.uiLabel,
                   display: 'inline-block',
                   padding: '3px 10px',
                   borderRadius: 20,
                   fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
                   background: UI.parentBadgeBg,
                   border: `1px solid ${UI.parentBadgeBorder}`,
                   color: TOKENS.amber,

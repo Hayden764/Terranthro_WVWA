@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
-import { TOKENS, alpha } from '../../styles/tokens';
+import { alpha, ink, TOKENS } from '../../styles/tokens';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
@@ -127,7 +127,7 @@ export default function AdminGeometryDiffMap({ oldGeometry, newGeometry, height 
         background: alpha(TOKENS.ink, 0.8), backdropFilter: 'blur(4px)',
         borderRadius: 5, padding: '6px 10px',
         display: 'flex', flexDirection: 'column', gap: 4,
-        fontSize: 11, fontFamily: "'Inter', sans-serif",
+        fontSize: 11, fontFamily: 'var(--font-sans)',
       }}>
         {oldGeometry && (
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: TOKENS.warning }}>

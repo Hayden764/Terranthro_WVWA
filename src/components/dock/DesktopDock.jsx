@@ -4,7 +4,7 @@ import DataLayerPanel from './DataLayerPanel';
 import ScalePanel from './ScalePanel';
 import InfoPanel from './InfoPanel';
 import WineriesPanel from './WineriesPanel';
-import { alpha, border, crimson, parchment, TOKENS } from '../../styles/tokens';
+import { alpha, border, crimson, parchment, TOKENS, TYPE } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 
 /**
@@ -50,11 +50,9 @@ const PanelShell = ({ title, onClose, children }) => (
       flexShrink: 0,
     }}>
       <span style={{
+        ...TYPE.uiLabel,
         fontSize: 12,
-        fontWeight: 700,
         color: GLASS.text,
-        textTransform: 'uppercase',
-        letterSpacing: '0.08em',
       }}>
         {title}
       </span>

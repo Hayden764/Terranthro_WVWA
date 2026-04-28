@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { TOKENS, alpha } from '../../styles/tokens';
+import { alpha, ink, muted, TOKENS } from '../../styles/tokens';
 import { apiJson, apiPost, apiFetch } from '../../lib/api';
 
 export default function AdminDashboard() {

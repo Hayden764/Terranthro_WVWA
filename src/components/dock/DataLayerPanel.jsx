@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { alpha, border, crimson, parchment, TOKENS } from '../../styles/tokens';
+import { alpha, border, crimson, parchment, TOKENS, TYPE } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { MONTH_ABBR } from '../../config/climateConfig';
 import { TOPO_LAYER_TYPES } from '../../config/topographyConfig';
@@ -30,10 +30,8 @@ const CARD = {
 };
 
 const SECTION_LABEL = {
+  ...TYPE.uiLabel,
   fontSize: 10,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.08em',
   color: GLASS.textDim,
   marginBottom: 8,
 };
@@ -211,16 +209,14 @@ export default function DataLayerPanel({
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={SECTION_LABEL}>Topography</span>
             <span style={{
+              ...TYPE.uiLabel,
               fontSize: 8,
-              fontWeight: 700,
-              letterSpacing: '0.06em',
               color: UI.lidarText,
               background: UI.lidarBg,
               border: `1px solid ${UI.lidarBorder}`,
               borderRadius: 4,
               padding: '1px 5px',
               lineHeight: 1.4,
-              textTransform: 'uppercase',
             }}>1m LiDAR</span>
           </div>
           <Chevron open={topoOpen} />
@@ -248,8 +244,9 @@ export default function DataLayerPanel({
                     fontFamily: 'var(--font-sans)',
                     transition: 'all 0.15s',
                     textAlign: 'center',
-                    letterSpacing: '0.03em',
-                    textTransform: 'uppercase',
+                    ...TYPE.uiLabel,
+                    fontSize: 10,
+                    fontWeight: 600,
                   }}
                   onMouseEnter={e => {
                     if (!active) e.currentTarget.style.background = UI.hoverBg;

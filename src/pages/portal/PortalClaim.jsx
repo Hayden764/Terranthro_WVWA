@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { border, ink, parchment, TOKENS } from '../../styles/tokens';
+import { border, ink, muted, parchment, TOKENS } from '../../styles/tokens';
 import { apiJson, apiPost } from '../../lib/api';
 
 export default function PortalClaim() {
@@ -67,12 +67,12 @@ export default function PortalClaim() {
         background: parchment, minHeight: '100vh',
         borderLeft: `1px solid ${border}`, borderRight: `1px solid ${border}`,
       }}>
-        <Link to="/portal/dashboard" style={{ color: inkLight, fontSize: 13 }}>← Dashboard</Link>
+        <Link to="/portal/dashboard" style={{ color: muted, fontSize: 13 }}>← Dashboard</Link>
 
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: ink, margin: '16px 0 8px' }}>
           Claim a Vineyard
         </h1>
-        <p style={{ color: inkMuted, fontSize: 13, marginBottom: 24 }}>
+        <p style={{ color: muted, fontSize: 13, marginBottom: 24 }}>
           Search for an existing unlinked vineyard parcel, or request to add a new one.
         </p>
 
@@ -102,9 +102,9 @@ export default function PortalClaim() {
         {searched && (
           <div style={{ marginBottom: 32 }}>
             {loading ? (
-              <p style={{ color: inkMuted, fontSize: 13 }}>Searching…</p>
+              <p style={{ color: muted, fontSize: 13 }}>Searching…</p>
             ) : results.length === 0 ? (
-              <p style={{ color: inkMuted, fontSize: 13 }}>No unlinked parcels found matching "{search}".</p>
+              <p style={{ color: muted, fontSize: 13 }}>No unlinked parcels found matching "{search}".</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {results.map((r) => (
@@ -115,7 +115,7 @@ export default function PortalClaim() {
                     <div style={{ fontWeight: 600, fontSize: 14, color: ink }}>
                       {r.vineyard_name || 'Unnamed Parcel'}
                     </div>
-                    <div style={{ fontSize: 12, color: inkMuted, marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: muted, marginTop: 2 }}>
                       {r.nested_ava || r.ava_name || '—'} · {Number(r.acres || 0).toFixed(1)} acres
                       {r.situs_city && ` · ${r.situs_city}`}
                     </div>
@@ -140,7 +140,7 @@ export default function PortalClaim() {
                         />
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => handleClaim(r.id)} style={smallBtn}>Submit Claim</button>
-                          <button onClick={() => { setClaiming(null); setClaimNotes(''); }} style={{ ...smallBtn, background: 'transparent', color: inkMuted, border: `1px solid ${border}` }}>
+                          <button onClick={() => { setClaiming(null); setClaimNotes(''); }} style={{ ...smallBtn, background: 'transparent', color: muted, border: `1px solid ${border}` }}>
                             Cancel
                           </button>
                         </div>
@@ -206,7 +206,7 @@ export default function PortalClaim() {
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="submit" style={smallBtn}>Submit</button>
-                <button type="button" onClick={() => setShowNew(false)} style={{ ...smallBtn, background: 'transparent', color: inkMuted, border: `1px solid ${border}` }}>
+                <button type="button" onClick={() => setShowNew(false)} style={{ ...smallBtn, background: 'transparent', color: muted, border: `1px solid ${border}` }}>
                   Cancel
                 </button>
               </div>
@@ -224,7 +224,7 @@ const smallBtn = {
   fontWeight: 600, cursor: 'pointer',
 };
 
-const labelStyle = { display: 'block', fontSize: 12, color: inkMuted, marginBottom: 4 };
+const labelStyle = { display: 'block', fontSize: 12, color: muted, marginBottom: 4 };
 
 const inputStyle = {
   width: '100%', padding: '8px 12px', borderRadius: 6,

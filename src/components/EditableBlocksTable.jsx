@@ -14,7 +14,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiPost } from '../lib/api';
-import { alpha, border, crimson, ink, parchment, TOKENS } from '../styles/tokens';
+import { alpha, border, crimson, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 const UI = {
   dirtyRowBg: alpha(TOKENS.crimson, 0.04),
@@ -167,13 +167,12 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                 <th
                   key={col.key}
                   style={{
+                    ...TYPE.uiLabel,
                     textAlign: 'left',
                     padding: '9px 10px',
-                    color: inkMuted,
+                    color: muted,
                     fontWeight: 600,
                     fontSize: 11,
-                    letterSpacing: '0.04em',
-                    textTransform: 'uppercase',
                     borderBottom: `1px solid ${border}`,
                     width: col.width,
                     whiteSpace: 'nowrap',
@@ -232,7 +231,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                         <span style={{
                           display: 'block',
                           padding: '9px 10px',
-                          color: rowData[col.key] ? ink : inkMuted,
+                          color: rowData[col.key] ? ink : muted,
                           fontStyle: rowData[col.key] ? 'normal' : 'italic',
                         }}>
                           {rowData[col.key] || '—'}
@@ -267,7 +266,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                 {COLUMNS.map((col) => (
                   <td key={col.key} style={{ padding: '0', verticalAlign: 'middle' }}>
                     {col.readonly ? (
-                      <span style={{ display: 'block', padding: '9px 10px', color: inkMuted, fontStyle: 'italic' }}>auto</span>
+                      <span style={{ display: 'block', padding: '9px 10px', color: muted, fontStyle: 'italic' }}>auto</span>
                     ) : (
                       <input
                         type={col.type}
@@ -308,7 +307,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
         }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button onClick={addNewRow} style={addRowBtnStyle}>+ Add Block</button>
-            <p style={{ fontSize: 12, color: inkMuted, margin: 0 }}>
+            <p style={{ fontSize: 12, color: muted, margin: 0 }}>
               {hasChanges
                 ? `${changedBlocks.length + pendingNewRows.length} pending — submit for admin review`
                 : 'Edit cells above · Acres are calculated automatically'}
@@ -350,7 +349,7 @@ const iconBtnStyle = {
   background: 'none',
   border: 'none',
   cursor: 'pointer',
-  color: inkMuted,
+  color: muted,
   fontSize: 11,
   padding: '2px 4px',
   lineHeight: 1,
@@ -387,7 +386,7 @@ const secondaryBtnStyle = {
   borderRadius: 6,
   border: `1px solid ${border}`,
   background: 'transparent',
-  color: inkMuted,
+  color: muted,
   cursor: 'pointer',
   fontSize: 13,
   fontFamily: 'var(--font-sans)',

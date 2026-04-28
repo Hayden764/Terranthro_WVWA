@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { TOKENS, alpha, mix } from '../styles/tokens';
+import { alpha, ink, mix, TOKENS } from '../styles/tokens';
 
 const MAX_PITCH_FLAT = 85;
 const MAX_PITCH_WITH_TERRAIN = 71;

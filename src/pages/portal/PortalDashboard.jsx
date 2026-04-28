@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { border, ink, parchment, TOKENS } from '../../styles/tokens';
+import { border, ink, muted, parchment, TOKENS } from '../../styles/tokens';
 import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 
@@ -42,7 +42,7 @@ export default function PortalDashboard() {
   }
 
   if (loading) {
-    return <PageShell><p style={{ color: inkMuted }}>Loading…</p></PageShell>;
+    return <PageShell><p style={{ color: muted }}>Loading…</p></PageShell>;
   }
 
   const pendingRequests = requests.filter((r) => r.status === 'pending');
@@ -58,7 +58,7 @@ export default function PortalDashboard() {
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, color: ink, margin: 0 }}>
             {profile?.title}
           </h1>
-          <p style={{ color: inkMuted, fontSize: 13, marginTop: 4 }}>Winery Portal</p>
+          <p style={{ color: muted, fontSize: 13, marginTop: 4 }}>Winery Portal</p>
         </div>
         <button onClick={handleLogout} style={linkBtnStyle}>Sign Out</button>
       </div>
@@ -88,7 +88,7 @@ export default function PortalDashboard() {
               }
             }}
           />
-          <p style={{ fontSize: 12, color: inkMuted, marginTop: 8 }}>
+          <p style={{ fontSize: 12, color: muted, marginTop: 8 }}>
             Click a parcel to view details.
           </p>
         </Section>
@@ -107,7 +107,7 @@ export default function PortalDashboard() {
       {/* Vineyards — grouped by name */}
       <Section title="Linked Vineyards">
         {vineyards.length === 0 ? (
-          <p style={{ color: inkMuted, fontSize: 14 }}>No vineyards linked yet.</p>
+          <p style={{ color: muted, fontSize: 14 }}>No vineyards linked yet.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {groupVineyardsByName(vineyards).map((group) => {
@@ -137,12 +137,12 @@ export default function PortalDashboard() {
                   }}
                 >
                   <div style={{ fontWeight: 600, fontSize: 15 }}>{group.name}</div>
-                  <div style={{ fontSize: 13, color: inkMuted, marginTop: 4 }}>
+                  <div style={{ fontSize: 13, color: muted, marginTop: 4 }}>
                     {ava}
                     {group.parcels.length > 1 && ` · ${group.parcels.length} parcels`}
                     {totalBlocks > 0 && ` · ${totalBlocks} blocks`}
                   </div>
-                  <div style={{ fontSize: 12, color: inkLight, marginTop: 6, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 12, color: muted, marginTop: 6, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                     <span>{totalAcres.toFixed(1)} ac</span>
                     {topo && (
                       <>
@@ -165,7 +165,7 @@ export default function PortalDashboard() {
       {/* Recent requests */}
       <Section title="Recent Requests">
         {requests.length === 0 ? (
-          <p style={{ color: inkMuted, fontSize: 14 }}>No requests submitted yet.</p>
+          <p style={{ color: muted, fontSize: 14 }}>No requests submitted yet.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {requests.slice(0, 10).map((r) => (
@@ -228,7 +228,7 @@ function StatCard({ label, value }) {
       textAlign: 'center',
     }}>
       <div style={{ fontSize: 28, fontWeight: 700, color: ink }}>{value}</div>
-      <div style={{ fontSize: 12, color: inkMuted, marginTop: 4 }}>{label}</div>
+      <div style={{ fontSize: 12, color: muted, marginTop: 4 }}>{label}</div>
     </div>
   );
 }
@@ -236,7 +236,7 @@ function StatCard({ label, value }) {
 function InfoRow({ label, value }) {
   return (
     <div style={{ display: 'flex', gap: 12, marginBottom: 8, fontSize: 14 }}>
-      <span style={{ color: inkMuted, minWidth: 100, flexShrink: 0 }}>{label}</span>
+      <span style={{ color: muted, minWidth: 100, flexShrink: 0 }}>{label}</span>
       <span style={{ color: ink, wordBreak: 'break-word' }}>{value}</span>
     </div>
   );
@@ -278,7 +278,7 @@ const linkBtnStyle = {
   borderRadius: 6,
   padding: '6px 16px',
   fontSize: 13,
-  color: inkLight,
+  color: muted,
   cursor: 'pointer',
 };
 

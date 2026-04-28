@@ -9,7 +9,7 @@
  */
 import { useState, useCallback } from 'react';
 import { apiJson } from '../lib/api';
-import { border, ink, parchment, TOKENS } from '../styles/tokens';
+import { border, ink, muted, parchment, TOKENS } from '../styles/tokens';
 
 const REQUEST_TYPE_LABELS = {
   profile:             'Winery Profile',
@@ -53,22 +53,22 @@ function FieldChange({ entry }) {
       display: 'flex', gap: 8, alignItems: 'flex-start',
       padding: '6px 0', borderBottom: `1px solid ${border}18`, fontSize: 12,
     }}>
-      <span style={{ minWidth: 100, color: inkMuted, flexShrink: 0, fontWeight: 500 }}>
+      <span style={{ minWidth: 100, color: muted, flexShrink: 0, fontWeight: 500 }}>
         {field}
       </span>
       {isGeometry ? (
-        <span style={{ color: inkMuted, fontStyle: 'italic' }}>Boundary geometry updated</span>
+        <span style={{ color: muted, fontStyle: 'italic' }}>Boundary geometry updated</span>
       ) : (
         <span style={{ color: ink }}>
           {entry.old_value ? (
             <>
-              <span style={{ textDecoration: 'line-through', color: inkMuted, marginRight: 6 }}>
+              <span style={{ textDecoration: 'line-through', color: muted, marginRight: 6 }}>
                 {entry.old_value}
               </span>
-              → {entry.new_value || <em style={{ color: inkMuted }}>cleared</em>}
+              → {entry.new_value || <em style={{ color: muted }}>cleared</em>}
             </>
           ) : (
-            entry.new_value || <em style={{ color: inkMuted }}>—</em>
+            entry.new_value || <em style={{ color: muted }}>—</em>
           )}
         </span>
       )}
@@ -139,17 +139,17 @@ export default function ParcelHistorySection({ parcelId }) {
         }}
       >
         <span style={{ fontSize: 13, fontWeight: 600, color: ink }}>Edit History</span>
-        <span style={{ fontSize: 12, color: inkMuted }}>{open ? '▲' : '▼'}</span>
+        <span style={{ fontSize: 12, color: muted }}>{open ? '▲' : '▼'}</span>
       </button>
 
       {open && (
         <div style={{ paddingBottom: 8 }}>
           {loading && (
-            <p style={{ fontSize: 13, color: inkMuted, padding: '8px 0' }}>Loading…</p>
+            <p style={{ fontSize: 13, color: muted, padding: '8px 0' }}>Loading…</p>
           )}
 
           {isEmpty && (
-            <p style={{ fontSize: 13, color: inkMuted, padding: '8px 0' }}>
+            <p style={{ fontSize: 13, color: muted, padding: '8px 0' }}>
               No edit history yet.
             </p>
           )}
@@ -168,12 +168,12 @@ export default function ParcelHistorySection({ parcelId }) {
                       {REQUEST_TYPE_LABELS[r.request_type] || r.request_type}
                     </span>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: inkMuted }}>{formatDate(r.created_at)}</span>
+                      <span style={{ fontSize: 11, color: muted }}>{formatDate(r.created_at)}</span>
                       <StatusBadge status={r.status} />
                     </div>
                   </div>
                   {r.admin_notes && (
-                    <p style={{ fontSize: 12, color: inkMuted, margin: '4px 0 0', fontStyle: 'italic' }}>
+                    <p style={{ fontSize: 12, color: muted, margin: '4px 0 0', fontStyle: 'italic' }}>
                       Admin note: {r.admin_notes}
                     </p>
                   )}
@@ -195,9 +195,9 @@ export default function ParcelHistorySection({ parcelId }) {
                 </span>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   {group.reviewed_by && (
-                    <span style={{ fontSize: 11, color: inkMuted }}>by {group.reviewed_by}</span>
+                    <span style={{ fontSize: 11, color: muted }}>by {group.reviewed_by}</span>
                   )}
-                  <span style={{ fontSize: 11, color: inkMuted }}>{formatDate(group.edited_at)}</span>
+                  <span style={{ fontSize: 11, color: muted }}>{formatDate(group.edited_at)}</span>
                   <StatusBadge status="approved" />
                 </div>
               </div>
@@ -207,7 +207,7 @@ export default function ParcelHistorySection({ parcelId }) {
               ))}
 
               {group.admin_notes && (
-                <p style={{ fontSize: 12, color: inkMuted, marginTop: 8, fontStyle: 'italic' }}>
+                <p style={{ fontSize: 12, color: muted, marginTop: 8, fontStyle: 'italic' }}>
                   Note: {group.admin_notes}
                 </p>
               )}

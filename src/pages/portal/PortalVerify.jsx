@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { alpha, border, crimson, ink, parchment, TOKENS } from '../../styles/tokens';
+import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '../../styles/tokens';
 import { apiFetch } from '../../lib/api';
 
 export default function PortalVerify() {
@@ -57,7 +57,7 @@ export default function PortalVerify() {
         {status === 'verifying' && (
           <>
             <div style={{ fontSize: 32, marginBottom: 16 }}>⏳</div>
-            <p style={{ color: inkMuted }}>Verifying your sign-in link…</p>
+            <p style={{ color: muted }}>Verifying your sign-in link…</p>
           </>
         )}
         {status === 'success' && (

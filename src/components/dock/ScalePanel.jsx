@@ -1,4 +1,4 @@
-import { TOKENS, alpha } from '../../styles/tokens';
+import { alpha, TOKENS, TYPE } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { TOPO_LAYER_TYPES } from '../../config/topographyConfig';
 
@@ -16,10 +16,8 @@ const CARD = {
 };
 
 const LABEL = {
+  ...TYPE.uiLabel,
   fontSize: 10,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.08em',
   color: GLASS.textDim,
   marginBottom: 6,
 };
@@ -158,7 +156,7 @@ export default function ScalePanel({ activeLayer, topoStats }) {
           }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: GLASS.textMuted }}>
             <span>{climateRamp.min}</span>
-            <span style={{ fontSize: 9, color: GLASS.textDim, textTransform: 'uppercase', letterSpacing: '0.04em' }}>min – max</span>
+            <span style={{ ...TYPE.uiLabel, fontSize: 9, color: GLASS.textDim }}>min – max</span>
             <span>{climateRamp.max}</span>
           </div>
         </div>

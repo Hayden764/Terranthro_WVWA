@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { LISTING_CATEGORIES } from './WVWAMap';
 import { alpha, border, crimson, ink, mix, parchment, TOKENS } from '../styles/tokens';
+import { alpha, border, crimson, ink, mix, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 // Category order for display
 const CATEGORY_ORDER = ['winery', 'tasting', 'restaurant', 'hotel', 'other'];
@@ -295,7 +296,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
                       width: 10, height: 10, borderRadius: '50%',
                       background: cat.color, flexShrink: 0,
                     }} />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: cat.color, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    <span style={{ ...TYPE.uiLabel, fontSize: 11, color: cat.color }}>
                       {cat.label}
                     </span>
                     <span style={{ fontSize: 11, color: UI.textFaint, fontWeight: 500 }}>

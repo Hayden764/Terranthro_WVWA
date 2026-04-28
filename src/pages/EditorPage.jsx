@@ -4,7 +4,7 @@ import maplibregl from 'maplibre-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { TOKENS } from '../styles/tokens';
+import { TOKENS, TYPE } from '../styles/tokens';
 
 const API_BASE = import.meta.env.DEV
   ? ''
@@ -877,7 +877,7 @@ export default function EditorPage() {
         {/* ── Draw-new-block panel ── */}
         {isDrawingNew && (
           <div style={{ background: TOKENS.surfaceRaised, borderRadius: 8, border: `1px solid ${TOKENS.border}`, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ color: TOKENS.electricBlue, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>New Block</div>
+            <div style={{ ...TYPE.uiLabel, color: TOKENS.electricBlue, fontSize: 11, fontWeight: 600 }}>New Block</div>
             {statusMessage && (
               <div style={{ color: TOKENS.muted, fontSize: 11, lineHeight: 1.5 }}>{statusMessage}</div>
             )}
@@ -900,14 +900,14 @@ export default function EditorPage() {
         {/* ── Staged changes panel ──────────────────────────────────────── */}
         {stagedOps.length > 0 && (
           <div style={{ borderTop: `1px solid ${TOKENS.border}`, paddingTop: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: TOKENS.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+            <div style={{ ...TYPE.uiLabel, fontSize: 11, color: TOKENS.muted, marginBottom: 8 }}>
               Staged ({stagedOps.length})
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 10, maxHeight: 160, overflowY: 'auto' }}>
               {stagedOps.map((op, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: TOKENS.surfaceRaised, borderRadius: 5, padding: '5px 8px' }}>
                   <div>
-                    <span style={{ fontSize: 11, color: op.op === 'geometry' ? TOKENS.electricBlue : op.op === 'add' ? TOKENS.success : op.op === 'delete' ? TOKENS.danger : TOKENS.violet, fontWeight: 600, textTransform: 'uppercase' }}>{op.op}</span>
+                    <span style={{ ...TYPE.uiLabel, fontSize: 11, color: op.op === 'geometry' ? TOKENS.electricBlue : op.op === 'add' ? TOKENS.success : op.op === 'delete' ? TOKENS.danger : TOKENS.violet, fontWeight: 600 }}>{op.op}</span>
                     <span style={{ fontSize: 11, color: TOKENS.muted, marginLeft: 6 }}>{op.parcel_name}</span>
                   </div>
                   <button
@@ -966,7 +966,7 @@ function MetaField({ label, field, form, setForm, type = 'text', multiline = fal
   };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <label style={{ color: TOKENS.ghost, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+      <label style={{ ...TYPE.uiLabel, color: TOKENS.ghost, fontSize: 10, fontWeight: 600 }}>
         {label}
       </label>
       {multiline ? (

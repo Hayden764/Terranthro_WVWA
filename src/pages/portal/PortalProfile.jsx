@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { border, crimson, ink, parchment, TOKENS } from '../../styles/tokens';
+import { border, crimson, ink, muted, parchment, TOKENS } from '../../styles/tokens';
 import { apiJson, apiPost } from '../../lib/api';
 
 export default function PortalProfile() {
@@ -64,19 +64,19 @@ export default function PortalProfile() {
   }
 
   if (!profile) {
-    return <Shell><p style={{ color: inkMuted }}>Loading…</p></Shell>;
+    return <Shell><p style={{ color: muted }}>Loading…</p></Shell>;
   }
 
   return (
     <Shell>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <Link to="/portal/dashboard" style={{ color: inkLight, fontSize: 13 }}>← Dashboard</Link>
+        <Link to="/portal/dashboard" style={{ color: muted, fontSize: 13 }}>← Dashboard</Link>
       </div>
 
       <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: ink, marginBottom: 8 }}>
         Edit Profile
       </h1>
-      <p style={{ color: inkMuted, fontSize: 13, marginBottom: 24 }}>
+      <p style={{ color: muted, fontSize: 13, marginBottom: 24 }}>
         Changes are submitted for review and applied once approved.
       </p>
 
@@ -146,7 +146,7 @@ function Shell({ children }) {
 function Field({ label, children }) {
   return (
     <div style={{ marginBottom: 18 }}>
-      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: inkLight, marginBottom: 6 }}>
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: muted, marginBottom: 6 }}>
         {label}
       </label>
       {children}
@@ -224,7 +224,7 @@ function PasswordSection({ hasPassword }) {
       <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 18, color: ink, marginBottom: 6 }}>
         {hasPassword ? 'Change Password' : 'Set a Password'}
       </h2>
-      <p style={{ color: inkMuted, fontSize: 13, marginBottom: 20 }}>
+      <p style={{ color: muted, fontSize: 13, marginBottom: 20 }}>
         {hasPassword
           ? 'Update your portal login password.'
           : 'Set a password so you can log in without an email link.'}

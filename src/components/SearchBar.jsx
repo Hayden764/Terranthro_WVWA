@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { WV_SUB_AVAS } from '../config/topographyConfig';
 import { LISTING_CATEGORIES } from './WVWAMap';
-import { alpha, border, crimson, ink, parchment, TOKENS } from '../styles/tokens';
+import { alpha, border, crimson, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 const API_BASE = import.meta.env.DEV
   ? ''
@@ -234,7 +234,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           }}>
             {r.label}
           </div>
-          <div style={{ fontSize: 11, color: inkMuted, marginTop: 1, lineHeight: 1.2 }}>
+          <div style={{ fontSize: 11, color: muted, marginTop: 1, lineHeight: 1.2 }}>
             {label}
           </div>
         </div>
@@ -258,7 +258,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          color: inkDark,
+          color: ink,
           flexShrink: 0,
         }}
       >
@@ -302,7 +302,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           : `0 2px 8px ${UI.inputShadow}`,
         transition: 'border-color 0.15s, border-radius 0.1s, box-shadow 0.15s',
       }}>
-        <span style={{ color: open ? crimson : inkMuted, flexShrink: 0, display: 'flex', transition: 'color 0.15s' }}>
+        <span style={{ color: open ? crimson : muted, flexShrink: 0, display: 'flex', transition: 'color 0.15s' }}>
           {loading
             ? <SpinnerIcon />
             : <SearchIcon />}
@@ -344,7 +344,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
             style={{
               background: 'none',
               border: 'none',
-              color: inkMuted,
+              color: muted,
               cursor: 'pointer',
               fontSize: 14,
               lineHeight: 1,
@@ -364,7 +364,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
             style={{
               background: 'none',
               border: 'none',
-              color: inkMuted,
+              color: muted,
               cursor: 'pointer',
               fontSize: 11,
               lineHeight: 1,
@@ -398,7 +398,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
             <div style={{
               padding: '14px 16px',
               fontSize: 13,
-              color: inkMuted,
+              color: muted,
               textAlign: 'center',
             }}>
               No results for &ldquo;{query}&rdquo;
@@ -437,12 +437,10 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
 function SectionHeader({ label }) {
   return (
     <div style={{
+      ...TYPE.uiLabel,
       padding: '5px 14px 3px',
       fontSize: 10,
-      fontWeight: 700,
-      letterSpacing: '0.08em',
-      textTransform: 'uppercase',
-      color: inkMuted,
+      color: muted,
       borderTop: `1px solid ${border}`,
     }}
       dangerouslySetInnerHTML={{ __html: label }}

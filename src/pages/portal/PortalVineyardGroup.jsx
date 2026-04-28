@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import lineSplit from '@turf/line-split';
 import { feature as turfFeature } from '@turf/helpers';
-import { border, crimson, ink, parchment, TOKENS } from '../../styles/tokens';
+import { border, crimson, ink, muted, parchment, TOKENS } from '../../styles/tokens';
 import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import EditableBlocksTable from '../../components/EditableBlocksTable';
@@ -74,7 +74,7 @@ export default function PortalVineyardGroup() {
   }, [navigate]);
 
   if (loading) {
-    return <Shell><p style={{ color: inkMuted }}>Loading…</p></Shell>;
+    return <Shell><p style={{ color: muted }}>Loading…</p></Shell>;
   }
 
   const totalAcres = parcels.reduce((s, v) => s + Number(v.acres || 0), 0);
@@ -199,7 +199,7 @@ export default function PortalVineyardGroup() {
           onAddCancel={() => setAddingParcel(false)}
         />
         {!editingParcelId && !splittingParcelId && !addingParcel && (
-          <p style={{ fontSize: 11, color: inkMuted, padding: '6px 12px', margin: 0, borderTop: `1px solid ${border}`, background: parchment }}>
+          <p style={{ fontSize: 11, color: muted, padding: '6px 12px', margin: 0, borderTop: `1px solid ${border}`, background: parchment }}>
             Click a parcel to highlight it →
           </p>
         )}
@@ -213,7 +213,7 @@ export default function PortalVineyardGroup() {
           background: parchment, borderBottom: `1px solid ${border}`,
           padding: '12px 0', marginBottom: 8,
         }}>
-          <Link to="/portal/dashboard" style={{ color: inkLight, fontSize: 13 }}>
+          <Link to="/portal/dashboard" style={{ color: muted, fontSize: 13 }}>
             ← Dashboard
           </Link>
         </div>
@@ -224,7 +224,7 @@ export default function PortalVineyardGroup() {
         }}>
           {name}
         </h1>
-        <p style={{ color: inkMuted, fontSize: 13, marginBottom: 24 }}>
+        <p style={{ color: muted, fontSize: 13, marginBottom: 24 }}>
           {parcels[0]?.nested_ava || parcels[0]?.ava_name || '—'}
           {' · '}
           {totalAcres.toFixed(1)} acres total
@@ -274,7 +274,7 @@ export default function PortalVineyardGroup() {
         {/* Add Parcel — group-level (not per-parcel) */}
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', paddingTop: 8 }}>
           {addingParcel ? (
-            <span style={{ fontSize: 13, color: inkMuted }}>Drawing new parcel on map…</span>
+            <span style={{ fontSize: 13, color: muted }}>Drawing new parcel on map…</span>
           ) : addSubmitStatus === 'success' ? (
             <span style={{ fontSize: 13, color: TOKENS.success, fontWeight: 500 }}>✓ New parcel submitted for review</span>
           ) : (
@@ -288,7 +288,7 @@ export default function PortalVineyardGroup() {
         {pendingAdd && (
           <div style={{ background: TOKENS.warningDim, border: `1px solid ${TOKENS.warning}`, borderRadius: 8, padding: '14px 16px' }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: ink, marginBottom: 6 }}>+ Review new parcel</p>
-            <p style={{ fontSize: 12, color: inkMuted, marginBottom: 10 }}>Give the new parcel a name and any notes for the admin.</p>
+            <p style={{ fontSize: 12, color: muted, marginBottom: 10 }}>Give the new parcel a name and any notes for the admin.</p>
             <input
               type="text"
               placeholder="Parcel / vineyard name"
@@ -308,7 +308,7 @@ export default function PortalVineyardGroup() {
               <button onClick={submitAdd} disabled={addSubmitStatus === 'submitting' || !pendingAdd.vineyard_name.trim()} style={smallBtnStyle}>
                 {addSubmitStatus === 'submitting' ? 'Submitting…' : 'Submit for Review'}
               </button>
-              <button onClick={() => { setPendingAdd(null); setAddSubmitStatus(null); }} style={{ ...smallBtnStyle, background: 'transparent', color: inkMuted, border: `1px solid ${border}` }}>
+              <button onClick={() => { setPendingAdd(null); setAddSubmitStatus(null); }} style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}>
                 Discard
               </button>
             </div>
@@ -361,14 +361,14 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
         <div>
           <div style={{ fontWeight: 600, fontSize: 14, color: ink }}>
             {parcel.vineyard_name || 'Unnamed Parcel'}
-            <span style={{ fontWeight: 400, color: inkMuted, marginLeft: 8, fontSize: 12 }}>
+            <span style={{ fontWeight: 400, color: muted, marginLeft: 8, fontSize: 12 }}>
               #{parcel.id}
             </span>
           </div>
           {address && (
-            <div style={{ fontSize: 12, color: inkMuted, marginTop: 2 }}>{address}</div>
+            <div style={{ fontSize: 12, color: muted, marginTop: 2 }}>{address}</div>
           )}
-          <div style={{ fontSize: 12, color: inkMuted, marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: muted, marginTop: 2 }}>
             {parcel.acres ? `${Number(parcel.acres).toFixed(1)} acres` : 'Acreage unknown'}
             {parcel.nested_ava && ` · ${parcel.nested_ava}`}
           </div>
@@ -388,7 +388,7 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
         <div style={{
           margin: '0 16px 12px',
           padding: '8px 12px', borderRadius: 6,
-          background: parchment, fontSize: 12, color: inkMuted,
+          background: parchment, fontSize: 12, color: muted,
           display: 'flex', gap: 16, flexWrap: 'wrap',
         }}>
           <span>Elev: {Number(parcel.topo_stats.elevation_min_ft).toFixed(0)}–{Number(parcel.topo_stats.elevation_max_ft).toFixed(0)} ft</span>
@@ -415,7 +415,7 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
       }}>
         {/* Edit Block Info */}
         {editingBlocks ? (
-          <span style={{ fontSize: 12, color: inkMuted, alignSelf: 'center' }}>
+          <span style={{ fontSize: 12, color: muted, alignSelf: 'center' }}>
             Editing block info above…
           </span>
         ) : (
@@ -429,7 +429,7 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
           <button onClick={onEditGeometry} style={smallBtnStyle}>Edit Boundary</button>
         )}
         {isEditing && (
-          <span style={{ fontSize: 12, color: inkMuted, alignSelf: 'center' }}>Editing on map…</span>
+          <span style={{ fontSize: 12, color: muted, alignSelf: 'center' }}>Editing on map…</span>
         )}
         {geoSubmitStatus === 'success' && (
           <span style={{ fontSize: 12, color: TOKENS.success, fontWeight: 500 }}>✓ Boundary submitted</span>
@@ -438,7 +438,7 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
         {/* Split Parcel */}
         {onSplitParcel && !pendingSplit && splitSubmitStatus !== 'success' && (
           isSplitting ? (
-            <span style={{ fontSize: 12, color: inkMuted, alignSelf: 'center' }}>Drawing split line…</span>
+            <span style={{ fontSize: 12, color: muted, alignSelf: 'center' }}>Drawing split line…</span>
           ) : (
             <button onClick={onSplitParcel} style={smallBtnStyle}>Split Parcel</button>
           )
@@ -488,7 +488,7 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
             <button onClick={onRemoveSubmit} disabled={removeSubmitStatus === 'submitting'} style={{ ...smallBtnStyle, background: crimson }}>
               {removeSubmitStatus === 'submitting' ? 'Submitting…' : 'Submit Request'}
             </button>
-            <button onClick={onRemoveCancel} style={{ ...smallBtnStyle, background: 'transparent', color: inkMuted, border: `1px solid ${border}` }}>Cancel</button>
+            <button onClick={onRemoveCancel} style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}>Cancel</button>
           </div>
         </div>
       )}
@@ -497,7 +497,7 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
       {pendingSplit && (
         <div style={{ margin: '0 16px 16px', background: TOKENS.warningDim, border: `1px solid ${TOKENS.warning}`, borderRadius: 8, padding: '14px 16px' }}>
           <p style={{ fontSize: 13, fontWeight: 600, color: ink, marginBottom: 6 }}>✂ Confirm parcel split</p>
-          <p style={{ fontSize: 12, color: inkMuted, marginBottom: 10 }}>
+          <p style={{ fontSize: 12, color: muted, marginBottom: 10 }}>
             {pendingSplit.polygon_a ? 'Two sub-parcels were computed from your split line.' : 'Split line recorded — admin will apply manually.'}
           </p>
           <textarea
@@ -512,7 +512,7 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
             <button onClick={onSplitSubmit} disabled={splitSubmitStatus === 'submitting'} style={smallBtnStyle}>
               {splitSubmitStatus === 'submitting' ? 'Submitting…' : 'Submit Split Request'}
             </button>
-            <button onClick={onSplitDiscard} style={{ ...smallBtnStyle, background: 'transparent', color: inkMuted, border: `1px solid ${border}` }}>Discard</button>
+            <button onClick={onSplitDiscard} style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}>Discard</button>
           </div>
         </div>
       )}
@@ -532,7 +532,7 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
           <p style={{ fontSize: 13, fontWeight: 600, color: ink, marginBottom: 6 }}>
             ⚠ Review before submitting
           </p>
-          <p style={{ fontSize: 12, color: inkMuted, marginBottom: 10 }}>
+          <p style={{ fontSize: 12, color: muted, marginBottom: 10 }}>
             Your boundary change will be sent to admin for approval.
           </p>
           <textarea
@@ -559,7 +559,7 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
               </button>
               <button
                 onClick={onPendingDiscard}
-                style={{ ...smallBtnStyle, background: 'transparent', color: inkMuted, border: `1px solid ${border}` }}
+                style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}
               >
                 Discard
               </button>
@@ -630,7 +630,7 @@ function RequestButton({ vineyard, type, label }) {
 
   return (
     <div style={{ width: '100%', marginTop: 4 }}>
-      <label style={{ fontSize: 12, color: inkMuted, marginBottom: 4, display: 'block' }}>
+      <label style={{ fontSize: 12, color: muted, marginBottom: 4, display: 'block' }}>
         {type === 'vineyard_varietals' ? 'New varietals list' : 'Describe the requested changes'}
       </label>
       <textarea
@@ -649,7 +649,7 @@ function RequestButton({ vineyard, type, label }) {
         </button>
         <button
           onClick={() => setOpen(false)}
-          style={{ ...smallBtnStyle, background: 'transparent', color: inkMuted, border: `1px solid ${border}` }}
+          style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}
         >
           Cancel
         </button>

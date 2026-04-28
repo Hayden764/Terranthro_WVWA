@@ -1,4 +1,4 @@
-import { TOKENS, alpha } from '../../styles/tokens';
+import { alpha, TOKENS, TYPE } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { LISTING_CATEGORIES, LISTING_FILTER_MODES } from '../WVWAMap';
 
@@ -39,14 +39,12 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
   const wineryCategory = LISTING_CATEGORIES.winery;
 
   return (
-    <div style={{ padding: '12px 12px 16px', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ padding: '12px 12px 16px', fontFamily: 'var(--font-sans)' }}>
 
       {/* ── Listing mode buttons ─────────────────────────────────── */}
       <div style={{
+        ...TYPE.uiLabel,
         fontSize: 10,
-        fontWeight: 700,
-        textTransform: 'uppercase',
-        letterSpacing: '0.08em',
         color: GLASS.textDim,
         marginBottom: 8,
       }}>
@@ -197,10 +195,8 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
 
       {/* ── Listing count ─────────────────────────────────────────── */}
       <div style={{
+        ...TYPE.uiLabel,
         fontSize: 10,
-        fontWeight: 700,
-        textTransform: 'uppercase',
-        letterSpacing: '0.08em',
         color: GLASS.textDim,
         marginBottom: 8,
       }}>

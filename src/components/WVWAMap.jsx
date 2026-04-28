@@ -517,6 +517,39 @@ function raiseListingLayers(map) {
 }
 
 /**
+ * Fit the camera to the bounding box of a set of vineyard polygon features.
+ * Returns true if bounds were valid and fitBounds was called; false if caller
+ * should fall back to a point-based navigation.
+ */
+function flyToVineyardBounds(map, features) {
+  if (!features?.length) return false;
+  let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+  for (const feature of features) {
+    const rings = feature.geometry.type === 'Polygon'
+      ? feature.geometry.coordinates
+      : feature.geometry.coordinates.flat();
+    for (const ring of rings) {
+      for (const [lng, lat] of ring) {
+        if (lng < minLng) minLng = lng;
+        if (lat < minLat) minLat = lat;
+        if (lng > maxLng) maxLng = lng;
+        if (lat > maxLat) maxLat = lat;
+      }
+    }
+  }
+  if (![minLng, minLat, maxLng, maxLat].every(Number.isFinite)) return false;
+  map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
+    padding: { top: 100, bottom: 100, left: 80, right: 80 },
+    maxZoom: features.length === 1 ? 16.2 : 14.8,
+    pitch: 40,
+    curve: 1.4,
+    speed: 0.55,
+    essential: true,
+  });
+  return true;
+}
+
+/**
  * blinkMapLayer — pulse a paint property through a sequence of timed values.
  * beats: [{ delay: ms, value: any }, ...]
  */
@@ -1569,14 +1602,15 @@ const WVWAMap = forwardRef(function WVWAMap({
       if (!map || !slug) return;
       const cam = AVA_CAMERA[slug];
       if (cam) {
-        map.easeTo({
+        map.flyTo({
           center:   [cam.lng, cam.lat],
           zoom:     cam.zoom,
           pitch:    cam.pitch   ?? 40,
           bearing:  cam.bearing ?? 0,
-          duration: 1800,
+          curve:    1.85,
+          speed:    0.45,
+          easing:   t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2,
           essential: true,
-          freezeElevation: true,
         });
       } else {
         const avaSource = map.getSource(`ava-${slug}`);
@@ -1589,7 +1623,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             };
             const features = avaSource._data.features || [avaSource._data];
             features.forEach(f => addCoords(f.geometry.coordinates));
-            map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, pitch: 40, duration: 1800, freezeElevation: true, linear: true });
+            map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, pitch: 40, curve: 1.85, speed: 0.45, freezeElevation: true });
           } catch (e) { /* ignore */ }
         }
       }
@@ -1610,7 +1644,9 @@ const WVWAMap = forwardRef(function WVWAMap({
         raiseListingLayers(map);
       }
 
-      map.easeTo({ center: [listing.lng, listing.lat], zoom: 15, duration: 1900 });
+      if (!flyToVineyardBounds(map, vineyardFeatures)) {
+        map.flyTo({ center: [listing.lng, listing.lat], zoom: 14, curve: 1.4, speed: 0.55, essential: true });
+      }
       map.once('moveend', () => {
         const BLINK = [
           { delay:   0, value: 1.0 },
@@ -1663,7 +1699,9 @@ const WVWAMap = forwardRef(function WVWAMap({
           src.setData({ type: 'FeatureCollection', features });
           raiseListingLayers(map);
         }
-        map.easeTo({ center: [lng, lat], zoom: 15, duration: 1900 });
+        if (!flyToVineyardBounds(map, features)) {
+          map.flyTo({ center: [lng, lat], zoom: 14, curve: 1.4, speed: 0.55, essential: true });
+        }
         map.once('moveend', () => {
           if (map.getLayer('vineyards-selected-fill'))
             map.setLayoutProperty('vineyards-selected-fill', 'visibility', 'visible');
@@ -1695,7 +1733,9 @@ const WVWAMap = forwardRef(function WVWAMap({
           src.setData({ type: 'FeatureCollection', features });
           raiseListingLayers(map);
         }
-        map.easeTo({ center: [lng, lat], zoom: 15, duration: 1900 });
+        if (!flyToVineyardBounds(map, features)) {
+          map.flyTo({ center: [lng, lat], zoom: 14, curve: 1.4, speed: 0.55, essential: true });
+        }
         map.once('moveend', () => {
           const WHITE_LINE = [
             { delay:   0, value: 1.0 },
@@ -1718,7 +1758,7 @@ const WVWAMap = forwardRef(function WVWAMap({
     },
     flyToCoords({ lng, lat, zoom = 14 }) {
       if (mapRef.current) {
-        mapRef.current.easeTo({ center: [lng, lat], zoom, duration: 1600 });
+        mapRef.current.flyTo({ center: [lng, lat], zoom, curve: 1.4, speed: 0.55, essential: true });
       }
     },
     // Called by ExplorerSidebar's onVineyardHover to highlight parcels on map
@@ -1756,8 +1796,11 @@ const WVWAMap = forwardRef(function WVWAMap({
       const isSingle = features.length === 1;
       map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
         padding: { top: 80, bottom: 80, left: 60, right: 60 },
-        duration: isSingle ? 1350 : 1500,
         maxZoom: isSingle ? 16.2 : 14.8,
+        pitch: 40,
+        curve: 1.4,
+        speed: 0.55,
+        essential: true,
       });
     },
     hoverAva(slug) {
@@ -1846,8 +1889,11 @@ const WVWAMap = forwardRef(function WVWAMap({
       [[minLng, minLat], [maxLng, maxLat]],
       {
         padding: { top: 80, bottom: 80, left: 60, right: 60 },
-        duration: isSingleFeature ? 1350 : 1500,
         maxZoom: isSingleFeature ? 16.2 : 14.8,
+        pitch: 40,
+        curve: 1.4,
+        speed: 0.55,
+        essential: true,
       }
     );
   }, []);
@@ -2523,7 +2569,7 @@ const WVWAMap = forwardRef(function WVWAMap({
                 if (lat > maxLat) maxLat = lat;
               }
               map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
-                padding: { top: 80, bottom: 80, left: 60, right: 60 }, duration: 1900, maxZoom: 17,
+                padding: { top: 80, bottom: 80, left: 60, right: 60 }, maxZoom: 17, pitch: 40, curve: 1.4, speed: 0.55, essential: true,
               });
             }
           }
@@ -2822,7 +2868,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         const clusterId = features[0].properties.cluster_id;
         map.getSource('listings').getClusterExpansionZoom(clusterId, (err, zoom) => {
           if (err) return;
-          map.easeTo({ center: features[0].geometry.coordinates, zoom, duration: 1200 });
+          map.flyTo({ center: features[0].geometry.coordinates, zoom, curve: 1.4, speed: 0.55, essential: true });
         });
       });
 
@@ -2833,7 +2879,10 @@ const WVWAMap = forwardRef(function WVWAMap({
         const listing = listingsRef.current.find(l => l.id === props.id);
         if (!listing) return;
         setSelectedListingRef.current?.(listing);
-        map.easeTo({ center: [listing.lng, listing.lat], zoom: 15, duration: 1900 });
+        const vineyardFeatures = VINEYARD_BY_RECID[listing.id] ?? [];
+        if (!flyToVineyardBounds(map, vineyardFeatures)) {
+          map.flyTo({ center: [listing.lng, listing.lat], zoom: 14, curve: 1.4, speed: 0.55, essential: true });
+        }
       });
 
       // Cursor changes + map-dot hover highlight
@@ -2947,14 +2996,15 @@ const WVWAMap = forwardRef(function WVWAMap({
         blinkMapLayer(map, `ava-${_avaSlugForBlink}-fill`, 'fill-opacity', BLINK);
       };
       if (cam) {
-        map.easeTo({
+        map.flyTo({
           center:   [cam.lng, cam.lat],
           zoom:     cam.zoom,
           pitch:    cam.pitch   ?? 40,
           bearing:  cam.bearing ?? 0,
-          duration: 1800,
+          curve:    1.85,
+          speed:    0.45,
+          easing:   t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2,
           essential: true,
-          freezeElevation: true,
         });
         map.once('moveend', _onAvaMoveEnd);
       } else {
@@ -2969,7 +3019,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             };
             const features = avaSource._data.features || [avaSource._data];
             features.forEach(f => addCoords(f.geometry.coordinates));
-            map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, pitch: 40, duration: 1800, freezeElevation: true, linear: true });
+            map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, pitch: 40, curve: 1.85, speed: 0.45, freezeElevation: true });
             map.once('moveend', _onAvaMoveEnd);
           } catch (e) { /* ignore */ }
         }
@@ -2997,14 +3047,15 @@ const WVWAMap = forwardRef(function WVWAMap({
 
       // ── Restore all listings layers — handled by listing filter effect ──
 
-      map.easeTo({
+      map.flyTo({
         center:   [WV_CAMERA.lng, WV_CAMERA.lat],
         zoom:     WV_CAMERA.zoom,
         pitch:    WV_CAMERA.pitch   ?? 35,
         bearing:  WV_CAMERA.bearing ?? 0,
-        duration: 1500,
+        curve:    1.85,
+        speed:    0.45,
+        easing:   t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2,
         essential: true,
-        freezeElevation: true,
       });
     }
   }, [selectedAva, mapLoaded]);
@@ -3094,8 +3145,12 @@ const WVWAMap = forwardRef(function WVWAMap({
 
   const handleListingClick = useCallback((listing) => {
     setSelectedListingBoth(listing);
-    if (mapRef.current) {
-      mapRef.current.easeTo({ center: [listing.lng, listing.lat], zoom: 15, duration: 1900 });
+    const map = mapRef.current;
+    if (map) {
+      const vineyardFeatures = VINEYARD_BY_RECID[listing.id] ?? [];
+      if (!flyToVineyardBounds(map, vineyardFeatures)) {
+        map.flyTo({ center: [listing.lng, listing.lat], zoom: 14, curve: 1.4, speed: 0.55, essential: true });
+      }
     }
   }, [setSelectedListingBoth]);
 
@@ -3199,11 +3254,23 @@ const WVWAMap = forwardRef(function WVWAMap({
     const map = mapRef.current;
     if (!map) return;
     if (selectedListing?.lat != null && selectedListing?.lng != null) {
-      map.flyTo({ center: [selectedListing.lng, selectedListing.lat], zoom: 13, pitch: 30, bearing: 0, duration: 1200, essential: true });
+      const vineyardFeatures = VINEYARD_BY_RECID[selectedListing.id] ?? [];
+      if (!flyToVineyardBounds(map, vineyardFeatures)) {
+        map.flyTo({ center: [selectedListing.lng, selectedListing.lat], zoom: 14, curve: 1.4, speed: 0.55, essential: true });
+      }
     } else if (selectedAva) {
       const cam = AVA_CAMERA[selectedAva];
       if (cam) {
-        map.flyTo({ center: [cam.lng, cam.lat], zoom: cam.zoom, pitch: cam.pitch ?? 40, bearing: cam.bearing ?? 0, duration: 1800, essential: true });
+        map.flyTo({
+          center:  [cam.lng, cam.lat],
+          zoom:    cam.zoom,
+          pitch:   cam.pitch ?? 40,
+          bearing: cam.bearing ?? 0,
+          curve:   1.85,
+          speed:   0.45,
+          easing:  t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2,
+          essential: true,
+        });
       } else {
         const avaSource = map.getSource(`ava-${selectedAva}`);
         if (avaSource?._data) {
@@ -3211,12 +3278,12 @@ const WVWAMap = forwardRef(function WVWAMap({
             const bounds = new maplibregl.LngLatBounds();
             const addCoords = (c) => { if (typeof c[0] === 'number') bounds.extend(c); else c.forEach(addCoords); };
             (avaSource._data.features || [avaSource._data]).forEach(f => addCoords(f.geometry.coordinates));
-            map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, pitch: 40, duration: 1800 });
+            map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, pitch: 40, curve: 1.85, speed: 0.45 });
           } catch (e) { /* ignore */ }
         }
       }
     } else {
-      map.fitBounds(WV_BOUNDS, { padding: 40, duration: 1200, pitch: 30, bearing: 0 });
+      map.fitBounds(WV_BOUNDS, { padding: 40, pitch: 30, bearing: 0, curve: 1.85, speed: 0.45 });
     }
   }, [selectedAva, selectedListing]);
 

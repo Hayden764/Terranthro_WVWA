@@ -18,7 +18,7 @@ const CARD = {
 
 const LABEL = {
   ...TYPE.uiLabel,
-  fontSize: 10,
+  fontSize: 'var(--type-ui-label-size)',
   color: GLASS.textDim,
   marginBottom: 6,
 };
@@ -37,8 +37,8 @@ export default function ScalePanel({ activeLayer, topoStats }) {
   if (!activeLayer) {
     return (
       <div style={{ padding: 16, textAlign: 'center' }}>
-        <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
-        <div style={{ fontSize: 12, color: GLASS.textDim, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 'var(--type-display-medium-size)', marginBottom: 8 }}>📊</div>
+        <div style={{ fontSize: 'var(--type-body-size)', color: GLASS.textDim, lineHeight: 1.6 }}>
           Activate a data layer from the <strong style={{ color: GLASS.text }}>Layers</strong> panel to see its colour scale here.
         </div>
       </div>
@@ -73,8 +73,8 @@ export default function ScalePanel({ activeLayer, topoStats }) {
       <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
         {/* Layer name */}
         <div style={CARD}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: GLASS.text, marginBottom: 2 }}>{label}</div>
-          <div style={{ fontSize: 11, color: GLASS.textDim }}>{description} ({unit})</div>
+          <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 700, color: GLASS.text, marginBottom: 2 }}>{label}</div>
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim }}>{description} ({unit})</div>
         </div>
 
         {/* Colour gradient */}
@@ -87,7 +87,7 @@ export default function ScalePanel({ activeLayer, topoStats }) {
             background: `linear-gradient(to right, ${legend.colors.join(', ')})`,
             marginBottom: 6,
           }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: GLASS.textMuted }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: GLASS.textMuted }}>
             <span>{gradientMinLabel}</span>
             <span>{gradientMaxLabel}</span>
           </div>
@@ -120,7 +120,7 @@ export default function ScalePanel({ activeLayer, topoStats }) {
                   flexShrink: 0,
                   border: `1px solid ${alpha(TOKENS.parchment, 0.15)}`,
                 }} />
-                <span style={{ fontSize: 11, color: GLASS.text }}>{realLabels[i] || ''}</span>
+                <span style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.text }}>{realLabels[i] || ''}</span>
               </div>
             ))}
           </div>
@@ -135,8 +135,8 @@ export default function ScalePanel({ activeLayer, topoStats }) {
     return (
       <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={CARD}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: GLASS.text, marginBottom: 2 }}>{climateRamp.label}</div>
-          <div style={{ fontSize: 11, color: GLASS.textDim }}>PRISM 30-year normals</div>
+          <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 700, color: GLASS.text, marginBottom: 2 }}>{climateRamp.label}</div>
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim }}>PRISM 30-year normals</div>
         </div>
 
         <div style={CARD}>
@@ -148,9 +148,9 @@ export default function ScalePanel({ activeLayer, topoStats }) {
             background: climateRamp.gradient,
             marginBottom: 6,
           }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: GLASS.textMuted }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: GLASS.textMuted }}>
             <span>{climateRamp.min}</span>
-            <span style={{ ...TYPE.uiLabel, fontSize: 9, color: GLASS.textDim }}>min – max</span>
+            <span style={{ ...TYPE.uiLabel, color: GLASS.textDim }}>min – max</span>
             <span>{climateRamp.max}</span>
           </div>
         </div>
@@ -161,7 +161,7 @@ export default function ScalePanel({ activeLayer, topoStats }) {
   /* ── Fallback ─────────────────────────────────────────────────────── */
   return (
     <div style={{ padding: 16, textAlign: 'center' }}>
-      <div style={{ fontSize: 12, color: GLASS.textDim }}>No scale data for this layer.</div>
+      <div style={{ fontSize: 'var(--type-body-size)', color: GLASS.textDim }}>No scale data for this layer.</div>
     </div>
   );
 }

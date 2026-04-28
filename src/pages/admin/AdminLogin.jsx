@@ -37,10 +37,10 @@ export default function AdminLogin() {
         boxShadow: `0 8px 32px ${alpha(TOKENS.ink, 0.45)}`,
         border: `1px solid ${TOKENS.border}`,
       }}>
-        <h1 style={{ fontSize: 22, color: TOKENS.parchment, marginBottom: 8 }}>
+        <h1 style={{ fontSize: 'var(--type-display-italic-size)', color: TOKENS.parchment, marginBottom: 8 }}>
           Admin Console
         </h1>
-        <p style={{ color: TOKENS.muted, fontSize: 13, marginBottom: 28 }}>Terranthro</p>
+        <p style={{ color: TOKENS.muted, fontSize: 'var(--type-mono-size)', marginBottom: 28 }}>Terranthro</p>
 
         <form onSubmit={handleSubmit}>
           <label style={labelStyle}>Email</label>
@@ -57,11 +57,11 @@ export default function AdminLogin() {
             style={adminInputStyle}
           />
 
-          {error && <p style={{ color: TOKENS.danger, fontSize: 13, marginTop: 12 }}>{error}</p>}
+          {error && <p style={{ color: TOKENS.danger, fontSize: 'var(--type-mono-size)', marginTop: 12 }}>{error}</p>}
 
           <button type="submit" disabled={loading} style={{
             width: '100%', padding: '11px 0', borderRadius: 8, border: 'none',
-            background: TOKENS.electricBlue, color: TOKENS.ink, fontSize: 14, fontWeight: 600,
+            background: TOKENS.electricBlue, color: TOKENS.ink, fontSize: 'var(--type-body-size)', fontWeight: 600,
             cursor: loading ? 'wait' : 'pointer', marginTop: 20,
             opacity: loading ? 0.7 : 1,
           }}>
@@ -73,10 +73,10 @@ export default function AdminLogin() {
   );
 }
 
-const labelStyle = { display: 'block', fontSize: 12, color: TOKENS.ghost, marginBottom: 4 };
+const labelStyle = { display: 'block', fontSize: 'var(--type-body-size)', color: TOKENS.ghost, marginBottom: 4 };
 const adminInputStyle = {
   width: '100%', padding: '10px 14px', borderRadius: 8,
-  border: `1px solid ${TOKENS.border}`, fontSize: 14,
+  border: `1px solid ${TOKENS.border}`, fontSize: 'var(--type-body-size)',
   color: TOKENS.parchment, background: TOKENS.surfaceRaised,
   outline: 'none',
 };

@@ -488,7 +488,7 @@ export default function PortalVineyardMap({
         alignItems: 'center',
         justifyContent: 'center',
         color: muted,
-        fontSize: 13,
+        fontSize: 'var(--type-mono-size)',
         border: `1px solid ${border}`,
         ...wrapperStyle,
       }}>
@@ -519,7 +519,7 @@ export default function PortalVineyardMap({
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
           zIndex: 10,
         }}>
-          <span style={{ color: UI.editOverlayText, fontSize: 12, lineHeight: 1.4 }}>
+          <span style={{ color: UI.editOverlayText, fontSize: 'var(--type-body-size)', lineHeight: 1.4 }}>
             <strong style={{ color: UI.overlayTitle }}>Editing geometry</strong> — drag vertices to reshape the parcel boundary
           </span>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
@@ -557,7 +557,7 @@ export default function PortalVineyardMap({
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
           zIndex: 10,
         }}>
-          <span style={{ color: UI.splitOverlayText, fontSize: 12, lineHeight: 1.4 }}>
+          <span style={{ color: UI.splitOverlayText, fontSize: 'var(--type-body-size)', lineHeight: 1.4 }}>
             <strong style={{ color: UI.overlayTitle }}>Draw split line</strong> — click to draw a line across the parcel, then click again to finish
           </span>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
@@ -593,7 +593,7 @@ export default function PortalVineyardMap({
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
           zIndex: 10,
         }}>
-          <span style={{ color: UI.addOverlayText, fontSize: 12, lineHeight: 1.4 }}>
+          <span style={{ color: UI.addOverlayText, fontSize: 'var(--type-body-size)', lineHeight: 1.4 }}>
             <strong style={{ color: UI.overlayTitle }}>Draw new parcel</strong> — click to place corners, double-click to close the polygon
           </span>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
@@ -624,12 +624,12 @@ export default function PortalVineyardMap({
 
 const editCancelBtnStyle = {
   padding: '6px 14px', borderRadius: 6, border: `1px solid ${UI.cancelBorder}`,
-  background: 'transparent', color: UI.cancelText, fontSize: 12, cursor: 'pointer',
+  background: 'transparent', color: UI.cancelText, fontSize: 'var(--type-body-size)', cursor: 'pointer',
   fontFamily: 'var(--font-sans)',
 };
 
 const editSaveBtnStyle = {
   padding: '6px 16px', borderRadius: 6, border: 'none',
-  background: crimson, color: 'white', fontSize: 12, fontWeight: 500,
+  background: crimson, color: 'white', fontSize: 'var(--type-body-size)', fontWeight: 500,
   cursor: 'pointer', fontFamily: 'var(--font-sans)',
 };

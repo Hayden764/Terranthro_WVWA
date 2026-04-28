@@ -143,7 +143,7 @@ export default function MapControls({ map, mapLoaded, selectedAva, onSelectAva, 
             <polyline points="18 15 12 9 6 15" />
           </svg>
         </ControlBtn>
-        <div style={{ fontSize: 9, color: UI.pitchLabel, fontFamily: 'monospace', fontWeight: 600, textAlign: 'center', userSelect: 'none', lineHeight: 1 }}>{pitch}°</div>
+        <div style={{ fontSize: 'var(--type-ui-label-size)', color: UI.pitchLabel, fontFamily: 'var(--font-mono)', fontWeight: 600, textAlign: 'center', userSelect: 'none', lineHeight: 1 }}>{pitch}°</div>
         <ControlBtn style={pitch <= 0 ? { ...BTN_BASE, opacity: 0.35, cursor: 'default' } : BTN_BASE} onClick={handlePitchDown} title="Decrease pitch (-10°)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="6 9 12 15 18 9" />

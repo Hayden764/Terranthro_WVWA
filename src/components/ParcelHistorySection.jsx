@@ -37,7 +37,7 @@ function StatusBadge({ status }) {
   const c = STATUS_COLORS[status] || STATUS_COLORS.pending;
   return (
     <span style={{
-      padding: '2px 9px', borderRadius: 10, fontSize: 11, fontWeight: 600,
+      padding: '2px 9px', borderRadius: 10, fontSize: 'var(--type-ui-label-size)', fontWeight: 600,
       background: c.bg, color: c.color, textTransform: 'capitalize',
     }}>
       {status}
@@ -51,7 +51,7 @@ function FieldChange({ entry }) {
   return (
     <div style={{
       display: 'flex', gap: 8, alignItems: 'flex-start',
-      padding: '6px 0', borderBottom: `1px solid ${border}18`, fontSize: 12,
+      padding: '6px 0', borderBottom: `1px solid ${border}18`, fontSize: 'var(--type-body-size)',
     }}>
       <span style={{ minWidth: 100, color: muted, flexShrink: 0, fontWeight: 500 }}>
         {field}
@@ -138,18 +138,18 @@ export default function ParcelHistorySection({ parcelId }) {
           padding: '10px 0', borderTop: `1px solid ${border}`,
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 600, color: ink }}>Edit History</span>
-        <span style={{ fontSize: 12, color: muted }}>{open ? '▲' : '▼'}</span>
+        <span style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Edit History</span>
+        <span style={{ fontSize: 'var(--type-body-size)', color: muted }}>{open ? '▲' : '▼'}</span>
       </button>
 
       {open && (
         <div style={{ paddingBottom: 8 }}>
           {loading && (
-            <p style={{ fontSize: 13, color: muted, padding: '8px 0' }}>Loading…</p>
+            <p style={{ fontSize: 'var(--type-mono-size)', color: muted, padding: '8px 0' }}>Loading…</p>
           )}
 
           {isEmpty && (
-            <p style={{ fontSize: 13, color: muted, padding: '8px 0' }}>
+            <p style={{ fontSize: 'var(--type-mono-size)', color: muted, padding: '8px 0' }}>
               No edit history yet.
             </p>
           )}
@@ -164,16 +164,16 @@ export default function ParcelHistorySection({ parcelId }) {
                   background: parchment,
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: ink }}>
+                    <span style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>
                       {REQUEST_TYPE_LABELS[r.request_type] || r.request_type}
                     </span>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: muted }}>{formatDate(r.created_at)}</span>
+                      <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>{formatDate(r.created_at)}</span>
                       <StatusBadge status={r.status} />
                     </div>
                   </div>
                   {r.admin_notes && (
-                    <p style={{ fontSize: 12, color: muted, margin: '4px 0 0', fontStyle: 'italic' }}>
+                    <p style={{ fontSize: 'var(--type-body-size)', color: muted, margin: '4px 0 0', fontStyle: 'italic' }}>
                       Admin note: {r.admin_notes}
                     </p>
                   )}
@@ -190,14 +190,14 @@ export default function ParcelHistorySection({ parcelId }) {
               background: parchment,
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: ink }}>
+                <span style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>
                   {REQUEST_TYPE_LABELS[group.request_type] || (group.request_type || 'Data update')}
                 </span>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   {group.reviewed_by && (
-                    <span style={{ fontSize: 11, color: muted }}>by {group.reviewed_by}</span>
+                    <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>by {group.reviewed_by}</span>
                   )}
-                  <span style={{ fontSize: 11, color: muted }}>{formatDate(group.edited_at)}</span>
+                  <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>{formatDate(group.edited_at)}</span>
                   <StatusBadge status="approved" />
                 </div>
               </div>
@@ -207,7 +207,7 @@ export default function ParcelHistorySection({ parcelId }) {
               ))}
 
               {group.admin_notes && (
-                <p style={{ fontSize: 12, color: muted, marginTop: 8, fontStyle: 'italic' }}>
+                <p style={{ fontSize: 'var(--type-body-size)', color: muted, marginTop: 8, fontStyle: 'italic' }}>
                   Note: {group.admin_notes}
                 </p>
               )}

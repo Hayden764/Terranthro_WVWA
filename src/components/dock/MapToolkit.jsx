@@ -22,7 +22,7 @@ const CARD = {
 
 const LABEL = {
   ...TYPE.uiLabel,
-  fontSize: 10,
+  fontSize: 'var(--type-ui-label-size)',
   color: GLASS.textDim,
   marginBottom: 6,
 };
@@ -145,8 +145,8 @@ export default function MapToolkit({
         {/* Bearing */}
         <div style={{ marginBottom: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <span style={{ fontSize: 11, color: GLASS.textDim }}>Bearing</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: GLASS.text }}>{currentBearing}°</span>
+            <span style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim }}>Bearing</span>
+            <span style={{ fontSize: 'var(--type-ui-label-size)', fontWeight: 600, color: GLASS.text }}>{currentBearing}°</span>
           </div>
           <input
             type="range"
@@ -161,8 +161,8 @@ export default function MapToolkit({
         {/* Pitch */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <span style={{ fontSize: 11, color: GLASS.textDim }}>Pitch</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: GLASS.text }}>{currentPitch}°</span>
+            <span style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim }}>Pitch</span>
+            <span style={{ fontSize: 'var(--type-ui-label-size)', fontWeight: 600, color: GLASS.text }}>{currentPitch}°</span>
           </div>
           <input
             type="range"
@@ -196,7 +196,7 @@ export default function MapToolkit({
                   <span>{option.label}</span>
                   <span style={{
                     ...TYPE.uiLabel,
-                    fontSize: 10,
+                    fontSize: 'var(--type-ui-label-size)',
                     opacity: active ? 0.95 : 0.45,
                   }}>
                     {active ? 'Active' : 'Apply'}
@@ -214,7 +214,7 @@ export default function MapToolkit({
         return ava ? (
           <div style={CARD}>
             <div style={LABEL}>Current AVA</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: GLASS.text }}>{ava.name}</div>
+            <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: GLASS.text }}>{ava.name}</div>
           </div>
         ) : null;
       })()}
@@ -234,7 +234,7 @@ function btnStyle(active) {
     border: `1px solid ${active ? alpha(TOKENS.crimson, 0.4) : GLASS.borderLight}`,
     background: active ? GLASS.accentDim : 'transparent',
     color: active ? parchment : GLASS.textDim,
-    fontSize: 11,
+    fontSize: 'var(--type-ui-label-size)',
     fontWeight: 600,
     fontFamily: 'var(--font-sans)',
     cursor: 'pointer',

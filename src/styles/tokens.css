@@ -34,4 +34,12 @@
   --font-display: 'Cormorant Garamond', serif;
   --font-sans:    'Inter', sans-serif;
   --font-mono:    ui-monospace, monospace;
+
+  /* Canonical type role sizes */
+  --type-display-size: 68px;
+  --type-display-medium-size: 30px;
+  --type-display-italic-size: 22px;
+  --type-ui-label-size: 11px;
+  --type-body-size: 14px;
+  --type-mono-size: 13px;
 }

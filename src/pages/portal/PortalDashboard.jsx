@@ -56,10 +56,10 @@ export default function PortalDashboard() {
         marginBottom: 32,
       }}>
         <div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, color: ink, margin: 0 }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-medium-size)', color: ink, margin: 0 }}>
             {profile?.title}
           </h1>
-          <p style={{ color: muted, fontSize: 13, marginTop: 4 }}>Winery Portal</p>
+          <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginTop: 4 }}>Winery Portal</p>
         </div>
         <button onClick={handleLogout} style={linkBtnStyle}>Sign Out</button>
       </div>
@@ -89,7 +89,7 @@ export default function PortalDashboard() {
               }
             }}
           />
-          <p style={{ fontSize: 12, color: muted, marginTop: 8 }}>
+          <p style={{ fontSize: 'var(--type-body-size)', color: muted, marginTop: 8 }}>
             Click a parcel to view details.
           </p>
         </Section>
@@ -108,7 +108,7 @@ export default function PortalDashboard() {
       {/* Vineyards — grouped by name */}
       <Section title="Linked Vineyards">
         {vineyards.length === 0 ? (
-          <p style={{ color: muted, fontSize: 14 }}>No vineyards linked yet.</p>
+          <p style={{ color: muted, fontSize: 'var(--type-body-size)' }}>No vineyards linked yet.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {groupVineyardsByName(vineyards).map((group) => {
@@ -144,8 +144,8 @@ export default function PortalDashboard() {
                     textDecoration: 'none', color: ink,
                   }}
                 >
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{group.name}</div>
-                  <div style={{ fontSize: 13, color: muted, marginTop: 4 }}>
+                  <div style={{ fontWeight: 600, fontSize: 'var(--type-display-italic-size)' }}>{group.name}</div>
+                  <div style={{ fontSize: 'var(--type-mono-size)', color: muted, marginTop: 4 }}>
                     {ava}
                     {group.parcels.length > 1 && ` · ${group.parcels.length} parcels`}
                     {totalBlocks > 0 && ` · ${totalBlocks} blocks`}
@@ -166,13 +166,13 @@ export default function PortalDashboard() {
       {/* Recent requests */}
       <Section title="Recent Requests">
         {requests.length === 0 ? (
-          <p style={{ color: muted, fontSize: 14 }}>No requests submitted yet.</p>
+          <p style={{ color: muted, fontSize: 'var(--type-body-size)' }}>No requests submitted yet.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {requests.slice(0, 10).map((r) => (
               <div key={r.id} style={{
                 padding: '10px 14px', borderRadius: 6,
-                background: parchment, fontSize: 13,
+                background: parchment, fontSize: 'var(--type-mono-size)',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
                 <span>
@@ -211,7 +211,7 @@ function Section({ title, children }) {
       border: `1px solid ${border}`, marginBottom: 24,
     }}>
       <h2 style={{
-        fontSize: 16, fontWeight: 600, color: ink,
+        fontSize: 'var(--type-display-italic-size)', fontWeight: 600, color: ink,
         marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${border}`,
       }}>
         {title}
@@ -228,15 +228,15 @@ function StatCard({ label, value }) {
       padding: '18px 16px', border: `1px solid ${border}`,
       textAlign: 'center',
     }}>
-      <div style={{ fontSize: 28, fontWeight: 700, color: ink }}>{value}</div>
-      <div style={{ fontSize: 12, color: muted, marginTop: 4 }}>{label}</div>
+      <div style={{ fontSize: 'var(--type-display-medium-size)', fontWeight: 700, color: ink }}>{value}</div>
+      <div style={{ fontSize: 'var(--type-body-size)', color: muted, marginTop: 4 }}>{label}</div>
     </div>
   );
 }
 
 function InfoRow({ label, value }) {
   return (
-    <div style={{ display: 'flex', gap: 12, marginBottom: 8, fontSize: 14 }}>
+    <div style={{ display: 'flex', gap: 12, marginBottom: 8, fontSize: 'var(--type-body-size)' }}>
       <span style={{ color: muted, minWidth: 100, flexShrink: 0 }}>{label}</span>
       <span style={{ color: ink, wordBreak: 'break-word' }}>{value}</span>
     </div>
@@ -252,7 +252,7 @@ function StatusBadge({ status }) {
   const c = colors[status] || colors.pending;
   return (
     <span style={{
-      padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600,
+      padding: '3px 10px', borderRadius: 12, fontSize: 'var(--type-ui-label-size)', fontWeight: 600,
       background: c.bg, color: c.color, textTransform: 'capitalize',
     }}>
       {status}
@@ -266,7 +266,7 @@ const actionBtnStyle = {
   borderRadius: 6,
   background: ink,
   color: parchment,
-  fontSize: 13,
+  fontSize: 'var(--type-mono-size)',
   fontWeight: 600,
   textDecoration: 'none',
   border: 'none',
@@ -278,7 +278,7 @@ const linkBtnStyle = {
   border: `1px solid ${border}`,
   borderRadius: 6,
   padding: '6px 16px',
-  fontSize: 13,
+  fontSize: 'var(--type-mono-size)',
   color: muted,
   cursor: 'pointer',
 };

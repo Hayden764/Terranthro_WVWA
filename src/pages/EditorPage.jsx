@@ -685,22 +685,22 @@ export default function EditorPage() {
       }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h1 style={{ color: TOKENS.parchment, fontSize: 16, fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>
+          <h1 style={{ color: TOKENS.parchment, fontSize: 'var(--type-display-italic-size)', fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>
             Parcel Editor
           </h1>
-          <Link to="/admin/dashboard" style={{ color: TOKENS.muted, fontSize: 12, textDecoration: 'none' }}>
+          <Link to="/admin/dashboard" style={{ color: TOKENS.muted, fontSize: 'var(--type-body-size)', textDecoration: 'none' }}>
             ← Dashboard
           </Link>
         </div>
 
         {/* Parcel count */}
-        <p style={{ color: TOKENS.muted, fontSize: 11, margin: 0 }}>
+        <p style={{ color: TOKENS.muted, fontSize: 'var(--type-ui-label-size)', margin: 0 }}>
           {parcels ? `${parcels.features.length.toLocaleString()} parcels loaded` : 'Loading parcels…'}
         </p>
 
         {/* Add New Block button — always visible */}
         {!isDrawingNew && !isEditing && (
-          <button onClick={handleStartDrawNew} style={{ ...btnStyle(TOKENS.success, TOKENS.vividGreen), fontSize: 12 }}>
+          <button onClick={handleStartDrawNew} style={{ ...btnStyle(TOKENS.success, TOKENS.vividGreen), fontSize: 'var(--type-body-size)' }}>
             + Add New Block
           </button>
         )}
@@ -715,7 +715,7 @@ export default function EditorPage() {
             style={{
               width: '100%', boxSizing: 'border-box',
               background: TOKENS.surfaceRaised, border: `1px solid ${TOKENS.border}`,
-              borderRadius: 6, color: TOKENS.parchment, fontSize: 12,
+              borderRadius: 6, color: TOKENS.parchment, fontSize: 'var(--type-body-size)',
               padding: '7px 10px', outline: 'none',
             }}
           />
@@ -725,7 +725,7 @@ export default function EditorPage() {
         {searchQuery.trim() && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 240, overflowY: 'auto' }}>
             {filteredParcels.length === 0 && (
-              <div style={{ color: TOKENS.muted, fontSize: 12, padding: '6px 0' }}>No matches</div>
+              <div style={{ color: TOKENS.muted, fontSize: 'var(--type-body-size)', padding: '6px 0' }}>No matches</div>
             )}
             {filteredParcels.map((f) => (
               <button
@@ -733,12 +733,12 @@ export default function EditorPage() {
                 onClick={() => handleSelectFromList(f)}
                 style={{
                   background: TOKENS.surfaceRaised, border: `1px solid ${TOKENS.border}`, borderRadius: 5,
-                  color: TOKENS.parchment, fontSize: 12, padding: '7px 10px',
+                  color: TOKENS.parchment, fontSize: 'var(--type-body-size)', padding: '7px 10px',
                   cursor: 'pointer', textAlign: 'left', lineHeight: 1.4,
                 }}
               >
                 <div style={{ fontWeight: 500 }}>{f.properties.vineyard_name || `Block #${f.properties.id}`}</div>
-                <div style={{ color: TOKENS.ghost, fontSize: 11 }}>{f.properties.winery_title || '—'}</div>
+                <div style={{ color: TOKENS.ghost, fontSize: 'var(--type-ui-label-size)' }}>{f.properties.winery_title || '—'}</div>
               </button>
             ))}
           </div>
@@ -748,7 +748,7 @@ export default function EditorPage() {
 
         {/* ── No selection hint ── */}
         {!selectedParcel && !searchQuery && !isDrawingNew && (
-          <div style={{ color: TOKENS.ghost, fontSize: 12, background: TOKENS.surfaceRaised, borderRadius: 8, padding: '12px', lineHeight: 1.7 }}>
+          <div style={{ color: TOKENS.ghost, fontSize: 'var(--type-body-size)', background: TOKENS.surfaceRaised, borderRadius: 8, padding: '12px', lineHeight: 1.7 }}>
             Click any parcel on the map to select it.
           </div>
         )}
@@ -759,10 +759,10 @@ export default function EditorPage() {
 
             {/* Identity strip */}
             <div style={{ background: TOKENS.surfaceRaised, borderRadius: 8, padding: '10px 12px', border: `1px solid ${TOKENS.border}` }}>
-              <div style={{ color: TOKENS.parchment, fontWeight: 600, fontSize: 13 }}>
+              <div style={{ color: TOKENS.parchment, fontWeight: 600, fontSize: 'var(--type-mono-size)' }}>
                 {selectedParcel.properties.vineyard_name || `Block #${selectedParcel.properties.id}`}
               </div>
-              <div style={{ color: TOKENS.ghost, fontSize: 11, marginTop: 2 }}>
+              <div style={{ color: TOKENS.ghost, fontSize: 'var(--type-ui-label-size)', marginTop: 2 }}>
                 {selectedParcel.properties.winery_title || '—'}
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
@@ -777,13 +777,13 @@ export default function EditorPage() {
             {!stagedOps.some((o) => o.op === 'delete' && o.parcel_id === selectedParcel.properties.id) && (
               <button
                 onClick={() => setConfirmDelete((v) => !v)}
-                style={{ ...btnStyle(TOKENS.dangerDim, TOKENS.dangerDim), color: TOKENS.danger, fontSize: 12, border: `1px solid ${TOKENS.danger}` }}
+                style={{ ...btnStyle(TOKENS.dangerDim, TOKENS.dangerDim), color: TOKENS.danger, fontSize: 'var(--type-body-size)', border: `1px solid ${TOKENS.danger}` }}
               >
                 🗑 Delete Block
               </button>
             )}
             {stagedOps.some((o) => o.op === 'delete' && o.parcel_id === selectedParcel.properties.id) && (
-              <span style={{ fontSize: 11, fontWeight: 700, color: TOKENS.danger, background: TOKENS.dangerDim, padding: '4px 8px', borderRadius: 4, textAlign: 'center' }}>
+              <span style={{ fontSize: 'var(--type-ui-label-size)', fontWeight: 700, color: TOKENS.danger, background: TOKENS.dangerDim, padding: '4px 8px', borderRadius: 4, textAlign: 'center' }}>
                 Staged for deletion
               </span>
             )}
@@ -791,9 +791,9 @@ export default function EditorPage() {
             {/* Inline delete confirm */}
             {confirmDelete && (
               <div style={{ background: TOKENS.dangerDim, border: `1px solid ${TOKENS.danger}`, borderRadius: 6, padding: '8px 10px', display: 'flex', gap: 6, alignItems: 'center' }}>
-                <span style={{ color: TOKENS.danger, fontSize: 11, flex: 1 }}>Permanently delete this block?</span>
-                <button onClick={() => handleDeleteBlock(selectedParcel)} style={{ background: TOKENS.danger, border: 'none', color: TOKENS.parchment, borderRadius: 4, fontSize: 11, padding: '3px 8px', cursor: 'pointer', fontWeight: 600 }}>Yes, Delete</button>
-                <button onClick={() => setConfirmDelete(false)} style={{ background: 'none', border: `1px solid ${TOKENS.border}`, color: TOKENS.muted, borderRadius: 4, fontSize: 11, padding: '3px 8px', cursor: 'pointer' }}>Cancel</button>
+                <span style={{ color: TOKENS.danger, fontSize: 'var(--type-ui-label-size)', flex: 1 }}>Permanently delete this block?</span>
+                <button onClick={() => handleDeleteBlock(selectedParcel)} style={{ background: TOKENS.danger, border: 'none', color: TOKENS.parchment, borderRadius: 4, fontSize: 'var(--type-ui-label-size)', padding: '3px 8px', cursor: 'pointer', fontWeight: 600 }}>Yes, Delete</button>
+                <button onClick={() => setConfirmDelete(false)} style={{ background: 'none', border: `1px solid ${TOKENS.border}`, color: TOKENS.muted, borderRadius: 4, fontSize: 'var(--type-ui-label-size)', padding: '3px 8px', cursor: 'pointer' }}>Cancel</button>
               </div>
             )}
 
@@ -808,7 +808,7 @@ export default function EditorPage() {
                     background: activeTab === tab ? TOKENS.electricBlue : TOKENS.surfaceRaised,
                     color: activeTab === tab ? TOKENS.ink : TOKENS.ghost,
                     border: 'none', cursor: isEditing ? 'not-allowed' : 'pointer',
-                    fontSize: 11, fontWeight: 600, textTransform: 'capitalize',
+                    fontSize: 'var(--type-ui-label-size)', fontWeight: 600, textTransform: 'capitalize',
                     opacity: isEditing && tab !== 'geometry' ? 0.4 : 1,
                   }}
                 >
@@ -824,17 +824,17 @@ export default function EditorPage() {
                   <button onClick={handleStartEdit} style={btnStyle(TOKENS.electricBlue, TOKENS.electricBlue)}>Edit Geometry</button>
                 ) : (
                   <>
-                    <div style={{ fontSize: 11, color: TOKENS.warning, background: TOKENS.warningDim, border: `1px solid ${TOKENS.warning}`, borderRadius: 5, padding: '6px 9px' }}>
+                    <div style={{ fontSize: 'var(--type-ui-label-size)', color: TOKENS.warning, background: TOKENS.warningDim, border: `1px solid ${TOKENS.warning}`, borderRadius: 5, padding: '6px 9px' }}>
                       ✏ Editing — drag vertices to reshape
                     </div>
                     <button onClick={handleSave} disabled={saveStatus === 'staging'} style={btnStyle(saveStatus === 'staging' ? TOKENS.vividGreen : TOKENS.success, TOKENS.vividGreen)}>
                       {saveStatus === 'staging' ? 'Staging…' : 'Stage Geometry'}
                     </button>
-                    <button onClick={handleDiscard} style={{ background: 'transparent', color: TOKENS.muted, border: `1px solid ${TOKENS.border}`, borderRadius: 6, padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Discard</button>
+                    <button onClick={handleDiscard} style={{ background: 'transparent', color: TOKENS.muted, border: `1px solid ${TOKENS.border}`, borderRadius: 6, padding: '7px 12px', cursor: 'pointer', fontSize: 'var(--type-body-size)', fontWeight: 500 }}>Discard</button>
                   </>
                 )}
                 {statusMessage && (
-                  <div style={{ color: saveStatus === 'error' ? TOKENS.danger : saveStatus === 'staged' ? TOKENS.success : TOKENS.muted, fontSize: 11, padding: '5px 9px', background: TOKENS.surfaceRaised, borderRadius: 5, lineHeight: 1.5 }}>
+                  <div style={{ color: saveStatus === 'error' ? TOKENS.danger : saveStatus === 'staged' ? TOKENS.success : TOKENS.muted, fontSize: 'var(--type-ui-label-size)', padding: '5px 9px', background: TOKENS.surfaceRaised, borderRadius: 5, lineHeight: 1.5 }}>
                     {statusMessage}
                   </div>
                 )}
@@ -861,11 +861,11 @@ export default function EditorPage() {
                 <MetaField label="Situs Address"       field="situs_address"     form={metaForm} setForm={setMetaForm} />
                 <MetaField label="Situs City"          field="situs_city"        form={metaForm} setForm={setMetaForm} />
                 <MetaField label="Situs ZIP"           field="situs_zip"         form={metaForm} setForm={setMetaForm} />
-                <button onClick={handleSaveMeta} disabled={metaSaveStatus === 'saving'} style={{ ...btnStyle(metaSaveStatus === 'saving' ? TOKENS.vividGreen : TOKENS.success, TOKENS.vividGreen), marginTop: 4, fontSize: 12 }}>
+                <button onClick={handleSaveMeta} disabled={metaSaveStatus === 'saving'} style={{ ...btnStyle(metaSaveStatus === 'saving' ? TOKENS.vividGreen : TOKENS.success, TOKENS.vividGreen), marginTop: 4, fontSize: 'var(--type-body-size)' }}>
                   {metaSaveStatus === 'saving' ? 'Staging…' : 'Stage Metadata'}
                 </button>
                 {metaStatusMessage && (
-                  <div style={{ color: metaSaveStatus === 'error' ? TOKENS.danger : TOKENS.success, fontSize: 11, padding: '5px 9px', background: TOKENS.surfaceRaised, borderRadius: 5, lineHeight: 1.5 }}>
+                  <div style={{ color: metaSaveStatus === 'error' ? TOKENS.danger : TOKENS.success, fontSize: 'var(--type-ui-label-size)', padding: '5px 9px', background: TOKENS.surfaceRaised, borderRadius: 5, lineHeight: 1.5 }}>
                     {metaStatusMessage}
                   </div>
                 )}
@@ -877,9 +877,9 @@ export default function EditorPage() {
         {/* ── Draw-new-block panel ── */}
         {isDrawingNew && (
           <div style={{ background: TOKENS.surfaceRaised, borderRadius: 8, border: `1px solid ${TOKENS.border}`, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ ...TYPE.uiLabel, color: TOKENS.electricBlue, fontSize: 11, fontWeight: 600 }}>New Block</div>
+            <div style={{ ...TYPE.uiLabel, color: TOKENS.electricBlue, fontSize: 'var(--type-ui-label-size)', fontWeight: 600 }}>New Block</div>
             {statusMessage && (
-              <div style={{ color: TOKENS.muted, fontSize: 11, lineHeight: 1.5 }}>{statusMessage}</div>
+              <div style={{ color: TOKENS.muted, fontSize: 'var(--type-ui-label-size)', lineHeight: 1.5 }}>{statusMessage}</div>
             )}
             <MetaField label="Block Name" field="vineyard_name" form={newBlockForm} setForm={setNewBlockForm} />
             <MetaField label="Winery ID" field="winery_id" form={newBlockForm} setForm={setNewBlockForm} type="number" />
@@ -887,10 +887,10 @@ export default function EditorPage() {
             <MetaField label="AVA Name" field="ava_name" form={newBlockForm} setForm={setNewBlockForm} />
             <MetaField label="Varietals" field="varietals_list" form={newBlockForm} setForm={setNewBlockForm} multiline />
             <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
-              <button onClick={handleSaveNewBlock} disabled={!newBlockGeomRef.current} style={{ ...btnStyle(newBlockGeomRef.current ? TOKENS.success : TOKENS.surfaceRaised, TOKENS.vividGreen), flex: 1, fontSize: 12, opacity: newBlockGeomRef.current ? 1 : 0.5 }}>
+              <button onClick={handleSaveNewBlock} disabled={!newBlockGeomRef.current} style={{ ...btnStyle(newBlockGeomRef.current ? TOKENS.success : TOKENS.surfaceRaised, TOKENS.vividGreen), flex: 1, fontSize: 'var(--type-body-size)', opacity: newBlockGeomRef.current ? 1 : 0.5 }}>
                 Stage New Block
               </button>
-              <button onClick={handleCancelDraw} style={{ background: 'transparent', color: TOKENS.muted, border: `1px solid ${TOKENS.border}`, borderRadius: 6, padding: '8px 10px', cursor: 'pointer', fontSize: 12 }}>
+              <button onClick={handleCancelDraw} style={{ background: 'transparent', color: TOKENS.muted, border: `1px solid ${TOKENS.border}`, borderRadius: 6, padding: '8px 10px', cursor: 'pointer', fontSize: 'var(--type-body-size)' }}>
                 Cancel
               </button>
             </div>
@@ -900,19 +900,19 @@ export default function EditorPage() {
         {/* ── Staged changes panel ──────────────────────────────────────── */}
         {stagedOps.length > 0 && (
           <div style={{ borderTop: `1px solid ${TOKENS.border}`, paddingTop: 12 }}>
-            <div style={{ ...TYPE.uiLabel, fontSize: 11, color: TOKENS.muted, marginBottom: 8 }}>
+            <div style={{ ...TYPE.uiLabel, color: TOKENS.muted, marginBottom: 8 }}>
               Staged ({stagedOps.length})
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 10, maxHeight: 160, overflowY: 'auto' }}>
               {stagedOps.map((op, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: TOKENS.surfaceRaised, borderRadius: 5, padding: '5px 8px' }}>
                   <div>
-                    <span style={{ ...TYPE.uiLabel, fontSize: 11, color: op.op === 'geometry' ? TOKENS.electricBlue : op.op === 'add' ? TOKENS.success : op.op === 'delete' ? TOKENS.danger : TOKENS.violet, fontWeight: 600 }}>{op.op}</span>
-                    <span style={{ fontSize: 11, color: TOKENS.muted, marginLeft: 6 }}>{op.parcel_name}</span>
+                    <span style={{ ...TYPE.uiLabel, color: op.op === 'geometry' ? TOKENS.electricBlue : op.op === 'add' ? TOKENS.success : op.op === 'delete' ? TOKENS.danger : TOKENS.violet, fontWeight: 600 }}>{op.op}</span>
+                    <span style={{ fontSize: 'var(--type-ui-label-size)', color: TOKENS.muted, marginLeft: 6 }}>{op.parcel_name}</span>
                   </div>
                   <button
                     onClick={() => setStagedOps((prev) => prev.filter((_, j) => j !== i))}
-                    style={{ background: 'none', border: 'none', color: TOKENS.muted, cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1 }}
+                    style={{ background: 'none', border: 'none', color: TOKENS.muted, cursor: 'pointer', fontSize: 'var(--type-body-size)', padding: '0 2px', lineHeight: 1 }}
                   >×</button>
                 </div>
               ))}
@@ -920,12 +920,12 @@ export default function EditorPage() {
             <button
               onClick={handlePushForReview}
               disabled={pushStatus === 'pushing'}
-              style={{ ...btnStyle(pushStatus === 'pushing' ? TOKENS.warning : TOKENS.amber, TOKENS.warning), fontSize: 12, fontWeight: 700 }}
+              style={{ ...btnStyle(pushStatus === 'pushing' ? TOKENS.warning : TOKENS.amber, TOKENS.warning), fontSize: 'var(--type-body-size)', fontWeight: 700 }}
             >
               {pushStatus === 'pushing' ? 'Submitting…' : `↑ Push ${stagedOps.length} Change${stagedOps.length !== 1 ? 's' : ''} for Review`}
             </button>
             {pushMessage && (
-              <div style={{ marginTop: 6, fontSize: 11, color: pushStatus === 'error' ? TOKENS.danger : pushStatus === 'done' ? TOKENS.success : TOKENS.muted, background: TOKENS.surfaceRaised, borderRadius: 5, padding: '5px 8px', lineHeight: 1.5 }}>
+              <div style={{ marginTop: 6, fontSize: 'var(--type-ui-label-size)', color: pushStatus === 'error' ? TOKENS.danger : pushStatus === 'done' ? TOKENS.success : TOKENS.muted, background: TOKENS.surfaceRaised, borderRadius: 5, padding: '5px 8px', lineHeight: 1.5 }}>
                 {pushMessage}
               </div>
             )}
@@ -933,7 +933,7 @@ export default function EditorPage() {
         )}
 
         {/* Help text */}
-        <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: `1px solid ${TOKENS.border}`, color: TOKENS.ghost, fontSize: 11, lineHeight: 1.7 }}>
+        <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: `1px solid ${TOKENS.border}`, color: TOKENS.ghost, fontSize: 'var(--type-ui-label-size)', lineHeight: 1.7 }}>
           <span style={{ color: TOKENS.muted, fontWeight: 600 }}>Editing station</span><br />
           Click a parcel on the map to select it.<br />
           Edit geometry or metadata, add or delete blocks.<br />
@@ -957,7 +957,7 @@ function MetaField({ label, field, form, setForm, type = 'text', multiline = fal
     border: `1px solid ${TOKENS.border}`,
     borderRadius: 5,
     color: TOKENS.parchment,
-    fontSize: 12,
+    fontSize: 'var(--type-body-size)',
     padding: '5px 8px',
     outline: 'none',
     resize: multiline ? 'vertical' : undefined,
@@ -966,7 +966,7 @@ function MetaField({ label, field, form, setForm, type = 'text', multiline = fal
   };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <label style={{ ...TYPE.uiLabel, color: TOKENS.ghost, fontSize: 10, fontWeight: 600 }}>
+      <label style={{ ...TYPE.uiLabel, color: TOKENS.ghost, fontSize: 'var(--type-ui-label-size)', fontWeight: 600 }}>
         {label}
       </label>
       {multiline ? (
@@ -994,7 +994,7 @@ function Tag({ children }) {
     <span style={{
       background: TOKENS.surface,
       color: TOKENS.ghost,
-      fontSize: 10,
+      fontSize: 'var(--type-ui-label-size)',
       padding: '2px 7px',
       borderRadius: 4,
       border: `1px solid ${TOKENS.border}`,
@@ -1012,7 +1012,7 @@ function btnStyle(bg, hoverBg) {
     borderRadius: 6,
     padding: '8px 14px',
     cursor: 'pointer',
-    fontSize: 13,
+    fontSize: 'var(--type-mono-size)',
     fontWeight: 600,
     width: '100%',
   };

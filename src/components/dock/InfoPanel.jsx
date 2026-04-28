@@ -20,13 +20,13 @@ const CARD = {
 
 const LBL = {
   ...TYPE.uiLabel,
-  fontSize: 10,
+  fontSize: 'var(--type-ui-label-size)',
   color: GLASS.textDim,
   marginBottom: 4,
 };
 
 const VAL = {
-  fontSize: 13,
+  fontSize: 'var(--type-mono-size)',
   color: GLASS.text,
   lineHeight: 1.55,
 };
@@ -122,14 +122,14 @@ function AVAButton({ item, onSelectAva, onHoverAva, indent }) {
       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {item.name}
       </span>
-      <span style={{ fontSize: 13, marginLeft: 8, opacity: 0.55, flexShrink: 0 }}>↗</span>
+      <span style={{ fontSize: 'var(--type-mono-size)', marginLeft: 8, opacity: 0.55, flexShrink: 0 }}>↗</span>
     </button>
   );
 
   if (indent) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, paddingLeft: 14 }}>
-        <span style={{ color: GLASS.textMuted, fontSize: 11, flexShrink: 0, userSelect: 'none', lineHeight: 1 }}>↳</span>
+        <span style={{ color: GLASS.textMuted, fontSize: 'var(--type-ui-label-size)', flexShrink: 0, userSelect: 'none', lineHeight: 1 }}>↳</span>
         {btn}
       </div>
     );
@@ -206,7 +206,7 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                 display: 'inline-block',
                 padding: '3px 10px',
                 borderRadius: 20,
-                fontSize: 10,
+                fontSize: 'var(--type-ui-label-size)',
                 background: GLASS.accentDim,
                 border: `1px solid ${UI.nestedBadgeBorder}`,
                 color: GLASS.text,
@@ -219,7 +219,7 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                   display: 'inline-block',
                   padding: '3px 10px',
                   borderRadius: 20,
-                  fontSize: 10,
+                  fontSize: 'var(--type-ui-label-size)',
                   background: UI.parentBadgeBg,
                   border: `1px solid ${UI.parentBadgeBorder}`,
                   color: TOKENS.amber,
@@ -234,26 +234,26 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
                 <button
                   onClick={() => onSelectAva?.(null)}
-                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, color: GLASS.textDim, fontFamily: 'var(--font-sans)' }}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim, fontFamily: 'var(--font-sans)' }}
                 >
                   Willamette Valley
                 </button>
-                <span style={{ color: GLASS.textMuted, fontSize: 11 }}>›</span>
+                <span style={{ color: GLASS.textMuted, fontSize: 'var(--type-ui-label-size)' }}>›</span>
                 <button
                   onClick={() => onSelectAva?.(parentAvaSlug)}
-                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, color: TOKENS.amber, fontFamily: 'var(--font-sans)', fontWeight: 600 }}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 'var(--type-ui-label-size)', color: TOKENS.amber, fontFamily: 'var(--font-sans)', fontWeight: 600 }}
                 >
                   {parentAva.name}
                 </button>
-                <span style={{ color: GLASS.textMuted, fontSize: 11 }}>›</span>
-                <span style={{ fontSize: 11, color: GLASS.text, fontWeight: 600 }}>{ava.name}</span>
+                <span style={{ color: GLASS.textMuted, fontSize: 'var(--type-ui-label-size)' }}>›</span>
+                <span style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.text, fontWeight: 600 }}>{ava.name}</span>
               </div>
             )}
 
-            <div style={{ fontSize: 18, fontWeight: 700, color: GLASS.text, fontFamily: 'var(--font-display)', marginBottom: 4 }}>
+            <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: GLASS.text, fontFamily: 'var(--font-display)', marginBottom: 4 }}>
               {ava.name}
             </div>
-            <div style={{ fontSize: 12, color: GLASS.textDim }}>
+            <div style={{ fontSize: 'var(--type-body-size)', color: GLASS.textDim }}>
               {isDoubleNested
                 ? `${parentAva.name} · Willamette Valley, Oregon`
                 : 'Willamette Valley, Oregon'}
@@ -272,7 +272,7 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                 Contains Sub-AVAs
                 <span style={{ fontWeight: 400, opacity: 0.6, marginLeft: 6 }}>({subAvas.length})</span>
               </div>
-              <div style={{ fontSize: 11, color: GLASS.textDim, lineHeight: 1.5, marginBottom: 8 }}>
+              <div style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim, lineHeight: 1.5, marginBottom: 8 }}>
                 These appellations are nested within Chehalem Mountains and also within the broader Willamette Valley AVA — making them double-nested.
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -307,14 +307,14 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                     width: '100%', padding: '8px 12px', borderRadius: 8,
                      border: `1px solid ${UI.amberBtnBorder}`,
                     background: UI.amberBtnBg,
-                    color: TOKENS.amber, fontSize: 12, fontWeight: 600,
+                    color: TOKENS.amber, fontSize: 'var(--type-body-size)', fontWeight: 600,
                     fontFamily: 'var(--font-sans)', cursor: 'pointer',
                     transition: 'background 0.15s, border-color 0.15s, color 0.15s',
                     textAlign: 'left',
                   }}
                 >
                   <span>{parentAva.name}</span>
-                  <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 8 }}>Direct parent ↗</span>
+                  <span style={{ fontSize: 'var(--type-ui-label-size)', opacity: 0.7, marginLeft: 8 }}>Direct parent ↗</span>
                 </button>
                 {/* Willamette Valley grandparent */}
                 <button
@@ -334,14 +334,14 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                     width: '100%', padding: '8px 12px', borderRadius: 8,
                      border: `1px solid ${UI.idleBorder}`,
                     background: UI.idleBg,
-                    color: GLASS.textDim, fontSize: 12, fontWeight: 500,
+                    color: GLASS.textDim, fontSize: 'var(--type-body-size)', fontWeight: 500,
                     fontFamily: 'var(--font-sans)', cursor: 'pointer',
                     transition: 'background 0.15s, border-color 0.15s, color 0.15s',
                     textAlign: 'left',
                   }}
                 >
                   <span>Willamette Valley AVA</span>
-                  <span style={{ fontSize: 13, marginLeft: 8, opacity: 0.55 }}>↗</span>
+                  <span style={{ fontSize: 'var(--type-mono-size)', marginLeft: 8, opacity: 0.55 }}>↗</span>
                 </button>
               </div>
             ) : (
@@ -364,14 +364,14 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                   width: '100%', padding: '8px 12px', borderRadius: 8,
                    border: `1px solid ${UI.idleBorder}`,
                   background: UI.idleBg,
-                  color: GLASS.textDim, fontSize: 12, fontWeight: 500,
+                  color: GLASS.textDim, fontSize: 'var(--type-body-size)', fontWeight: 500,
                   fontFamily: 'var(--font-sans)', cursor: 'pointer',
                   transition: 'background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s',
                   textAlign: 'left',
                 }}
               >
                 <span>Willamette Valley AVA</span>
-                <span style={{ fontSize: 13, marginLeft: 8, opacity: 0.55, flexShrink: 0 }}>↗</span>
+                <span style={{ fontSize: 'var(--type-mono-size)', marginLeft: 8, opacity: 0.55, flexShrink: 0 }}>↗</span>
               </button>
             )}
           </div>
@@ -391,10 +391,10 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
         /* ── No AVA selected — general info ──────────────────────── */
         <>
           <div style={CARD}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: GLASS.text, fontFamily: 'var(--font-display)', marginBottom: 6 }}>
+            <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: GLASS.text, fontFamily: 'var(--font-display)', marginBottom: 6 }}>
               Willamette Valley
             </div>
-            <div style={{ fontSize: 12, color: GLASS.textDim, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 'var(--type-body-size)', color: GLASS.textDim, lineHeight: 1.6 }}>
               Oregon's premier wine region, home to {WV_SUB_AVAS.length} distinct nested AVAs.
               Known world-wide for Pinot Noir, the valley's diverse terroir creates unique growing conditions across its appellations.
             </div>

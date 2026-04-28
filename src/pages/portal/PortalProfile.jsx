@@ -70,20 +70,20 @@ export default function PortalProfile() {
   return (
     <Shell>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <Link to="/portal/dashboard" style={{ color: muted, fontSize: 13 }}>← Dashboard</Link>
+        <Link to="/portal/dashboard" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>← Dashboard</Link>
       </div>
 
-      <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: ink, marginBottom: 8 }}>
+      <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink, marginBottom: 8 }}>
         Edit Profile
       </h1>
-      <p style={{ color: muted, fontSize: 13, marginBottom: 24 }}>
+      <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 24 }}>
         Changes are submitted for review and applied once approved.
       </p>
 
       {submitted ? (
         <div style={{
           background: TOKENS.successDim, border: `1px solid ${TOKENS.success}`, borderRadius: 8,
-          padding: '20px 16px', color: TOKENS.success, fontSize: 14, lineHeight: 1.6,
+          padding: '20px 16px', color: TOKENS.success, fontSize: 'var(--type-body-size)', lineHeight: 1.6,
         }}>
           <strong>Request submitted!</strong> Your changes will be reviewed shortly.{' '}
           <Link to="/portal/dashboard" style={{ color: TOKENS.success, fontWeight: 600 }}>
@@ -113,7 +113,7 @@ export default function PortalProfile() {
             <input type="url" value={form.image_url} onChange={handleChange('image_url')} style={inputStyle} />
           </Field>
 
-          {error && <p style={{ color: crimson, fontSize: 13, marginBottom: 12 }}>{error}</p>}
+          {error && <p style={{ color: crimson, fontSize: 'var(--type-mono-size)', marginBottom: 12 }}>{error}</p>}
 
           <button type="submit" disabled={submitting} style={btnStyle(submitting)}>
             {submitting ? 'Submitting…' : 'Submit for Review'}
@@ -146,7 +146,7 @@ function Shell({ children }) {
 function Field({ label, children }) {
   return (
     <div style={{ marginBottom: 18 }}>
-      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: muted, marginBottom: 6 }}>
+      <label style={{ display: 'block', fontSize: 'var(--type-mono-size)', fontWeight: 500, color: muted, marginBottom: 6 }}>
         {label}
       </label>
       {children}
@@ -159,7 +159,7 @@ const inputStyle = {
   padding: '10px 14px',
   borderRadius: 8,
   border: `1px solid ${border}`,
-  fontSize: 14,
+  fontSize: 'var(--type-body-size)',
   color: ink,
   background: parchment,
   outline: 'none',
@@ -174,7 +174,7 @@ function btnStyle(disabled) {
     border: 'none',
     background: ink,
     color: parchment,
-    fontSize: 14,
+    fontSize: 'var(--type-body-size)',
     fontWeight: 600,
     cursor: disabled ? 'wait' : 'pointer',
     opacity: disabled ? 0.7 : 1,
@@ -221,10 +221,10 @@ function PasswordSection({ hasPassword }) {
 
   return (
     <div>
-      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 18, color: ink, marginBottom: 6 }}>
+      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink, marginBottom: 6 }}>
         {hasPassword ? 'Change Password' : 'Set a Password'}
       </h2>
-      <p style={{ color: muted, fontSize: 13, marginBottom: 20 }}>
+      <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 20 }}>
         {hasPassword
           ? 'Update your portal login password.'
           : 'Set a password so you can log in without an email link.'}
@@ -233,7 +233,7 @@ function PasswordSection({ hasPassword }) {
       {pwSuccess ? (
         <div style={{
           background: TOKENS.successDim, border: `1px solid ${TOKENS.success}`, borderRadius: 8,
-          padding: '14px 16px', color: TOKENS.success, fontSize: 14,
+          padding: '14px 16px', color: TOKENS.success, fontSize: 'var(--type-body-size)',
         }}>
           Password {hasPassword ? 'updated' : 'set'} successfully.
         </div>
@@ -272,7 +272,7 @@ function PasswordSection({ hasPassword }) {
             />
           </Field>
 
-          {pwError && <p style={{ color: crimson, fontSize: 13, marginBottom: 12 }}>{pwError}</p>}
+          {pwError && <p style={{ color: crimson, fontSize: 'var(--type-mono-size)', marginBottom: 12 }}>{pwError}</p>}
 
           <button type="submit" disabled={saving} style={btnStyle(saving)}>
             {saving ? 'Saving…' : hasPassword ? 'Update Password' : 'Set Password'}

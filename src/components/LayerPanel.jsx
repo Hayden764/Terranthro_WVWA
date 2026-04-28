@@ -4,7 +4,7 @@ import { border, crimson, ink, muted, parchment, TYPE } from '../styles/tokens';
 
 const UI_LABEL = {
   ...TYPE.uiLabel,
-  fontSize: 10,
+  fontSize: 'var(--type-ui-label-size)',
 };
 
 const CLIMATE_LAYERS = [
@@ -42,7 +42,7 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
         alignItems: 'center',
         justifyContent: 'space-between',
       }}>
-        <span style={{ ...TYPE.uiLabel, color: parchment, fontWeight: 600, fontSize: 13 }}>
+        <span style={{ ...TYPE.uiLabel, color: parchment, fontWeight: 600, fontSize: 'var(--type-mono-size)' }}>
           Data Layers
         </span>
       </div>
@@ -69,8 +69,8 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
                 transition: 'all 0.15s',
               }}
             >
-              <div style={{ fontSize: 13, fontWeight: 500, color: ink }}>{layer.label}</div>
-              <div style={{ fontSize: 11, color: muted, marginTop: 1 }}>{layer.sub}</div>
+              <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 500, color: ink }}>{layer.label}</div>
+              <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.sub}</div>
             </button>
           ))}
 
@@ -78,8 +78,8 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
           {isClimate && (
             <div style={{ marginTop: 8, padding: '0 2px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 11, color: muted }}>Month</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: crimson }}>{MONTH_ABBR[currentMonth - 1]}</span>
+                <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>Month</span>
+                <span style={{ fontSize: 'var(--type-body-size)', fontWeight: 600, color: crimson }}>{MONTH_ABBR[currentMonth - 1]}</span>
               </div>
               <input
                 type="range"
@@ -89,7 +89,7 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
                 onChange={e => onMonthChange(Number(e.target.value))}
                 style={{ width: '100%', accentColor: crimson, cursor: 'pointer' }}
               />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: muted, marginTop: 2 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
                 <span>Jan</span><span>Apr</span><span>Jul</span><span>Oct</span><span>Dec</span>
               </div>
             </div>
@@ -116,7 +116,7 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
                   border: activeLayer === layer.id ? `1.5px solid ${crimson}` : `1.5px solid ${border}`,
                   background: activeLayer === layer.id ? parchment : parchment,
                   cursor: 'pointer',
-                  fontSize: 11,
+                  fontSize: 'var(--type-ui-label-size)',
                   fontWeight: 500,
                   color: activeLayer === layer.id ? crimson : muted,
                   transition: 'all 0.15s',

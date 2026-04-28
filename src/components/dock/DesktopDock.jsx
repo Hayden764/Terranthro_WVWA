@@ -51,7 +51,7 @@ const PanelShell = ({ title, onClose, children }) => (
     }}>
       <span style={{
         ...TYPE.uiLabel,
-        fontSize: 12,
+        fontSize: 'var(--type-body-size)',
         color: GLASS.text,
       }}>
         {title}
@@ -63,7 +63,7 @@ const PanelShell = ({ title, onClose, children }) => (
           border: 'none',
           color: GLASS.textDim,
           cursor: 'pointer',
-          fontSize: 16,
+          fontSize: 'var(--type-display-italic-size)',
           lineHeight: 1,
           padding: '2px 4px',
         }}

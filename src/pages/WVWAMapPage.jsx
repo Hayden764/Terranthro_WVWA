@@ -40,7 +40,7 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
       {/* Headline */}
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
         <div style={{
-          fontSize: 28,
+          fontSize: 'var(--type-display-medium-size)',
           fontWeight: 700,
           color: parchment,
           letterSpacing: '-0.01em',
@@ -50,7 +50,7 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
           Willamette Valley
         </div>
         <div style={{
-          fontSize: 20,
+          fontSize: 'var(--type-display-italic-size)',
           fontWeight: 400,
           color: parchment,
           letterSpacing: '0.04em',
@@ -68,7 +68,7 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
 
       {/* Tagline */}
       <div style={{
-        fontSize: 12,
+        fontSize: 'var(--type-body-size)',
           color: UI.taglineText,
         fontStyle: 'italic',
         letterSpacing: '0.06em',
@@ -92,7 +92,7 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
           borderRadius: 4,
           color: mapReady ? parchment : UI.btnTextIdle,
           ...TYPE.uiLabel,
-          fontSize: 13,
+          fontSize: 'var(--type-mono-size)',
           fontWeight: 600,
           cursor: mapReady ? 'pointer' : 'default',
           fontFamily: 'var(--font-sans)',
@@ -177,7 +177,7 @@ export default function WVWAMapPage() {
             style={{ height: 28, width: 'auto', display: 'block', filter: 'brightness(0) invert(1)' }}
           />
         </a>
-        <div style={{ fontSize: 12, color: UI.subtleLabel, fontFamily: 'var(--font-sans)', letterSpacing: '0.02em' }}>
+        <div style={{ fontSize: 'var(--type-body-size)', color: UI.subtleLabel, fontFamily: 'var(--font-sans)', letterSpacing: '0.02em' }}>
           Wineries &amp; AVA Explorer
         </div>
       </header>
@@ -241,7 +241,7 @@ export default function WVWAMapPage() {
                 position: 'absolute', top: 12, left: 12, zIndex: 100,
                 width: 42, height: 42,
                 background: ink, border: 'none', borderRadius: 10,
-                color: parchment, fontSize: 20,
+                color: parchment, fontSize: 'var(--type-display-italic-size)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', boxShadow: `0 2px 8px ${UI.fabShadow}`,
                 fontFamily: 'var(--font-sans)', lineHeight: 1,

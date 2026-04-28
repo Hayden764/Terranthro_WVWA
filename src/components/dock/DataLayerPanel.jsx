@@ -31,7 +31,7 @@ const CARD = {
 
 const SECTION_LABEL = {
   ...TYPE.uiLabel,
-  fontSize: 10,
+  fontSize: 'var(--type-ui-label-size)',
   color: GLASS.textDim,
   marginBottom: 8,
 };
@@ -115,8 +115,8 @@ export default function DataLayerPanel({
                     if (!active) e.currentTarget.style.background = 'transparent';
                   }}
                 >
-                  <div style={{ fontSize: 12, fontWeight: 600, color: active ? GLASS.text : GLASS.textDim }}>{layer.label}</div>
-                  <div style={{ fontSize: 10, color: GLASS.textMuted, marginTop: 2 }}>{layer.sub}</div>
+                  <div style={{ fontSize: 'var(--type-body-size)', fontWeight: 600, color: active ? GLASS.text : GLASS.textDim }}>{layer.label}</div>
+                  <div style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.textMuted, marginTop: 2 }}>{layer.sub}</div>
                 </button>
               );
             })}
@@ -125,8 +125,8 @@ export default function DataLayerPanel({
             {isClimate && (
               <div style={{ marginTop: 6, padding: '4px 2px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <span style={{ fontSize: 10, color: GLASS.textDim }}>Month</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: crimson, background: GLASS.accentDim, padding: '1px 8px', borderRadius: 4 }}>
+                  <span style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim }}>Month</span>
+                  <span style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: crimson, background: GLASS.accentDim, padding: '1px 8px', borderRadius: 4 }}>
                     {MONTH_ABBR[currentMonth - 1]}
                   </span>
                 </div>
@@ -138,7 +138,7 @@ export default function DataLayerPanel({
                   onChange={e => onMonthChange(Number(e.target.value))}
                   style={{ width: '100%', accentColor: crimson, cursor: 'pointer', height: 4 }}
                 />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: GLASS.textMuted, marginTop: 2 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: GLASS.textMuted, marginTop: 2 }}>
                   <span>Jan</span><span>Apr</span><span>Jul</span><span>Oct</span><span>Dec</span>
                 </div>
               </div>
@@ -181,10 +181,10 @@ export default function DataLayerPanel({
             }
           }}
         >
-          <div style={{ fontSize: 12, fontWeight: 600, color: listingFilterMode === LISTING_FILTER_MODES.noVineyardsVisualized ? GLASS.text : GLASS.textDim }}>
+          <div style={{ fontSize: 'var(--type-body-size)', fontWeight: 600, color: listingFilterMode === LISTING_FILTER_MODES.noVineyardsVisualized ? GLASS.text : GLASS.textDim }}>
             No Vineyards Visualized
           </div>
-          <div style={{ fontSize: 10, color: GLASS.textMuted, marginTop: 2 }}>
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.textMuted, marginTop: 2 }}>
             Hide parcel polygons while keeping winery listings and markers available.
           </div>
         </button>
@@ -210,7 +210,7 @@ export default function DataLayerPanel({
             <span style={SECTION_LABEL}>Topography</span>
             <span style={{
               ...TYPE.uiLabel,
-              fontSize: 8,
+              fontSize: 'var(--type-ui-label-size)',
               color: UI.lidarText,
               background: UI.lidarBg,
               border: `1px solid ${UI.lidarBorder}`,
@@ -239,13 +239,13 @@ export default function DataLayerPanel({
                     background: active ? GLASS.accentDim : 'transparent',
                     color: active ? GLASS.text : GLASS.textDim,
                     cursor: 'pointer',
-                    fontSize: 10,
+                    fontSize: 'var(--type-ui-label-size)',
                     fontWeight: 600,
                     fontFamily: 'var(--font-sans)',
                     transition: 'all 0.15s',
                     textAlign: 'center',
                     ...TYPE.uiLabel,
-                    fontSize: 10,
+                    fontSize: 'var(--type-ui-label-size)',
                     fontWeight: 600,
                   }}
                   onMouseEnter={e => {

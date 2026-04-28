@@ -129,7 +129,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
             <div>
               <h2 style={{
                 margin: 0,
-                fontSize: 20,
+                fontSize: 'var(--type-display-italic-size)',
                 fontWeight: 700,
                 color: parchment,
                 fontFamily: 'var(--font-display)',
@@ -137,7 +137,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
               }}>
                 <span style={{ color: crimson }}>W</span>illamette Valley Directory
               </h2>
-              <p style={{ margin: '3px 0 0', fontSize: 12, color: UI.textDim }}>
+              <p style={{ margin: '3px 0 0', fontSize: 'var(--type-body-size)', color: UI.textDim }}>
                 {listings.length} places · click any listing to locate on map
               </p>
             </div>
@@ -149,7 +149,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
                 borderRadius: 8,
                 color: UI.textSoft,
                 cursor: 'pointer',
-                fontSize: 18,
+                fontSize: 'var(--type-display-italic-size)',
                 lineHeight: 1,
                 padding: '4px 10px',
                 transition: 'background 0.15s',
@@ -168,7 +168,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
               left: 12,
               top: '50%',
               transform: 'translateY(-50%)',
-              fontSize: 14,
+              fontSize: 'var(--type-body-size)',
               color: UI.textMuted,
               pointerEvents: 'none',
             }}>🔍</span>
@@ -185,7 +185,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
                 border: `1px solid ${UI.panelBorderLight}`,
                 borderRadius: 10,
                 padding: '10px 12px 10px 36px',
-                fontSize: 13,
+                fontSize: 'var(--type-mono-size)',
                 color: parchment,
                 outline: 'none',
                 fontFamily: 'var(--font-sans)',
@@ -206,7 +206,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
                   border: 'none',
                   color: UI.textDim,
                   cursor: 'pointer',
-                  fontSize: 14,
+                  fontSize: 'var(--type-body-size)',
                   padding: 2,
                 }}
               >✕</button>
@@ -236,7 +236,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
                     background: isActive ? alpha(tab.color, 0.13) : UI.chipBgActive,
                     color: isActive ? tab.color : UI.textDim,
                     cursor: 'pointer',
-                    fontSize: 11,
+                    fontSize: 'var(--type-ui-label-size)',
                     fontWeight: isActive ? 700 : 500,
                     fontFamily: 'var(--font-sans)',
                     transition: 'all 0.15s',
@@ -255,7 +255,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
                     background: isActive ? alpha(tab.color, 0.2) : UI.chipBg,
                     borderRadius: 10,
                     padding: '1px 6px',
-                    fontSize: 10,
+                    fontSize: 'var(--type-ui-label-size)',
                     fontWeight: 600,
                     color: isActive ? tab.color : UI.textMuted,
                   }}>{count}</span>
@@ -268,7 +268,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
         {/* ── Scrollable list ── */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 20px' }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '48px 0', color: UI.textMuted, fontSize: 14 }}>
+            <div style={{ textAlign: 'center', padding: '48px 0', color: UI.textMuted, fontSize: 'var(--type-body-size)' }}>
               No listings match "{query}"
             </div>
           ) : activeTab === 'all' ? (
@@ -296,10 +296,10 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
                       width: 10, height: 10, borderRadius: '50%',
                       background: cat.color, flexShrink: 0,
                     }} />
-                    <span style={{ ...TYPE.uiLabel, fontSize: 11, color: cat.color }}>
+                    <span style={{ ...TYPE.uiLabel, color: cat.color }}>
                       {cat.label}
                     </span>
-                    <span style={{ fontSize: 11, color: UI.textFaint, fontWeight: 500 }}>
+                    <span style={{ fontSize: 'var(--type-ui-label-size)', color: UI.textFaint, fontWeight: 500 }}>
                       {items.length}
                     </span>
                   </div>
@@ -369,7 +369,7 @@ function ListingRow({ listing, cat, query, onClick }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: 10,
+        fontSize: 'var(--type-ui-label-size)',
         fontWeight: 700,
         color: UI.rowNumberText,
         flexShrink: 0,
@@ -384,7 +384,7 @@ function ListingRow({ listing, cat, query, onClick }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
           <span style={{
-            fontSize: 13,
+            fontSize: 'var(--type-mono-size)',
             fontWeight: 600,
             color: hovered ? parchment : UI.rowTitleIdle,
             lineHeight: 1.3,
@@ -393,7 +393,7 @@ function ListingRow({ listing, cat, query, onClick }) {
           </span>
         </div>
         {descSnippet && (
-          <div style={{ fontSize: 11, color: UI.rowDesc, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: UI.rowDesc, lineHeight: 1.5 }}>
             <Highlight text={descSnippet} query={query} color={cat.color} />
           </div>
         )}
@@ -401,7 +401,7 @@ function ListingRow({ listing, cat, query, onClick }) {
 
       {/* Arrow */}
       <div style={{
-        fontSize: 13,
+        fontSize: 'var(--type-mono-size)',
         color: hovered ? cat.color : UI.textVeryFaint,
         transition: 'color 0.12s',
         flexShrink: 0,

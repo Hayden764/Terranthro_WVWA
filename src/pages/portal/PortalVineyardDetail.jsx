@@ -231,16 +231,16 @@ export default function PortalVineyardDetail() {
           background: parchment, borderBottom: `1px solid ${border}`,
           padding: '12px 0', marginBottom: 8,
         }}>
-          <Link to="/portal/dashboard" style={{ color: muted, fontSize: 13 }}>← Dashboard</Link>
+          <Link to="/portal/dashboard" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>← Dashboard</Link>
         </div>
 
         <h1 style={{
-          fontFamily: 'var(--font-display)', fontSize: 22, color: ink,
+          fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink,
           margin: '16px 0 4px',
         }}>
           {vineyard.vineyard_name || 'Unnamed Parcel'}
         </h1>
-        <p style={{ color: muted, fontSize: 13, marginBottom: 24 }}>
+        <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 24 }}>
           {vineyard.nested_ava || vineyard.ava_name || '—'} · {Number(vineyard.acres || 0).toFixed(1)} acres
         </p>
 
@@ -269,7 +269,7 @@ export default function PortalVineyardDetail() {
         {/* Blocks */}
         <Section title="Blocks">
           {vineyard.blocks.length === 0 ? (
-            <p style={{ color: muted, fontSize: 13 }}>No blocks recorded.</p>
+            <p style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>No blocks recorded.</p>
           ) : (
             <EditableBlocksTable
               parcelId={vineyard.id}
@@ -283,7 +283,7 @@ export default function PortalVineyardDetail() {
 
         {/* Request Changes */}
         <Section title="Request Changes">
-          <p style={{ color: muted, fontSize: 13, marginBottom: 16 }}>
+          <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 16 }}>
             All changes are submitted for admin review before being applied.
           </p>
 
@@ -291,10 +291,10 @@ export default function PortalVineyardDetail() {
           {vineyard.geometry && !pendingGeometry && (
             <div style={{ marginBottom: 16 }}>
               {geoSubmitStatus === 'success' ? (
-                <p style={{ fontSize: 13, color: TOKENS.success, fontWeight: 500 }}>✓ Geometry update submitted for review</p>
+                <p style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.success, fontWeight: 500 }}>✓ Geometry update submitted for review</p>
               ) : (
                 <>
-                  <p style={{ fontSize: 13, color: muted, marginBottom: 8 }}>
+                  <p style={{ fontSize: 'var(--type-mono-size)', color: muted, marginBottom: 8 }}>
                     To correct the parcel boundary, click below — the map will enter edit mode so you can drag vertices.
                   </p>
                 </>
@@ -305,10 +305,10 @@ export default function PortalVineyardDetail() {
           {/* Pending geometry confirmation */}
           {pendingGeometry && (
             <div style={pendingCardStyle}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: ink, marginBottom: 6 }}>
+              <p style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, marginBottom: 6 }}>
                 ⚠ Review before submitting
               </p>
-              <p style={{ fontSize: 12, color: muted, marginBottom: 10 }}>
+              <p style={{ fontSize: 'var(--type-body-size)', color: muted, marginBottom: 10 }}>
                 Your boundary change will be sent to admin for approval. Add an optional note explaining the correction.
               </p>
               <textarea
@@ -319,7 +319,7 @@ export default function PortalVineyardDetail() {
                 style={textareaStyle}
               />
               {geoSubmitStatus === 'error' && (
-                <p style={{ fontSize: 12, color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>
+                <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>
               )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={submitGeometry} disabled={geoSubmitStatus === 'submitting'} style={smallBtnStyle}>
@@ -338,10 +338,10 @@ export default function PortalVineyardDetail() {
           {/* Pending split confirmation */}
           {pendingSplit && (
             <div style={pendingCardStyle}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: ink, marginBottom: 6 }}>
+              <p style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, marginBottom: 6 }}>
                 ✂ Confirm parcel split
               </p>
-              <p style={{ fontSize: 12, color: muted, marginBottom: 10 }}>
+              <p style={{ fontSize: 'var(--type-body-size)', color: muted, marginBottom: 10 }}>
                 {pendingSplit.polygon_a
                   ? 'Two sub-parcels were computed from your split line. Add an optional note for the admin.'
                   : 'The split line was recorded. Admin will apply the split manually. Add an optional note below.'}
@@ -354,7 +354,7 @@ export default function PortalVineyardDetail() {
                 style={textareaStyle}
               />
               {splitSubmitStatus === 'error' && (
-                <p style={{ fontSize: 12, color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>
+                <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>
               )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={submitSplit} disabled={splitSubmitStatus === 'submitting'} style={smallBtnStyle}>
@@ -373,7 +373,7 @@ export default function PortalVineyardDetail() {
           {/* Remove / unlink confirmation */}
           {removingParcel && (
             <div style={{ ...pendingCardStyle, borderColor: alpha(TOKENS.danger, 0.35), background: TOKENS.dangerDim, marginBottom: 16 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: crimson, marginBottom: 8 }}>
+              <p style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: crimson, marginBottom: 8 }}>
                 Remove this parcel
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
@@ -381,7 +381,7 @@ export default function PortalVineyardDetail() {
                   { value: 'delete', label: 'Delete — vines have been pulled up or parcel no longer exists' },
                   { value: 'unlink', label: 'Unlink — parcel was sold or is no longer associated with my winery' },
                 ].map(({ value, label }) => (
-                  <label key={value} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                  <label key={value} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 'var(--type-mono-size)', cursor: 'pointer' }}>
                     <input
                       type="radio"
                       name="removeAction"
@@ -402,7 +402,7 @@ export default function PortalVineyardDetail() {
                 style={textareaStyle}
               />
               {removeSubmitStatus === 'error' && (
-                <p style={{ fontSize: 12, color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>
+                <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>
               )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={submitRemove} disabled={removeSubmitStatus === 'submitting'} style={{ ...smallBtnStyle, background: crimson }}>
@@ -421,10 +421,10 @@ export default function PortalVineyardDetail() {
           {/* Add parcel confirmation */}
           {pendingAdd && (
             <div style={pendingCardStyle}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: ink, marginBottom: 6 }}>
+              <p style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, marginBottom: 6 }}>
                 + Review new parcel
               </p>
-              <p style={{ fontSize: 12, color: muted, marginBottom: 10 }}>
+              <p style={{ fontSize: 'var(--type-body-size)', color: muted, marginBottom: 10 }}>
                 Give your new parcel a name and any notes for the admin.
               </p>
               <input
@@ -442,7 +442,7 @@ export default function PortalVineyardDetail() {
                 style={textareaStyle}
               />
               {addSubmitStatus === 'error' && (
-                <p style={{ fontSize: 12, color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>
+                <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>
               )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={submitAdd} disabled={addSubmitStatus === 'submitting' || !pendingAdd.vineyard_name.trim()} style={smallBtnStyle}>
@@ -463,7 +463,7 @@ export default function PortalVineyardDetail() {
             {/* Edit Boundary */}
             {vineyard.geometry && !pendingGeometry && geoSubmitStatus !== 'success' && (
               editingGeometry ? (
-                <span style={{ fontSize: 13, color: muted, alignSelf: 'center' }}>Editing on map…</span>
+                <span style={{ fontSize: 'var(--type-mono-size)', color: muted, alignSelf: 'center' }}>Editing on map…</span>
               ) : (
                 <button onClick={() => { setEditingGeometry(true); setGeoSubmitStatus(null); }} style={smallBtnStyle}>
                   Edit Boundary
@@ -473,7 +473,7 @@ export default function PortalVineyardDetail() {
 
             {/* Edit Block Info */}
             {editingBlocks ? (
-              <span style={{ fontSize: 13, color: muted, alignSelf: 'center' }}>
+              <span style={{ fontSize: 'var(--type-mono-size)', color: muted, alignSelf: 'center' }}>
                 Editing block info above…
               </span>
             ) : (
@@ -485,7 +485,7 @@ export default function PortalVineyardDetail() {
             {/* Split Parcel */}
             {vineyard.geometry && !pendingSplit && splitSubmitStatus !== 'success' && (
               splittingParcel ? (
-                <span style={{ fontSize: 13, color: muted, alignSelf: 'center' }}>Drawing split line…</span>
+                <span style={{ fontSize: 'var(--type-mono-size)', color: muted, alignSelf: 'center' }}>Drawing split line…</span>
               ) : (
                 <button onClick={() => { setSplittingParcel(true); setSplitSubmitStatus(null); }} style={smallBtnStyle}>
                   Split Parcel
@@ -493,13 +493,13 @@ export default function PortalVineyardDetail() {
               )
             )}
             {splitSubmitStatus === 'success' && (
-              <span style={{ fontSize: 13, color: TOKENS.success, fontWeight: 500 }}>✓ Split request submitted</span>
+              <span style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.success, fontWeight: 500 }}>✓ Split request submitted</span>
             )}
 
             {/* Add Parcel */}
             {!pendingAdd && addSubmitStatus !== 'success' && (
               addingParcel ? (
-                <span style={{ fontSize: 13, color: muted, alignSelf: 'center' }}>Drawing on map…</span>
+                <span style={{ fontSize: 'var(--type-mono-size)', color: muted, alignSelf: 'center' }}>Drawing on map…</span>
               ) : (
                 <button onClick={() => { setAddingParcel(true); setAddSubmitStatus(null); }} style={smallBtnStyle}>
                   Add Parcel
@@ -507,7 +507,7 @@ export default function PortalVineyardDetail() {
               )
             )}
             {addSubmitStatus === 'success' && (
-              <span style={{ fontSize: 13, color: TOKENS.success, fontWeight: 500 }}>✓ New parcel submitted for review</span>
+              <span style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.success, fontWeight: 500 }}>✓ New parcel submitted for review</span>
             )}
 
             {/* Remove / Unlink */}
@@ -520,7 +520,7 @@ export default function PortalVineyardDetail() {
               </button>
             )}
             {removeSubmitStatus === 'success' && (
-              <span style={{ fontSize: 13, color: TOKENS.success, fontWeight: 500 }}>✓ Removal request submitted</span>
+              <span style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.success, fontWeight: 500 }}>✓ Removal request submitted</span>
             )}
           </div>
 
@@ -560,7 +560,7 @@ function RequestButton({ vineyard, type, label }) {
   }
 
   if (done) {
-    return <span style={{ fontSize: 13, color: TOKENS.success, fontWeight: 500 }}>✓ Submitted</span>;
+    return <span style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.success, fontWeight: 500 }}>✓ Submitted</span>;
   }
 
   if (!open) {
@@ -573,7 +573,7 @@ function RequestButton({ vineyard, type, label }) {
 
   return (
     <div style={{ width: '100%', marginBottom: 8 }}>
-      <label style={{ fontSize: 12, color: muted, marginBottom: 4, display: 'block' }}>
+      <label style={{ fontSize: 'var(--type-body-size)', color: muted, marginBottom: 4, display: 'block' }}>
         {type === 'vineyard_varietals' ? 'New varietals list' : 'Describe the requested changes'}
       </label>
       <textarea
@@ -582,7 +582,7 @@ function RequestButton({ vineyard, type, label }) {
         rows={3}
         style={{
           width: '100%', padding: '8px 12px', borderRadius: 6,
-          border: `1px solid ${border}`, fontSize: 13,
+          border: `1px solid ${border}`, fontSize: 'var(--type-mono-size)',
           fontFamily: 'var(--font-sans)', resize: 'vertical',
         }}
       />
@@ -618,7 +618,7 @@ function Section({ title, children }) {
       background: parchment, borderRadius: 10, padding: '20px 16px',
       border: `1px solid ${border}`, marginBottom: 20,
     }}>
-      <h2 style={{ fontSize: 15, fontWeight: 600, color: ink, marginBottom: 12 }}>{title}</h2>
+      <h2 style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 600, color: ink, marginBottom: 12 }}>{title}</h2>
       {children}
     </div>
   );
@@ -626,7 +626,7 @@ function Section({ title, children }) {
 
 function InfoRow({ label, value }) {
   return (
-    <div style={{ display: 'flex', gap: 12, marginBottom: 6, fontSize: 13 }}>
+    <div style={{ display: 'flex', gap: 12, marginBottom: 6, fontSize: 'var(--type-mono-size)' }}>
       <span style={{ color: muted, minWidth: 80, flexShrink: 0 }}>{label}</span>
       <span style={{ color: ink }}>{value}</span>
     </div>
@@ -640,7 +640,7 @@ const smallBtnStyle = {
   border: 'none',
   background: ink,
   color: parchment,
-  fontSize: 12,
+  fontSize: 'var(--type-body-size)',
   fontWeight: 600,
   cursor: 'pointer',
 };
@@ -666,7 +666,7 @@ const textareaStyle = {
   padding: '8px 10px',
   borderRadius: 6,
   border: `1px solid ${border}`,
-  fontSize: 12,
+  fontSize: 'var(--type-body-size)',
   fontFamily: 'var(--font-sans)',
   resize: 'vertical',
   marginBottom: 10,

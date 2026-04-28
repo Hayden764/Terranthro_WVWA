@@ -46,16 +46,15 @@ export default function TerroirDataChips({ chips = [], variant = 'light' }) {
           >
             <div style={{
               ...TYPE.uiLabel,
-              fontSize: 9,
               color: glass ? alpha(TOKENS.parchment, 0.72) : TOKENS.muted,
               marginBottom: 4,
             }}>
               {chip.label}
             </div>
             <div style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 18,
+              ...TYPE.displayItalic,
               lineHeight: 1.15,
+              fontStyle: 'normal',
               color: tone.color,
               textShadow: chip.glow ? tone.glow : 'none',
               whiteSpace: 'nowrap',

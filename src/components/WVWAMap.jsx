@@ -742,7 +742,7 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
                     borderBottom: isActive ? `2px solid ${crimson}` : '2px solid transparent',
                     color: isActive ? UI.tabActiveText : UI.tabIdleText,
                     cursor: 'pointer',
-                    fontSize: 11,
+                    fontSize: 'var(--type-ui-label-size)',
                     fontWeight: 700,
                     fontFamily: 'var(--font-sans)',
                     letterSpacing: '0.04em',
@@ -753,7 +753,7 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
                     transition: 'color 0.15s, border-color 0.15s, background 0.15s',
                   }}
                 >
-                  <span style={{ fontSize: 13 }}>{t.icon}</span>
+                  <span style={{ fontSize: 'var(--type-mono-size)' }}>{t.icon}</span>
                   {t.label}
                   {/* Per-tab close × */}
                   <span
@@ -762,7 +762,7 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
                     onClick={e => { e.stopPropagation(); t.id === 'listing' ? onCloseListing() : onCloseLayer(); }}
                     style={{
                       marginLeft: 4,
-                      fontSize: 10,
+                      fontSize: 'var(--type-ui-label-size)',
                       opacity: 0.5,
                       lineHeight: 1,
                       cursor: 'pointer',
@@ -780,14 +780,14 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
           /* Single-mode header row */
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16 }}>
+              <span style={{ fontSize: 'var(--type-display-italic-size)' }}>
                 {resolvedTab === 'listing' ? (cat?.icon ?? '📍') : getLayerIcon(activeLayer)}
               </span>
               <div>
-                <div style={{ ...TYPE.uiLabel, fontSize: 10, color: UI.tabIdleText, lineHeight: 1, marginBottom: 2 }}>
+                <div style={{ ...TYPE.uiLabel, color: UI.tabIdleText, lineHeight: 1, marginBottom: 2 }}>
                   {resolvedTab === 'listing' ? cat?.label : 'Active Layer'}
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: UI.tabActiveText, lineHeight: 1.2 }}>
+                <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 700, color: UI.tabActiveText, lineHeight: 1.2 }}>
                   {resolvedTab === 'listing' ? listing.title : getLayerLabel(activeLayer)}
                 </div>
               </div>
@@ -800,7 +800,7 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
                 borderRadius: 8,
                 color: UI.closeBtnText,
                 width: 28, height: 28,
-                cursor: 'pointer', fontSize: 14,
+                cursor: 'pointer', fontSize: 'var(--type-body-size)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 lineHeight: 1, flexShrink: 0,
               }}
@@ -835,8 +835,8 @@ function getLayerLabel(id) { return LAYER_META[id]?.label ?? id; }
 /* ── Listing tab ──────────────────────────────────────────────────────── */
 function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyardHover, onViewAllVineyards }) {
   const CARD = { background: UI.cardBg, border: `1px solid ${UI.cardBorder}`, borderRadius: 10, padding: '12px 14px', marginBottom: 8 };
-  const LBL  = { ...TYPE.uiLabel, fontSize: 10, color: UI.labelText, marginBottom: 4 };
-  const VAL  = { fontSize: 12, color: UI.valueText, lineHeight: 1.5 };
+  const LBL  = { ...TYPE.uiLabel, color: UI.labelText, marginBottom: 4 };
+  const VAL  = { fontSize: 'var(--type-body-size)', color: UI.valueText, lineHeight: 1.5 };
 
   const [hoveredIdx, setHoveredIdx] = useState(null);
   const [expandedGroupKey, setExpandedGroupKey] = useState(null);
@@ -894,29 +894,29 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
           <span style={{
             width: 24, height: 24, borderRadius: '50%', background: cat.color,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 10, fontWeight: 700, color: UI.white, flexShrink: 0, marginTop: 2,
+            fontSize: 'var(--type-ui-label-size)', fontWeight: 700, color: UI.white, flexShrink: 0, marginTop: 2,
           }}>
             {listing.num}
           </span>
-          <div style={{ fontSize: 14, fontWeight: 700, color: UI.titleText, lineHeight: 1.3 }}>
+          <div style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: UI.titleText, lineHeight: 1.3 }}>
             {listing.title}
           </div>
         </div>
 
         {listing.desc && (
-          <p style={{ fontSize: 12, color: UI.bodyText, lineHeight: 1.6, margin: '0 0 12px 0' }}>
+          <p style={{ fontSize: 'var(--type-body-size)', color: UI.bodyText, lineHeight: 1.6, margin: '0 0 12px 0' }}>
             {listing.desc.slice(0, 300)}{listing.desc.length > 300 ? '…' : ''}
           </p>
         )}
 
         {listing.phone && (
-          <a href={`tel:${listing.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: UI.phoneText, textDecoration: 'none', marginBottom: 10 }}>
+          <a href={`tel:${listing.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--type-body-size)', color: UI.phoneText, textDecoration: 'none', marginBottom: 10 }}>
             📞 {listing.phone}
           </a>
         )}
 
         {listing.url && (
-          <a href={listing.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', padding: '8px 14px', background: cat.color, color: UI.white, borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', textAlign: 'center', marginTop: 4 }}>
+          <a href={listing.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', padding: '8px 14px', background: cat.color, color: UI.white, borderRadius: 8, fontSize: 'var(--type-body-size)', fontWeight: 600, textDecoration: 'none', textAlign: 'center', marginTop: 4 }}>
             Visit Website ↗
           </a>
         )}
@@ -925,7 +925,7 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
         {vineyards && vineyards.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <div style={{ ...TYPE.uiLabel, fontSize: 10, color: UI.sectionLabel }}>
+              <div style={{ ...TYPE.uiLabel, color: UI.sectionLabel }}>
                 🍇 Estate Vineyard{vineyards.length > 1 ? 's' : ''}
               </div>
               {vineyards.length > 1 && (
@@ -936,7 +936,7 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                     border: `1px solid ${UI.vineyardAccentBorder}`,
                     borderRadius: 6,
                     color: UI.vineyardAccent,
-                    fontSize: 10,
+                    fontSize: 'var(--type-ui-label-size)',
                     fontWeight: 700,
                     fontFamily: 'var(--font-sans)',
                     letterSpacing: '0.04em',
@@ -1054,9 +1054,9 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                   title="Click to view vineyard details and zoom"
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isExpanded ? 8 : 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: isHovered ? UI.hoverAccent : UI.vineyardAccent, transition: 'color 0.15s', flex: 1, paddingRight: 8 }}>{group.name}</div>
+                    <div style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: isHovered ? UI.hoverAccent : UI.vineyardAccent, transition: 'color 0.15s', flex: 1, paddingRight: 8 }}>{group.name}</div>
                     <span style={{
-                      fontSize: 10,
+                      fontSize: 'var(--type-ui-label-size)',
                       color: isHovered ? UI.hoverAccentMuted : UI.vineyardAccentMuted,
                       transition: 'color 0.15s, transform 0.15s',
                       transform: isHovered ? 'scale(1.15)' : 'scale(1)',
@@ -1075,19 +1075,19 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                       {groupTopoStats && (
                         <div style={{ marginTop: 8, paddingTop: 7, borderTop: `1px solid ${UI.subtleDivider}`, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                           {groupTopoStats.elev_min != null && groupTopoStats.elev_max != null && (
-                            <span style={{ fontSize: 10, color: UI.faintText, display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <span style={{ fontSize: 'var(--type-ui-label-size)', color: UI.faintText, display: 'flex', alignItems: 'center', gap: 3 }}>
                               <span style={{ opacity: 0.6 }}>↑</span>
                               {Math.round(groupTopoStats.elev_min)}–{Math.round(groupTopoStats.elev_max)} ft
                             </span>
                           )}
                           {groupTopoStats.slope_mean != null && (
-                            <span style={{ fontSize: 10, color: UI.faintText, display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <span style={{ fontSize: 'var(--type-ui-label-size)', color: UI.faintText, display: 'flex', alignItems: 'center', gap: 3 }}>
                               <span style={{ opacity: 0.6 }}>⊿</span>
                               {groupTopoStats.slope_mean.toFixed(1)}° slope
                             </span>
                           )}
                           {groupTopoStats.aspect_label && groupTopoStats.aspect_label !== 'Flat' && (
-                            <span style={{ fontSize: 10, color: UI.faintText, display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <span style={{ fontSize: 'var(--type-ui-label-size)', color: UI.faintText, display: 'flex', alignItems: 'center', gap: 3 }}>
                               <span style={{ opacity: 0.6 }}>◎</span>
                               {groupTopoStats.aspect_label}
                             </span>
@@ -1107,8 +1107,8 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                                 background: UI.blockBg,
                               }}
                             >
-                              <div style={{ fontSize: 11, fontWeight: 700, color: UI.cardTextStrong }}>{b.name || `Block ${bi + 1}`}</div>
-                              <div style={{ fontSize: 10, color: UI.bodyText, marginTop: 2 }}>
+                              <div style={{ fontSize: 'var(--type-ui-label-size)', fontWeight: 700, color: UI.cardTextStrong }}>{b.name || `Block ${bi + 1}`}</div>
+                              <div style={{ fontSize: 'var(--type-ui-label-size)', color: UI.bodyText, marginTop: 2 }}>
                                 {[
                                   b.varieties.size > 0 ? Array.from(b.varieties).slice(0, 2).join(', ') : null,
                                   b.clones.size > 0 ? `Clones: ${Array.from(b.clones).slice(0, 2).join(', ')}` : null,
@@ -1140,13 +1140,13 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                                   padding: '7px 8px',
                                   background: UI.blockBg,
                                   color: UI.valueText,
-                                  fontSize: 11,
+                                  fontSize: 'var(--type-ui-label-size)',
                                   cursor: 'pointer',
                                 }}
                                 title="Zoom to this block footprint"
                               >
                                 <div style={{ fontWeight: 700 }}>Block {fi + 1}</div>
-                                <div style={{ marginTop: 2, fontSize: 10, color: UI.bodyText }}>{fAcres || 'No acreage'} • Click to zoom</div>
+                                <div style={{ marginTop: 2, fontSize: 'var(--type-ui-label-size)', color: UI.bodyText }}>{fAcres || 'No acreage'} • Click to zoom</div>
                               </button>
                             );
                           })
@@ -1188,20 +1188,20 @@ function LayerTabContent({ activeLayer, topoStats }) {
   const topoConfig = TOPO_LAYER_TYPES[activeLayer];
 
   const CARD = { background: UI.cardBg, border: `1px solid ${UI.cardBorder}`, borderRadius: 10, padding: '12px 14px', marginBottom: 8 };
-  const LBL  = { ...TYPE.uiLabel, fontSize: 10, color: UI.labelText, marginBottom: 4 };
-  const VAL  = { fontSize: 13, color: UI.cardTextStrong, lineHeight: 1.55 };
+  const LBL  = { ...TYPE.uiLabel, color: UI.labelText, marginBottom: 4 };
+  const VAL  = { ...TYPE.mono, color: UI.cardTextStrong, lineHeight: 1.55 };
   const fmt  = (v) => typeof v === 'number' ? v.toFixed(1) : '—';
 
   return (
     <div style={{ padding: '12px 12px 16px' }}>
       <div style={CARD}>
-        <p style={{ fontSize: 12, color: alpha(TOKENS.parchment, 0.55), lineHeight: 1.7, margin: 0 }}>{info.why}</p>
+        <p style={{ ...TYPE.body, color: alpha(TOKENS.parchment, 0.55), lineHeight: 1.7, margin: 0 }}>{info.why}</p>
       </div>
 
       <div style={CARD}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div><div style={LBL}>Period</div><div style={VAL}>{info.period}</div></div>
-          <div><div style={LBL}>Source</div><div style={{ ...VAL, fontSize: 11, color: UI.faintText }}>{info.source}</div></div>
+          <div><div style={LBL}>Source</div><div style={{ ...VAL, color: UI.faintText }}>{info.source}</div></div>
         </div>
       </div>
 
@@ -1213,7 +1213,7 @@ function LayerTabContent({ activeLayer, topoStats }) {
           <div style={CARD}>
             <div style={{ ...LBL, marginBottom: 8 }}>Data Range — Willamette Valley</div>
             <div style={{ height: 10, borderRadius: 6, background: gradient, marginBottom: 4, border: `1px solid ${alpha(TOKENS.parchment, 0.1)}` }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: UI.labelText, marginBottom: 12 }}>
+            <div style={{ ...TYPE.uiLabel, display: 'flex', justifyContent: 'space-between', color: UI.labelText, marginBottom: 12 }}>
               <span>{fmt(min)}{unit}</span><span>{fmt(max)}{unit}</span>
             </div>
             <TerroirDataChips variant="glass" chips={[
@@ -1229,7 +1229,7 @@ function LayerTabContent({ activeLayer, topoStats }) {
       {!topoStats && topoConfig && (
         <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${UI.spinnerBorder}`, borderTopColor: UI.spinnerTop, animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-          <span style={{ fontSize: 11, color: UI.labelText }}>Loading data range…</span>
+          <span style={{ ...TYPE.uiLabel, color: UI.labelText }}>Loading data range…</span>
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       )}
@@ -1311,7 +1311,7 @@ function DevLayerPanel({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 6,
-    fontSize: 11,
+    fontSize: 'var(--type-ui-label-size)',
     color: alpha(TOKENS.parchment, 0.88),
     gap: 10,
   };
@@ -1356,7 +1356,7 @@ function DevLayerPanel({
         cursor: isDragging ? 'grabbing' : 'grab',
         userSelect: 'none',
       }}>
-        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.09em' }}>DEV LAYERS {devPanelOpen ? ':: DRAG' : ''}</span>
+        <span style={{ ...TYPE.uiLabel, fontWeight: 800 }}>DEV LAYERS {devPanelOpen ? ':: DRAG' : ''}</span>
         <button
           onClick={onTogglePanelOpen}
           onMouseDown={(event) => event.stopPropagation()}
@@ -1366,7 +1366,7 @@ function DevLayerPanel({
             color: UI.devButtonText,
             borderRadius: 6,
             cursor: 'pointer',
-            fontSize: 10,
+            ...TYPE.uiLabel,
             fontWeight: 700,
             padding: '3px 6px',
           }}
@@ -1378,14 +1378,14 @@ function DevLayerPanel({
       {devPanelOpen && (
         <div style={{ padding: 10, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
           <div style={groupStyle}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', opacity: 0.75, marginBottom: 6 }}>BASE</div>
+            <div style={{ ...TYPE.uiLabel, opacity: 0.75, marginBottom: 6 }}>BASE</div>
             <ToggleRow label="WV Mask" keyName="wvMask" />
             <ToggleRow label="WV Boundary" keyName="wvBoundary" />
             <ToggleRow label="AVA Boundaries + Labels" keyName="avaBoundaries" />
           </div>
 
           <div style={groupStyle}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', opacity: 0.75, marginBottom: 6 }}>VINEYARDS</div>
+            <div style={{ ...TYPE.uiLabel, opacity: 0.75, marginBottom: 6 }}>VINEYARDS</div>
             <ToggleRow label="Dundee/Chehalem Ref" keyName="vineyardsDundeeChehalem" />
             <ToggleRow label="Yamhill-Carlton Ref" keyName="vineyardsYC" />
             <ToggleRow label="Adelsheim Ref (white)" keyName="vineyardsAdelsheimReference" />
@@ -1394,7 +1394,7 @@ function DevLayerPanel({
           </div>
 
           <div style={groupStyle}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', opacity: 0.75, marginBottom: 6 }}>OTHER</div>
+            <div style={{ ...TYPE.uiLabel, opacity: 0.75, marginBottom: 6 }}>OTHER</div>
             <ToggleRow label="Winery Markers" keyName="wineries" />
             <ToggleRow label="Climate Raster" keyName="climate" />
             <ToggleRow label="Topography Raster" keyName="topography" />
@@ -1408,11 +1408,10 @@ function DevLayerPanel({
               border: `1px solid ${UI.devPanelBorder}`,
               borderRadius: 8,
               color: UI.devResetText,
-              fontSize: 11,
+              ...TYPE.uiLabel,
               fontWeight: 700,
               cursor: 'pointer',
               padding: '7px 8px',
-              letterSpacing: '0.03em',
             }}
           >
             Reset All On
@@ -3246,7 +3245,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           background: UI.wineryHoverBg, backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
           border: `1.5px solid ${UI.wineryHoverBorder}`, borderRadius: 8,
-          padding: '5px 14px', fontSize: 13, fontWeight: 600, color: parchment,
+          padding: '5px 14px', fontSize: 'var(--type-mono-size)', fontWeight: 600, color: parchment,
           pointerEvents: 'none', zIndex: 5, fontFamily: 'var(--font-sans)',
           boxShadow: `0 4px 20px ${UI.wineryHoverShadow}`,
         }}>
@@ -3261,7 +3260,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           background: UI.vineyardHoverBg, backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
           border: `1.5px solid ${UI.hoverAccent}`, borderRadius: 8,
-          padding: '5px 14px', fontSize: 13, fontWeight: 600, color: parchment,
+          padding: '5px 14px', fontSize: 'var(--type-mono-size)', fontWeight: 600, color: parchment,
           pointerEvents: 'none', zIndex: 5, fontFamily: 'var(--font-sans)',
           boxShadow: `0 4px 20px ${UI.vineyardHoverShadow}`,
         }}>
@@ -3289,7 +3288,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             gap: 10,
             whiteSpace: 'nowrap',
           }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: parchment, letterSpacing: '0.01em' }}>
+            <span style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: parchment, letterSpacing: '0.01em' }}>
               {ava.name}
             </span>
           </div>

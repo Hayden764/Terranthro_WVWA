@@ -160,7 +160,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
     <div>
       {/* Table */}
       <div style={{ overflowX: 'auto', borderRadius: 8, border: `1px solid ${border}` }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 560 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--type-mono-size)', minWidth: 560 }}>
           <thead>
             <tr style={{ background: parchment }}>
               {COLUMNS.map((col) => (
@@ -172,7 +172,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                     padding: '9px 10px',
                     color: muted,
                     fontWeight: 600,
-                    fontSize: 11,
+                    fontSize: 'var(--type-ui-label-size)',
                     borderBottom: `1px solid ${border}`,
                     width: col.width,
                     whiteSpace: 'nowrap',
@@ -219,7 +219,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                               ? `2px solid ${crimson}`
                               : `2px solid transparent`,
                             background: 'transparent',
-                            fontSize: 13,
+                            fontSize: 'var(--type-mono-size)',
                             fontFamily: 'var(--font-sans)',
                             color: ink,
                             outline: 'none',
@@ -276,7 +276,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                         style={{
                           width: '100%', padding: '8px 10px',
                           border: 'none', borderBottom: `2px solid ${UI.borderVeryFaded(crimson)}`,
-                          background: 'transparent', fontSize: 13,
+                          background: 'transparent', fontSize: 'var(--type-mono-size)',
                           fontFamily: 'var(--font-sans)', color: ink,
                           outline: 'none', boxSizing: 'border-box',
                         }}
@@ -307,7 +307,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
         }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button onClick={addNewRow} style={addRowBtnStyle}>+ Add Block</button>
-            <p style={{ fontSize: 12, color: muted, margin: 0 }}>
+            <p style={{ fontSize: 'var(--type-body-size)', color: muted, margin: 0 }}>
               {hasChanges
                 ? `${changedBlocks.length + pendingNewRows.length} pending — submit for admin review`
                 : 'Edit cells above · Acres are calculated automatically'}
@@ -316,10 +316,10 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {status === 'success' && (
-              <span style={{ fontSize: 12, color: UI.successText, fontWeight: 600 }}>✓ Submitted</span>
+              <span style={{ fontSize: 'var(--type-body-size)', color: UI.successText, fontWeight: 600 }}>✓ Submitted</span>
             )}
             {status === 'error' && (
-              <span style={{ fontSize: 12, color: crimson }}>Error — try again</span>
+              <span style={{ fontSize: 'var(--type-body-size)', color: crimson }}>Error — try again</span>
             )}
             <button
               onClick={() => { setEditMap({}); setNewRows([]); setStatus(null); onEditCancel?.(); }}
@@ -350,7 +350,7 @@ const iconBtnStyle = {
   border: 'none',
   cursor: 'pointer',
   color: muted,
-  fontSize: 11,
+  fontSize: 'var(--type-ui-label-size)',
   padding: '2px 4px',
   lineHeight: 1,
   borderRadius: 3,
@@ -363,7 +363,7 @@ const addRowBtnStyle = {
   background: 'transparent',
   color: ink,
   cursor: 'pointer',
-  fontSize: 12,
+  fontSize: 'var(--type-body-size)',
   fontWeight: 600,
   fontFamily: 'var(--font-sans)',
   whiteSpace: 'nowrap',
@@ -376,7 +376,7 @@ const primaryBtnStyle = {
   background: ink,
   color: parchment,
   cursor: 'pointer',
-  fontSize: 13,
+  fontSize: 'var(--type-mono-size)',
   fontWeight: 600,
   fontFamily: 'var(--font-sans)',
 };
@@ -388,6 +388,6 @@ const secondaryBtnStyle = {
   background: 'transparent',
   color: muted,
   cursor: 'pointer',
-  fontSize: 13,
+  fontSize: 'var(--type-mono-size)',
   fontFamily: 'var(--font-sans)',
 };

@@ -51,7 +51,7 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
           <div>
             <div style={{
               color: parchment,
-              fontSize: 18,
+              fontSize: 'var(--type-display-italic-size)',
               fontWeight: 700,
               fontFamily: 'var(--font-display)',
             }}>
@@ -59,7 +59,7 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
             </div>
             <div style={{
               color: UI.subtitle,
-              fontSize: 12,
+              fontSize: 'var(--type-body-size)',
               marginTop: 4,
             }}>
               {WV_SUB_AVAS.length} American Viticultural Areas
@@ -75,7 +75,7 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
               height: 32,
               borderRadius: 8,
               cursor: 'pointer',
-              fontSize: 18,
+              fontSize: 'var(--type-display-italic-size)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -128,7 +128,7 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 13,
+                fontSize: 'var(--type-mono-size)',
                 fontWeight: 700,
                 flexShrink: 0,
               }}>
@@ -136,7 +136,7 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{
-                  fontSize: 14,
+                  fontSize: 'var(--type-body-size)',
                   fontWeight: 600,
                   color: ink,
                 }}>
@@ -146,7 +146,7 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
               {/* Arrow */}
               <div style={{
                 color: muted,
-                fontSize: 16,
+                fontSize: 'var(--type-display-italic-size)',
                 flexShrink: 0,
               }}>
                 →

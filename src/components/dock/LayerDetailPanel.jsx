@@ -61,13 +61,13 @@ const CARD = {
 
 const LBL = {
   ...TYPE.uiLabel,
-  fontSize: 10,
+  fontSize: 'var(--type-ui-label-size)',
   color: GLASS.textDim,
   marginBottom: 4,
 };
 
 const VAL = {
-  fontSize: 13,
+  fontSize: 'var(--type-mono-size)',
   color: GLASS.text,
   lineHeight: 1.55,
 };
@@ -131,18 +131,18 @@ export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, 
         flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 18 }}>{layerInfo.icon}</span>
+          <span style={{ fontSize: 'var(--type-display-italic-size)' }}>{layerInfo.icon}</span>
           <div>
             <div style={{
               ...TYPE.uiLabel,
-              fontSize: 11,
+              fontSize: 'var(--type-ui-label-size)',
               color: GLASS.textDim,
               lineHeight: 1,
               marginBottom: 2,
             }}>
               Active Layer
             </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: GLASS.text, lineHeight: 1.2 }}>
+            <div style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: GLASS.text, lineHeight: 1.2 }}>
               {layerInfo.label}
             </div>
           </div>
@@ -158,7 +158,7 @@ export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, 
             width: 28,
             height: 28,
             cursor: 'pointer',
-            fontSize: 14,
+            fontSize: 'var(--type-body-size)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -181,7 +181,7 @@ export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, 
 
         {/* Description */}
         <div style={CARD}>
-          <p style={{ fontSize: 12, color: GLASS.textDim, lineHeight: 1.7, margin: 0 }}>
+          <p style={{ fontSize: 'var(--type-body-size)', color: GLASS.textDim, lineHeight: 1.7, margin: 0 }}>
             {layerInfo.why}
           </p>
         </div>
@@ -195,7 +195,7 @@ export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, 
             </div>
             <div>
               <div style={LBL}>Source</div>
-              <div style={{ ...VAL, fontSize: 11, color: GLASS.textDim }}>{layerInfo.source}</div>
+              <div style={{ ...VAL, fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim }}>{layerInfo.source}</div>
             </div>
           </div>
         </div>
@@ -221,7 +221,7 @@ export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, 
                 marginBottom: 4,
                 border: `1px solid ${UI.rampBarBorder}`,
               }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: GLASS.textDim, marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim, marginBottom: 12 }}>
                 <span>{fmt(min)}{unit}</span>
                 <span>{fmt(max)}{unit}</span>
               </div>
@@ -247,7 +247,7 @@ export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, 
               animation: 'spin 0.8s linear infinite',
               flexShrink: 0,
             }} />
-            <span style={{ fontSize: 11, color: GLASS.textDim }}>Loading data range…</span>
+            <span style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim }}>Loading data range…</span>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         )}
@@ -255,8 +255,8 @@ export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, 
         {/* Hint when no AVA is selected and topo is active */}
         {!topoStats && activeLayer && TOPO_LAYER_TYPES[activeLayer] && !selectedAva && (
           <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 16, flexShrink: 0 }}>💡</span>
-            <span style={{ fontSize: 11, color: GLASS.textDim, lineHeight: 1.5 }}>
+            <span style={{ fontSize: 'var(--type-display-italic-size)', flexShrink: 0 }}>💡</span>
+            <span style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim, lineHeight: 1.5 }}>
               Select an AVA to see terrain statistics for that region.
             </span>
           </div>

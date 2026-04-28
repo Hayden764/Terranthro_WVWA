@@ -221,10 +221,10 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           transition: 'background 0.1s',
         }}
       >
-        <span style={{ fontSize: 15, flexShrink: 0, width: 20, textAlign: 'center' }}>{icon}</span>
+        <span style={{ fontSize: 'var(--type-display-italic-size)', flexShrink: 0, width: 20, textAlign: 'center' }}>{icon}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
-            fontSize: 13,
+            fontSize: 'var(--type-mono-size)',
             fontWeight: 600,
             color: isActive ? crimson : ink,
             whiteSpace: 'nowrap',
@@ -234,7 +234,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           }}>
             {r.label}
           </div>
-          <div style={{ fontSize: 11, color: muted, marginTop: 1, lineHeight: 1.2 }}>
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1, lineHeight: 1.2 }}>
             {label}
           </div>
         </div>
@@ -323,7 +323,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
             border: 'none',
             outline: 'none',
             background: 'transparent',
-            fontSize: 13,
+            fontSize: 'var(--type-mono-size)',
             color: ink,
             fontFamily: 'var(--font-sans)',
             caretColor: crimson,
@@ -346,7 +346,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
               border: 'none',
               color: muted,
               cursor: 'pointer',
-              fontSize: 14,
+              fontSize: 'var(--type-body-size)',
               lineHeight: 1,
               padding: '2px 4px',
               flexShrink: 0,
@@ -366,7 +366,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
               border: 'none',
               color: muted,
               cursor: 'pointer',
-              fontSize: 11,
+              fontSize: 'var(--type-ui-label-size)',
               lineHeight: 1,
               padding: '2px 4px',
               flexShrink: 0,
@@ -397,7 +397,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           {results.length === 0 && !loading && (
             <div style={{
               padding: '14px 16px',
-              fontSize: 13,
+              fontSize: 'var(--type-mono-size)',
               color: muted,
               textAlign: 'center',
             }}>
@@ -439,7 +439,7 @@ function SectionHeader({ label }) {
     <div style={{
       ...TYPE.uiLabel,
       padding: '5px 14px 3px',
-      fontSize: 10,
+      fontSize: 'var(--type-ui-label-size)',
       color: muted,
       borderTop: `1px solid ${border}`,
     }}

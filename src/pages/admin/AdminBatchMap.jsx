@@ -208,7 +208,7 @@ export default function AdminBatchMap({ ops = [], activeIndex = null, showOld = 
         background: alpha(TOKENS.ink, 0.82), backdropFilter: 'blur(4px)',
         borderRadius: 6, padding: '7px 11px',
         display: 'flex', flexDirection: 'column', gap: 5,
-        fontSize: 11, fontFamily: 'var(--font-sans)',
+        fontSize: 'var(--type-ui-label-size)', fontFamily: 'var(--font-sans)',
         pointerEvents: 'none',
       }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: showOld ? TOKENS.warning : alpha(TOKENS.parchment, 0.35) }}>
@@ -224,7 +224,7 @@ export default function AdminBatchMap({ ops = [], activeIndex = null, showOld = 
       {geomOps.length === 0 && (
         <div style={{
           position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'none', color: alpha(TOKENS.parchment, 0.35), fontSize: 13, fontStyle: 'italic',
+          pointerEvents: 'none', color: alpha(TOKENS.parchment, 0.35), fontSize: 'var(--type-mono-size)', fontStyle: 'italic',
         }}>
           No geometry ops in this batch
         </div>

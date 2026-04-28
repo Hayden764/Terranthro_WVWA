@@ -44,7 +44,7 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
       {/* ── Listing mode buttons ─────────────────────────────────── */}
       <div style={{
         ...TYPE.uiLabel,
-        fontSize: 10,
+        fontSize: 'var(--type-ui-label-size)',
         color: GLASS.textDim,
         marginBottom: 8,
       }}>
@@ -74,7 +74,7 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
             flexShrink: 0,
           }} />
           <span style={{
-            fontSize: 10,
+            fontSize: 'var(--type-ui-label-size)',
             fontWeight: 600,
             color: isAllMode ? UI.filterTextActive : UI.filterTextIdle,
             whiteSpace: 'nowrap',
@@ -107,7 +107,7 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
             flexShrink: 0,
           }} />
           <span style={{
-            fontSize: 10,
+            fontSize: 'var(--type-ui-label-size)',
             fontWeight: 600,
             color: hasPolygonMode ? UI.filterTextActive : UI.filterTextIdle,
             whiteSpace: 'nowrap',
@@ -140,7 +140,7 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
             flexShrink: 0,
           }} />
           <span style={{
-            fontSize: 10,
+            fontSize: 'var(--type-ui-label-size)',
             fontWeight: 600,
             color: noPolygonMode ? UI.filterTextActive : UI.filterTextIdle,
             whiteSpace: 'nowrap',
@@ -173,7 +173,7 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
             flexShrink: 0,
           }} />
           <span style={{
-            fontSize: 10,
+            fontSize: 'var(--type-ui-label-size)',
             fontWeight: 600,
             color: noWineriesVisualizedMode ? UI.filterTextActive : UI.filterTextIdle,
             whiteSpace: 'nowrap',
@@ -185,7 +185,7 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
       </div>
 
       <div style={{
-        fontSize: 10,
+        fontSize: 'var(--type-ui-label-size)',
         color: UI.subtleText,
         marginTop: -6,
         marginBottom: 10,
@@ -196,7 +196,7 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
       {/* ── Listing count ─────────────────────────────────────────── */}
       <div style={{
         ...TYPE.uiLabel,
-        fontSize: 10,
+        fontSize: 'var(--type-ui-label-size)',
         color: GLASS.textDim,
         marginBottom: 8,
       }}>
@@ -210,7 +210,7 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
           padding: '20px 0',
           textAlign: 'center',
           color: UI.emptyText,
-          fontSize: 12,
+          fontSize: 'var(--type-body-size)',
         }}>
           No winery listings match this mode
         </div>
@@ -254,7 +254,7 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 9,
+                  fontSize: 'var(--type-ui-label-size)',
                   fontWeight: 700,
                   color: UI.badgeText,
                   flexShrink: 0,
@@ -264,7 +264,7 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
                 {/* Text */}
                 <div style={{ minWidth: 0 }}>
                   <div style={{
-                    fontSize: 12,
+                    fontSize: 'var(--type-body-size)',
                     fontWeight: 600,
                     color: UI.rowTitleText,
                     whiteSpace: 'nowrap',
@@ -274,7 +274,7 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
                     {listing.title}
                   </div>
                   <div style={{
-                    fontSize: 10,
+                    fontSize: 'var(--type-ui-label-size)',
                     color: cat.color,
                     fontWeight: 600,
                     marginTop: 1,

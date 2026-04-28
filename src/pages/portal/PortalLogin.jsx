@@ -53,7 +53,7 @@ export default function PortalLogin() {
     padding: '10px 14px',
     borderRadius: 8,
     border: `1px solid ${border}`,
-    fontSize: 15,
+    fontSize: 'var(--type-display-italic-size)',
     color: ink,
     background: parchment,
     outline: 'none',
@@ -63,7 +63,7 @@ export default function PortalLogin() {
 
   const labelStyle = {
     display: 'block',
-    fontSize: 13,
+    fontSize: 'var(--type-mono-size)',
     fontWeight: 500,
     color: muted,
     marginBottom: 6,
@@ -89,13 +89,13 @@ export default function PortalLogin() {
       }}>
         <h1 style={{
           fontFamily: 'var(--font-display)',
-          fontSize: 24,
+          fontSize: 'var(--type-display-medium-size)',
           color: ink,
           marginBottom: 8,
         }}>
           Winery Portal
         </h1>
-        <p style={{ color: muted, fontSize: 14, marginBottom: 24 }}>
+        <p style={{ color: muted, fontSize: 'var(--type-body-size)', marginBottom: 24 }}>
           Sign in to your winery account
         </p>
 
@@ -119,7 +119,7 @@ export default function PortalLogin() {
                 border: 'none',
                 borderBottom: tab === key ? `2px solid ${ink}` : '2px solid transparent',
                 marginBottom: -1,
-                fontSize: 14,
+                fontSize: 'var(--type-body-size)',
                 fontWeight: tab === key ? 600 : 400,
                 color: tab === key ? ink : muted,
                 cursor: 'pointer',
@@ -152,7 +152,7 @@ export default function PortalLogin() {
             />
 
             {error && (
-              <p style={{ color: crimson, fontSize: 13, marginBottom: 12 }}>
+              <p style={{ color: crimson, fontSize: 'var(--type-mono-size)', marginBottom: 12 }}>
                 {error}
               </p>
             )}
@@ -167,7 +167,7 @@ export default function PortalLogin() {
                 border: 'none',
                 background: ink,
                 color: parchment,
-                fontSize: 15,
+                fontSize: 'var(--type-display-italic-size)',
                 fontWeight: 600,
                 cursor: loading ? 'wait' : 'pointer',
                 opacity: loading ? 0.7 : 1,
@@ -176,8 +176,8 @@ export default function PortalLogin() {
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
 
-            <p style={{ marginTop: 14, fontSize: 12, color: muted, textAlign: 'center' }}>
-              No password yet? Use the <button onClick={() => setTab(TAB.MAGIC)} style={{ background: 'none', border: 'none', color: crimson, fontSize: 12, cursor: 'pointer', padding: 0 }}>email link</button> tab to log in, then set one in your profile.
+            <p style={{ marginTop: 14, fontSize: 'var(--type-body-size)', color: muted, textAlign: 'center' }}>
+              No password yet? Use the <button onClick={() => setTab(TAB.MAGIC)} style={{ background: 'none', border: 'none', color: crimson, fontSize: 'var(--type-body-size)', cursor: 'pointer', padding: 0 }}>email link</button> tab to log in, then set one in your profile.
             </p>
           </form>
         )}
@@ -190,7 +190,7 @@ export default function PortalLogin() {
               borderRadius: 8,
               padding: '20px 16px',
               color: TOKENS.success,
-              fontSize: 14,
+              fontSize: 'var(--type-body-size)',
               lineHeight: 1.6,
             }}>
               <strong>Check your inbox.</strong> We've sent a sign-in link to{' '}
@@ -209,7 +209,7 @@ export default function PortalLogin() {
               />
 
               {error && (
-                <p style={{ color: crimson, fontSize: 13, marginBottom: 12 }}>
+                <p style={{ color: crimson, fontSize: 'var(--type-mono-size)', marginBottom: 12 }}>
                   {error}
                 </p>
               )}
@@ -224,7 +224,7 @@ export default function PortalLogin() {
                   border: 'none',
                   background: ink,
                   color: parchment,
-                  fontSize: 15,
+                  fontSize: 'var(--type-display-italic-size)',
                   fontWeight: 600,
                   cursor: loading ? 'wait' : 'pointer',
                   opacity: loading ? 0.7 : 1,
@@ -238,7 +238,7 @@ export default function PortalLogin() {
 
         <p style={{
           marginTop: 32,
-          fontSize: 12,
+          fontSize: 'var(--type-body-size)',
           color: muted,
           textAlign: 'center',
         }}>

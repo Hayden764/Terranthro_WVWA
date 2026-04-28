@@ -56,19 +56,19 @@ export default function PortalVerify() {
       }}>
         {status === 'verifying' && (
           <>
-            <div style={{ fontSize: 32, marginBottom: 16 }}>⏳</div>
+            <div style={{ fontSize: 'var(--type-display-medium-size)', marginBottom: 16 }}>⏳</div>
             <p style={{ color: muted }}>Verifying your sign-in link…</p>
           </>
         )}
         {status === 'success' && (
           <>
-            <div style={{ fontSize: 32, marginBottom: 16 }}>✓</div>
+            <div style={{ fontSize: 'var(--type-display-medium-size)', marginBottom: 16 }}>✓</div>
             <p style={{ color: TOKENS.success, fontWeight: 600 }}>Signed in! Redirecting…</p>
           </>
         )}
         {status === 'error' && (
           <>
-            <div style={{ fontSize: 32, marginBottom: 16 }}>✗</div>
+            <div style={{ fontSize: 'var(--type-display-medium-size)', marginBottom: 16 }}>✗</div>
             <p style={{ color: crimson, marginBottom: 16 }}>{errorMsg}</p>
             <a href="/portal" style={{ color: ink, fontWeight: 500 }}>
               Back to sign in

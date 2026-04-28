@@ -127,7 +127,7 @@ export default function AdminGeometryDiffMap({ oldGeometry, newGeometry, height 
         background: alpha(TOKENS.ink, 0.8), backdropFilter: 'blur(4px)',
         borderRadius: 5, padding: '6px 10px',
         display: 'flex', flexDirection: 'column', gap: 4,
-        fontSize: 11, fontFamily: 'var(--font-sans)',
+        fontSize: 'var(--type-ui-label-size)', fontFamily: 'var(--font-sans)',
       }}>
         {oldGeometry && (
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: TOKENS.warning }}>

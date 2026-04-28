@@ -68,12 +68,12 @@ export default function PortalClaim() {
         background: parchment, minHeight: '100vh',
         borderLeft: `1px solid ${border}`, borderRight: `1px solid ${border}`,
       }}>
-        <Link to="/portal/dashboard" style={{ color: muted, fontSize: 13 }}>← Dashboard</Link>
+        <Link to="/portal/dashboard" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>← Dashboard</Link>
 
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: ink, margin: '16px 0 8px' }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink, margin: '16px 0 8px' }}>
           Claim a Vineyard
         </h1>
-        <p style={{ color: muted, fontSize: 13, marginBottom: 24 }}>
+        <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 24 }}>
           Search for an existing unlinked vineyard parcel, or request to add a new one.
         </p>
 
@@ -86,13 +86,13 @@ export default function PortalClaim() {
             placeholder="Search by vineyard or owner name…"
             style={{
               flex: 1, padding: '10px 14px', borderRadius: 8,
-              border: `1px solid ${border}`, fontSize: 14,
+              border: `1px solid ${border}`, fontSize: 'var(--type-body-size)',
               color: ink, background: parchment, outline: 'none',
             }}
           />
           <button type="submit" disabled={loading} style={{
             padding: '10px 20px', borderRadius: 8, border: 'none',
-            background: ink, color: parchment, fontSize: 14,
+            background: ink, color: parchment, fontSize: 'var(--type-body-size)',
             fontWeight: 600, cursor: 'pointer',
           }}>
             Search
@@ -103,9 +103,9 @@ export default function PortalClaim() {
         {searched && (
           <div style={{ marginBottom: 32 }}>
             {loading ? (
-              <p style={{ color: muted, fontSize: 13 }}>Searching…</p>
+              <p style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>Searching…</p>
             ) : results.length === 0 ? (
-              <p style={{ color: muted, fontSize: 13 }}>No unlinked parcels found matching "{search}".</p>
+              <p style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>No unlinked parcels found matching "{search}".</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {results.map((r) => (
@@ -113,10 +113,10 @@ export default function PortalClaim() {
                     padding: '14px 16px', borderRadius: 8,
                     border: `1px solid ${border}`, background: parchment,
                   }}>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: ink }}>
+                    <div style={{ fontWeight: 600, fontSize: 'var(--type-body-size)', color: ink }}>
                       {r.vineyard_name || 'Unnamed Parcel'}
                     </div>
-                    <div style={{ fontSize: 12, color: muted, marginTop: 2 }}>
+                    <div style={{ fontSize: 'var(--type-body-size)', color: muted, marginTop: 2 }}>
                       {r.nested_ava || r.ava_name || '—'} · {Number(r.acres || 0).toFixed(1)} acres
                       {r.situs_city && ` · ${r.situs_city}`}
                     </div>
@@ -132,7 +132,7 @@ export default function PortalClaim() {
                     </div>
 
                     {submitted === r.id ? (
-                      <p style={{ fontSize: 12, color: TOKENS.success, marginTop: 8, fontWeight: 500 }}>
+                      <p style={{ fontSize: 'var(--type-body-size)', color: TOKENS.success, marginTop: 8, fontWeight: 500 }}>
                         ✓ Claim request submitted
                       </p>
                     ) : claiming === r.id ? (
@@ -144,7 +144,7 @@ export default function PortalClaim() {
                           rows={2}
                           style={{
                             width: '100%', padding: '6px 10px', borderRadius: 6,
-                            border: `1px solid ${border}`, fontSize: 12,
+                            border: `1px solid ${border}`, fontSize: 'var(--type-body-size)',
                             fontFamily: 'var(--font-sans)', resize: 'vertical',
                             marginBottom: 6,
                           }}
@@ -173,12 +173,12 @@ export default function PortalClaim() {
           background: parchment, borderRadius: 10, padding: '20px 16px',
           border: `1px solid ${border}`,
         }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: ink, marginBottom: 8 }}>
+          <h2 style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 600, color: ink, marginBottom: 8 }}>
             Don't see your vineyard?
           </h2>
 
           {newSubmitted ? (
-            <p style={{ color: TOKENS.success, fontSize: 13, fontWeight: 500 }}>
+            <p style={{ color: TOKENS.success, fontSize: 'var(--type-mono-size)', fontWeight: 500 }}>
               ✓ New vineyard request submitted. We'll review it shortly.
             </p>
           ) : !showNew ? (
@@ -231,15 +231,15 @@ export default function PortalClaim() {
 
 const smallBtn = {
   padding: '6px 16px', borderRadius: 6, border: 'none',
-  background: ink, color: parchment, fontSize: 12,
+  background: ink, color: parchment, fontSize: 'var(--type-body-size)',
   fontWeight: 600, cursor: 'pointer',
 };
 
-const labelStyle = { display: 'block', fontSize: 12, color: muted, marginBottom: 4 };
+const labelStyle = { display: 'block', fontSize: 'var(--type-body-size)', color: muted, marginBottom: 4 };
 
 const inputStyle = {
   width: '100%', padding: '8px 12px', borderRadius: 6,
-  border: `1px solid ${border}`, fontSize: 13,
+  border: `1px solid ${border}`, fontSize: 'var(--type-mono-size)',
   fontFamily: 'var(--font-sans)', color: ink,
   background: parchment, resize: 'vertical',
 };

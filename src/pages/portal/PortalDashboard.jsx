@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { BRAND, TOKENS } from '../../styles/tokens';
+import { border, ink, parchment, TOKENS } from '../../styles/tokens';
 import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 
@@ -42,7 +42,7 @@ export default function PortalDashboard() {
   }
 
   if (loading) {
-    return <PageShell><p style={{ color: BRAND.textMuted }}>Loading…</p></PageShell>;
+    return <PageShell><p style={{ color: inkMuted }}>Loading…</p></PageShell>;
   }
 
   const pendingRequests = requests.filter((r) => r.status === 'pending');
@@ -55,10 +55,10 @@ export default function PortalDashboard() {
         marginBottom: 32,
       }}>
         <div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, color: BRAND.brown, margin: 0 }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, color: ink, margin: 0 }}>
             {profile?.title}
           </h1>
-          <p style={{ color: BRAND.textMuted, fontSize: 13, marginTop: 4 }}>Winery Portal</p>
+          <p style={{ color: inkMuted, fontSize: 13, marginTop: 4 }}>Winery Portal</p>
         </div>
         <button onClick={handleLogout} style={linkBtnStyle}>Sign Out</button>
       </div>
@@ -88,7 +88,7 @@ export default function PortalDashboard() {
               }
             }}
           />
-          <p style={{ fontSize: 12, color: BRAND.textMuted, marginTop: 8 }}>
+          <p style={{ fontSize: 12, color: inkMuted, marginTop: 8 }}>
             Click a parcel to view details.
           </p>
         </Section>
@@ -107,7 +107,7 @@ export default function PortalDashboard() {
       {/* Vineyards — grouped by name */}
       <Section title="Linked Vineyards">
         {vineyards.length === 0 ? (
-          <p style={{ color: BRAND.textMuted, fontSize: 14 }}>No vineyards linked yet.</p>
+          <p style={{ color: inkMuted, fontSize: 14 }}>No vineyards linked yet.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {groupVineyardsByName(vineyards).map((group) => {
@@ -132,17 +132,17 @@ export default function PortalDashboard() {
                   to={href}
                   style={{
                     display: 'block', padding: '14px 16px', borderRadius: 8,
-                    border: `1px solid ${BRAND.border}`, background: BRAND.eggshell,
-                    textDecoration: 'none', color: BRAND.text,
+                    border: `1px solid ${border}`, background: parchment,
+                    textDecoration: 'none', color: ink,
                   }}
                 >
                   <div style={{ fontWeight: 600, fontSize: 15 }}>{group.name}</div>
-                  <div style={{ fontSize: 13, color: BRAND.textMuted, marginTop: 4 }}>
+                  <div style={{ fontSize: 13, color: inkMuted, marginTop: 4 }}>
                     {ava}
                     {group.parcels.length > 1 && ` · ${group.parcels.length} parcels`}
                     {totalBlocks > 0 && ` · ${totalBlocks} blocks`}
                   </div>
-                  <div style={{ fontSize: 12, color: BRAND.brownLight, marginTop: 6, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 12, color: inkLight, marginTop: 6, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                     <span>{totalAcres.toFixed(1)} ac</span>
                     {topo && (
                       <>
@@ -165,13 +165,13 @@ export default function PortalDashboard() {
       {/* Recent requests */}
       <Section title="Recent Requests">
         {requests.length === 0 ? (
-          <p style={{ color: BRAND.textMuted, fontSize: 14 }}>No requests submitted yet.</p>
+          <p style={{ color: inkMuted, fontSize: 14 }}>No requests submitted yet.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {requests.slice(0, 10).map((r) => (
               <div key={r.id} style={{
                 padding: '10px 14px', borderRadius: 6,
-                background: BRAND.eggshell, fontSize: 13,
+                background: parchment, fontSize: 13,
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
                 <span>
@@ -193,7 +193,7 @@ export default function PortalDashboard() {
 function PageShell({ children }) {
   return (
     <div style={{
-      minHeight: '100vh', background: BRAND.eggshell,
+      minHeight: '100vh', background: parchment,
       fontFamily: 'var(--font-sans)',
     }}>
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 20px' }}>
@@ -206,12 +206,12 @@ function PageShell({ children }) {
 function Section({ title, children }) {
   return (
     <div style={{
-      background: BRAND.white, borderRadius: 10, padding: '24px 20px',
-      border: `1px solid ${BRAND.border}`, marginBottom: 24,
+      background: parchment, borderRadius: 10, padding: '24px 20px',
+      border: `1px solid ${border}`, marginBottom: 24,
     }}>
       <h2 style={{
-        fontSize: 16, fontWeight: 600, color: BRAND.brown,
-        marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${BRAND.border}`,
+        fontSize: 16, fontWeight: 600, color: ink,
+        marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${border}`,
       }}>
         {title}
       </h2>
@@ -223,12 +223,12 @@ function Section({ title, children }) {
 function StatCard({ label, value }) {
   return (
     <div style={{
-      flex: '1 1 140px', background: BRAND.white, borderRadius: 10,
-      padding: '18px 16px', border: `1px solid ${BRAND.border}`,
+      flex: '1 1 140px', background: parchment, borderRadius: 10,
+      padding: '18px 16px', border: `1px solid ${border}`,
       textAlign: 'center',
     }}>
-      <div style={{ fontSize: 28, fontWeight: 700, color: BRAND.brown }}>{value}</div>
-      <div style={{ fontSize: 12, color: BRAND.textMuted, marginTop: 4 }}>{label}</div>
+      <div style={{ fontSize: 28, fontWeight: 700, color: ink }}>{value}</div>
+      <div style={{ fontSize: 12, color: inkMuted, marginTop: 4 }}>{label}</div>
     </div>
   );
 }
@@ -236,8 +236,8 @@ function StatCard({ label, value }) {
 function InfoRow({ label, value }) {
   return (
     <div style={{ display: 'flex', gap: 12, marginBottom: 8, fontSize: 14 }}>
-      <span style={{ color: BRAND.textMuted, minWidth: 100, flexShrink: 0 }}>{label}</span>
-      <span style={{ color: BRAND.text, wordBreak: 'break-word' }}>{value}</span>
+      <span style={{ color: inkMuted, minWidth: 100, flexShrink: 0 }}>{label}</span>
+      <span style={{ color: ink, wordBreak: 'break-word' }}>{value}</span>
     </div>
   );
 }
@@ -263,8 +263,8 @@ const actionBtnStyle = {
   display: 'inline-block',
   padding: '8px 20px',
   borderRadius: 6,
-  background: BRAND.brown,
-  color: BRAND.white,
+  background: ink,
+  color: parchment,
   fontSize: 13,
   fontWeight: 600,
   textDecoration: 'none',
@@ -274,11 +274,11 @@ const actionBtnStyle = {
 
 const linkBtnStyle = {
   background: 'none',
-  border: `1px solid ${BRAND.border}`,
+  border: `1px solid ${border}`,
   borderRadius: 6,
   padding: '6px 16px',
   fontSize: 13,
-  color: BRAND.brownLight,
+  color: inkLight,
   cursor: 'pointer',
 };
 

@@ -1,4 +1,4 @@
-import { BRAND, TOKENS, alpha } from '../../styles/tokens';
+import { TOKENS, alpha } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../../config/topographyConfig';
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { BRAND, TOKENS, alpha } from '../styles/tokens';
+import { alpha, border, crimson, ink, parchment, TOKENS } from '../styles/tokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
@@ -7,15 +7,15 @@ import { MONTH_ABBR } from '../config/climateConfig';
 
 // ── Design tokens (light‑mode, eggshell base) ────────────────────────────
 const T = {
-  sidebarBg:    BRAND.eggshell,
-  headerBg:     BRAND.brown,
-  headerText:   BRAND.eggshell,
-  border:       BRAND.border,
-  sectionLabel: { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.09em', color: BRAND.textMuted },
-  itemText:     { fontSize: 13, color: BRAND.text, lineHeight: 1.45 },
-  itemTextMuted:{ fontSize: 12, color: BRAND.textMuted, lineHeight: 1.4 },
-  accent:       BRAND.burgundy,
-  hoverBg:      BRAND.cream,
+  sidebarBg:    parchment,
+  headerBg:     ink,
+  headerText:   parchment,
+  border:       border,
+  sectionLabel: { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.09em', color: inkMuted },
+  itemText:     { fontSize: 13, color: ink, lineHeight: 1.45 },
+  itemTextMuted:{ fontSize: 12, color: inkMuted, lineHeight: 1.4 },
+  accent:       crimson,
+  hoverBg:      parchment,
   activeBg:     TOKENS.dangerDim,
 };
 
@@ -78,12 +78,12 @@ const BackBtn = ({ onClick }) => (
     style={{
       display: 'flex', alignItems: 'center', gap: 6,
       background: 'none', border: 'none', cursor: 'pointer',
-      color: BRAND.textMuted, fontSize: 12, padding: '8px 16px',
+      color: inkMuted, fontSize: 12, padding: '8px 16px',
       fontFamily: 'var(--font-sans)', width: '100%', textAlign: 'left',
-      borderBottom: `1px solid ${BRAND.border}`,
+      borderBottom: `1px solid ${border}`,
     }}
-    onMouseEnter={e => e.currentTarget.style.color = BRAND.brown}
-    onMouseLeave={e => e.currentTarget.style.color = BRAND.textMuted}
+    onMouseEnter={e => e.currentTarget.style.color = ink}
+    onMouseLeave={e => e.currentTarget.style.color = inkMuted}
   >
     <span style={{ fontSize: 14, lineHeight: 1 }}>‹</span> Back
   </button>
@@ -96,14 +96,14 @@ function SectionHeader({ label, open, onToggle, count }) {
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         width: '100%', padding: '10px 16px',
-        background: 'none', border: 'none', borderBottom: `1px solid ${BRAND.border}`,
+        background: 'none', border: 'none', borderBottom: `1px solid ${border}`,
         cursor: 'pointer', fontFamily: 'var(--font-sans)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={T.sectionLabel}>{label}</span>
         {count != null && (
-          <span style={{ fontSize: 10, background: BRAND.cream, borderRadius: 10, padding: '1px 7px', color: BRAND.textMuted, fontWeight: 600 }}>
+          <span style={{ fontSize: 10, background: parchment, borderRadius: 10, padding: '1px 7px', color: inkMuted, fontWeight: 600 }}>
             {count}
           </span>
         )}
@@ -140,8 +140,8 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, onL
       {onBack && <BackBtn onClick={onBack} />}
 
       {/* Hero */}
-      <div style={{ background: BRAND.brown, padding: '18px 16px 14px' }}>
-        <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-display)', color: BRAND.eggshell, lineHeight: 1.2 }}>
+      <div style={{ background: ink, padding: '18px 16px 14px' }}>
+        <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-display)', color: parchment, lineHeight: 1.2 }}>
           {ava.name}
         </div>
         <div style={{ fontSize: 11, color: UI.parchment55, marginTop: 4 }}>
@@ -155,24 +155,24 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, onL
         {/* Stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {meta.established && (
-            <div style={{ background: BRAND.cream, borderRadius: 8, padding: '10px 12px' }}>
+            <div style={{ background: parchment, borderRadius: 8, padding: '10px 12px' }}>
               <div style={T.sectionLabel}>Established</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.brown, marginTop: 3 }}>{meta.established}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: ink, marginTop: 3 }}>{meta.established}</div>
             </div>
           )}
           {meta.acres && (
-            <div style={{ background: BRAND.cream, borderRadius: 8, padding: '10px 12px' }}>
+            <div style={{ background: parchment, borderRadius: 8, padding: '10px 12px' }}>
               <div style={T.sectionLabel}>Approx. Acres</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.brown, marginTop: 3 }}>{meta.acres}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: ink, marginTop: 3 }}>{meta.acres}</div>
             </div>
           )}
-          <div style={{ background: BRAND.cream, borderRadius: 8, padding: '10px 12px' }}>
+          <div style={{ background: parchment, borderRadius: 8, padding: '10px 12px' }}>
             <div style={T.sectionLabel}>Member Wineries</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.brown, marginTop: 3 }}>{inside.length}</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: ink, marginTop: 3 }}>{inside.length}</div>
           </div>
-          <div style={{ background: BRAND.cream, borderRadius: 8, padding: '10px 12px' }}>
+          <div style={{ background: parchment, borderRadius: 8, padding: '10px 12px' }}>
             <div style={T.sectionLabel}>Mapped Wineries</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.brown, marginTop: 3 }}>{withPolygons.length}</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: ink, marginTop: 3 }}>{withPolygons.length}</div>
           </div>
         </div>
 
@@ -180,7 +180,7 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, onL
         {meta.highlights && (
           <div>
             <div style={{ ...T.sectionLabel, marginBottom: 6 }}>About</div>
-            <p style={{ fontSize: 13, color: BRAND.text, lineHeight: 1.65, margin: 0 }}>{meta.highlights}</p>
+            <p style={{ fontSize: 13, color: ink, lineHeight: 1.65, margin: 0 }}>{meta.highlights}</p>
           </div>
         )}
 
@@ -199,15 +199,15 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, onL
                     background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left',
                     fontFamily: 'var(--font-sans)',
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.background = BRAND.cream; onListingHover?.(l); }}
+                  onMouseEnter={e => { e.currentTarget.style.background = parchment; onListingHover?.(l); }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'none'; onListingHover?.(null); }}
                 >
                   <span style={{
                     width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                    background: vineyardRecidSet.has(l.id) ? UI.mapped : BRAND.textMuted,
+                    background: vineyardRecidSet.has(l.id) ? UI.mapped : inkMuted,
                   }} />
-                  <span style={{ fontSize: 13, color: BRAND.text, flex: 1 }}>{l.title}</span>
-                  <span style={{ fontSize: 10, color: BRAND.textMuted }}>›</span>
+                  <span style={{ fontSize: 13, color: ink, flex: 1 }}>{l.title}</span>
+                  <span style={{ fontSize: 10, color: inkMuted }}>›</span>
                 </button>
               ))}
             </div>
@@ -310,8 +310,8 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
       )}
 
       {/* Header */}
-      <div style={{ background: BRAND.brown, padding: '16px 16px 12px' }}>
-        <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--font-display)', color: BRAND.eggshell, lineHeight: 1.25 }}>
+      <div style={{ background: ink, padding: '16px 16px 12px' }}>
+        <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--font-display)', color: parchment, lineHeight: 1.25 }}>
           {listing.title}
         </div>
         <div style={{ fontSize: 11, color: UI.parchment55, marginTop: 5 }}>
@@ -322,7 +322,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
       <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         {listing.desc && (
-          <p style={{ fontSize: 13, color: BRAND.textMuted, lineHeight: 1.65, margin: 0 }}>
+          <p style={{ fontSize: 13, color: inkMuted, lineHeight: 1.65, margin: 0 }}>
             {listing.desc.slice(0, 280)}{listing.desc.length > 280 ? '…' : ''}
           </p>
         )}
@@ -330,13 +330,13 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
         {/* Contact / links */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {listing.phone && (
-            <a href={`tel:${listing.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: BRAND.brown, textDecoration: 'none' }}>
+            <a href={`tel:${listing.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: ink, textDecoration: 'none' }}>
               <span>📞</span> {listing.phone}
             </a>
           )}
           {listing.url && (
             <a href={listing.url} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'block', padding: '9px 14px', background: BRAND.burgundy, color: BRAND.white, borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>
+              style={{ display: 'block', padding: '9px 14px', background: crimson, color: parchment, borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>
               Visit Website ↗
             </a>
           )}
@@ -412,9 +412,9 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                     rendered.push(
                       <div key={`ava-divider-${avaLabel || i}`} style={{
                         fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-                        textTransform: 'uppercase', color: BRAND.textMuted,
+                        textTransform: 'uppercase', color: inkMuted,
                         padding: i === 0 ? '0 2px 6px' : '12px 2px 6px',
-                        borderTop: i === 0 ? 'none' : `1px solid ${BRAND.border}`,
+                        borderTop: i === 0 ? 'none' : `1px solid ${border}`,
                         marginTop: i === 0 ? 0 : 6,
                       }}>
                         {avaLabel || 'Unmapped AVA'}
@@ -426,8 +426,8 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                     <div
                       key={group.key}
                       style={{
-                        border: `1px solid ${isHovered ? UI.vineyardGroupHoverBorder : BRAND.border}`,
-                        borderRadius: 10, background: isHovered ? UI.vineyardGroupHoverBg : BRAND.cream,
+                        border: `1px solid ${isHovered ? UI.vineyardGroupHoverBorder : border}`,
+                        borderRadius: 10, background: isHovered ? UI.vineyardGroupHoverBg : parchment,
                         transition: 'border-color 0.15s, background 0.15s', cursor: 'pointer',
                         overflow: 'hidden', marginBottom: 6,
                       }}
@@ -438,38 +438,38 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                       {/* Collapsed header */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px 8px' }}>
                         <div style={{ flex: 1, paddingRight: 8, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: isHovered ? UI.mapped : BRAND.brown, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: isHovered ? UI.mapped : ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {group.name}
                           </div>
                           {acres && (
-                            <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 2 }}>
+                            <div style={{ fontSize: 11, color: inkMuted, marginTop: 2 }}>
                               {acres} ac
                               {blockRows.length > 0 && ` · ${blockRows.length} block${blockRows.length !== 1 ? 's' : ''}`}
                             </div>
                           )}
                         </div>
-                        <span style={{ fontSize: 11, color: BRAND.textMuted, flexShrink: 0 }}>{isExpanded ? '▾' : '▸'}</span>
+                        <span style={{ fontSize: 11, color: inkMuted, flexShrink: 0 }}>{isExpanded ? '▾' : '▸'}</span>
                       </div>
 
                       {/* Expanded content */}
                       {isExpanded && (
-                        <div style={{ padding: '0 12px 12px', borderTop: `1px solid ${BRAND.border}` }}>
+                        <div style={{ padding: '0 12px 12px', borderTop: `1px solid ${border}` }}>
                           {/* Stats grid */}
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 12px', paddingTop: 10 }}>
                             {acres && (
                               <div>
                                 <div style={T.sectionLabel}>Acres</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.text }}>{acres} ac</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>{acres} ac</div>
                               </div>
                             )}
                             <div>
                               <div style={T.sectionLabel}>Blocks</div>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.text }}>{blockRows.length || group.features.length}</div>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>{blockRows.length || group.features.length}</div>
                             </div>
                             {groupTopoStats?.elev_min != null && groupTopoStats?.elev_max != null && (
                               <div>
                                 <div style={T.sectionLabel}>Elev. Range</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.text }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>
                                   {Math.round(groupTopoStats.elev_min)}–{Math.round(groupTopoStats.elev_max)} ft
                                 </div>
                               </div>
@@ -477,13 +477,13 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                             {groupTopoStats?.slope_mean != null && (
                               <div>
                                 <div style={T.sectionLabel}>Avg. Slope</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.text }}>{groupTopoStats.slope_mean.toFixed(1)}°</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>{groupTopoStats.slope_mean.toFixed(1)}°</div>
                               </div>
                             )}
                             {groupTopoStats?.aspect_card && (
                               <div>
                                 <div style={T.sectionLabel}>Avg. Aspect</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.text }}>{groupTopoStats.aspect_card}</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>{groupTopoStats.aspect_card}</div>
                               </div>
                             )}
                           </div>
@@ -492,9 +492,9 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                           {blockRows.length > 0 && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 10 }}>
                               {blockRows.map((b, bi) => (
-                                <div key={`${b.name}-${bi}`} style={{ border: `1px solid ${BRAND.border}`, borderRadius: 7, padding: '7px 10px', background: BRAND.eggshell }}>
-                                  <div style={{ fontSize: 12, fontWeight: 700, color: BRAND.brown }}>{b.name}</div>
-                                  <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 2 }}>
+                                <div key={`${b.name}-${bi}`} style={{ border: `1px solid ${border}`, borderRadius: 7, padding: '7px 10px', background: parchment }}>
+                                  <div style={{ fontSize: 12, fontWeight: 700, color: ink }}>{b.name}</div>
+                                  <div style={{ fontSize: 11, color: inkMuted, marginTop: 2 }}>
                                     {[
                                       b.varieties.size > 0 ? Array.from(b.varieties).slice(0, 2).join(', ') : null,
                                       b.clones.size > 0 ? `Clone ${Array.from(b.clones).slice(0, 2).join('/')}` : null,
@@ -518,7 +518,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
         )}
 
         {(!selectedVineyards || selectedVineyards.length === 0) && (
-          <div style={{ textAlign: 'center', padding: '16px 0', color: BRAND.textMuted, fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: '16px 0', color: inkMuted, fontSize: 13 }}>
             No mapped vineyard parcels
           </div>
         )}
@@ -548,7 +548,7 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
     <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: 0 }}>
 
       {/* Climate */}
-      <div style={{ borderBottom: `1px solid ${BRAND.border}` }}>
+      <div style={{ borderBottom: `1px solid ${border}` }}>
         <button
           onClick={() => setClimateOpen(p => !p)}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
@@ -568,20 +568,20 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
-                      border: `1.5px solid ${active ? BRAND.burgundy + '80' : BRAND.border}`,
-                      background: active ? TOKENS.dangerDim : BRAND.eggshell,
+                      border: `1.5px solid ${active ? crimson + '80' : border}`,
+                      background: active ? TOKENS.dangerDim : parchment,
                       cursor: 'pointer', fontFamily: 'var(--font-sans)', marginBottom: active ? 6 : 0,
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: active ? BRAND.burgundy : BRAND.brown }}>{layer.label}</div>
-                      <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 1 }}>{layer.sub}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
+                      <div style={{ fontSize: 11, color: inkMuted, marginTop: 1 }}>{layer.sub}</div>
                     </div>
                     <div style={{
-                      width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? BRAND.burgundy : BRAND.border}`,
+                      width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                     }}>
-                      {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: BRAND.burgundy }} />}
+                      {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
                     </div>
                   </button>
 
@@ -590,14 +590,14 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
                     <div style={{ padding: '8px 10px 4px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                         <span style={T.sectionLabel}>Month</span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: BRAND.brown }}>{MONTH_ABBR[currentMonth - 1]}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: ink }}>{MONTH_ABBR[currentMonth - 1]}</span>
                       </div>
                       <input
                         type="range" min="1" max="12" value={currentMonth}
                         onChange={e => onMonthChange(Number(e.target.value))}
-                        style={{ width: '100%', accentColor: BRAND.burgundy, cursor: 'pointer' }}
+                        style={{ width: '100%', accentColor: crimson, cursor: 'pointer' }}
                       />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: BRAND.textMuted, marginTop: 2 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: inkMuted, marginTop: 2 }}>
                         <span>Jan</span><span>Jun</span><span>Dec</span>
                       </div>
                     </div>
@@ -610,7 +610,7 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
       </div>
 
       {/* Topography */}
-      <div style={{ borderBottom: `1px solid ${BRAND.border}` }}>
+      <div style={{ borderBottom: `1px solid ${border}` }}>
         <button
           onClick={() => setTopoOpen(p => !p)}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
@@ -630,20 +630,20 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
-                    border: `1.5px solid ${active ? BRAND.burgundy + '80' : BRAND.border}`,
-                    background: active ? TOKENS.dangerDim : BRAND.eggshell,
+                    border: `1.5px solid ${active ? crimson + '80' : border}`,
+                    background: active ? TOKENS.dangerDim : parchment,
                     cursor: 'pointer', fontFamily: 'var(--font-sans)',
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: active ? BRAND.burgundy : BRAND.brown }}>{layer.label}</div>
-                    <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 1 }}>{layer.sub}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
+                    <div style={{ fontSize: 11, color: inkMuted, marginTop: 1 }}>{layer.sub}</div>
                   </div>
                   <div style={{
-                    width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? BRAND.burgundy : BRAND.border}`,
+                    width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                   }}>
-                    {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: BRAND.burgundy }} />}
+                    {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
                   </div>
                 </button>
               );
@@ -651,37 +651,37 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
 
             {/* Legend / scale for active topo layer */}
             {topoConfig && activeLayer && (
-              <div style={{ border: `1px solid ${BRAND.border}`, borderRadius: 8, padding: '10px 12px', background: BRAND.cream, marginTop: 4 }}>
+              <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
                 <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Scale — {topoConfig.label}</div>
-                <div style={{ height: 8, borderRadius: 6, background: COLORMAP_CSS[topoConfig.colormap] || TOKENS.ghost, marginBottom: 4, border: `1px solid ${BRAND.border}` }} />
+                <div style={{ height: 8, borderRadius: 6, background: COLORMAP_CSS[topoConfig.colormap] || TOKENS.ghost, marginBottom: 4, border: `1px solid ${border}` }} />
                 {topoStats && (
                   <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: BRAND.textMuted, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: inkMuted, marginBottom: 8 }}>
                       <span>{topoStats.min?.toFixed(1)}{topoConfig.unit}</span>
                       <span>{topoStats.max?.toFixed(1)}{topoConfig.unit}</span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                      <div><div style={T.sectionLabel}>Min</div><div style={{ fontSize: 12, fontWeight: 600, color: BRAND.text }}>{fmt(topoStats.min)}{topoConfig.unit}</div></div>
-                      <div><div style={T.sectionLabel}>Max</div><div style={{ fontSize: 12, fontWeight: 600, color: BRAND.text }}>{fmt(topoStats.max)}{topoConfig.unit}</div></div>
-                      <div><div style={T.sectionLabel}>Mean</div><div style={{ fontSize: 12, fontWeight: 600, color: BRAND.text }}>{fmt(topoStats.mean)}{topoConfig.unit}</div></div>
-                      <div><div style={T.sectionLabel}>Std Dev</div><div style={{ fontSize: 12, fontWeight: 600, color: BRAND.text }}>±{fmt(topoStats.std)}{topoConfig.unit}</div></div>
+                      <div><div style={T.sectionLabel}>Min</div><div style={{ fontSize: 12, fontWeight: 600, color: ink }}>{fmt(topoStats.min)}{topoConfig.unit}</div></div>
+                      <div><div style={T.sectionLabel}>Max</div><div style={{ fontSize: 12, fontWeight: 600, color: ink }}>{fmt(topoStats.max)}{topoConfig.unit}</div></div>
+                      <div><div style={T.sectionLabel}>Mean</div><div style={{ fontSize: 12, fontWeight: 600, color: ink }}>{fmt(topoStats.mean)}{topoConfig.unit}</div></div>
+                      <div><div style={T.sectionLabel}>Std Dev</div><div style={{ fontSize: 12, fontWeight: 600, color: ink }}>±{fmt(topoStats.std)}{topoConfig.unit}</div></div>
                     </div>
                   </>
                 )}
                 {!topoStats && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 2 }}>
-                    <div style={{ width: 12, height: 12, borderRadius: '50%', border: `2px solid ${BRAND.border}`, borderTopColor: BRAND.brown, animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-                    <span style={{ fontSize: 11, color: BRAND.textMuted }}>Loading statistics…</span>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', border: `2px solid ${border}`, borderTopColor: ink, animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: inkMuted }}>Loading statistics…</span>
                     <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
                   </div>
                 )}
               </div>
             )}
             {activeLayer === 'tdmean' && (
-              <div style={{ border: `1px solid ${BRAND.border}`, borderRadius: 8, padding: '10px 12px', background: BRAND.cream, marginTop: 4 }}>
+              <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
                 <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Scale — Mean Temperature</div>
-                <div style={{ height: 8, borderRadius: 6, background: COLORMAP_CSS.plasma, marginBottom: 4, border: `1px solid ${BRAND.border}` }} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: BRAND.textMuted }}>
+                <div style={{ height: 8, borderRadius: 6, background: COLORMAP_CSS.plasma, marginBottom: 4, border: `1px solid ${border}` }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: inkMuted }}>
                   <span>−22°C</span><span>26°C</span>
                 </div>
               </div>
@@ -715,7 +715,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
   return (
     <div>
       {/* Filter pills */}
-      <div style={{ padding: '10px 16px 8px', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: `1px solid ${BRAND.border}` }}>
+      <div style={{ padding: '10px 16px 8px', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: `1px solid ${border}` }}>
         {pills.map(p => {
           const isActive = listingFilterMode === p.id;
           return (
@@ -724,9 +724,9 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
               onClick={() => onListingFilterModeChange(p.id)}
               style={{
                 padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                border: `1px solid ${isActive ? BRAND.burgundy + '90' : BRAND.border}`,
-                background: isActive ? TOKENS.dangerDim : BRAND.eggshell,
-                color: isActive ? BRAND.burgundy : BRAND.textMuted,
+                border: `1px solid ${isActive ? crimson + '90' : border}`,
+                background: isActive ? TOKENS.dangerDim : parchment,
+                color: isActive ? crimson : inkMuted,
                 cursor: 'pointer', fontFamily: 'var(--font-sans)',
                 transition: 'all 0.15s',
               }}
@@ -738,15 +738,15 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
       </div>
 
       {ava && (
-        <div style={{ padding: '6px 16px', background: TOKENS.dangerDim, borderBottom: `1px solid ${BRAND.border}` }}>
-          <span style={{ fontSize: 11, color: BRAND.burgundy }}>Showing {ava.name} only — {visible.length} winer{visible.length === 1 ? 'y' : 'ies'}</span>
+        <div style={{ padding: '6px 16px', background: TOKENS.dangerDim, borderBottom: `1px solid ${border}` }}>
+          <span style={{ fontSize: 11, color: crimson }}>Showing {ava.name} only — {visible.length} winer{visible.length === 1 ? 'y' : 'ies'}</span>
         </div>
       )}
 
       {/* Winery list */}
       <div style={{ overflowY: 'auto', maxHeight: 340 }}>
         {visible.length === 0 && (
-          <div style={{ padding: '20px 16px', textAlign: 'center', color: BRAND.textMuted, fontSize: 13 }}>
+          <div style={{ padding: '20px 16px', textAlign: 'center', color: inkMuted, fontSize: 13 }}>
             {listings.length === 0 ? 'Loading…' : 'No wineries match this filter.'}
           </div>
         )}
@@ -757,18 +757,18 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
             style={{
               display: 'flex', alignItems: 'center', gap: 10,
               width: '100%', padding: '9px 16px', background: 'none',
-              border: 'none', borderBottom: `1px solid ${BRAND.border}`, cursor: 'pointer',
+              border: 'none', borderBottom: `1px solid ${border}`, cursor: 'pointer',
               fontFamily: 'var(--font-sans)', textAlign: 'left',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = BRAND.cream; onListingHover?.(l); }}
+            onMouseEnter={e => { e.currentTarget.style.background = parchment; onListingHover?.(l); }}
             onMouseLeave={e => { e.currentTarget.style.background = 'none'; onListingHover?.(null); }}
           >
             <span style={{
               width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-              background: vineyardRecidSet.has(l.id) ? UI.mapped : BRAND.textMuted,
+              background: vineyardRecidSet.has(l.id) ? UI.mapped : inkMuted,
             }} />
-            <span style={{ fontSize: 13, color: BRAND.text, flex: 1, lineHeight: 1.3 }}>{l.title}</span>
-            <span style={{ fontSize: 10, color: BRAND.textMuted }}>›</span>
+            <span style={{ fontSize: 13, color: ink, flex: 1, lineHeight: 1.3 }}>{l.title}</span>
+            <span style={{ fontSize: 10, color: inkMuted }}>›</span>
           </button>
         ))}
       </div>
@@ -779,9 +779,9 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
 // ── About section ─────────────────────────────────────────────────────────
 function AboutSection() {
   return (
-    <div style={{ padding: '14px 16px', fontSize: 13, color: BRAND.textMuted, lineHeight: 1.75 }}>
+    <div style={{ padding: '14px 16px', fontSize: 13, color: inkMuted, lineHeight: 1.75 }}>
       <p style={{ margin: '0 0 12px' }}>
-        <strong style={{ color: BRAND.brown }}>Willamette Valley Wine Country</strong> encompasses over 500 wineries and 26,000+ acres of vineyard across eleven American Viticultural Areas in Oregon's Northern Willamette Valley.
+        <strong style={{ color: ink }}>Willamette Valley Wine Country</strong> encompasses over 500 wineries and 26,000+ acres of vineyard across eleven American Viticultural Areas in Oregon's Northern Willamette Valley.
       </p>
       <p style={{ margin: '0 0 12px' }}>
         This explorer provides detailed vineyard mapping, topographic analysis, and climate data for each nested AVA.
@@ -796,7 +796,7 @@ function AboutSection() {
           <span style={{ fontSize: 12 }}>Reference parcels (no winery link)</span>
         </div>
       </div>
-      <p style={{ margin: '14px 0 0', fontSize: 11, color: BRAND.textMuted }}>
+      <p style={{ margin: '14px 0 0', fontSize: 11, color: inkMuted }}>
         Data: WVWA, PRISM Climate Group, USGS.<br />
         Boundary data: TTB (Tax &amp; Trade Bureau).
       </p>
@@ -955,7 +955,7 @@ export default function ExplorerSidebar({
       maxWidth: isMobile ? 360 : SIDEBAR_MAX_W,
       height: '100%',
       background: T.sidebarBg,
-      borderRight: `1px solid ${BRAND.border}`,
+      borderRight: `1px solid ${border}`,
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
@@ -1032,9 +1032,9 @@ export default function ExplorerSidebar({
 
             {/* Hero welcome card */}
             <div style={{
-              background: `linear-gradient(155deg, ${BRAND.brownDark} 0%, ${BRAND.brown} 55%, ${TOKENS.surfaceRaised} 100%)`,
+              background: `linear-gradient(155deg, ${inkDark} 0%, ${ink} 55%, ${TOKENS.surfaceRaised} 100%)`,
               padding: '18px 16px 16px',
-              borderBottom: `1px solid ${BRAND.border}`,
+              borderBottom: `1px solid ${border}`,
               position: 'relative',
               overflow: 'hidden',
             }}>
@@ -1050,11 +1050,11 @@ export default function ExplorerSidebar({
               {/* Stat chips grid */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, position: 'relative' }}>
                 <div style={{ background: UI.parchment10, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.parchment12}` }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: BRAND.eggshell, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{WV_SUB_AVAS.length}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: parchment, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{WV_SUB_AVAS.length}</div>
                   <div style={{ fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Nested AVAs</div>
                 </div>
                 <div style={{ background: UI.parchment10, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.parchment12}` }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: BRAND.eggshell, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{wineryCount > 0 ? wineryCount : '—'}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: parchment, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{wineryCount > 0 ? wineryCount : '—'}</div>
                   <div style={{ fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Wineries</div>
                 </div>
                 <div style={{ background: UI.mappedChipBg, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.mappedChipBorder}` }}>
@@ -1062,7 +1062,7 @@ export default function ExplorerSidebar({
                   <div style={{ fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Wineries Mapped</div>
                 </div>
                 <div style={{ background: UI.parchment10, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.parchment12}` }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: BRAND.eggshell, fontFamily: 'var(--font-display)', lineHeight: 1 }}>26k+</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: parchment, fontFamily: 'var(--font-display)', lineHeight: 1 }}>26k+</div>
                   <div style={{ fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Vineyard Acres</div>
                 </div>
               </div>
@@ -1074,7 +1074,7 @@ export default function ExplorerSidebar({
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 width: '100%', padding: '13px 16px', background: 'none', border: 'none',
-                borderBottom: `1px solid ${BRAND.border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                borderBottom: `1px solid ${border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
               }}
               onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
               onMouseLeave={e => e.currentTarget.style.background = 'none'}
@@ -1082,17 +1082,17 @@ export default function ExplorerSidebar({
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                  background: UI.buttonBg1, border: `1px solid ${BRAND.border}`,
+                  background: UI.buttonBg1, border: `1px solid ${border}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={BRAND.brown} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ink} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
                 </div>
                 <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.brown }}>Nested AVAs</div>
-                  <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 2 }}>{WV_SUB_AVAS.length} viticultural areas</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>Nested AVAs</div>
+                  <div style={{ fontSize: 11, color: inkMuted, marginTop: 2 }}>{WV_SUB_AVAS.length} viticultural areas</div>
                 </div>
               </div>
-              <span style={{ fontSize: 16, color: BRAND.textMuted }}>›</span>
+              <span style={{ fontSize: 16, color: inkMuted }}>›</span>
             </button>
 
             {/* Enhanced: Wineries nav row */}
@@ -1101,7 +1101,7 @@ export default function ExplorerSidebar({
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 width: '100%', padding: '13px 16px', background: 'none', border: 'none',
-                borderBottom: `1px solid ${BRAND.border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                borderBottom: `1px solid ${border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
               }}
               onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
               onMouseLeave={e => e.currentTarget.style.background = 'none'}
@@ -1115,11 +1115,11 @@ export default function ExplorerSidebar({
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={UI.danger75} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="M6 2h12l-3 9a5 5 0 0 1-6 0L6 2z"/></svg>
                 </div>
                 <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.brown }}>Wineries</div>
-                  <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 2 }}>{wineryCount > 0 ? `${wineryCount} in the valley` : 'Browse all wineries'}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>Wineries</div>
+                  <div style={{ fontSize: 11, color: inkMuted, marginTop: 2 }}>{wineryCount > 0 ? `${wineryCount} in the valley` : 'Browse all wineries'}</div>
                 </div>
               </div>
-              <span style={{ fontSize: 16, color: BRAND.textMuted }}>›</span>
+              <span style={{ fontSize: 16, color: inkMuted }}>›</span>
             </button>
 
             {/* Enhanced: Data Layers nav row */}
@@ -1128,7 +1128,7 @@ export default function ExplorerSidebar({
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 width: '100%', padding: '13px 16px', background: 'none', border: 'none',
-                borderBottom: `1px solid ${BRAND.border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                borderBottom: `1px solid ${border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
               }}
               onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
               onMouseLeave={e => e.currentTarget.style.background = 'none'}
@@ -1142,14 +1142,14 @@ export default function ExplorerSidebar({
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={UI.electric75} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                 </div>
                 <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.brown }}>Data Layers</div>
-                  <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 2 }}>Climate &amp; topography overlays</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>Data Layers</div>
+                  <div style={{ fontSize: 11, color: inkMuted, marginTop: 2 }}>Climate &amp; topography overlays</div>
                 </div>
               </div>
               <Chevron open={sections.layers} size={13} />
             </button>
             {sections.layers && (
-              <div style={{ borderBottom: `1px solid ${BRAND.border}` }}>
+              <div style={{ borderBottom: `1px solid ${border}` }}>
                 <LayerSection
                   activeLayer={activeLayer}
                   onLayerChange={onLayerChange}
@@ -1167,7 +1167,7 @@ export default function ExplorerSidebar({
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   width: '100%', padding: '13px 16px', background: 'none', border: 'none',
-                  borderBottom: sections.about ? `1px solid ${BRAND.border}` : 'none',
+                  borderBottom: sections.about ? `1px solid ${border}` : 'none',
                   cursor: 'pointer', fontFamily: 'var(--font-sans)',
                 }}
                 onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
@@ -1176,12 +1176,12 @@ export default function ExplorerSidebar({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{
                     width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                    background: UI.buttonBg2, border: `1px solid ${BRAND.border}`,
+                    background: UI.buttonBg2, border: `1px solid ${border}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
                   }}>ℹ️</div>
                   <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.brown }}>About &amp; Legend</div>
-                    <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 2 }}>Data sources &amp; map key</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>About &amp; Legend</div>
+                    <div style={{ fontSize: 11, color: inkMuted, marginTop: 2 }}>Data sources &amp; map key</div>
                   </div>
                 </div>
                 <Chevron open={sections.about} size={13} />
@@ -1224,12 +1224,12 @@ export default function ExplorerSidebar({
                       onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'none'; mapRef.current?.hoverAva(null); }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {ava.parentAva && <span style={{ width: 8, fontSize: 9, color: BRAND.textMuted }}>└</span>}
-                        <span style={{ fontSize: 13, color: isSelected ? BRAND.burgundy : BRAND.brown, fontWeight: isSelected ? 600 : 400 }}>
+                        {ava.parentAva && <span style={{ width: 8, fontSize: 9, color: inkMuted }}>└</span>}
+                        <span style={{ fontSize: 13, color: isSelected ? crimson : ink, fontWeight: isSelected ? 600 : 400 }}>
                           {ava.name}
                         </span>
                       </div>
-                      <span style={{ fontSize: 11, color: BRAND.textMuted }}>›</span>
+                      <span style={{ fontSize: 11, color: inkMuted }}>›</span>
                     </button>
                   );
                 })}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BRAND, TOKENS, alpha } from '../../styles/tokens';
+import { TOKENS, alpha } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { WV_SUB_AVAS } from '../../config/topographyConfig';
 
@@ -36,7 +36,7 @@ const UI = {
   // AVA button states
   hoverBorder:      alpha(TOKENS.electricBlue, 0.55),
   hoverBg:          alpha(TOKENS.electricBlue, 0.12),
-  hoverText:        UI.hoverText,
+  hoverText:        TOKENS.electricBlue,
   hoverGlowOuter:   alpha(TOKENS.electricBlue, 0.18),
   hoverGlowInner:   alpha(TOKENS.electricBlue, 0.06),
   idleBorder:       alpha(TOKENS.parchment, 0.10),
@@ -111,7 +111,7 @@ function AVAButton({ item, onSelectAva, onHoverAva, indent }) {
         border: `1px solid ${hovered ? UI.hoverBorder : UI.idleBorder}`,
         background: hovered ? UI.hoverBg : UI.idleBg,
         color: hovered ? UI.hoverText : GLASS.textDim,
-        boxShadow: hovered ? `0 0 0 2px , inset 0 0 8px ` : 'none',
+        boxShadow: hovered ? `0 0 0 2px ${UI.hoverGlowOuter}, inset 0 0 8px ${UI.hoverGlowInner}` : 'none',
         fontSize: indent ? 11 : 12,
         fontWeight: 500,
         fontFamily: 'var(--font-sans)',
@@ -191,7 +191,7 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                 letterSpacing: '0.06em',
                 textTransform: 'uppercase',
                 background: GLASS.accentDim,
-                border: `1px solid `,
+                border: `1px solid ${UI.nestedBadgeBorder}`,
                 color: GLASS.text,
               }}>
                 {isDoubleNested ? 'Double-Nested AVA' : 'Nested AVA'}
@@ -206,7 +206,7 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                   letterSpacing: '0.06em',
                   textTransform: 'uppercase',
                   background: UI.parentBadgeBg,
-                  border: `1px solid `,
+                  border: `1px solid ${UI.parentBadgeBorder}`,
                   color: TOKENS.amber,
                 }}>
                   Parent AVA
@@ -285,7 +285,7 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     width: '100%', padding: '8px 12px', borderRadius: 8,
-                    border: `1px solid `,
+                     border: `1px solid ${UI.amberBtnBorder}`,
                     background: UI.amberBtnBg,
                     color: TOKENS.amber, fontSize: 12, fontWeight: 600,
                     fontFamily: 'var(--font-sans)', cursor: 'pointer',
@@ -312,7 +312,7 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     width: '100%', padding: '8px 12px', borderRadius: 8,
-                    border: `1px solid `,
+                     border: `1px solid ${UI.idleBorder}`,
                     background: UI.idleBg,
                     color: GLASS.textDim, fontSize: 12, fontWeight: 500,
                     fontFamily: 'var(--font-sans)', cursor: 'pointer',
@@ -331,7 +331,7 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                   e.currentTarget.style.background = UI.hoverBg;
                   e.currentTarget.style.borderColor = UI.hoverBorder;
                   e.currentTarget.style.color = UI.hoverText;
-                  e.currentTarget.style.boxShadow = `0 0 0 2px , inset 0 0 8px `;
+                   e.currentTarget.style.boxShadow = `0 0 0 2px ${UI.hoverGlowOuter}, inset 0 0 8px ${UI.hoverGlowInner}`;
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.background = UI.idleBg;
@@ -342,7 +342,7 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   width: '100%', padding: '8px 12px', borderRadius: 8,
-                  border: `1px solid `,
+                   border: `1px solid ${UI.idleBorder}`,
                   background: UI.idleBg,
                   color: GLASS.textDim, fontSize: 12, fontWeight: 500,
                   fontFamily: 'var(--font-sans)', cursor: 'pointer',

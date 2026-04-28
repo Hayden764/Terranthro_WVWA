@@ -23,7 +23,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
-import { BRAND, TOKENS, alpha, mix } from '../styles/tokens';
+import { alpha, border, crimson, ink, mix, parchment, TOKENS } from '../styles/tokens';
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 
@@ -32,19 +32,19 @@ const UI = {
   parcelFill: TOKENS.success,
   parcelHighlight: TOKENS.danger,
   parcelStrokeBase: mix(TOKENS.success, 60, TOKENS.ink),
-  parcelLabelText: BRAND.white,
+  parcelLabelText: parchment,
   parcelLabelHalo: alpha('black', 0.65),
   popupTitle: TOKENS.ink,
-  popupSub: BRAND.textMuted,
-  popupMeta: BRAND.text,
+  popupSub: inkMuted,
+  popupMeta: ink,
   editOverlayBg: alpha(TOKENS.ink, 0.88),
   editOverlayText: alpha(TOKENS.parchment, 0.88),
   splitOverlayBg: mix(TOKENS.electricBlue, 18, TOKENS.ink),
   splitOverlayText: alpha(TOKENS.parchment, 0.88),
   addOverlayBg: mix(TOKENS.success, 18, TOKENS.ink),
   addOverlayText: alpha(TOKENS.parchment, 0.88),
-  overlayTitle: BRAND.white,
-  cancelBorder: alpha(BRAND.white, 0.25),
+  overlayTitle: parchment,
+  cancelBorder: alpha(parchment, 0.25),
   cancelText: alpha(TOKENS.parchment, 0.88),
 };
 
@@ -482,14 +482,14 @@ export default function PortalVineyardMap({
     return (
       <div style={{
         height,
-        background: BRAND.cream,
+        background: parchment,
         borderRadius: 8,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: BRAND.textMuted,
+        color: inkMuted,
         fontSize: 13,
-        border: `1px solid ${BRAND.border}`,
+        border: `1px solid ${border}`,
         ...wrapperStyle,
       }}>
         No geometry available for map display.
@@ -505,7 +505,7 @@ export default function PortalVineyardMap({
           height: '100%',
           borderRadius: (editParcelId || splitParcelId || addMode) ? 0 : 8,
           overflow: 'hidden',
-          border: `1px solid ${BRAND.border}`,
+          border: `1px solid ${border}`,
         }}
       />
 
@@ -630,6 +630,6 @@ const editCancelBtnStyle = {
 
 const editSaveBtnStyle = {
   padding: '6px 16px', borderRadius: 6, border: 'none',
-  background: BRAND.burgundy, color: 'white', fontSize: 12, fontWeight: 500,
+  background: crimson, color: 'white', fontSize: 12, fontWeight: 500,
   cursor: 'pointer', fontFamily: 'var(--font-sans)',
 };

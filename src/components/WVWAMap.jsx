@@ -11,7 +11,7 @@ import TopographyLayer from './TopographyLayer';
 import MapControls from './MapControls';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { AVA_CAMERA, WV_CAMERA } from '../config/avaCameraConfig';
-import { BRAND, TOKENS, alpha } from '../styles/tokens';
+import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '../styles/tokens';
 
 // In dev, always use relative API paths through the Vite proxy.
 // In production, use VITE_API_BASE_URL if provided.
@@ -72,12 +72,12 @@ export const LISTING_CATEGORIES = {
   hotel:      { label: 'Hotel / Inn',        color: TOKENS.amber, icon: '🏨', emoji: '🏨' },
   restaurant: { label: 'Restaurant / Dining', color: TOKENS.vividGreen, icon: '🍽️', emoji: '🍽️' },
   tasting:    { label: 'Tasting Room',        color: TOKENS.violet, icon: '🍷', emoji: '🍷' },
-  winery:     { label: 'Winery / Vineyard',   color: BRAND.burgundy, icon: '🍇', emoji: '🍇' },
-  other:      { label: 'Other',               color: BRAND.brownLight, icon: '📍', emoji: '📍' },
+  winery:     { label: 'Winery / Vineyard',   color: crimson, icon: '🍇', emoji: '🍇' },
+  other:      { label: 'Other',               color: inkLight, icon: '📍', emoji: '📍' },
 };
 
 const UI = {
-  white: BRAND.white,
+  white: parchment,
   panelBg: alpha(TOKENS.ink, 0.92),
   panelBorder: alpha(TOKENS.parchment, 0.12),
   panelShadow: alpha(TOKENS.ink, 0.45),
@@ -731,7 +731,7 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
                     padding: '10px 8px',
                     background: isActive ? UI.tabActiveBg : 'transparent',
                     border: 'none',
-                    borderBottom: isActive ? `2px solid ${BRAND.burgundy}` : '2px solid transparent',
+                    borderBottom: isActive ? `2px solid ${crimson}` : '2px solid transparent',
                     color: isActive ? UI.tabActiveText : UI.tabIdleText,
                     cursor: 'pointer',
                     fontSize: 11,
@@ -2121,7 +2121,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         source: 'wine-regions',
         paint: {
           'circle-radius': 3,
-          'circle-color': BRAND.eggshell,
+          'circle-color': parchment,
           'circle-opacity': 0.85,
           'circle-stroke-width': 0,
         },
@@ -2153,7 +2153,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           'symbol-placement': 'point',
         },
         paint: {
-          'text-color': BRAND.eggshell,
+          'text-color': parchment,
           'text-opacity': 0.9,
           'text-halo-color': 'rgba(0,0,0,0.5)',
           'text-halo-width': 1,
@@ -2180,7 +2180,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         type: 'line',
         source: 'wine-region-lines',
         paint: {
-          'line-color': BRAND.eggshell,
+          'line-color': parchment,
           'line-opacity': 0.35,
           'line-width': 1,
         },
@@ -3238,7 +3238,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           background: UI.wineryHoverBg, backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
           border: `1.5px solid ${UI.wineryHoverBorder}`, borderRadius: 8,
-          padding: '5px 14px', fontSize: 13, fontWeight: 600, color: BRAND.eggshell,
+          padding: '5px 14px', fontSize: 13, fontWeight: 600, color: parchment,
           pointerEvents: 'none', zIndex: 5, fontFamily: 'var(--font-sans)',
           boxShadow: `0 4px 20px ${UI.wineryHoverShadow}`,
         }}>
@@ -3253,7 +3253,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           background: UI.vineyardHoverBg, backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
           border: `1.5px solid ${UI.hoverAccent}`, borderRadius: 8,
-          padding: '5px 14px', fontSize: 13, fontWeight: 600, color: BRAND.eggshell,
+          padding: '5px 14px', fontSize: 13, fontWeight: 600, color: parchment,
           pointerEvents: 'none', zIndex: 5, fontFamily: 'var(--font-sans)',
           boxShadow: `0 4px 20px ${UI.vineyardHoverShadow}`,
         }}>
@@ -3281,7 +3281,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             gap: 10,
             whiteSpace: 'nowrap',
           }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: BRAND.eggshell, letterSpacing: '0.01em' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: parchment, letterSpacing: '0.01em' }}>
               {ava.name}
             </span>
           </div>

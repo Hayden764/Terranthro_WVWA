@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { WV_SUB_AVAS } from '../config/topographyConfig';
 import { LISTING_CATEGORIES } from './WVWAMap';
-import { BRAND, TOKENS, alpha } from '../styles/tokens';
+import { alpha, border, crimson, ink, parchment, TOKENS } from '../styles/tokens';
 
 const API_BASE = import.meta.env.DEV
   ? ''
@@ -214,7 +214,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           textAlign: 'left',
           background: isActive ? UI.activeRowBg : 'transparent',
           border: 'none',
-          borderLeft: isActive ? `3px solid ${BRAND.burgundy}` : '3px solid transparent',
+          borderLeft: isActive ? `3px solid ${crimson}` : '3px solid transparent',
           padding: '8px 14px',
           cursor: 'pointer',
           fontFamily: 'var(--font-sans)',
@@ -226,7 +226,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           <div style={{
             fontSize: 13,
             fontWeight: 600,
-            color: isActive ? BRAND.burgundy : BRAND.text,
+            color: isActive ? crimson : ink,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -234,7 +234,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           }}>
             {r.label}
           </div>
-          <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 1, lineHeight: 1.2 }}>
+          <div style={{ fontSize: 11, color: inkMuted, marginTop: 1, lineHeight: 1.2 }}>
             {label}
           </div>
         </div>
@@ -258,7 +258,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          color: BRAND.brownDark,
+          color: inkDark,
           flexShrink: 0,
         }}
       >
@@ -291,8 +291,8 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        background: BRAND.eggshell,
-        border: `1.5px solid ${open ? BRAND.burgundy : UI.inputBorderIdle}`,
+        background: parchment,
+        border: `1.5px solid ${open ? crimson : UI.inputBorderIdle}`,
         borderRadius: open ? '10px 10px 0 0' : 10,
         padding: '0 12px',
         height: 36,
@@ -302,7 +302,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           : `0 2px 8px ${UI.inputShadow}`,
         transition: 'border-color 0.15s, border-radius 0.1s, box-shadow 0.15s',
       }}>
-        <span style={{ color: open ? BRAND.burgundy : BRAND.textMuted, flexShrink: 0, display: 'flex', transition: 'color 0.15s' }}>
+        <span style={{ color: open ? crimson : inkMuted, flexShrink: 0, display: 'flex', transition: 'color 0.15s' }}>
           {loading
             ? <SpinnerIcon />
             : <SearchIcon />}
@@ -324,9 +324,9 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
             outline: 'none',
             background: 'transparent',
             fontSize: 13,
-            color: BRAND.text,
+            color: ink,
             fontFamily: 'var(--font-sans)',
-            caretColor: BRAND.burgundy,
+            caretColor: crimson,
           }}
         />
 
@@ -344,7 +344,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
             style={{
               background: 'none',
               border: 'none',
-              color: BRAND.textMuted,
+              color: inkMuted,
               cursor: 'pointer',
               fontSize: 14,
               lineHeight: 1,
@@ -364,7 +364,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
             style={{
               background: 'none',
               border: 'none',
-              color: BRAND.textMuted,
+              color: inkMuted,
               cursor: 'pointer',
               fontSize: 11,
               lineHeight: 1,
@@ -384,21 +384,21 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           top: '100%',
           left: 0,
           right: 0,
-          background: BRAND.eggshell,
-          border: `1.5px solid ${BRAND.burgundy}`,
-          borderTop: `1px solid ${BRAND.border}`,
+          background: parchment,
+          border: `1.5px solid ${crimson}`,
+          borderTop: `1px solid ${border}`,
           borderRadius: '0 0 10px 10px',
           boxShadow: `0 8px 24px ${UI.dropdownShadow}`,
           overflowY: 'auto',
           maxHeight: 360,
           scrollbarWidth: 'thin',
-          scrollbarColor: `${BRAND.border} transparent`,
+          scrollbarColor: `${border} transparent`,
         }}>
           {results.length === 0 && !loading && (
             <div style={{
               padding: '14px 16px',
               fontSize: 13,
-              color: BRAND.textMuted,
+              color: inkMuted,
               textAlign: 'center',
             }}>
               No results for &ldquo;{query}&rdquo;
@@ -442,8 +442,8 @@ function SectionHeader({ label }) {
       fontWeight: 700,
       letterSpacing: '0.08em',
       textTransform: 'uppercase',
-      color: BRAND.textMuted,
-      borderTop: `1px solid ${BRAND.border}`,
+      color: inkMuted,
+      borderTop: `1px solid ${border}`,
     }}
       dangerouslySetInnerHTML={{ __html: label }}
     />
@@ -466,7 +466,7 @@ function SpinnerIcon() {
       width: 13,
       height: 13,
       border: `2px solid ${UI.spinnerBorder}`,
-      borderTopColor: BRAND.burgundy,
+      borderTopColor: crimson,
       borderRadius: '50%',
       animation: 'sb-spin 0.7s linear infinite',
     }}>

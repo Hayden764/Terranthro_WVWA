@@ -14,7 +14,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiPost } from '../lib/api';
-import { BRAND, TOKENS, alpha } from '../styles/tokens';
+import { alpha, border, crimson, ink, parchment, TOKENS } from '../styles/tokens';
 
 const UI = {
   dirtyRowBg: alpha(TOKENS.crimson, 0.04),
@@ -159,22 +159,22 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
   return (
     <div>
       {/* Table */}
-      <div style={{ overflowX: 'auto', borderRadius: 8, border: `1px solid ${BRAND.border}` }}>
+      <div style={{ overflowX: 'auto', borderRadius: 8, border: `1px solid ${border}` }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 560 }}>
           <thead>
-            <tr style={{ background: BRAND.eggshell }}>
+            <tr style={{ background: parchment }}>
               {COLUMNS.map((col) => (
                 <th
                   key={col.key}
                   style={{
                     textAlign: 'left',
                     padding: '9px 10px',
-                    color: BRAND.textMuted,
+                    color: inkMuted,
                     fontWeight: 600,
                     fontSize: 11,
                     letterSpacing: '0.04em',
                     textTransform: 'uppercase',
-                    borderBottom: `1px solid ${BRAND.border}`,
+                    borderBottom: `1px solid ${border}`,
                     width: col.width,
                     whiteSpace: 'nowrap',
                   }}
@@ -182,7 +182,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                   {col.label}
                 </th>
               ))}
-              <th style={{ width: 32, borderBottom: `1px solid ${BRAND.border}` }} />
+              <th style={{ width: 32, borderBottom: `1px solid ${border}` }} />
             </tr>
           </thead>
           <tbody>
@@ -196,7 +196,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                 <tr
                   key={rowKey(block)}
                   style={{
-                    borderBottom: isLast ? 'none' : `1px solid ${UI.borderFaded(BRAND.border)}`,
+                    borderBottom: isLast ? 'none' : `1px solid ${UI.borderFaded(border)}`,
                     background: isDirty
                       ? UI.dirtyRowBg
                       : 'transparent',
@@ -217,12 +217,12 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                             padding: '8px 10px',
                             border: 'none',
                             borderBottom: isDirty
-                              ? `2px solid ${BRAND.burgundy}`
+                              ? `2px solid ${crimson}`
                               : `2px solid transparent`,
                             background: 'transparent',
                             fontSize: 13,
                             fontFamily: 'var(--font-sans)',
-                            color: BRAND.text,
+                            color: ink,
                             outline: 'none',
                             boxSizing: 'border-box',
                           }}
@@ -232,7 +232,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                         <span style={{
                           display: 'block',
                           padding: '9px 10px',
-                          color: rowData[col.key] ? BRAND.text : BRAND.textMuted,
+                          color: rowData[col.key] ? ink : inkMuted,
                           fontStyle: rowData[col.key] ? 'normal' : 'italic',
                         }}>
                           {rowData[col.key] || '—'}
@@ -253,7 +253,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                     ) : isDirty ? (
                       <span style={{
                         display: 'inline-block', width: 6, height: 6,
-                        borderRadius: '50%', background: BRAND.burgundy,
+                        borderRadius: '50%', background: crimson,
                       }} title="Unsaved change" />
                     ) : null}
                   </td>
@@ -263,11 +263,11 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
 
             {/* New (unsaved) rows — always editable */}
             {newRows.map((row) => (
-              <tr key={row._tmpId} style={{ background: UI.dirtyRowBg, borderBottom: `1px solid ${UI.borderFaded(BRAND.border)}` }}>
+              <tr key={row._tmpId} style={{ background: UI.dirtyRowBg, borderBottom: `1px solid ${UI.borderFaded(border)}` }}>
                 {COLUMNS.map((col) => (
                   <td key={col.key} style={{ padding: '0', verticalAlign: 'middle' }}>
                     {col.readonly ? (
-                      <span style={{ display: 'block', padding: '9px 10px', color: BRAND.textMuted, fontStyle: 'italic' }}>auto</span>
+                      <span style={{ display: 'block', padding: '9px 10px', color: inkMuted, fontStyle: 'italic' }}>auto</span>
                     ) : (
                       <input
                         type={col.type}
@@ -276,9 +276,9 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                         placeholder={col.label}
                         style={{
                           width: '100%', padding: '8px 10px',
-                          border: 'none', borderBottom: `2px solid ${UI.borderVeryFaded(BRAND.burgundy)}`,
+                          border: 'none', borderBottom: `2px solid ${UI.borderVeryFaded(crimson)}`,
                           background: 'transparent', fontSize: 13,
-                          fontFamily: 'var(--font-sans)', color: BRAND.text,
+                          fontFamily: 'var(--font-sans)', color: ink,
                           outline: 'none', boxSizing: 'border-box',
                         }}
                       />
@@ -308,7 +308,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
         }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button onClick={addNewRow} style={addRowBtnStyle}>+ Add Block</button>
-            <p style={{ fontSize: 12, color: BRAND.textMuted, margin: 0 }}>
+            <p style={{ fontSize: 12, color: inkMuted, margin: 0 }}>
               {hasChanges
                 ? `${changedBlocks.length + pendingNewRows.length} pending — submit for admin review`
                 : 'Edit cells above · Acres are calculated automatically'}
@@ -320,7 +320,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
               <span style={{ fontSize: 12, color: UI.successText, fontWeight: 600 }}>✓ Submitted</span>
             )}
             {status === 'error' && (
-              <span style={{ fontSize: 12, color: BRAND.burgundy }}>Error — try again</span>
+              <span style={{ fontSize: 12, color: crimson }}>Error — try again</span>
             )}
             <button
               onClick={() => { setEditMap({}); setNewRows([]); setStatus(null); onEditCancel?.(); }}
@@ -350,7 +350,7 @@ const iconBtnStyle = {
   background: 'none',
   border: 'none',
   cursor: 'pointer',
-  color: BRAND.textMuted,
+  color: inkMuted,
   fontSize: 11,
   padding: '2px 4px',
   lineHeight: 1,
@@ -360,9 +360,9 @@ const iconBtnStyle = {
 const addRowBtnStyle = {
   padding: '5px 12px',
   borderRadius: 6,
-  border: `1px solid ${BRAND.border}`,
+  border: `1px solid ${border}`,
   background: 'transparent',
-  color: BRAND.brown,
+  color: ink,
   cursor: 'pointer',
   fontSize: 12,
   fontWeight: 600,
@@ -374,8 +374,8 @@ const primaryBtnStyle = {
   padding: '7px 18px',
   borderRadius: 6,
   border: 'none',
-  background: BRAND.brown,
-  color: BRAND.white,
+  background: ink,
+  color: parchment,
   cursor: 'pointer',
   fontSize: 13,
   fontWeight: 600,
@@ -385,9 +385,9 @@ const primaryBtnStyle = {
 const secondaryBtnStyle = {
   padding: '7px 14px',
   borderRadius: 6,
-  border: `1px solid ${BRAND.border}`,
+  border: `1px solid ${border}`,
   background: 'transparent',
-  color: BRAND.textMuted,
+  color: inkMuted,
   cursor: 'pointer',
   fontSize: 13,
   fontFamily: 'var(--font-sans)',

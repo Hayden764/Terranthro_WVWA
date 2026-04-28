@@ -1,4 +1,4 @@
-import { BRAND, TOKENS, alpha } from '../../styles/tokens';
+import { alpha, border, crimson, parchment, TOKENS } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { WV_SUB_AVAS } from '../../config/topographyConfig';
 
@@ -119,7 +119,7 @@ export default function MapToolkit({
           justifyContent: 'center',
           background: GLASS.accentDim,
           borderColor: alpha(TOKENS.crimson, 0.35),
-          color: BRAND.eggshell,
+          color: parchment,
         }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="1 4 1 10 7 10" />
@@ -192,7 +192,7 @@ export default function MapToolkit({
                     ...btnStyle(active),
                     width: '100%',
                     justifyContent: 'space-between',
-                    color: active ? BRAND.eggshell : GLASS.text,
+                    color: active ? parchment : GLASS.text,
                   }}
                 >
                   <span>{option.label}</span>
@@ -236,7 +236,7 @@ function btnStyle(active) {
     borderRadius: 8,
     border: `1px solid ${active ? alpha(TOKENS.crimson, 0.4) : GLASS.borderLight}`,
     background: active ? GLASS.accentDim : 'transparent',
-    color: active ? BRAND.eggshell : GLASS.textDim,
+    color: active ? parchment : GLASS.textDim,
     fontSize: 11,
     fontWeight: 600,
     fontFamily: 'var(--font-sans)',
@@ -249,7 +249,7 @@ function btnStyle(active) {
 const sliderStyle = {
   width: '100%',
   height: 4,
-  accentColor: BRAND.burgundy,
+  accentColor: crimson,
   cursor: 'pointer',
   WebkitAppearance: 'auto',
 };

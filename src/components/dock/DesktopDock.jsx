@@ -4,7 +4,7 @@ import DataLayerPanel from './DataLayerPanel';
 import ScalePanel from './ScalePanel';
 import InfoPanel from './InfoPanel';
 import WineriesPanel from './WineriesPanel';
-import { BRAND, TOKENS, alpha } from '../../styles/tokens';
+import { alpha, border, crimson, parchment, TOKENS } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 
 /**
@@ -198,7 +198,7 @@ export default function DesktopDock({
                 borderRadius: 10,
                 border: 'none',
                 background: isActive ? GLASS.accentDim : 'transparent',
-                color: isActive ? BRAND.eggshell : GLASS.textDim,
+                color: isActive ? parchment : GLASS.textDim,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -224,7 +224,7 @@ export default function DesktopDock({
                   width: 3,
                   height: 14,
                   borderRadius: 2,
-                  background: BRAND.burgundy,
+                  background: crimson,
                 }} />
               )}
             </button>

@@ -7,34 +7,61 @@ const toPercent = (value) => {
 
 // ─── Design-system tokens ────────────────────────────────────────────────────
 
+export const ink = v('--color-ink');
+export const surface = v('--color-surface');
+export const surfaceRaised = v('--color-surface-raised');
+export const border = v('--color-border');
+export const parchment = v('--color-parchment');
+export const muted = v('--color-muted');
+export const ghost = v('--color-ghost');
+
+export const electricBlue = v('--color-electric-blue');
+export const vividGreen = v('--color-vivid-green');
+export const crimson = v('--color-crimson');
+export const amber = v('--color-amber');
+export const violet = v('--color-violet');
+
+export const success = v('--color-success');
+export const successDim = v('--color-success-dim');
+export const warning = v('--color-warning');
+export const warningDim = v('--color-warning-dim');
+export const danger = v('--color-danger');
+export const dangerDim = v('--color-danger-dim');
+
+export const glowBlue = v('--glow-blue');
+export const glowGreen = v('--glow-green');
+export const glowCrimson = v('--glow-crimson');
+export const glowAmber = v('--glow-amber');
+export const glowViolet = v('--glow-violet');
+
 export const TOKENS = {
   // Base
-  ink:          v('--color-ink'),
-  surface:      v('--color-surface'),
-  surfaceRaised:v('--color-surface-raised'),
-  border:       v('--color-border'),
-  parchment:    v('--color-parchment'),
-  muted:        v('--color-muted'),
-  ghost:        v('--color-ghost'),
+  ink,
+  surface,
+  surfaceRaised,
+  border,
+  parchment,
+  muted,
+  ghost,
   // Accent
-  electricBlue: v('--color-electric-blue'),
-  vividGreen:   v('--color-vivid-green'),
-  crimson:      v('--color-crimson'),
-  amber:        v('--color-amber'),
-  violet:       v('--color-violet'),
+  electricBlue,
+  vividGreen,
+  crimson,
+  amber,
+  violet,
   // Semantic status
-  success:      v('--color-success'),
-  successDim:   v('--color-success-dim'),
-  warning:      v('--color-warning'),
-  warningDim:   v('--color-warning-dim'),
-  danger:       v('--color-danger'),
-  dangerDim:    v('--color-danger-dim'),
+  success,
+  successDim,
+  warning,
+  warningDim,
+  danger,
+  dangerDim,
   // Glows (for use in boxShadow / textShadow)
-  glowBlue:    v('--glow-blue'),
-  glowGreen:   v('--glow-green'),
-  glowCrimson: v('--glow-crimson'),
-  glowAmber:   v('--glow-amber'),
-  glowViolet:  v('--glow-violet'),
+  glowBlue,
+  glowGreen,
+  glowCrimson,
+  glowAmber,
+  glowViolet,
 };
 
 export const FONTS = {
@@ -50,20 +77,3 @@ export const alpha = (color, opacity) => (
 export const mix = (primary, primaryWeight, secondary) => (
   `color-mix(in srgb, ${primary} ${toPercent(primaryWeight)}%, ${secondary})`
 );
-
-// ─── Legacy BRAND shim (backward-compat, no Proxy/runtime dependency) ────────
-// Existing components using BRAND.* continue to work unchanged.
-// Migrate component-by-component to TOKENS.* in Phase 2.
-
-export const BRAND = {
-  white:      'white',
-  brown:      TOKENS.ink,
-  brownDark:  TOKENS.ink,
-  text:       TOKENS.ink,
-  burgundy:   TOKENS.crimson,
-  eggshell:   TOKENS.parchment,
-  cream:      TOKENS.parchment,
-  brownLight: TOKENS.muted,
-  textMuted:  TOKENS.muted,
-  border:     TOKENS.ghost,
-};

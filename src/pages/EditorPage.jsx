@@ -29,14 +29,12 @@ const MAP_STYLE = MAPTILER_KEY
       layers: [{ id: 'esri-world-imagery', type: 'raster', source: 'esriWorldImagery', minzoom: 0, maxzoom: 19 }],
     };
 
-// audit-ignore-start editor-map-colors
 const MAP_COLORS = {
-  lineDefault: '#2E9BFF',
-  lineHover: '#C87D4A',
-  lineSelected: '#00C44F',
-  lightPoint: '#E8E2D6',
+  lineDefault: TOKENS.electricBlue,
+  lineHover: TOKENS.amber,
+  lineSelected: TOKENS.success,
+  lightPoint: TOKENS.parchment,
 };
-// audit-ignore-end
 
 // Custom draw styles — @mapbox/mapbox-gl-draw's default styles use bare numeric
 // line-dasharray arrays which MapLibre GL v5 now rejects (requires ["literal", [...]]).

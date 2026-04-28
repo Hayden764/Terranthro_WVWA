@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { BRAND, TOKENS } from '../../styles/tokens';
+import { border, crimson, ink, parchment, TOKENS } from '../../styles/tokens';
 import { apiJson, apiPost } from '../../lib/api';
 
 export default function PortalProfile() {
@@ -64,19 +64,19 @@ export default function PortalProfile() {
   }
 
   if (!profile) {
-    return <Shell><p style={{ color: BRAND.textMuted }}>Loading…</p></Shell>;
+    return <Shell><p style={{ color: inkMuted }}>Loading…</p></Shell>;
   }
 
   return (
     <Shell>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <Link to="/portal/dashboard" style={{ color: BRAND.brownLight, fontSize: 13 }}>← Dashboard</Link>
+        <Link to="/portal/dashboard" style={{ color: inkLight, fontSize: 13 }}>← Dashboard</Link>
       </div>
 
-      <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: BRAND.brown, marginBottom: 8 }}>
+      <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: ink, marginBottom: 8 }}>
         Edit Profile
       </h1>
-      <p style={{ color: BRAND.textMuted, fontSize: 13, marginBottom: 24 }}>
+      <p style={{ color: inkMuted, fontSize: 13, marginBottom: 24 }}>
         Changes are submitted for review and applied once approved.
       </p>
 
@@ -113,7 +113,7 @@ export default function PortalProfile() {
             <input type="url" value={form.image_url} onChange={handleChange('image_url')} style={inputStyle} />
           </Field>
 
-          {error && <p style={{ color: BRAND.burgundy, fontSize: 13, marginBottom: 12 }}>{error}</p>}
+          {error && <p style={{ color: crimson, fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
           <button type="submit" disabled={submitting} style={btnStyle(submitting)}>
             {submitting ? 'Submitting…' : 'Submit for Review'}
@@ -122,7 +122,7 @@ export default function PortalProfile() {
       )}
 
       {/* ── Password ── */}
-      <hr style={{ margin: '36px 0', border: 'none', borderTop: `1px solid ${BRAND.border}` }} />
+      <hr style={{ margin: '36px 0', border: 'none', borderTop: `1px solid ${border}` }} />
       <PasswordSection hasPassword={profile.has_password} />
     </Shell>
   );
@@ -130,12 +130,12 @@ export default function PortalProfile() {
 
 function Shell({ children }) {
   return (
-    <div style={{ minHeight: '100vh', background: BRAND.eggshell, fontFamily: 'var(--font-sans)' }}>
+    <div style={{ minHeight: '100vh', background: parchment, fontFamily: 'var(--font-sans)' }}>
       <div style={{
         maxWidth: 600, margin: '0 auto', padding: '40px 20px',
-        background: BRAND.white, minHeight: '100vh',
-        borderLeft: `1px solid ${BRAND.border}`,
-        borderRight: `1px solid ${BRAND.border}`,
+        background: parchment, minHeight: '100vh',
+        borderLeft: `1px solid ${border}`,
+        borderRight: `1px solid ${border}`,
       }}>
         {children}
       </div>
@@ -146,7 +146,7 @@ function Shell({ children }) {
 function Field({ label, children }) {
   return (
     <div style={{ marginBottom: 18 }}>
-      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: BRAND.brownLight, marginBottom: 6 }}>
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: inkLight, marginBottom: 6 }}>
         {label}
       </label>
       {children}
@@ -158,10 +158,10 @@ const inputStyle = {
   width: '100%',
   padding: '10px 14px',
   borderRadius: 8,
-  border: `1px solid ${BRAND.border}`,
+  border: `1px solid ${border}`,
   fontSize: 14,
-  color: BRAND.text,
-  background: BRAND.eggshell,
+  color: ink,
+  background: parchment,
   outline: 'none',
   fontFamily: 'var(--font-sans)',
   resize: 'vertical',
@@ -172,8 +172,8 @@ function btnStyle(disabled) {
     padding: '10px 28px',
     borderRadius: 8,
     border: 'none',
-    background: BRAND.brown,
-    color: BRAND.white,
+    background: ink,
+    color: parchment,
     fontSize: 14,
     fontWeight: 600,
     cursor: disabled ? 'wait' : 'pointer',
@@ -221,10 +221,10 @@ function PasswordSection({ hasPassword }) {
 
   return (
     <div>
-      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 18, color: BRAND.brown, marginBottom: 6 }}>
+      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 18, color: ink, marginBottom: 6 }}>
         {hasPassword ? 'Change Password' : 'Set a Password'}
       </h2>
-      <p style={{ color: BRAND.textMuted, fontSize: 13, marginBottom: 20 }}>
+      <p style={{ color: inkMuted, fontSize: 13, marginBottom: 20 }}>
         {hasPassword
           ? 'Update your portal login password.'
           : 'Set a password so you can log in without an email link.'}
@@ -272,7 +272,7 @@ function PasswordSection({ hasPassword }) {
             />
           </Field>
 
-          {pwError && <p style={{ color: BRAND.burgundy, fontSize: 13, marginBottom: 12 }}>{pwError}</p>}
+          {pwError && <p style={{ color: crimson, fontSize: 13, marginBottom: 12 }}>{pwError}</p>}
 
           <button type="submit" disabled={saving} style={btnStyle(saving)}>
             {saving ? 'Saving…' : hasPassword ? 'Update Password' : 'Set Password'}

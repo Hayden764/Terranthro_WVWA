@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BRAND, TOKENS, alpha } from '../../styles/tokens';
+import { alpha, border, crimson, parchment, TOKENS } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { MONTH_ABBR } from '../../config/climateConfig';
 import { TOPO_LAYER_TYPES } from '../../config/topographyConfig';
@@ -128,7 +128,7 @@ export default function DataLayerPanel({
               <div style={{ marginTop: 6, padding: '4px 2px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <span style={{ fontSize: 10, color: GLASS.textDim }}>Month</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: BRAND.burgundy, background: GLASS.accentDim, padding: '1px 8px', borderRadius: 4 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: crimson, background: GLASS.accentDim, padding: '1px 8px', borderRadius: 4 }}>
                     {MONTH_ABBR[currentMonth - 1]}
                   </span>
                 </div>
@@ -138,7 +138,7 @@ export default function DataLayerPanel({
                   max={12}
                   value={currentMonth}
                   onChange={e => onMonthChange(Number(e.target.value))}
-                  style={{ width: '100%', accentColor: BRAND.burgundy, cursor: 'pointer', height: 4 }}
+                  style={{ width: '100%', accentColor: crimson, cursor: 'pointer', height: 4 }}
                 />
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: GLASS.textMuted, marginTop: 2 }}>
                   <span>Jan</span><span>Apr</span><span>Jul</span><span>Oct</span><span>Dec</span>

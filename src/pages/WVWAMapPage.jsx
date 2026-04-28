@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import WVWAMap, { LISTING_FILTER_MODES } from '../components/WVWAMap';
 import ExplorerSidebar from '../components/ExplorerSidebar';
-import { BRAND, TOKENS, alpha } from '../styles/tokens';
+import { alpha, border, crimson, ink, parchment, TOKENS } from '../styles/tokens';
 
 const UI = {
   taglineText:      alpha(TOKENS.parchment, 0.5),
@@ -21,7 +21,7 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
       width: isMobile ? '100%' : 300,
       height: '100%',
       flexShrink: 0,
-      background: BRAND.brownDark,
+      background: inkDark,
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -42,7 +42,7 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
         <div style={{
           fontSize: 28,
           fontWeight: 700,
-          color: BRAND.eggshell,
+          color: parchment,
           letterSpacing: '-0.01em',
           lineHeight: 1.15,
           fontFamily: 'var(--font-display)',
@@ -52,7 +52,7 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
         <div style={{
           fontSize: 20,
           fontWeight: 400,
-          color: BRAND.eggshell,
+          color: parchment,
           letterSpacing: '0.04em',
           lineHeight: 1.3,
           fontFamily: 'var(--font-display)',
@@ -64,7 +64,7 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
       </div>
 
       {/* Burgundy rule */}
-      <div style={{ width: 40, height: 2, background: BRAND.burgundy, borderRadius: 1, marginBottom: 20 }} />
+      <div style={{ width: 40, height: 2, background: crimson, borderRadius: 1, marginBottom: 20 }} />
 
       {/* Tagline */}
       <div style={{
@@ -88,9 +88,9 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
           width: '100%',
           padding: '13px 0',
           background: 'transparent',
-          border: `1.5px solid ${mapReady ? BRAND.eggshell : UI.btnBorderIdle}`,
+          border: `1.5px solid ${mapReady ? parchment : UI.btnBorderIdle}`,
           borderRadius: 4,
-          color: mapReady ? BRAND.eggshell : UI.btnTextIdle,
+          color: mapReady ? parchment : UI.btnTextIdle,
           fontSize: 13,
           fontWeight: 600,
           letterSpacing: '0.1em',
@@ -152,12 +152,12 @@ export default function WVWAMapPage() {
   useEffect(() => { if (isMobile && selectedAva) setSidebarOpen(true); }, [isMobile, selectedAva]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', overflow: 'hidden', background: BRAND.eggshell, fontFamily: 'var(--font-sans)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', overflow: 'hidden', background: parchment, fontFamily: 'var(--font-sans)' }}>
 
       {/* ── Slim header ─────────────────────────────────────────────── */}
       <header style={{
         height: 48,
-        background: BRAND.brown,
+        background: ink,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -241,8 +241,8 @@ export default function WVWAMapPage() {
               style={{
                 position: 'absolute', top: 12, left: 12, zIndex: 100,
                 width: 42, height: 42,
-                background: BRAND.brown, border: 'none', borderRadius: 10,
-                color: BRAND.eggshell, fontSize: 20,
+                background: ink, border: 'none', borderRadius: 10,
+                color: parchment, fontSize: 20,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', boxShadow: `0 2px 8px ${UI.fabShadow}`,
                 fontFamily: 'var(--font-sans)', lineHeight: 1,

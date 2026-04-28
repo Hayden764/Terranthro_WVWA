@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { LISTING_CATEGORIES } from './WVWAMap';
-import { BRAND, TOKENS, alpha, mix } from '../styles/tokens';
+import { alpha, border, crimson, ink, mix, parchment, TOKENS } from '../styles/tokens';
 
 // Category order for display
 const CATEGORY_ORDER = ['winery', 'tasting', 'restaurant', 'hotel', 'other'];
@@ -21,7 +21,7 @@ const UI = {
   overlayBg: alpha('black', 0.55),
   modalShadow: alpha('black', 0.55),
   closeHoverBg: alpha(TOKENS.parchment, 0.15),
-  rowNumberText: alpha(BRAND.white, 0.95),
+  rowNumberText: alpha(parchment, 0.95),
   rowNumberBorder: alpha(TOKENS.parchment, 0.25),
   rowNumberShadow: alpha('black', 0.3),
   rowTitleIdle: alpha(TOKENS.parchment, 0.88),
@@ -130,11 +130,11 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
                 margin: 0,
                 fontSize: 20,
                 fontWeight: 700,
-                color: BRAND.eggshell,
+                color: parchment,
                 fontFamily: 'var(--font-display)',
                 letterSpacing: '-0.01em',
               }}>
-                <span style={{ color: BRAND.burgundy }}>W</span>illamette Valley Directory
+                <span style={{ color: crimson }}>W</span>illamette Valley Directory
               </h2>
               <p style={{ margin: '3px 0 0', fontSize: 12, color: UI.textDim }}>
                 {listings.length} places · click any listing to locate on map
@@ -185,12 +185,12 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
                 borderRadius: 10,
                 padding: '10px 12px 10px 36px',
                 fontSize: 13,
-                color: BRAND.eggshell,
+                color: parchment,
                 outline: 'none',
                 fontFamily: 'var(--font-sans)',
                 transition: 'border-color 0.15s',
               }}
-              onFocus={e => e.target.style.borderColor = BRAND.burgundy}
+              onFocus={e => e.target.style.borderColor = crimson}
               onBlur={e => e.target.style.borderColor = UI.panelBorderLight}
             />
             {query && (
@@ -214,7 +214,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
 
           {/* Category tabs */}
           <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12 }}>
-            {[{ key: 'all', label: 'All', color: BRAND.brown }, ...CATEGORY_ORDER.map(k => ({ key: k, ...LISTING_CATEGORIES[k] }))].map(tab => {
+            {[{ key: 'all', label: 'All', color: ink }, ...CATEGORY_ORDER.map(k => ({ key: k, ...LISTING_CATEGORIES[k] }))].map(tab => {
               const isActive = activeTab === tab.key;
               const count = tab.key === 'all'
                 ? (query ? filtered.length : counts.all)
@@ -385,7 +385,7 @@ function ListingRow({ listing, cat, query, onClick }) {
           <span style={{
             fontSize: 13,
             fontWeight: 600,
-            color: hovered ? BRAND.eggshell : UI.rowTitleIdle,
+            color: hovered ? parchment : UI.rowTitleIdle,
             lineHeight: 1.3,
           }}>
             <Highlight text={listing.title} query={query} color={cat.color} />

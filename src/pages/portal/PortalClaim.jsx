@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BRAND, TOKENS } from '../../styles/tokens';
+import { border, ink, parchment, TOKENS } from '../../styles/tokens';
 import { apiJson, apiPost } from '../../lib/api';
 
 export default function PortalClaim() {
@@ -61,18 +61,18 @@ export default function PortalClaim() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: BRAND.eggshell, fontFamily: 'var(--font-sans)' }}>
+    <div style={{ minHeight: '100vh', background: parchment, fontFamily: 'var(--font-sans)' }}>
       <div style={{
         maxWidth: 700, margin: '0 auto', padding: '40px 20px',
-        background: BRAND.white, minHeight: '100vh',
-        borderLeft: `1px solid ${BRAND.border}`, borderRight: `1px solid ${BRAND.border}`,
+        background: parchment, minHeight: '100vh',
+        borderLeft: `1px solid ${border}`, borderRight: `1px solid ${border}`,
       }}>
-        <Link to="/portal/dashboard" style={{ color: BRAND.brownLight, fontSize: 13 }}>← Dashboard</Link>
+        <Link to="/portal/dashboard" style={{ color: inkLight, fontSize: 13 }}>← Dashboard</Link>
 
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: BRAND.brown, margin: '16px 0 8px' }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: ink, margin: '16px 0 8px' }}>
           Claim a Vineyard
         </h1>
-        <p style={{ color: BRAND.textMuted, fontSize: 13, marginBottom: 24 }}>
+        <p style={{ color: inkMuted, fontSize: 13, marginBottom: 24 }}>
           Search for an existing unlinked vineyard parcel, or request to add a new one.
         </p>
 
@@ -85,13 +85,13 @@ export default function PortalClaim() {
             placeholder="Search by vineyard or owner name…"
             style={{
               flex: 1, padding: '10px 14px', borderRadius: 8,
-              border: `1px solid ${BRAND.border}`, fontSize: 14,
-              color: BRAND.text, background: BRAND.eggshell, outline: 'none',
+              border: `1px solid ${border}`, fontSize: 14,
+              color: ink, background: parchment, outline: 'none',
             }}
           />
           <button type="submit" disabled={loading} style={{
             padding: '10px 20px', borderRadius: 8, border: 'none',
-            background: BRAND.brown, color: BRAND.white, fontSize: 14,
+            background: ink, color: parchment, fontSize: 14,
             fontWeight: 600, cursor: 'pointer',
           }}>
             Search
@@ -102,20 +102,20 @@ export default function PortalClaim() {
         {searched && (
           <div style={{ marginBottom: 32 }}>
             {loading ? (
-              <p style={{ color: BRAND.textMuted, fontSize: 13 }}>Searching…</p>
+              <p style={{ color: inkMuted, fontSize: 13 }}>Searching…</p>
             ) : results.length === 0 ? (
-              <p style={{ color: BRAND.textMuted, fontSize: 13 }}>No unlinked parcels found matching "{search}".</p>
+              <p style={{ color: inkMuted, fontSize: 13 }}>No unlinked parcels found matching "{search}".</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {results.map((r) => (
                   <div key={r.id} style={{
                     padding: '14px 16px', borderRadius: 8,
-                    border: `1px solid ${BRAND.border}`, background: BRAND.eggshell,
+                    border: `1px solid ${border}`, background: parchment,
                   }}>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: BRAND.text }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: ink }}>
                       {r.vineyard_name || 'Unnamed Parcel'}
                     </div>
-                    <div style={{ fontSize: 12, color: BRAND.textMuted, marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: inkMuted, marginTop: 2 }}>
                       {r.nested_ava || r.ava_name || '—'} · {Number(r.acres || 0).toFixed(1)} acres
                       {r.situs_city && ` · ${r.situs_city}`}
                     </div>
@@ -133,14 +133,14 @@ export default function PortalClaim() {
                           rows={2}
                           style={{
                             width: '100%', padding: '6px 10px', borderRadius: 6,
-                            border: `1px solid ${BRAND.border}`, fontSize: 12,
+                            border: `1px solid ${border}`, fontSize: 12,
                             fontFamily: 'var(--font-sans)', resize: 'vertical',
                             marginBottom: 6,
                           }}
                         />
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => handleClaim(r.id)} style={smallBtn}>Submit Claim</button>
-                          <button onClick={() => { setClaiming(null); setClaimNotes(''); }} style={{ ...smallBtn, background: 'transparent', color: BRAND.textMuted, border: `1px solid ${BRAND.border}` }}>
+                          <button onClick={() => { setClaiming(null); setClaimNotes(''); }} style={{ ...smallBtn, background: 'transparent', color: inkMuted, border: `1px solid ${border}` }}>
                             Cancel
                           </button>
                         </div>
@@ -159,10 +159,10 @@ export default function PortalClaim() {
 
         {/* New vineyard */}
         <div style={{
-          background: BRAND.eggshell, borderRadius: 10, padding: '20px 16px',
-          border: `1px solid ${BRAND.border}`,
+          background: parchment, borderRadius: 10, padding: '20px 16px',
+          border: `1px solid ${border}`,
         }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: BRAND.brown, marginBottom: 8 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: ink, marginBottom: 8 }}>
             Don't see your vineyard?
           </h2>
 
@@ -206,7 +206,7 @@ export default function PortalClaim() {
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="submit" style={smallBtn}>Submit</button>
-                <button type="button" onClick={() => setShowNew(false)} style={{ ...smallBtn, background: 'transparent', color: BRAND.textMuted, border: `1px solid ${BRAND.border}` }}>
+                <button type="button" onClick={() => setShowNew(false)} style={{ ...smallBtn, background: 'transparent', color: inkMuted, border: `1px solid ${border}` }}>
                   Cancel
                 </button>
               </div>
@@ -220,15 +220,15 @@ export default function PortalClaim() {
 
 const smallBtn = {
   padding: '6px 16px', borderRadius: 6, border: 'none',
-  background: BRAND.brown, color: BRAND.white, fontSize: 12,
+  background: ink, color: parchment, fontSize: 12,
   fontWeight: 600, cursor: 'pointer',
 };
 
-const labelStyle = { display: 'block', fontSize: 12, color: BRAND.textMuted, marginBottom: 4 };
+const labelStyle = { display: 'block', fontSize: 12, color: inkMuted, marginBottom: 4 };
 
 const inputStyle = {
   width: '100%', padding: '8px 12px', borderRadius: 6,
-  border: `1px solid ${BRAND.border}`, fontSize: 13,
-  fontFamily: 'var(--font-sans)', color: BRAND.text,
-  background: BRAND.white, resize: 'vertical',
+  border: `1px solid ${border}`, fontSize: 13,
+  fontFamily: 'var(--font-sans)', color: ink,
+  background: parchment, resize: 'vertical',
 };

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { BRAND, TOKENS, alpha } from '../../styles/tokens';
+import { alpha, border, crimson, ink, parchment, TOKENS } from '../../styles/tokens';
 import { apiFetch } from '../../lib/api';
 
 export default function PortalVerify() {
@@ -38,26 +38,26 @@ export default function PortalVerify() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: BRAND.eggshell,
+      background: parchment,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       fontFamily: 'var(--font-sans)',
     }}>
       <div style={{
-        background: BRAND.white,
+        background: parchment,
         borderRadius: 12,
         padding: '48px 40px',
         width: '100%',
         maxWidth: 420,
         boxShadow: `0 4px 24px ${alpha(TOKENS.ink, 0.1)}`,
-        border: `1px solid ${BRAND.border}`,
+        border: `1px solid ${border}`,
         textAlign: 'center',
       }}>
         {status === 'verifying' && (
           <>
             <div style={{ fontSize: 32, marginBottom: 16 }}>⏳</div>
-            <p style={{ color: BRAND.textMuted }}>Verifying your sign-in link…</p>
+            <p style={{ color: inkMuted }}>Verifying your sign-in link…</p>
           </>
         )}
         {status === 'success' && (
@@ -69,8 +69,8 @@ export default function PortalVerify() {
         {status === 'error' && (
           <>
             <div style={{ fontSize: 32, marginBottom: 16 }}>✗</div>
-            <p style={{ color: BRAND.burgundy, marginBottom: 16 }}>{errorMsg}</p>
-            <a href="/portal" style={{ color: BRAND.brown, fontWeight: 500 }}>
+            <p style={{ color: crimson, marginBottom: 16 }}>{errorMsg}</p>
+            <a href="/portal" style={{ color: ink, fontWeight: 500 }}>
               Back to sign in
             </a>
           </>

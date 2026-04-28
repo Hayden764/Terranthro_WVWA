@@ -1,6 +1,6 @@
 import { MONTH_ABBR } from '../config/climateConfig';
 import { TOPO_LAYER_TYPES } from '../config/topographyConfig';
-import { BRAND } from '../styles/tokens';
+import { border, crimson, ink, parchment } from '../styles/tokens';
 
 const CLIMATE_LAYERS = [
   { id: 'tdmean', label: 'Mean Temperature', sub: 'PRISM 30-yr normals' },
@@ -21,23 +21,23 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
       top: 16,
       right: 16,
       width: 260,
-      background: BRAND.eggshell,
+      background: parchment,
       borderRadius: 12,
       boxShadow: '0 4px 24px rgba(46,34,26,0.14), 0 1px 4px rgba(46,34,26,0.08)',
-      border: `1px solid ${BRAND.border}`,
+      border: `1px solid ${border}`,
       overflow: 'hidden',
       fontFamily: 'var(--font-sans)',
       zIndex: 10,
     }}>
       {/* Header */}
       <div style={{
-        background: BRAND.brown,
+        background: ink,
         padding: '12px 16px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
       }}>
-        <span style={{ color: BRAND.eggshell, fontWeight: 600, fontSize: 13, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+        <span style={{ color: parchment, fontWeight: 600, fontSize: 13, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
           Data Layers
         </span>
       </div>
@@ -45,7 +45,7 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
       <div style={{ padding: '12px 0' }}>
         {/* Climate section */}
         <div style={{ padding: '4px 16px 8px' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: BRAND.textMuted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: inkMuted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
             Climate
           </div>
           {CLIMATE_LAYERS.map(layer => (
@@ -57,15 +57,15 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
                 textAlign: 'left',
                 padding: '8px 10px',
                 borderRadius: 8,
-                border: activeLayer === layer.id ? `1.5px solid ${BRAND.burgundy}` : '1.5px solid transparent',
-                background: activeLayer === layer.id ? BRAND.cream : 'transparent',
+                border: activeLayer === layer.id ? `1.5px solid ${crimson}` : '1.5px solid transparent',
+                background: activeLayer === layer.id ? parchment : 'transparent',
                 cursor: 'pointer',
                 marginBottom: 2,
                 transition: 'all 0.15s',
               }}
             >
-              <div style={{ fontSize: 13, fontWeight: 500, color: BRAND.text }}>{layer.label}</div>
-              <div style={{ fontSize: 11, color: BRAND.textMuted, marginTop: 1 }}>{layer.sub}</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: ink }}>{layer.label}</div>
+              <div style={{ fontSize: 11, color: inkMuted, marginTop: 1 }}>{layer.sub}</div>
             </button>
           ))}
 
@@ -73,8 +73,8 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
           {isClimate && (
             <div style={{ marginTop: 8, padding: '0 2px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 11, color: BRAND.textMuted }}>Month</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: BRAND.burgundy }}>{MONTH_ABBR[currentMonth - 1]}</span>
+                <span style={{ fontSize: 11, color: inkMuted }}>Month</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: crimson }}>{MONTH_ABBR[currentMonth - 1]}</span>
               </div>
               <input
                 type="range"
@@ -82,20 +82,20 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
                 max={12}
                 value={currentMonth}
                 onChange={e => onMonthChange(Number(e.target.value))}
-                style={{ width: '100%', accentColor: BRAND.burgundy, cursor: 'pointer' }}
+                style={{ width: '100%', accentColor: crimson, cursor: 'pointer' }}
               />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: BRAND.textMuted, marginTop: 2 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: inkMuted, marginTop: 2 }}>
                 <span>Jan</span><span>Apr</span><span>Jul</span><span>Oct</span><span>Dec</span>
               </div>
             </div>
           )}
         </div>
 
-        <div style={{ height: 1, background: BRAND.border, margin: '4px 0' }} />
+        <div style={{ height: 1, background: border, margin: '4px 0' }} />
 
         {/* Topography section */}
         <div style={{ padding: '8px 16px 4px' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: BRAND.textMuted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: inkMuted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
             Topography
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -108,12 +108,12 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
                   flex: 1,
                   padding: '7px 4px',
                   borderRadius: 7,
-                  border: activeLayer === layer.id ? `1.5px solid ${BRAND.burgundy}` : `1.5px solid ${BRAND.border}`,
-                  background: activeLayer === layer.id ? BRAND.cream : BRAND.eggshell,
+                  border: activeLayer === layer.id ? `1.5px solid ${crimson}` : `1.5px solid ${border}`,
+                  background: activeLayer === layer.id ? parchment : parchment,
                   cursor: 'pointer',
                   fontSize: 11,
                   fontWeight: 500,
-                  color: activeLayer === layer.id ? BRAND.burgundy : BRAND.brownLight,
+                  color: activeLayer === layer.id ? crimson : inkLight,
                   transition: 'all 0.15s',
                   textAlign: 'center',
                 }}

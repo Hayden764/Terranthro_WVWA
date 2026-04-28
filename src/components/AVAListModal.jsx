@@ -1,4 +1,4 @@
-import { BRAND, TOKENS, alpha } from '../styles/tokens';
+import { alpha, border, crimson, ink, parchment, TOKENS } from '../styles/tokens';
 import { WV_SUB_AVAS } from '../config/topographyConfig';
 
 // UI constants for modal styling
@@ -31,18 +31,18 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          background: BRAND.eggshell,
+          background: parchment,
           borderRadius: 16,
           width: 420,
           maxHeight: '80vh',
           overflow: 'hidden',
           boxShadow: `0 20px 60px ${UI.shadowDark}, 0 4px 16px ${UI.shadowLight}`,
-          border: `1px solid ${BRAND.border}`,
+          border: `1px solid ${border}`,
         }}
       >
         {/* Modal header */}
         <div style={{
-          background: BRAND.brown,
+          background: ink,
           padding: '20px 24px',
           display: 'flex',
           alignItems: 'center',
@@ -50,7 +50,7 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
         }}>
           <div>
             <div style={{
-              color: BRAND.eggshell,
+              color: parchment,
               fontSize: 18,
               fontWeight: 700,
               fontFamily: 'var(--font-display)',
@@ -70,7 +70,7 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
             style={{
               background: UI.closeBtn,
               border: 'none',
-              color: BRAND.eggshell,
+              color: parchment,
               width: 32,
               height: 32,
               borderRadius: 8,
@@ -110,8 +110,8 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
                 marginBottom: 2,
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.background = BRAND.cream;
-                e.currentTarget.style.borderColor = BRAND.border;
+                e.currentTarget.style.background = parchment;
+                e.currentTarget.style.borderColor = border;
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.background = 'transparent';
@@ -123,8 +123,8 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
                 width: 32,
                 height: 32,
                 borderRadius: 8,
-                background: i % 2 === 0 ? BRAND.burgundy : BRAND.brown,
-                color: BRAND.eggshell,
+                background: i % 2 === 0 ? crimson : ink,
+                color: parchment,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -138,14 +138,14 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
                 <div style={{
                   fontSize: 14,
                   fontWeight: 600,
-                  color: BRAND.text,
+                  color: ink,
                 }}>
                   {ava.name}
                 </div>
               </div>
               {/* Arrow */}
               <div style={{
-                color: BRAND.textMuted,
+                color: inkMuted,
                 fontSize: 16,
                 flexShrink: 0,
               }}>

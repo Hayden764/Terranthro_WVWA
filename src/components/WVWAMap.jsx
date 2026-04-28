@@ -137,6 +137,13 @@ const UI = {
   // audit-ignore-end
 };
 
+// MapLibre paint properties require concrete color values, not CSS var() tokens.
+const MAP_PARCHMENT = '#EDE2D4';
+const MAP_AMBER = '#C28A3A';
+const toMapLibreColor = (color, fallback) => (
+  typeof color === 'string' && color.startsWith('var(') ? fallback : color
+);
+
 export const LISTING_FILTER_MODES = {
   allWineries: 'allWineries',
   withVineyardPolygons: 'withVineyardPolygons',
@@ -2121,7 +2128,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         source: 'wine-regions',
         paint: {
           'circle-radius': 3,
-          'circle-color': parchment,
+          'circle-color': MAP_PARCHMENT,
           'circle-opacity': 0.85,
           'circle-stroke-width': 0,
         },
@@ -2153,7 +2160,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           'symbol-placement': 'point',
         },
         paint: {
-          'text-color': parchment,
+          'text-color': MAP_PARCHMENT,
           'text-opacity': 0.9,
           'text-halo-color': 'rgba(0,0,0,0.5)',
           'text-halo-width': 1,
@@ -2180,7 +2187,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         type: 'line',
         source: 'wine-region-lines',
         paint: {
-          'line-color': parchment,
+          'line-color': MAP_PARCHMENT,
           'line-opacity': 0.35,
           'line-width': 1,
         },
@@ -2672,7 +2679,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             type: 'fill',
             source: `ava-${ava.slug}`,
             paint: {
-              'fill-color': ava.color,
+              'fill-color': toMapLibreColor(ava.color, MAP_AMBER),
               'fill-opacity': 0,
             },
           });

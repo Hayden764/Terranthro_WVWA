@@ -1,3 +1,4 @@
+import { TOKENS, alpha } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { TOPO_LAYER_TYPES } from '../../config/topographyConfig';
 
@@ -7,8 +8,8 @@ import { TOPO_LAYER_TYPES } from '../../config/topographyConfig';
  */
 
 const CARD = {
-  background: 'rgba(250,247,242,0.06)',
-  border: `1px solid rgba(250,247,242,0.08)`,
+  background: alpha(TOKENS.parchment, 0.06),
+  border: `1px solid ${alpha(TOKENS.parchment, 0.08)}`,
   borderRadius: 10,
   padding: '10px 12px',
   marginBottom: 8,
@@ -23,8 +24,7 @@ const LABEL = {
   marginBottom: 6,
 };
 
-/* ─── Colormaps for climate layers ─────────────────────────────────── */
-const CLIMATE_RAMPS = {
+/* ─── Colormaps for climate layers ─────────────────────────────────── */// audit-ignore-start climate-rampsconst CLIMATE_RAMPS = {
   tdmean: {
     label: 'Mean Temperature',
     gradient: 'linear-gradient(to right, #0d0887, #46039f, #7201a8, #9c179e, #bd3786, #d8576b, #ed7953, #fb9f3a, #fdca26, #f0f921)',
@@ -32,6 +32,7 @@ const CLIMATE_RAMPS = {
     max: '26 °C',
   },
 };
+// audit-ignore-end
 
 export default function ScalePanel({ activeLayer, topoStats }) {
   if (!activeLayer) {
@@ -125,7 +126,7 @@ export default function ScalePanel({ activeLayer, topoStats }) {
                   borderRadius: 3,
                   background: color,
                   flexShrink: 0,
-                  border: `1px solid rgba(250,247,242,0.15)`,
+                  border: `1px solid ${alpha(TOKENS.parchment, 0.15)}`,
                 }} />
                 <span style={{ fontSize: 11, color: GLASS.text }}>{realLabels[i] || ''}</span>
               </div>

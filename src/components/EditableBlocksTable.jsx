@@ -14,7 +14,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiPost } from '../lib/api';
-import { BRAND } from '../config/brandColors';
+import { BRAND, TOKENS, alpha } from '../styles/tokens';
+
+const UI = {
+  dirtyRowBg: alpha(TOKENS.crimson, 0.04),
+  successText: TOKENS.success,
+  borderFaded: (color) => alpha(color, 0.09),
+  borderVeryFaded: (color) => alpha(color, 0.25),
+};
 
 const COLUMNS = [
   { key: 'block_name',   label: 'Block',      type: 'text',   width: '14%' },
@@ -189,9 +196,9 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                 <tr
                   key={rowKey(block)}
                   style={{
-                    borderBottom: isLast ? 'none' : `1px solid ${BRAND.border}18`,
+                    borderBottom: isLast ? 'none' : `1px solid ${UI.borderFaded(BRAND.border)}`,
                     background: isDirty
-                      ? 'rgba(142, 21, 55, 0.04)'
+                      ? UI.dirtyRowBg
                       : 'transparent',
                     cursor: 'default',
                     transition: 'background 0.15s',
@@ -214,7 +221,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                               : `2px solid transparent`,
                             background: 'transparent',
                             fontSize: 13,
-                            fontFamily: "'Inter', sans-serif",
+                            fontFamily: 'var(--font-sans)',
                             color: BRAND.text,
                             outline: 'none',
                             boxSizing: 'border-box',
@@ -256,7 +263,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
 
             {/* New (unsaved) rows — always editable */}
             {newRows.map((row) => (
-              <tr key={row._tmpId} style={{ background: 'rgba(142, 21, 55, 0.04)', borderBottom: `1px solid ${BRAND.border}18` }}>
+              <tr key={row._tmpId} style={{ background: UI.dirtyRowBg, borderBottom: `1px solid ${UI.borderFaded(BRAND.border)}` }}>
                 {COLUMNS.map((col) => (
                   <td key={col.key} style={{ padding: '0', verticalAlign: 'middle' }}>
                     {col.readonly ? (
@@ -269,9 +276,9 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                         placeholder={col.label}
                         style={{
                           width: '100%', padding: '8px 10px',
-                          border: 'none', borderBottom: `2px solid ${BRAND.burgundy}40`,
+                          border: 'none', borderBottom: `2px solid ${UI.borderVeryFaded(BRAND.burgundy)}`,
                           background: 'transparent', fontSize: 13,
-                          fontFamily: "'Inter', sans-serif", color: BRAND.text,
+                          fontFamily: 'var(--font-sans)', color: BRAND.text,
                           outline: 'none', boxSizing: 'border-box',
                         }}
                       />
@@ -310,7 +317,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {status === 'success' && (
-              <span style={{ fontSize: 12, color: '#3a5a1f', fontWeight: 600 }}>✓ Submitted</span>
+              <span style={{ fontSize: 12, color: UI.successText, fontWeight: 600 }}>✓ Submitted</span>
             )}
             {status === 'error' && (
               <span style={{ fontSize: 12, color: BRAND.burgundy }}>Error — try again</span>
@@ -359,7 +366,7 @@ const addRowBtnStyle = {
   cursor: 'pointer',
   fontSize: 12,
   fontWeight: 600,
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: 'var(--font-sans)',
   whiteSpace: 'nowrap',
 };
 
@@ -368,11 +375,11 @@ const primaryBtnStyle = {
   borderRadius: 6,
   border: 'none',
   background: BRAND.brown,
-  color: '#fff',
+  color: BRAND.white,
   cursor: 'pointer',
   fontSize: 13,
   fontWeight: 600,
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: 'var(--font-sans)',
 };
 
 const secondaryBtnStyle = {
@@ -383,5 +390,5 @@ const secondaryBtnStyle = {
   color: BRAND.textMuted,
   cursor: 'pointer',
   fontSize: 13,
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: 'var(--font-sans)',
 };

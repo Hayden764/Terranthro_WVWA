@@ -23,8 +23,30 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
+import { BRAND, TOKENS, alpha, mix } from '../styles/tokens';
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
+
+// UI constants for map layer styling
+const UI = {
+  parcelFill: TOKENS.success,
+  parcelHighlight: TOKENS.danger,
+  parcelStrokeBase: mix(TOKENS.success, 60, TOKENS.ink),
+  parcelLabelText: BRAND.white,
+  parcelLabelHalo: alpha('black', 0.65),
+  popupTitle: TOKENS.ink,
+  popupSub: BRAND.textMuted,
+  popupMeta: BRAND.text,
+  editOverlayBg: alpha(TOKENS.ink, 0.88),
+  editOverlayText: alpha(TOKENS.parchment, 0.88),
+  splitOverlayBg: mix(TOKENS.electricBlue, 18, TOKENS.ink),
+  splitOverlayText: alpha(TOKENS.parchment, 0.88),
+  addOverlayBg: mix(TOKENS.success, 18, TOKENS.ink),
+  addOverlayText: alpha(TOKENS.parchment, 0.88),
+  overlayTitle: BRAND.white,
+  cancelBorder: alpha(BRAND.white, 0.25),
+  cancelText: alpha(TOKENS.parchment, 0.88),
+};
 
 // MapLibre v4+ requires ["literal", [...]] for array values inside expressions.
 // @mapbox/mapbox-gl-draw's default theme uses bare arrays in line-dasharray match
@@ -166,7 +188,7 @@ export default function PortalVineyardMap({
         source: 'parcels',
         filter: ['==', ['get', 'highlighted'], 0],
         paint: {
-          'fill-color': '#4CAF50',
+          'fill-color': UI.parcelFill,
           'fill-opacity': 0.25,
         },
       });
@@ -178,7 +200,7 @@ export default function PortalVineyardMap({
         source: 'parcels',
         filter: ['==', ['get', 'highlighted'], 1],
         paint: {
-          'fill-color': '#8E1537',
+          'fill-color': UI.parcelHighlight,
           'fill-opacity': 0.45,
         },
       });
@@ -191,8 +213,8 @@ export default function PortalVineyardMap({
         paint: {
           'line-color': [
             'case',
-            ['==', ['get', 'highlighted'], 1], '#8E1537',
-            '#2d6a2e',
+            ['==', ['get', 'highlighted'], 1], UI.parcelHighlight,
+            UI.parcelStrokeBase,
           ],
           'line-width': [
             'case',
@@ -215,8 +237,8 @@ export default function PortalVineyardMap({
           'text-anchor': 'center',
         },
         paint: {
-          'text-color': '#FFFFFF',
-          'text-halo-color': 'rgba(0,0,0,0.65)',
+          'text-color': UI.parcelLabelText,
+          'text-halo-color': UI.parcelLabelHalo,
           'text-halo-width': 1.5,
         },
       });
@@ -264,9 +286,9 @@ export default function PortalVineyardMap({
           .setLngLat(e.lngLat)
           .setHTML(`
             <div style="font-family:'Inter',sans-serif;min-width:160px;">
-              <div style="font-weight:600;font-size:13px;color:#2E221A;margin-bottom:2px;">${name}</div>
-              ${showSub ? `<div style="font-size:11px;color:#6B5344;margin-bottom:4px;">${parcelLabel}</div>` : ''}
-              ${acres ? `<div style="font-size:12px;color:#8A7968;">${acres} acres</div>` : ''}
+              <div style="font-weight:500;font-size:13px;color:${UI.popupTitle};margin-bottom:2px;">${name}</div>
+              ${showSub ? `<div style="font-size:11px;color:${UI.popupSub};margin-bottom:4px;">${parcelLabel}</div>` : ''}
+              ${acres ? `<div style="font-size:12px;color:${UI.popupMeta};">${acres} acres</div>` : ''}
             </div>
           `)
           .addTo(map);
@@ -460,14 +482,14 @@ export default function PortalVineyardMap({
     return (
       <div style={{
         height,
-        background: '#F0EBE3',
+        background: BRAND.cream,
         borderRadius: 8,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: '#8A7968',
+        color: BRAND.textMuted,
         fontSize: 13,
-        border: '1px solid #E0D8CE',
+        border: `1px solid ${BRAND.border}`,
         ...wrapperStyle,
       }}>
         No geometry available for map display.
@@ -483,7 +505,7 @@ export default function PortalVineyardMap({
           height: '100%',
           borderRadius: (editParcelId || splitParcelId || addMode) ? 0 : 8,
           overflow: 'hidden',
-          border: '1px solid #E0D8CE',
+          border: `1px solid ${BRAND.border}`,
         }}
       />
 
@@ -491,14 +513,14 @@ export default function PortalVineyardMap({
       {editParcelId && (
         <div style={{
           position: 'absolute', bottom: 0, left: 0, right: 0,
-          background: 'rgba(30, 20, 14, 0.88)',
+          background: UI.editOverlayBg,
           backdropFilter: 'blur(4px)',
           padding: '12px 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
           zIndex: 10,
         }}>
-          <span style={{ color: '#e8d8c4', fontSize: 12, lineHeight: 1.4 }}>
-            <strong style={{ color: '#fff' }}>Editing geometry</strong> — drag vertices to reshape the parcel boundary
+          <span style={{ color: UI.editOverlayText, fontSize: 12, lineHeight: 1.4 }}>
+            <strong style={{ color: UI.overlayTitle }}>Editing geometry</strong> — drag vertices to reshape the parcel boundary
           </span>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             <button
@@ -529,14 +551,14 @@ export default function PortalVineyardMap({
       {splitParcelId && (
         <div style={{
           position: 'absolute', bottom: 0, left: 0, right: 0,
-          background: 'rgba(20, 30, 50, 0.88)',
+          background: UI.splitOverlayBg,
           backdropFilter: 'blur(4px)',
           padding: '12px 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
           zIndex: 10,
         }}>
-          <span style={{ color: '#cce0ff', fontSize: 12, lineHeight: 1.4 }}>
-            <strong style={{ color: '#fff' }}>Draw split line</strong> — click to draw a line across the parcel, then click again to finish
+          <span style={{ color: UI.splitOverlayText, fontSize: 12, lineHeight: 1.4 }}>
+            <strong style={{ color: UI.overlayTitle }}>Draw split line</strong> — click to draw a line across the parcel, then click again to finish
           </span>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             <button
@@ -565,14 +587,14 @@ export default function PortalVineyardMap({
       {addMode && (
         <div style={{
           position: 'absolute', bottom: 0, left: 0, right: 0,
-          background: 'rgba(20, 50, 20, 0.88)',
+          background: UI.addOverlayBg,
           backdropFilter: 'blur(4px)',
           padding: '12px 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
           zIndex: 10,
         }}>
-          <span style={{ color: '#ccffcc', fontSize: 12, lineHeight: 1.4 }}>
-            <strong style={{ color: '#fff' }}>Draw new parcel</strong> — click to place corners, double-click to close the polygon
+          <span style={{ color: UI.addOverlayText, fontSize: 12, lineHeight: 1.4 }}>
+            <strong style={{ color: UI.overlayTitle }}>Draw new parcel</strong> — click to place corners, double-click to close the polygon
           </span>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             <button
@@ -601,13 +623,13 @@ export default function PortalVineyardMap({
 }
 
 const editCancelBtnStyle = {
-  padding: '6px 14px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.25)',
-  background: 'transparent', color: '#e8d8c4', fontSize: 12, cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  padding: '6px 14px', borderRadius: 6, border: `1px solid ${UI.cancelBorder}`,
+  background: 'transparent', color: UI.cancelText, fontSize: 12, cursor: 'pointer',
+  fontFamily: 'var(--font-sans)',
 };
 
 const editSaveBtnStyle = {
   padding: '6px 16px', borderRadius: 6, border: 'none',
-  background: '#8E1537', color: '#fff', fontSize: 12, fontWeight: 600,
-  cursor: 'pointer', fontFamily: "'Inter', sans-serif",
+  background: BRAND.burgundy, color: 'white', fontSize: 12, fontWeight: 500,
+  cursor: 'pointer', fontFamily: 'var(--font-sans)',
 };

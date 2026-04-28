@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import lineSplit from '@turf/line-split';
 import { lineString, polygon as turfPolygon, feature as turfFeature } from '@turf/helpers';
-import { BRAND } from '../../config/brandColors';
+import { BRAND, TOKENS, alpha } from '../../styles/tokens';
 import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import EditableBlocksTable from '../../components/EditableBlocksTable';
@@ -167,7 +167,7 @@ export default function PortalVineyardDetail() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: "'Inter', sans-serif", background: BRAND.eggshell }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'var(--font-sans)', background: BRAND.eggshell }}>
 
       {/* ── Left: sticky map pane ── */}
       {(vineyard.geometry || addingParcel) && (
@@ -215,7 +215,7 @@ export default function PortalVineyardDetail() {
         </div>
 
         <h1 style={{
-          fontFamily: "'Georgia', serif", fontSize: 22, color: BRAND.brown,
+          fontFamily: 'var(--font-display)', fontSize: 22, color: BRAND.brown,
           margin: '16px 0 4px',
         }}>
           {vineyard.vineyard_name || 'Unnamed Parcel'}
@@ -267,7 +267,7 @@ export default function PortalVineyardDetail() {
           {vineyard.geometry && !pendingGeometry && (
             <div style={{ marginBottom: 16 }}>
               {geoSubmitStatus === 'success' ? (
-                <p style={{ fontSize: 13, color: '#3a5a1f', fontWeight: 500 }}>✓ Geometry update submitted for review</p>
+                <p style={{ fontSize: 13, color: TOKENS.success, fontWeight: 500 }}>✓ Geometry update submitted for review</p>
               ) : (
                 <>
                   <p style={{ fontSize: 13, color: BRAND.textMuted, marginBottom: 8 }}>
@@ -348,7 +348,7 @@ export default function PortalVineyardDetail() {
 
           {/* Remove / unlink confirmation */}
           {removingParcel && (
-            <div style={{ ...pendingCardStyle, borderColor: '#e8a0a0', background: '#fff5f5', marginBottom: 16 }}>
+            <div style={{ ...pendingCardStyle, borderColor: alpha(TOKENS.danger, 0.35), background: TOKENS.dangerDim, marginBottom: 16 }}>
               <p style={{ fontSize: 13, fontWeight: 600, color: BRAND.burgundy, marginBottom: 8 }}>
                 Remove this parcel
               </p>
@@ -469,7 +469,7 @@ export default function PortalVineyardDetail() {
               )
             )}
             {splitSubmitStatus === 'success' && (
-              <span style={{ fontSize: 13, color: '#3a5a1f', fontWeight: 500 }}>✓ Split request submitted</span>
+              <span style={{ fontSize: 13, color: TOKENS.success, fontWeight: 500 }}>✓ Split request submitted</span>
             )}
 
             {/* Add Parcel */}
@@ -483,7 +483,7 @@ export default function PortalVineyardDetail() {
               )
             )}
             {addSubmitStatus === 'success' && (
-              <span style={{ fontSize: 13, color: '#3a5a1f', fontWeight: 500 }}>✓ New parcel submitted for review</span>
+              <span style={{ fontSize: 13, color: TOKENS.success, fontWeight: 500 }}>✓ New parcel submitted for review</span>
             )}
 
             {/* Remove / Unlink */}
@@ -496,7 +496,7 @@ export default function PortalVineyardDetail() {
               </button>
             )}
             {removeSubmitStatus === 'success' && (
-              <span style={{ fontSize: 13, color: '#3a5a1f', fontWeight: 500 }}>✓ Removal request submitted</span>
+              <span style={{ fontSize: 13, color: TOKENS.success, fontWeight: 500 }}>✓ Removal request submitted</span>
             )}
           </div>
 
@@ -536,7 +536,7 @@ function RequestButton({ vineyard, type, label }) {
   }
 
   if (done) {
-    return <span style={{ fontSize: 13, color: '#3a5a1f', fontWeight: 500 }}>✓ Submitted</span>;
+    return <span style={{ fontSize: 13, color: TOKENS.success, fontWeight: 500 }}>✓ Submitted</span>;
   }
 
   if (!open) {
@@ -559,7 +559,7 @@ function RequestButton({ vineyard, type, label }) {
         style={{
           width: '100%', padding: '8px 12px', borderRadius: 6,
           border: `1px solid ${BRAND.border}`, fontSize: 13,
-          fontFamily: "'Inter', sans-serif", resize: 'vertical',
+          fontFamily: 'var(--font-sans)', resize: 'vertical',
         }}
       />
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -576,7 +576,7 @@ function RequestButton({ vineyard, type, label }) {
 
 function Shell({ children }) {
   return (
-    <div style={{ minHeight: '100vh', background: BRAND.eggshell, fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: BRAND.eggshell, fontFamily: 'var(--font-sans)' }}>
       <div style={{
         maxWidth: 700, margin: '0 auto', padding: '40px 20px',
         background: BRAND.white, minHeight: '100vh',
@@ -629,8 +629,8 @@ const discardBtnStyle = {
 };
 
 const pendingCardStyle = {
-  background: '#fff8f0',
-  border: '1px solid #e8c97a',
+  background: TOKENS.warningDim,
+  border: `1px solid ${alpha(TOKENS.warning, 0.45)}`,
   borderRadius: 8,
   padding: '14px 16px',
   marginBottom: 16,
@@ -643,7 +643,7 @@ const textareaStyle = {
   borderRadius: 6,
   border: `1px solid ${BRAND.border}`,
   fontSize: 12,
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: 'var(--font-sans)',
   resize: 'vertical',
   marginBottom: 10,
 };

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { BRAND } from '../../config/brandColors';
+import { TOKENS, alpha } from '../../styles/tokens';
 import { apiJson, apiPost, apiFetch } from '../../lib/api';
 
 export default function AdminDashboard() {
@@ -69,7 +69,7 @@ export default function AdminDashboard() {
   }
 
   if (loading) {
-    return <Shell><p style={{ color: '#888' }}>Loading…</p></Shell>;
+    return <Shell><p style={{ color: TOKENS.muted }}>Loading…</p></Shell>;
   }
 
   return (
@@ -77,8 +77,8 @@ export default function AdminDashboard() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 22, color: '#e0e0e0', margin: 0 }}>Admin Console</h1>
-          <p style={{ color: '#888', fontSize: 12, marginTop: 2 }}>{admin?.email} ({admin?.role})</p>
+          <h1 style={{ fontSize: 22, color: TOKENS.parchment, margin: 0 }}>Admin Console</h1>
+          <p style={{ color: TOKENS.muted, fontSize: 12, marginTop: 2 }}>{admin?.email} ({admin?.role})</p>
         </div>
         <button onClick={handleLogout} style={outlineBtn}>Sign Out</button>
       </div>
@@ -91,8 +91,8 @@ export default function AdminDashboard() {
             onClick={() => setTab(t)}
             style={{
               padding: '8px 20px', borderRadius: 6, border: 'none',
-              background: tab === t ? '#4a90d9' : 'rgba(255,255,255,0.05)',
-              color: tab === t ? '#fff' : '#aaa',
+              background: tab === t ? TOKENS.electricBlue : alpha(TOKENS.parchment, 0.05),
+              color: tab === t ? TOKENS.ink : alpha(TOKENS.parchment, 0.65),
               fontSize: 13, fontWeight: 600, cursor: 'pointer',
               textTransform: 'capitalize',
             }}
@@ -106,11 +106,11 @@ export default function AdminDashboard() {
           style={{
             marginLeft: 'auto',
             padding: '7px 18px', borderRadius: 6,
-            background: 'rgba(99,102,241,0.15)',
-            color: '#818cf8',
+            background: alpha(TOKENS.violet, 0.15),
+            color: TOKENS.violet,
             fontSize: 13, fontWeight: 600,
             textDecoration: 'none',
-            border: '1px solid rgba(99,102,241,0.25)',
+            border: `1px solid ${alpha(TOKENS.violet, 0.25)}`,
           }}
         >
           ✎ Parcel Editor
@@ -127,8 +127,8 @@ export default function AdminDashboard() {
                 onClick={() => setFilter(s)}
                 style={{
                   padding: '4px 14px', borderRadius: 12, border: 'none',
-                  background: filter === s ? (s === 'flagged' ? 'rgba(234,179,8,0.2)' : 'rgba(74,144,217,0.2)') : 'transparent',
-                  color: filter === s ? (s === 'flagged' ? '#eab308' : '#4a90d9') : '#888',
+                  background: filter === s ? (s === 'flagged' ? alpha(TOKENS.warning, 0.2) : alpha(TOKENS.electricBlue, 0.2)) : 'transparent',
+                  color: filter === s ? (s === 'flagged' ? TOKENS.warning : TOKENS.electricBlue) : TOKENS.muted,
                   fontSize: 12, cursor: 'pointer', textTransform: 'capitalize',
                 }}
               >
@@ -138,7 +138,7 @@ export default function AdminDashboard() {
           </div>
 
           {requests.length === 0 ? (
-            <p style={{ color: '#888', fontSize: 13 }}>No {filter} requests.</p>
+            <p style={{ color: TOKENS.muted, fontSize: 13 }}>No {filter} requests.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {requests.map((r) => (
@@ -153,45 +153,45 @@ export default function AdminDashboard() {
                     cursor: 'pointer',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.07)';
-                    e.currentTarget.style.borderColor = 'rgba(74,144,217,0.3)';
+                    e.currentTarget.style.background = alpha(TOKENS.parchment, 0.07);
+                    e.currentTarget.style.borderColor = alpha(TOKENS.electricBlue, 0.3);
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                    e.currentTarget.style.background = alpha(TOKENS.parchment, 0.04);
+                    e.currentTarget.style.borderColor = alpha(TOKENS.parchment, 0.06);
                   }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
-                        <span style={{ fontWeight: 600, fontSize: 14, color: '#e0e0e0' }}>
+                        <span style={{ fontWeight: 600, fontSize: 14, color: TOKENS.parchment }}>
                           {r.request_type.replace(/_/g, ' ')}
                         </span>
-                        <span style={{ color: '#666', fontSize: 12, marginLeft: 8 }}>#{r.id}</span>
+                        <span style={{ color: alpha(TOKENS.parchment, 0.35), fontSize: 12, marginLeft: 8 }}>#{r.id}</span>
                         {r.origin === 'admin' && (
-                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#818cf8', background: 'rgba(99,102,241,0.12)', borderRadius: 4, padding: '1px 5px' }}>ADMIN</span>
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: TOKENS.violet, background: alpha(TOKENS.violet, 0.12), borderRadius: 4, padding: '1px 5px' }}>ADMIN</span>
                         )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         {r.flag === 'acreage_change' && (
-                          <span style={{ fontSize: 10, fontWeight: 700, color: '#eab308', background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.25)', borderRadius: 4, padding: '2px 6px' }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: TOKENS.warning, background: alpha(TOKENS.warning, 0.12), border: `1px solid ${alpha(TOKENS.warning, 0.25)}`, borderRadius: 4, padding: '2px 6px' }}>
                             ⚠ Acreage Δ{r.flag_detail?.pct_change != null ? ` ${r.flag_detail.pct_change > 0 ? '+' : ''}${r.flag_detail.pct_change}%` : ''}
                           </span>
                         )}
                         <StatusBadge status={r.status} />
-                        <span style={{ fontSize: 11, color: '#4a90d9' }}>View →</span>
+                        <span style={{ fontSize: 11, color: TOKENS.electricBlue }}>View →</span>
                       </div>
                     </div>
-                    <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>
-                      <strong style={{ color: '#ccc' }}>{r.winery_name}</strong>
+                    <div style={{ fontSize: 12, color: alpha(TOKENS.parchment, 0.7), marginTop: 4 }}>
+                      <strong style={{ color: alpha(TOKENS.parchment, 0.82) }}>{r.winery_name}</strong>
                       {' · '}{r.contact_email}
-                      {r.target_id && <span style={{ color: '#666' }}> · Parcel #{r.target_id}</span>}
+                      {r.target_id && <span style={{ color: alpha(TOKENS.parchment, 0.35) }}> · Parcel #{r.target_id}</span>}
                     </div>
-                    <div style={{ fontSize: 11, color: '#555', marginTop: 6 }}>
+                    <div style={{ fontSize: 11, color: alpha(TOKENS.parchment, 0.3), marginTop: 6 }}>
                       {new Date(r.created_at).toLocaleString()}
                       {r.reviewed_at && ` · reviewed ${new Date(r.reviewed_at).toLocaleString()}`}
                     </div>
                     {r.admin_notes && (
-                      <p style={{ fontSize: 11, color: '#888', marginTop: 4, fontStyle: 'italic', margin: '4px 0 0' }}>
+                      <p style={{ fontSize: 11, color: TOKENS.muted, marginTop: 4, fontStyle: 'italic', margin: '4px 0 0' }}>
                         Note: {r.admin_notes}
                       </p>
                     )}
@@ -207,7 +207,7 @@ export default function AdminDashboard() {
       {tab === 'accounts' && (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h2 style={{ fontSize: 16, color: '#e0e0e0', margin: 0 }}>Winery Portal Accounts</h2>
+            <h2 style={{ fontSize: 16, color: TOKENS.parchment, margin: 0 }}>Winery Portal Accounts</h2>
             <button onClick={() => setShowNewAccount(!showNewAccount)} style={outlineBtn}>
               {showNewAccount ? 'Cancel' : '+ Add Account'}
             </button>
@@ -238,28 +238,28 @@ export default function AdminDashboard() {
           )}
 
           {accounts.length === 0 ? (
-            <p style={{ color: '#888', fontSize: 13 }}>No winery accounts yet.</p>
+            <p style={{ color: TOKENS.muted, fontSize: 13 }}>No winery accounts yet.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {accounts.map((a) => (
                 <div key={a.id} style={cardStyle}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <span style={{ fontWeight: 600, fontSize: 14, color: '#e0e0e0' }}>
+                      <span style={{ fontWeight: 600, fontSize: 14, color: TOKENS.parchment }}>
                         {a.winery_name}
                       </span>
-                      <span style={{ color: '#888', fontSize: 12, marginLeft: 8 }}>
+                      <span style={{ color: TOKENS.muted, fontSize: 12, marginLeft: 8 }}>
                         ID {a.winery_id}
                       </span>
                     </div>
                     <button onClick={() => handleDeleteAccount(a.id)} style={{
-                      ...outlineBtn, color: '#ff6b6b', borderColor: 'rgba(255,107,107,0.3)',
+                      ...outlineBtn, color: TOKENS.danger, borderColor: alpha(TOKENS.danger, 0.3),
                       fontSize: 11, padding: '3px 10px',
                     }}>
                       Remove
                     </button>
                   </div>
-                  <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: alpha(TOKENS.parchment, 0.7), marginTop: 4 }}>
                     {a.contact_email}
                     {a.email_verified && ' ✓'}
                     {a.last_login && ` · last login ${new Date(a.last_login).toLocaleDateString()}`}
@@ -276,7 +276,7 @@ export default function AdminDashboard() {
 
 function Shell({ children }) {
   return (
-    <div style={{ minHeight: '100vh', background: '#1a1a2e', fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: TOKENS.ink, fontFamily: 'var(--font-sans)' }}>
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 20px' }}>
         {children}
       </div>
@@ -286,9 +286,9 @@ function Shell({ children }) {
 
 function StatusBadge({ status }) {
   const colors = {
-    pending: { bg: 'rgba(255,193,7,0.15)', color: '#FFD54F' },
-    approved: { bg: 'rgba(76,175,80,0.15)', color: '#81C784' },
-    rejected: { bg: 'rgba(244,67,54,0.15)', color: '#EF9A9A' },
+    pending: { bg: alpha(TOKENS.warning, 0.15), color: TOKENS.warning },
+    approved: { bg: alpha(TOKENS.success, 0.15), color: TOKENS.success },
+    rejected: { bg: alpha(TOKENS.danger, 0.15), color: TOKENS.danger },
   };
   const c = colors[status] || colors.pending;
   return (
@@ -303,26 +303,26 @@ function StatusBadge({ status }) {
 
 const cardStyle = {
   padding: '14px 16px', borderRadius: 8,
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.06)',
+  background: alpha(TOKENS.parchment, 0.04),
+  border: `1px solid ${alpha(TOKENS.parchment, 0.06)}`,
 };
 
 const outlineBtn = {
-  background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
+  background: 'transparent', border: `1px solid ${alpha(TOKENS.parchment, 0.12)}`,
   borderRadius: 6, padding: '6px 14px', fontSize: 12,
-  color: '#aaa', cursor: 'pointer',
+  color: alpha(TOKENS.parchment, 0.7), cursor: 'pointer',
 };
 
 const approveBtnStyle = {
   padding: '6px 16px', borderRadius: 6, border: 'none',
-  background: '#2e7d32', color: '#fff', fontSize: 12,
+  background: TOKENS.success, color: TOKENS.ink, fontSize: 12,
   fontWeight: 600, cursor: 'pointer',
 };
 
-const adminLabel = { display: 'block', fontSize: 11, color: '#888', marginBottom: 3 };
+const adminLabel = { display: 'block', fontSize: 11, color: TOKENS.muted, marginBottom: 3 };
 const adminInput = {
   width: '100%', padding: '8px 10px', borderRadius: 6,
-  border: '1px solid rgba(255,255,255,0.10)', fontSize: 13,
-  color: '#e0e0e0', background: 'rgba(255,255,255,0.05)',
+  border: `1px solid ${alpha(TOKENS.parchment, 0.10)}`, fontSize: 13,
+  color: TOKENS.parchment, background: alpha(TOKENS.parchment, 0.05),
   outline: 'none',
 };

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { WV_SUB_AVAS } from '../config/topographyConfig';
 import { LISTING_CATEGORIES } from './WVWAMap';
-import { BRAND } from '../config/brandColors';
+import { BRAND, TOKENS, alpha } from '../styles/tokens';
 
 const API_BASE = import.meta.env.DEV
   ? ''
@@ -18,6 +18,18 @@ const CATEGORY_ICON = {
   other:      '📍',
   vineyard:   '🍇',
   ava:        '◇',
+};
+
+const UI = {
+  activeRowBg: alpha(TOKENS.crimson, 0.12),
+  collapsedBtnBg: alpha(TOKENS.ink, 0.07),
+  collapsedBtnBorder: alpha(TOKENS.ink, 0.18),
+  inputBorderIdle: alpha(TOKENS.ink, 0.22),
+  inputGlow: alpha(TOKENS.ink, 0.14),
+  inputFocusRing: alpha(TOKENS.crimson, 0.08),
+  inputShadow: alpha(TOKENS.ink, 0.08),
+  dropdownShadow: alpha(TOKENS.ink, 0.16),
+  spinnerBorder: alpha(TOKENS.ink, 0.2),
 };
 
 function categoryLabel(r) {
@@ -200,12 +212,12 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           gap: 10,
           width: '100%',
           textAlign: 'left',
-          background: isActive ? 'rgba(142,21,55,0.12)' : 'transparent',
+          background: isActive ? UI.activeRowBg : 'transparent',
           border: 'none',
           borderLeft: isActive ? `3px solid ${BRAND.burgundy}` : '3px solid transparent',
           padding: '8px 14px',
           cursor: 'pointer',
-          fontFamily: 'Inter, sans-serif',
+          fontFamily: 'var(--font-sans)',
           transition: 'background 0.1s',
         }}
       >
@@ -237,8 +249,8 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
         onClick={() => { setExpanded(true); setTimeout(() => inputRef.current?.focus(), 80); }}
         aria-label="Open search"
         style={{
-          background: 'rgba(72,55,41,0.07)',
-          border: `1px solid rgba(72,55,41,0.18)`,
+          background: UI.collapsedBtnBg,
+          border: `1px solid ${UI.collapsedBtnBorder}`,
           borderRadius: 8,
           width: 36,
           height: 36,
@@ -262,7 +274,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
         position: 'relative',
         width: '100%',
         zIndex: 30,
-        fontFamily: 'Inter, sans-serif',
+        fontFamily: 'var(--font-sans)',
       } : {
         position: 'absolute',
         left: '50%',
@@ -272,7 +284,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
         width: 'min(480px, 33vw)',
         minWidth: 240,
         zIndex: 30,
-        fontFamily: 'Inter, sans-serif',
+        fontFamily: 'var(--font-sans)',
       }}
     >
       {/* Input */}
@@ -280,14 +292,14 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
         display: 'flex',
         alignItems: 'center',
         background: BRAND.eggshell,
-        border: `1.5px solid ${open ? BRAND.burgundy : 'rgba(72,55,41,0.22)'}`,
+        border: `1.5px solid ${open ? BRAND.burgundy : UI.inputBorderIdle}`,
         borderRadius: open ? '10px 10px 0 0' : 10,
         padding: '0 12px',
         height: 36,
         gap: 8,
         boxShadow: open
-          ? `0 4px 20px rgba(46,34,26,0.14), 0 0 0 3px rgba(142,21,55,0.08)`
-          : '0 2px 8px rgba(46,34,26,0.08)',
+          ? `0 4px 20px ${UI.inputGlow}, 0 0 0 3px ${UI.inputFocusRing}`
+          : `0 2px 8px ${UI.inputShadow}`,
         transition: 'border-color 0.15s, border-radius 0.1s, box-shadow 0.15s',
       }}>
         <span style={{ color: open ? BRAND.burgundy : BRAND.textMuted, flexShrink: 0, display: 'flex', transition: 'color 0.15s' }}>
@@ -313,7 +325,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
             background: 'transparent',
             fontSize: 13,
             color: BRAND.text,
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-sans)',
             caretColor: BRAND.burgundy,
           }}
         />
@@ -376,7 +388,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           border: `1.5px solid ${BRAND.burgundy}`,
           borderTop: `1px solid ${BRAND.border}`,
           borderRadius: '0 0 10px 10px',
-          boxShadow: '0 8px 24px rgba(46,34,26,0.16)',
+          boxShadow: `0 8px 24px ${UI.dropdownShadow}`,
           overflowY: 'auto',
           maxHeight: 360,
           scrollbarWidth: 'thin',
@@ -453,7 +465,7 @@ function SpinnerIcon() {
       display: 'inline-block',
       width: 13,
       height: 13,
-      border: '2px solid rgba(72,55,41,0.2)',
+      border: `2px solid ${UI.spinnerBorder}`,
       borderTopColor: BRAND.burgundy,
       borderRadius: '50%',
       animation: 'sb-spin 0.7s linear infinite',

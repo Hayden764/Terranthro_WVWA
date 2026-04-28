@@ -1,4 +1,4 @@
-import { BRAND } from '../../config/brandColors';
+import { BRAND, TOKENS, alpha } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../../config/topographyConfig';
 
@@ -9,12 +9,14 @@ import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../../config/topographyConfig';
  */
 
 /* ─── Color ramp gradients matching TiTiler colormaps ────────────────── */
+// audit-ignore-start colormap-gradients
 const COLORMAP_CSS = {
   terrain:  'linear-gradient(to right, #0B6623, #90EE90, #F5F5DC, #D2B48C, #8B4513, #FFFFFF)',
   rdylgn_r: 'linear-gradient(to right, #1A9850, #91CF60, #D9EF8B, #FEE08B, #FC8D59, #D73027)',
   hsv:      'linear-gradient(to right, #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000)',
   plasma:   'linear-gradient(to right, #0D0887, #7E03A8, #CC4778, #F89441, #F0F921)',
 };
+// audit-ignore-end
 
 /* ─── Layer metadata ──────────────────────────────────────────────────── */
 const LAYER_INFO = {
@@ -49,8 +51,8 @@ const LAYER_INFO = {
 };
 
 const CARD = {
-  background: 'rgba(250,247,242,0.06)',
-  border: '1px solid rgba(250,247,242,0.08)',
+  background: alpha(TOKENS.parchment, 0.06),
+  border: `1px solid ${alpha(TOKENS.parchment, 0.08)}`,
   borderRadius: 10,
   padding: '12px 14px',
   marginBottom: 8,
@@ -71,6 +73,19 @@ const VAL = {
   lineHeight: 1.55,
 };
 
+const UI = {
+  panelBg:        alpha(TOKENS.ink, 0.92),
+  panelBorder:    alpha(TOKENS.parchment, 0.12),
+  panelShadow:    alpha(TOKENS.ink, 0.45),
+  headerDivider:  alpha(TOKENS.parchment, 0.08),
+  closeBtnBg:     alpha(TOKENS.ink, 0.7),
+  closeBtnBorder: alpha(TOKENS.parchment, 0.15),
+  closeBtnText:   alpha(TOKENS.parchment, 0.7),
+  scrollbar:      alpha(TOKENS.parchment, 0.15),
+  rampBarBorder:  alpha(TOKENS.parchment, 0.1),
+  spinnerBorder:  alpha(TOKENS.parchment, 0.15),
+};
+
 export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, onClose }) {
   const layerInfo = activeLayer ? LAYER_INFO[activeLayer] : null;
   if (!layerInfo) return null;
@@ -87,13 +102,13 @@ export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, 
       transform: 'translateY(-50%)',
       width: 288,
       maxHeight: 'calc(100vh - 120px)',
-      background: 'rgba(46,34,26,0.92)',
+      background: UI.panelBg,
       backdropFilter: 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
-      border: '1px solid rgba(250,247,242,0.12)',
+      border: `1px solid ${UI.panelBorder}`,
       borderRadius: 14,
-      boxShadow: '0 8px 40px rgba(46,34,26,0.45)',
-      fontFamily: 'Inter, sans-serif',
+      boxShadow: `0 8px 40px ${UI.panelShadow}`,
+      fontFamily: 'var(--font-sans)',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
@@ -110,7 +125,7 @@ export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, 
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div style={{
         padding: '12px 16px',
-        borderBottom: '1px solid rgba(250,247,242,0.08)',
+        borderBottom: `1px solid ${UI.headerDivider}`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -139,10 +154,10 @@ export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, 
           onClick={onClose}
           title="Deactivate layer"
           style={{
-            background: 'rgba(46,34,26,0.7)',
-            border: '1px solid rgba(250,247,242,0.15)',
+            background: UI.closeBtnBg,
+            border: `1px solid ${UI.closeBtnBorder}`,
             borderRadius: 8,
-            color: 'rgba(250,247,242,0.7)',
+            color: UI.closeBtnText,
             width: 28,
             height: 28,
             cursor: 'pointer',
@@ -164,7 +179,7 @@ export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, 
         flex: 1,
         padding: '12px 12px 16px',
         scrollbarWidth: 'thin',
-        scrollbarColor: 'rgba(250,247,242,0.15) transparent',
+        scrollbarColor: `${UI.scrollbar} transparent`,
       }}>
 
         {/* Description */}
@@ -207,7 +222,7 @@ export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, 
                 borderRadius: 6,
                 background: gradient,
                 marginBottom: 4,
-                border: '1px solid rgba(250,247,242,0.1)',
+                border: `1px solid ${UI.rampBarBorder}`,
               }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: GLASS.textDim, marginBottom: 12 }}>
                 <span>{fmt(min)}{unit}</span>
@@ -242,7 +257,7 @@ export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, 
           <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{
               width: 14, height: 14, borderRadius: '50%',
-              border: '2px solid rgba(250,247,242,0.15)',
+              border: `2px solid ${UI.spinnerBorder}`,
               borderTopColor: GLASS.text,
               animation: 'spin 0.8s linear infinite',
               flexShrink: 0,

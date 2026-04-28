@@ -4,7 +4,7 @@ import DataLayerPanel from './DataLayerPanel';
 import ScalePanel from './ScalePanel';
 import InfoPanel from './InfoPanel';
 import WineriesPanel from './WineriesPanel';
-import { BRAND } from '../../config/brandColors';
+import { BRAND, TOKENS, alpha } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 
 /**
@@ -16,6 +16,7 @@ import { GLASS } from './glassTokens';
  */
 
 const DOCK_WIDTH = 52;
+const HOVER_BG = alpha(TOKENS.parchment, 0.08);
 
 /* ─── Floating panel shell (module-level so React never remounts it) ─── */
 const PanelShell = ({ title, onClose, children }) => (
@@ -32,7 +33,7 @@ const PanelShell = ({ title, onClose, children }) => (
     border: `1px solid ${GLASS.border}`,
     borderRadius: 14,
     boxShadow: GLASS.shadow,
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: 'var(--font-sans)',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
@@ -182,7 +183,7 @@ export default function DesktopDock({
         gap: 4,
         padding: '8px 0',
         zIndex: 50,
-        fontFamily: 'Inter, sans-serif',
+        fontFamily: 'var(--font-sans)',
       }}>
         {BUTTONS.map(({ id, label, Icon }) => {
           const isActive = activePanel === id;
@@ -206,7 +207,7 @@ export default function DesktopDock({
                 position: 'relative',
               }}
               onMouseEnter={e => {
-                if (!isActive) e.currentTarget.style.background = 'rgba(250,247,242,0.08)';
+                if (!isActive) e.currentTarget.style.background = HOVER_BG;
               }}
               onMouseLeave={e => {
                 if (!isActive) e.currentTarget.style.background = 'transparent';

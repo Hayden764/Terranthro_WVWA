@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { BRAND } from '../../config/brandColors';
+import { BRAND, TOKENS } from '../../styles/tokens';
 import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 
@@ -55,7 +55,7 @@ export default function PortalDashboard() {
         marginBottom: 32,
       }}>
         <div>
-          <h1 style={{ fontFamily: "'Georgia', serif", fontSize: 24, color: BRAND.brown, margin: 0 }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, color: BRAND.brown, margin: 0 }}>
             {profile?.title}
           </h1>
           <p style={{ color: BRAND.textMuted, fontSize: 13, marginTop: 4 }}>Winery Portal</p>
@@ -194,7 +194,7 @@ function PageShell({ children }) {
   return (
     <div style={{
       minHeight: '100vh', background: BRAND.eggshell,
-      fontFamily: "'Inter', sans-serif",
+      fontFamily: 'var(--font-sans)',
     }}>
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 20px' }}>
         {children}
@@ -244,9 +244,9 @@ function InfoRow({ label, value }) {
 
 function StatusBadge({ status }) {
   const colors = {
-    pending: { bg: '#FFF8E1', color: '#B8860B' },
-    approved: { bg: '#f0f9e8', color: '#3a5a1f' },
-    rejected: { bg: '#FEF0F0', color: '#A8323A' },
+    pending: { bg: TOKENS.warningDim, color: TOKENS.warning },
+    approved: { bg: TOKENS.successDim, color: TOKENS.success },
+    rejected: { bg: TOKENS.dangerDim, color: TOKENS.danger },
   };
   const c = colors[status] || colors.pending;
   return (

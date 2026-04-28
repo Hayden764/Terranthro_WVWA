@@ -1,4 +1,4 @@
-import { BRAND } from '../../config/brandColors';
+import { BRAND, TOKENS, alpha } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { WV_SUB_AVAS } from '../../config/topographyConfig';
 
@@ -13,8 +13,8 @@ const MAX_PITCH_WITH_TERRAIN = 71;
 
 /* ─── Shared card style ─────────────────────────────────────────────── */
 const CARD = {
-  background: 'rgba(250,247,242,0.06)',
-  border: `1px solid rgba(250,247,242,0.08)`,
+  background: alpha(TOKENS.parchment, 0.06),
+  border: `1px solid ${alpha(TOKENS.parchment, 0.08)}`,
   borderRadius: 10,
   padding: '10px 12px',
   marginBottom: 8,
@@ -118,7 +118,7 @@ export default function MapToolkit({
           width: '100%',
           justifyContent: 'center',
           background: GLASS.accentDim,
-          borderColor: 'rgba(142,21,55,0.35)',
+          borderColor: alpha(TOKENS.crimson, 0.35),
           color: BRAND.eggshell,
         }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -234,12 +234,12 @@ function btnStyle(active) {
     flex: 1,
     padding: '7px 10px',
     borderRadius: 8,
-    border: `1px solid ${active ? 'rgba(142,21,55,0.4)' : GLASS.borderLight}`,
+    border: `1px solid ${active ? alpha(TOKENS.crimson, 0.4) : GLASS.borderLight}`,
     background: active ? GLASS.accentDim : 'transparent',
     color: active ? BRAND.eggshell : GLASS.textDim,
     fontSize: 11,
     fontWeight: 600,
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: 'var(--font-sans)',
     cursor: 'pointer',
     transition: 'all 0.15s',
     letterSpacing: '0.02em',

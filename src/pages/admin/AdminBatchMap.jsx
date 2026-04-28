@@ -14,6 +14,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
+import { TOKENS, alpha } from '../../styles/tokens';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
@@ -77,6 +78,7 @@ export default function AdminBatchMap({ ops = [], activeIndex = null, showOld = 
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
     map.on('load', () => {
+      // audit-ignore-start map-style-colors
       geomOps.forEach((op, gi) => {
         if (op.before_geom) {
           map.addSource(`old-src-${gi}`, {
@@ -124,6 +126,7 @@ export default function AdminBatchMap({ ops = [], activeIndex = null, showOld = 
           });
         }
       });
+      // audit-ignore-end
 
       // Initial fit to all ops combined
       const allGeoms = geomOps.flatMap((op) => [op.before_geom, op.geometry].filter(Boolean));
@@ -196,24 +199,24 @@ export default function AdminBatchMap({ ops = [], activeIndex = null, showOld = 
   }, [mapLoaded, showOld, showNew]);
 
   return (
-    <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+    <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', border: `1px solid ${alpha(TOKENS.parchment, 0.08)}` }}>
       <div ref={containerRef} style={{ height }} />
 
       {/* Legend */}
       <div style={{
         position: 'absolute', top: 8, left: 8,
-        background: 'rgba(10,10,18,0.82)', backdropFilter: 'blur(4px)',
+        background: alpha(TOKENS.ink, 0.82), backdropFilter: 'blur(4px)',
         borderRadius: 6, padding: '7px 11px',
         display: 'flex', flexDirection: 'column', gap: 5,
         fontSize: 11, fontFamily: "'Inter', sans-serif",
         pointerEvents: 'none',
       }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: showOld ? '#e8a020' : '#555' }}>
-          <span style={{ display: 'inline-block', width: 20, height: 2, background: showOld ? '#e8a020' : '#555', borderRadius: 1 }} />
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: showOld ? TOKENS.warning : alpha(TOKENS.parchment, 0.35) }}>
+          <span style={{ display: 'inline-block', width: 20, height: 2, background: showOld ? TOKENS.warning : alpha(TOKENS.parchment, 0.35), borderRadius: 1 }} />
           Old boundary
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: showNew ? '#64b5f6' : '#555' }}>
-          <span style={{ display: 'inline-block', width: 20, height: 2, background: showNew ? '#64b5f6' : '#555', borderRadius: 1, borderTop: showNew ? '2px dashed #64b5f6' : 'none' }} />
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: showNew ? TOKENS.electricBlue : alpha(TOKENS.parchment, 0.35) }}>
+          <span style={{ display: 'inline-block', width: 20, height: 2, background: showNew ? TOKENS.electricBlue : alpha(TOKENS.parchment, 0.35), borderRadius: 1, borderTop: showNew ? `2px dashed ${TOKENS.electricBlue}` : 'none' }} />
           Proposed boundary
         </span>
       </div>
@@ -221,7 +224,7 @@ export default function AdminBatchMap({ ops = [], activeIndex = null, showOld = 
       {geomOps.length === 0 && (
         <div style={{
           position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'none', color: '#666', fontSize: 13, fontStyle: 'italic',
+          pointerEvents: 'none', color: alpha(TOKENS.parchment, 0.35), fontSize: 13, fontStyle: 'italic',
         }}>
           No geometry ops in this batch
         </div>

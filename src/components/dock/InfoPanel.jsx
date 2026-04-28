@@ -1,5 +1,5 @@
 import React from 'react';
-import { BRAND } from '../../config/brandColors';
+import { BRAND, TOKENS, alpha } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { WV_SUB_AVAS } from '../../config/topographyConfig';
 
@@ -10,8 +10,8 @@ import { WV_SUB_AVAS } from '../../config/topographyConfig';
  */
 
 const CARD = {
-  background: 'rgba(250,247,242,0.06)',
-  border: '1px solid rgba(250,247,242,0.08)',
+  background: alpha(TOKENS.parchment, 0.06),
+  border: `1px solid ${alpha(TOKENS.parchment, 0.08)}`,
   borderRadius: 10,
   padding: '12px 14px',
   marginBottom: 8,
@@ -32,13 +32,33 @@ const VAL = {
   lineHeight: 1.55,
 };
 
+const UI = {
+  // AVA button states
+  hoverBorder:      alpha(TOKENS.electricBlue, 0.55),
+  hoverBg:          alpha(TOKENS.electricBlue, 0.12),
+  hoverText:        UI.hoverText,
+  hoverGlowOuter:   alpha(TOKENS.electricBlue, 0.18),
+  hoverGlowInner:   alpha(TOKENS.electricBlue, 0.06),
+  idleBorder:       alpha(TOKENS.parchment, 0.10),
+  idleBg:           alpha(TOKENS.parchment, 0.05),
+  // Badges
+  nestedBadgeBorder: alpha(TOKENS.crimson, 0.35),
+  parentBadgeBg:     alpha(TOKENS.amber, 0.15),
+  parentBadgeBorder: alpha(TOKENS.amber, 0.4),
+  // Amber parent button
+  amberBtnBg:        alpha(TOKENS.amber, 0.08),
+  amberBtnBorder:    alpha(TOKENS.amber, 0.3),
+};
+
 /* ─── Color ramp gradients matching TiTiler colormaps ────────────────── */
+// audit-ignore-start colormap-gradients
 const COLORMAP_CSS = {
   terrain:  'linear-gradient(to right, #0B6623, #90EE90, #F5F5DC, #D2B48C, #8B4513, #FFFFFF)',
   rdylgn_r: 'linear-gradient(to right, #1A9850, #91CF60, #D9EF8B, #FEE08B, #FC8D59, #D73027)',
   hsv:      'linear-gradient(to right, #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000)',
   plasma:   'linear-gradient(to right, #0D0887, #7E03A8, #CC4778, #F89441, #F0F921)',
 };
+// audit-ignore-end
 
 /* ─── Layer info map ──────────────────────────────────────────────────── */
 const LAYER_INFO = {
@@ -88,13 +108,13 @@ function AVAButton({ item, onSelectAva, onHoverAva, indent }) {
         width: '100%',
         padding: indent ? '6px 10px' : '8px 12px',
         borderRadius: 8,
-        border: `1px solid ${hovered ? 'rgba(56,189,248,0.55)' : 'rgba(250,247,242,0.10)'}`,
-        background: hovered ? 'rgba(56,189,248,0.12)' : 'rgba(250,247,242,0.05)',
-        color: hovered ? '#7DD3FC' : GLASS.textDim,
-        boxShadow: hovered ? '0 0 0 2px rgba(56,189,248,0.18), inset 0 0 8px rgba(56,189,248,0.06)' : 'none',
+        border: `1px solid ${hovered ? UI.hoverBorder : UI.idleBorder}`,
+        background: hovered ? UI.hoverBg : UI.idleBg,
+        color: hovered ? UI.hoverText : GLASS.textDim,
+        boxShadow: hovered ? `0 0 0 2px , inset 0 0 8px ` : 'none',
         fontSize: indent ? 11 : 12,
         fontWeight: 500,
-        fontFamily: 'Inter, sans-serif',
+        fontFamily: 'var(--font-sans)',
         cursor: 'pointer',
         textAlign: 'left',
         transition: 'background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s',
@@ -171,7 +191,7 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                 letterSpacing: '0.06em',
                 textTransform: 'uppercase',
                 background: GLASS.accentDim,
-                border: '1px solid rgba(142,21,55,0.35)',
+                border: `1px solid `,
                 color: GLASS.text,
               }}>
                 {isDoubleNested ? 'Double-Nested AVA' : 'Nested AVA'}
@@ -185,9 +205,9 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                   fontWeight: 700,
                   letterSpacing: '0.06em',
                   textTransform: 'uppercase',
-                  background: 'rgba(201,168,76,0.15)',
-                  border: '1px solid rgba(201,168,76,0.4)',
-                  color: '#C9A84C',
+                  background: UI.parentBadgeBg,
+                  border: `1px solid `,
+                  color: TOKENS.amber,
                 }}>
                   Parent AVA
                 </div>
@@ -199,14 +219,14 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
                 <button
                   onClick={() => onSelectAva?.(null)}
-                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, color: GLASS.textDim, fontFamily: 'Inter, sans-serif' }}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, color: GLASS.textDim, fontFamily: 'var(--font-sans)' }}
                 >
                   Willamette Valley
                 </button>
                 <span style={{ color: GLASS.textMuted, fontSize: 11 }}>›</span>
                 <button
                   onClick={() => onSelectAva?.(parentAvaSlug)}
-                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, color: '#C9A84C', fontFamily: 'Inter, sans-serif', fontWeight: 600 }}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, color: TOKENS.amber, fontFamily: 'var(--font-sans)', fontWeight: 600 }}
                 >
                   {parentAva.name}
                 </button>
@@ -215,7 +235,7 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
               </div>
             )}
 
-            <div style={{ fontSize: 18, fontWeight: 700, color: GLASS.text, fontFamily: 'Georgia, serif', marginBottom: 4 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: GLASS.text, fontFamily: 'var(--font-display)', marginBottom: 4 }}>
               {ava.name}
             </div>
             <div style={{ fontSize: 12, color: GLASS.textDim }}>
@@ -253,22 +273,22 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                 <button
                   onClick={() => onSelectAva?.(parentAvaSlug)}
                   onMouseEnter={e => {
-                    e.currentTarget.style.background = 'rgba(56,189,248,0.12)';
-                    e.currentTarget.style.borderColor = 'rgba(56,189,248,0.55)';
-                    e.currentTarget.style.color = '#7DD3FC';
+                    e.currentTarget.style.background = UI.hoverBg;
+                    e.currentTarget.style.borderColor = UI.hoverBorder;
+                    e.currentTarget.style.color = UI.hoverText;
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.background = 'rgba(201,168,76,0.08)';
-                    e.currentTarget.style.borderColor = 'rgba(201,168,76,0.3)';
-                    e.currentTarget.style.color = '#C9A84C';
+                    e.currentTarget.style.background = UI.amberBtnBg;
+                    e.currentTarget.style.borderColor = UI.amberBtnBorder;
+                    e.currentTarget.style.color = TOKENS.amber;
                   }}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     width: '100%', padding: '8px 12px', borderRadius: 8,
-                    border: '1px solid rgba(201,168,76,0.3)',
-                    background: 'rgba(201,168,76,0.08)',
-                    color: '#C9A84C', fontSize: 12, fontWeight: 600,
-                    fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                    border: `1px solid `,
+                    background: UI.amberBtnBg,
+                    color: TOKENS.amber, fontSize: 12, fontWeight: 600,
+                    fontFamily: 'var(--font-sans)', cursor: 'pointer',
                     transition: 'background 0.15s, border-color 0.15s, color 0.15s',
                     textAlign: 'left',
                   }}
@@ -280,22 +300,22 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                 <button
                   onClick={() => onSelectAva?.(null)}
                   onMouseEnter={e => {
-                    e.currentTarget.style.background = 'rgba(56,189,248,0.12)';
-                    e.currentTarget.style.borderColor = 'rgba(56,189,248,0.55)';
-                    e.currentTarget.style.color = '#7DD3FC';
+                    e.currentTarget.style.background = UI.hoverBg;
+                    e.currentTarget.style.borderColor = UI.hoverBorder;
+                    e.currentTarget.style.color = UI.hoverText;
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.background = 'rgba(250,247,242,0.05)';
-                    e.currentTarget.style.borderColor = 'rgba(250,247,242,0.10)';
+                    e.currentTarget.style.background = UI.idleBg;
+                    e.currentTarget.style.borderColor = UI.idleBorder;
                     e.currentTarget.style.color = GLASS.textDim;
                   }}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     width: '100%', padding: '8px 12px', borderRadius: 8,
-                    border: '1px solid rgba(250,247,242,0.10)',
-                    background: 'rgba(250,247,242,0.05)',
+                    border: `1px solid `,
+                    background: UI.idleBg,
                     color: GLASS.textDim, fontSize: 12, fontWeight: 500,
-                    fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                    fontFamily: 'var(--font-sans)', cursor: 'pointer',
                     transition: 'background 0.15s, border-color 0.15s, color 0.15s',
                     textAlign: 'left',
                   }}
@@ -308,24 +328,24 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
               <button
                 onClick={() => onSelectAva?.(null)}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = 'rgba(56,189,248,0.12)';
-                  e.currentTarget.style.borderColor = 'rgba(56,189,248,0.55)';
-                  e.currentTarget.style.color = '#7DD3FC';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(56,189,248,0.18), inset 0 0 8px rgba(56,189,248,0.06)';
+                  e.currentTarget.style.background = UI.hoverBg;
+                  e.currentTarget.style.borderColor = UI.hoverBorder;
+                  e.currentTarget.style.color = UI.hoverText;
+                  e.currentTarget.style.boxShadow = `0 0 0 2px , inset 0 0 8px `;
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background = 'rgba(250,247,242,0.05)';
-                  e.currentTarget.style.borderColor = 'rgba(250,247,242,0.10)';
+                  e.currentTarget.style.background = UI.idleBg;
+                  e.currentTarget.style.borderColor = UI.idleBorder;
                   e.currentTarget.style.color = GLASS.textDim;
                   e.currentTarget.style.boxShadow = 'none';
                 }}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   width: '100%', padding: '8px 12px', borderRadius: 8,
-                  border: '1px solid rgba(250,247,242,0.10)',
-                  background: 'rgba(250,247,242,0.05)',
+                  border: `1px solid `,
+                  background: UI.idleBg,
                   color: GLASS.textDim, fontSize: 12, fontWeight: 500,
-                  fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)', cursor: 'pointer',
                   transition: 'background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s',
                   textAlign: 'left',
                 }}
@@ -351,7 +371,7 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
         /* ── No AVA selected — general info ──────────────────────── */
         <>
           <div style={CARD}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: GLASS.text, fontFamily: 'Georgia, serif', marginBottom: 6 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: GLASS.text, fontFamily: 'var(--font-display)', marginBottom: 6 }}>
               Willamette Valley
             </div>
             <div style={{ fontSize: 12, color: GLASS.textDim, lineHeight: 1.6 }}>

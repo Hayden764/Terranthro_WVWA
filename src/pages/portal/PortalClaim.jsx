@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BRAND } from '../../config/brandColors';
+import { BRAND, TOKENS } from '../../styles/tokens';
 import { apiJson, apiPost } from '../../lib/api';
 
 export default function PortalClaim() {
@@ -61,7 +61,7 @@ export default function PortalClaim() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: BRAND.eggshell, fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: BRAND.eggshell, fontFamily: 'var(--font-sans)' }}>
       <div style={{
         maxWidth: 700, margin: '0 auto', padding: '40px 20px',
         background: BRAND.white, minHeight: '100vh',
@@ -69,7 +69,7 @@ export default function PortalClaim() {
       }}>
         <Link to="/portal/dashboard" style={{ color: BRAND.brownLight, fontSize: 13 }}>← Dashboard</Link>
 
-        <h1 style={{ fontFamily: "'Georgia', serif", fontSize: 22, color: BRAND.brown, margin: '16px 0 8px' }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: BRAND.brown, margin: '16px 0 8px' }}>
           Claim a Vineyard
         </h1>
         <p style={{ color: BRAND.textMuted, fontSize: 13, marginBottom: 24 }}>
@@ -121,7 +121,7 @@ export default function PortalClaim() {
                     </div>
 
                     {submitted === r.id ? (
-                      <p style={{ fontSize: 12, color: '#3a5a1f', marginTop: 8, fontWeight: 500 }}>
+                      <p style={{ fontSize: 12, color: TOKENS.success, marginTop: 8, fontWeight: 500 }}>
                         ✓ Claim request submitted
                       </p>
                     ) : claiming === r.id ? (
@@ -134,7 +134,7 @@ export default function PortalClaim() {
                           style={{
                             width: '100%', padding: '6px 10px', borderRadius: 6,
                             border: `1px solid ${BRAND.border}`, fontSize: 12,
-                            fontFamily: "'Inter', sans-serif", resize: 'vertical',
+                            fontFamily: 'var(--font-sans)', resize: 'vertical',
                             marginBottom: 6,
                           }}
                         />
@@ -167,7 +167,7 @@ export default function PortalClaim() {
           </h2>
 
           {newSubmitted ? (
-            <p style={{ color: '#3a5a1f', fontSize: 13, fontWeight: 500 }}>
+            <p style={{ color: TOKENS.success, fontSize: 13, fontWeight: 500 }}>
               ✓ New vineyard request submitted. We'll review it shortly.
             </p>
           ) : !showNew ? (
@@ -229,6 +229,6 @@ const labelStyle = { display: 'block', fontSize: 12, color: BRAND.textMuted, mar
 const inputStyle = {
   width: '100%', padding: '8px 12px', borderRadius: 6,
   border: `1px solid ${BRAND.border}`, fontSize: 13,
-  fontFamily: "'Inter', sans-serif", color: BRAND.text,
+  fontFamily: 'var(--font-sans)', color: BRAND.text,
   background: BRAND.white, resize: 'vertical',
 };

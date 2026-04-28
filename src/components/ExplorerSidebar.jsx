@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { BRAND } from '../config/brandColors';
+import { BRAND, TOKENS, alpha } from '../styles/tokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
@@ -16,7 +16,37 @@ const T = {
   itemTextMuted:{ fontSize: 12, color: BRAND.textMuted, lineHeight: 1.4 },
   accent:       BRAND.burgundy,
   hoverBg:      BRAND.cream,
-  activeBg:     'rgba(142,21,55,0.08)',
+  activeBg:     TOKENS.dangerDim,
+};
+
+const UI = {
+  mapped: TOKENS.vividGreen,
+  refParcel: TOKENS.violet,
+  parchment55: alpha(TOKENS.parchment, 0.55),
+  parchment52: alpha(TOKENS.parchment, 0.52),
+  parchment68: alpha(TOKENS.parchment, 0.68),
+  parchment12: alpha(TOKENS.parchment, 0.12),
+  parchment10: alpha(TOKENS.parchment, 0.1),
+  danger20: alpha(TOKENS.danger, 0.2),
+  danger13: alpha(TOKENS.danger, 0.13),
+  danger08: alpha(TOKENS.danger, 0.08),
+  danger15: alpha(TOKENS.danger, 0.15),
+  danger75: alpha(TOKENS.danger, 0.75),
+  electric08: alpha(TOKENS.electricBlue, 0.08),
+  electric15: alpha(TOKENS.electricBlue, 0.15),
+  electric75: alpha(TOKENS.electricBlue, 0.75),
+  viewAllBtnBg: alpha(TOKENS.success, 0.1),
+  viewAllBtnBorder: alpha(TOKENS.success, 0.35),
+  vineyardGroupHoverBorder: alpha(TOKENS.success, 0.45),
+  vineyardGroupHoverBg: alpha(TOKENS.success, 0.06),
+  mobileShadow: alpha('black', 0.22),
+  backBtnBg: alpha(TOKENS.parchment, 0.12),
+  backBtnBorder: alpha(TOKENS.parchment, 0.2),
+  decorativeCircle: alpha(TOKENS.parchment, 0.05),
+  mappedChipBg: alpha(TOKENS.success, 0.14),
+  mappedChipBorder: alpha(TOKENS.success, 0.3),
+  buttonBg1: alpha(TOKENS.ink, 0.08),
+  buttonBg2: alpha(TOKENS.ink, 0.06),
 };
 
 const SIDEBAR_W = '25vw';
@@ -24,12 +54,14 @@ const SIDEBAR_MIN_W = 260;
 const SIDEBAR_MAX_W = 420;
 
 // ── Colormap gradients (matching WVWAMap / ScalePanel) ───────────────────
+// audit-ignore-start centralized-colormap-gradients
 const COLORMAP_CSS = {
   terrain:  'linear-gradient(to right, #0B6623, #90EE90, #F5F5DC, #D2B48C, #8B4513, #FFFFFF)',
   rdylgn_r: 'linear-gradient(to right, #1A9850, #91CF60, #D9EF8B, #FEE08B, #FC8D59, #D73027)',
   hsv:      'linear-gradient(to right, #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000)',
   plasma:   'linear-gradient(to right, #0D0887, #7E03A8, #CC4778, #F89441, #F0F921)',
 };
+// audit-ignore-end centralized-colormap-gradients
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const Chevron = ({ open, size = 12 }) => (
@@ -47,7 +79,7 @@ const BackBtn = ({ onClick }) => (
       display: 'flex', alignItems: 'center', gap: 6,
       background: 'none', border: 'none', cursor: 'pointer',
       color: BRAND.textMuted, fontSize: 12, padding: '8px 16px',
-      fontFamily: 'Inter, sans-serif', width: '100%', textAlign: 'left',
+      fontFamily: 'var(--font-sans)', width: '100%', textAlign: 'left',
       borderBottom: `1px solid ${BRAND.border}`,
     }}
     onMouseEnter={e => e.currentTarget.style.color = BRAND.brown}
@@ -65,7 +97,7 @@ function SectionHeader({ label, open, onToggle, count }) {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         width: '100%', padding: '10px 16px',
         background: 'none', border: 'none', borderBottom: `1px solid ${BRAND.border}`,
-        cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+        cursor: 'pointer', fontFamily: 'var(--font-sans)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -109,10 +141,10 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, onL
 
       {/* Hero */}
       <div style={{ background: BRAND.brown, padding: '18px 16px 14px' }}>
-        <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'Georgia, serif', color: BRAND.eggshell, lineHeight: 1.2 }}>
+        <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-display)', color: BRAND.eggshell, lineHeight: 1.2 }}>
           {ava.name}
         </div>
-        <div style={{ fontSize: 11, color: 'rgba(250,247,242,0.55)', marginTop: 4 }}>
+        <div style={{ fontSize: 11, color: UI.parchment55, marginTop: 4 }}>
           American Viticultural Area
           {ava.parentAva && <span> · Nested in {WV_SUB_AVAS.find(a => a.slug === ava.parentAva)?.name}</span>}
         </div>
@@ -165,14 +197,14 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, onL
                     display: 'flex', alignItems: 'center', gap: 10,
                     padding: '8px 10px', borderRadius: 8,
                     background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left',
-                    fontFamily: 'Inter, sans-serif',
+                    fontFamily: 'var(--font-sans)',
                   }}
                   onMouseEnter={e => { e.currentTarget.style.background = BRAND.cream; onListingHover?.(l); }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'none'; onListingHover?.(null); }}
                 >
                   <span style={{
                     width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                    background: vineyardRecidSet.has(l.id) ? '#3FAF79' : BRAND.textMuted,
+                    background: vineyardRecidSet.has(l.id) ? UI.mapped : BRAND.textMuted,
                   }} />
                   <span style={{ fontSize: 13, color: BRAND.text, flex: 1 }}>{l.title}</span>
                   <span style={{ fontSize: 10, color: BRAND.textMuted }}>›</span>
@@ -279,10 +311,10 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
 
       {/* Header */}
       <div style={{ background: BRAND.brown, padding: '16px 16px 12px' }}>
-        <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'Georgia, serif', color: BRAND.eggshell, lineHeight: 1.25 }}>
+        <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--font-display)', color: BRAND.eggshell, lineHeight: 1.25 }}>
           {listing.title}
         </div>
-        <div style={{ fontSize: 11, color: 'rgba(250,247,242,0.55)', marginTop: 5 }}>
+        <div style={{ fontSize: 11, color: UI.parchment55, marginTop: 5 }}>
           Winery &amp; Vineyard
         </div>
       </div>
@@ -304,7 +336,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
           )}
           {listing.url && (
             <a href={listing.url} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'block', padding: '9px 14px', background: BRAND.burgundy, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>
+              style={{ display: 'block', padding: '9px 14px', background: BRAND.burgundy, color: BRAND.white, borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>
               Visit Website ↗
             </a>
           )}
@@ -319,9 +351,9 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                 <button
                   onClick={() => onViewAllVineyards?.(selectedVineyards)}
                   style={{
-                    background: 'rgba(63,175,121,0.1)', border: '1px solid rgba(63,175,121,0.35)',
-                    borderRadius: 6, color: '#2B8A58', fontSize: 11, fontWeight: 700,
-                    padding: '3px 8px', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                    background: UI.viewAllBtnBg, border: `1px solid ${UI.viewAllBtnBorder}`,
+                    borderRadius: 6, color: UI.mapped, fontSize: 11, fontWeight: 700,
+                    padding: '3px 8px', cursor: 'pointer', fontFamily: 'var(--font-sans)',
                   }}
                 >
                   ⌖ View All
@@ -394,8 +426,8 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                     <div
                       key={group.key}
                       style={{
-                        border: `1px solid ${isHovered ? 'rgba(63,175,121,0.45)' : BRAND.border}`,
-                        borderRadius: 10, background: isHovered ? 'rgba(63,175,121,0.06)' : BRAND.cream,
+                        border: `1px solid ${isHovered ? UI.vineyardGroupHoverBorder : BRAND.border}`,
+                        borderRadius: 10, background: isHovered ? UI.vineyardGroupHoverBg : BRAND.cream,
                         transition: 'border-color 0.15s, background 0.15s', cursor: 'pointer',
                         overflow: 'hidden', marginBottom: 6,
                       }}
@@ -406,7 +438,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                       {/* Collapsed header */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px 8px' }}>
                         <div style={{ flex: 1, paddingRight: 8, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: isHovered ? '#2B8A58' : BRAND.brown, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: isHovered ? UI.mapped : BRAND.brown, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {group.name}
                           </div>
                           {acres && (
@@ -519,7 +551,7 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
       <div style={{ borderBottom: `1px solid ${BRAND.border}` }}>
         <button
           onClick={() => setClimateOpen(p => !p)}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
         >
           <span style={T.sectionLabel}>Climate</span>
           <Chevron open={climateOpen} />
@@ -537,8 +569,8 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
                       border: `1.5px solid ${active ? BRAND.burgundy + '80' : BRAND.border}`,
-                      background: active ? 'rgba(142,21,55,0.07)' : BRAND.eggshell,
-                      cursor: 'pointer', fontFamily: 'Inter, sans-serif', marginBottom: active ? 6 : 0,
+                      background: active ? TOKENS.dangerDim : BRAND.eggshell,
+                      cursor: 'pointer', fontFamily: 'var(--font-sans)', marginBottom: active ? 6 : 0,
                     }}
                   >
                     <div>
@@ -581,7 +613,7 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
       <div style={{ borderBottom: `1px solid ${BRAND.border}` }}>
         <button
           onClick={() => setTopoOpen(p => !p)}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
         >
           <span style={T.sectionLabel}>Topography</span>
           <Chevron open={topoOpen} />
@@ -599,8 +631,8 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
                     border: `1.5px solid ${active ? BRAND.burgundy + '80' : BRAND.border}`,
-                    background: active ? 'rgba(142,21,55,0.07)' : BRAND.eggshell,
-                    cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                    background: active ? TOKENS.dangerDim : BRAND.eggshell,
+                    cursor: 'pointer', fontFamily: 'var(--font-sans)',
                   }}
                 >
                   <div>
@@ -621,7 +653,7 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
             {topoConfig && activeLayer && (
               <div style={{ border: `1px solid ${BRAND.border}`, borderRadius: 8, padding: '10px 12px', background: BRAND.cream, marginTop: 4 }}>
                 <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Scale — {topoConfig.label}</div>
-                <div style={{ height: 8, borderRadius: 6, background: COLORMAP_CSS[topoConfig.colormap] || '#ccc', marginBottom: 4, border: `1px solid ${BRAND.border}` }} />
+                <div style={{ height: 8, borderRadius: 6, background: COLORMAP_CSS[topoConfig.colormap] || TOKENS.ghost, marginBottom: 4, border: `1px solid ${BRAND.border}` }} />
                 {topoStats && (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: BRAND.textMuted, marginBottom: 8 }}>
@@ -693,9 +725,9 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
               style={{
                 padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600,
                 border: `1px solid ${isActive ? BRAND.burgundy + '90' : BRAND.border}`,
-                background: isActive ? 'rgba(142,21,55,0.1)' : BRAND.eggshell,
+                background: isActive ? TOKENS.dangerDim : BRAND.eggshell,
                 color: isActive ? BRAND.burgundy : BRAND.textMuted,
-                cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                cursor: 'pointer', fontFamily: 'var(--font-sans)',
                 transition: 'all 0.15s',
               }}
             >
@@ -706,7 +738,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
       </div>
 
       {ava && (
-        <div style={{ padding: '6px 16px', background: 'rgba(142,21,55,0.05)', borderBottom: `1px solid ${BRAND.border}` }}>
+        <div style={{ padding: '6px 16px', background: TOKENS.dangerDim, borderBottom: `1px solid ${BRAND.border}` }}>
           <span style={{ fontSize: 11, color: BRAND.burgundy }}>Showing {ava.name} only — {visible.length} winer{visible.length === 1 ? 'y' : 'ies'}</span>
         </div>
       )}
@@ -726,14 +758,14 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
               display: 'flex', alignItems: 'center', gap: 10,
               width: '100%', padding: '9px 16px', background: 'none',
               border: 'none', borderBottom: `1px solid ${BRAND.border}`, cursor: 'pointer',
-              fontFamily: 'Inter, sans-serif', textAlign: 'left',
+              fontFamily: 'var(--font-sans)', textAlign: 'left',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = BRAND.cream; onListingHover?.(l); }}
             onMouseLeave={e => { e.currentTarget.style.background = 'none'; onListingHover?.(null); }}
           >
             <span style={{
               width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-              background: vineyardRecidSet.has(l.id) ? '#3FAF79' : BRAND.textMuted,
+              background: vineyardRecidSet.has(l.id) ? UI.mapped : BRAND.textMuted,
             }} />
             <span style={{ fontSize: 13, color: BRAND.text, flex: 1, lineHeight: 1.3 }}>{l.title}</span>
             <span style={{ fontSize: 10, color: BRAND.textMuted }}>›</span>
@@ -756,11 +788,11 @@ function AboutSection() {
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#3FAF79', flexShrink: 0 }} />
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: UI.mapped, flexShrink: 0 }} />
           <span style={{ fontSize: 12 }}>Mapped vineyard parcels</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#C7D6E8', flexShrink: 0 }} />
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: UI.refParcel, flexShrink: 0 }} />
           <span style={{ fontSize: 12 }}>Reference parcels (no winery link)</span>
         </div>
       </div>
@@ -933,7 +965,7 @@ export default function ExplorerSidebar({
       zIndex: isMobile ? 200 : 10,
       transform: isMobile ? (isOpen ? 'translateX(0)' : 'translateX(-100%)') : undefined,
       transition: isMobile ? 'transform 220ms cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
-      boxShadow: isMobile && isOpen ? '4px 0 24px rgba(0,0,0,0.22)' : undefined,
+      boxShadow: isMobile && isOpen ? `4px 0 24px ${UI.mobileShadow}` : undefined,
     }}>
 
       {/* Sidebar header */}
@@ -943,7 +975,7 @@ export default function ExplorerSidebar({
             <button
               onClick={handleBack}
               style={{
-                background: 'rgba(250,247,242,0.12)', border: '1px solid rgba(250,247,242,0.2)',
+                background: UI.backBtnBg, border: `1px solid ${UI.backBtnBorder}`,
                 borderRadius: 7, color: T.headerText, cursor: 'pointer',
                 width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 18, flexShrink: 0,
@@ -953,11 +985,11 @@ export default function ExplorerSidebar({
             </button>
           )}
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: isOnHome ? 15 : 14, fontWeight: 700, color: T.headerText, fontFamily: 'Georgia, serif', lineHeight: 1.2 }}>
+            <div style={{ fontSize: isOnHome ? 15 : 14, fontWeight: 700, color: T.headerText, fontFamily: 'var(--font-display)', lineHeight: 1.2 }}>
               {isOnHome ? 'Willamette Valley' : viewTitle}
             </div>
             {isOnHome && (
-              <div style={{ fontSize: 10, color: 'rgba(250,247,242,0.55)', marginTop: 2, letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: 10, color: UI.parchment55, marginTop: 2, letterSpacing: '0.04em' }}>
                 Wineries &amp; AVA Explorer
               </div>
             )}
@@ -967,7 +999,7 @@ export default function ExplorerSidebar({
               onClick={onClose}
               aria-label="Close menu"
               style={{
-                background: 'rgba(250,247,242,0.12)', border: '1px solid rgba(250,247,242,0.2)',
+                background: UI.backBtnBg, border: `1px solid ${UI.backBtnBorder}`,
                 borderRadius: 7, color: T.headerText, cursor: 'pointer',
                 width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 20, flexShrink: 0, lineHeight: 1,
@@ -1000,38 +1032,38 @@ export default function ExplorerSidebar({
 
             {/* Hero welcome card */}
             <div style={{
-              background: `linear-gradient(155deg, ${BRAND.brownDark} 0%, ${BRAND.brown} 55%, #5C3D2E 100%)`,
+              background: `linear-gradient(155deg, ${BRAND.brownDark} 0%, ${BRAND.brown} 55%, ${TOKENS.surfaceRaised} 100%)`,
               padding: '18px 16px 16px',
               borderBottom: `1px solid ${BRAND.border}`,
               position: 'relative',
               overflow: 'hidden',
             }}>
               {/* Decorative background circles */}
-              <div style={{ position: 'absolute', top: -28, right: -28, width: 110, height: 110, borderRadius: '50%', background: 'rgba(142,21,55,0.20)', pointerEvents: 'none' }} />
-              <div style={{ position: 'absolute', bottom: -18, right: 18, width: 65, height: 65, borderRadius: '50%', background: 'rgba(142,21,55,0.13)', pointerEvents: 'none' }} />
-              <div style={{ position: 'absolute', top: 10, right: 55, width: 28, height: 28, borderRadius: '50%', background: 'rgba(250,247,242,0.05)', pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', top: -28, right: -28, width: 110, height: 110, borderRadius: '50%', background: UI.danger20, pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', bottom: -18, right: 18, width: 65, height: 65, borderRadius: '50%', background: UI.danger13, pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', top: 10, right: 55, width: 28, height: 28, borderRadius: '50%', background: UI.decorativeCircle, pointerEvents: 'none' }} />
 
-              <p style={{ fontSize: 12, color: 'rgba(250,247,242,0.68)', margin: '0 0 14px', lineHeight: 1.65, position: 'relative', paddingRight: 24 }}>
+              <p style={{ fontSize: 12, color: UI.parchment68, margin: '0 0 14px', lineHeight: 1.65, position: 'relative', paddingRight: 24 }}>
                 Explore 11 nested American Viticultural Areas across Oregon's Northern Willamette Valley — with vineyard mapping, topographic analysis, and 30-year climate data.
               </p>
 
               {/* Stat chips grid */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, position: 'relative' }}>
-                <div style={{ background: 'rgba(250,247,242,0.10)', borderRadius: 8, padding: '9px 12px', border: '1px solid rgba(250,247,242,0.12)' }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: BRAND.eggshell, fontFamily: 'Georgia, serif', lineHeight: 1 }}>{WV_SUB_AVAS.length}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(250,247,242,0.52)', marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Nested AVAs</div>
+                <div style={{ background: UI.parchment10, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.parchment12}` }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: BRAND.eggshell, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{WV_SUB_AVAS.length}</div>
+                  <div style={{ fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Nested AVAs</div>
                 </div>
-                <div style={{ background: 'rgba(250,247,242,0.10)', borderRadius: 8, padding: '9px 12px', border: '1px solid rgba(250,247,242,0.12)' }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: BRAND.eggshell, fontFamily: 'Georgia, serif', lineHeight: 1 }}>{wineryCount > 0 ? wineryCount : '—'}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(250,247,242,0.52)', marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Wineries</div>
+                <div style={{ background: UI.parchment10, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.parchment12}` }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: BRAND.eggshell, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{wineryCount > 0 ? wineryCount : '—'}</div>
+                  <div style={{ fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Wineries</div>
                 </div>
-                <div style={{ background: 'rgba(63,175,121,0.14)', borderRadius: 8, padding: '9px 12px', border: '1px solid rgba(63,175,121,0.30)' }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: '#3FAF79', fontFamily: 'Georgia, serif', lineHeight: 1 }}>{mappedCount > 0 ? mappedCount : '—'}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(250,247,242,0.52)', marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Wineries Mapped</div>
+                <div style={{ background: UI.mappedChipBg, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.mappedChipBorder}` }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: UI.mapped, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{mappedCount > 0 ? mappedCount : '—'}</div>
+                  <div style={{ fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Wineries Mapped</div>
                 </div>
-                <div style={{ background: 'rgba(250,247,242,0.10)', borderRadius: 8, padding: '9px 12px', border: '1px solid rgba(250,247,242,0.12)' }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: BRAND.eggshell, fontFamily: 'Georgia, serif', lineHeight: 1 }}>26k+</div>
-                  <div style={{ fontSize: 10, color: 'rgba(250,247,242,0.52)', marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Vineyard Acres</div>
+                <div style={{ background: UI.parchment10, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.parchment12}` }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: BRAND.eggshell, fontFamily: 'var(--font-display)', lineHeight: 1 }}>26k+</div>
+                  <div style={{ fontSize: 10, color: UI.parchment52, marginTop: 3, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Vineyard Acres</div>
                 </div>
               </div>
             </div>
@@ -1042,7 +1074,7 @@ export default function ExplorerSidebar({
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 width: '100%', padding: '13px 16px', background: 'none', border: 'none',
-                borderBottom: `1px solid ${BRAND.border}`, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                borderBottom: `1px solid ${BRAND.border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
               }}
               onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
               onMouseLeave={e => e.currentTarget.style.background = 'none'}
@@ -1050,7 +1082,7 @@ export default function ExplorerSidebar({
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                  background: 'rgba(72,55,41,0.08)', border: `1px solid ${BRAND.border}`,
+                  background: UI.buttonBg1, border: `1px solid ${BRAND.border}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={BRAND.brown} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
@@ -1069,7 +1101,7 @@ export default function ExplorerSidebar({
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 width: '100%', padding: '13px 16px', background: 'none', border: 'none',
-                borderBottom: `1px solid ${BRAND.border}`, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                borderBottom: `1px solid ${BRAND.border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
               }}
               onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
               onMouseLeave={e => e.currentTarget.style.background = 'none'}
@@ -1077,10 +1109,10 @@ export default function ExplorerSidebar({
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                  background: 'rgba(142,21,55,0.08)', border: `1px solid rgba(142,21,55,0.15)`,
+                  background: UI.danger08, border: `1px solid ${UI.danger15}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="rgba(142,21,55,0.75)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="M6 2h12l-3 9a5 5 0 0 1-6 0L6 2z"/></svg>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={UI.danger75} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="M6 2h12l-3 9a5 5 0 0 1-6 0L6 2z"/></svg>
                 </div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.brown }}>Wineries</div>
@@ -1096,7 +1128,7 @@ export default function ExplorerSidebar({
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 width: '100%', padding: '13px 16px', background: 'none', border: 'none',
-                borderBottom: `1px solid ${BRAND.border}`, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                borderBottom: `1px solid ${BRAND.border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
               }}
               onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
               onMouseLeave={e => e.currentTarget.style.background = 'none'}
@@ -1104,10 +1136,10 @@ export default function ExplorerSidebar({
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                  background: 'rgba(30,100,160,0.08)', border: `1px solid rgba(30,100,160,0.15)`,
+                  background: UI.electric08, border: `1px solid ${UI.electric15}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="rgba(30,100,160,0.75)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={UI.electric75} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                 </div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.brown }}>Data Layers</div>
@@ -1136,7 +1168,7 @@ export default function ExplorerSidebar({
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   width: '100%', padding: '13px 16px', background: 'none', border: 'none',
                   borderBottom: sections.about ? `1px solid ${BRAND.border}` : 'none',
-                  cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                  cursor: 'pointer', fontFamily: 'var(--font-sans)',
                 }}
                 onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
                 onMouseLeave={e => e.currentTarget.style.background = 'none'}
@@ -1144,7 +1176,7 @@ export default function ExplorerSidebar({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{
                     width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                    background: 'rgba(72,55,41,0.06)', border: `1px solid ${BRAND.border}`,
+                    background: UI.buttonBg2, border: `1px solid ${BRAND.border}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
                   }}>ℹ️</div>
                   <div style={{ textAlign: 'left' }}>
@@ -1186,7 +1218,7 @@ export default function ExplorerSidebar({
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         width: '100%', padding: `8px 16px 8px ${ava.parentAva ? '28px' : '16px'}`,
                         background: isSelected ? T.activeBg : 'none', border: 'none',
-                        cursor: 'pointer', fontFamily: 'Inter, sans-serif', textAlign: 'left',
+                        cursor: 'pointer', fontFamily: 'var(--font-sans)', textAlign: 'left',
                       }}
                       onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = T.hoverBg; mapRef.current?.hoverAva(ava.slug); }}
                       onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'none'; mapRef.current?.hoverAva(null); }}

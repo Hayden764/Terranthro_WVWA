@@ -11,7 +11,7 @@ import TopographyLayer from './TopographyLayer';
 import MapControls from './MapControls';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { AVA_CAMERA, WV_CAMERA } from '../config/avaCameraConfig';
-import { BRAND } from '../config/brandColors';
+import { BRAND, TOKENS, alpha } from '../styles/tokens';
 
 // In dev, always use relative API paths through the Vite proxy.
 // In production, use VITE_API_BASE_URL if provided.
@@ -69,11 +69,72 @@ function normalizeVineyardName(name) {
 
 // ── Listing categories ────────────────────────────────────────────────────
 export const LISTING_CATEGORIES = {
-  hotel:      { label: 'Hotel / Inn',        color: '#C47C2B', icon: '🏨', emoji: '🏨' },
-  restaurant: { label: 'Restaurant / Dining', color: '#2B7A4B', icon: '🍽️', emoji: '🍽️' },
-  tasting:    { label: 'Tasting Room',        color: '#6B3A8E', icon: '🍷', emoji: '🍷' },
+  hotel:      { label: 'Hotel / Inn',        color: TOKENS.amber, icon: '🏨', emoji: '🏨' },
+  restaurant: { label: 'Restaurant / Dining', color: TOKENS.vividGreen, icon: '🍽️', emoji: '🍽️' },
+  tasting:    { label: 'Tasting Room',        color: TOKENS.violet, icon: '🍷', emoji: '🍷' },
   winery:     { label: 'Winery / Vineyard',   color: BRAND.burgundy, icon: '🍇', emoji: '🍇' },
   other:      { label: 'Other',               color: BRAND.brownLight, icon: '📍', emoji: '📍' },
+};
+
+const UI = {
+  white: BRAND.white,
+  panelBg: alpha(TOKENS.ink, 0.92),
+  panelBorder: alpha(TOKENS.parchment, 0.12),
+  panelShadow: alpha(TOKENS.ink, 0.45),
+  panelDivider: alpha(TOKENS.parchment, 0.08),
+  tabActiveBg: alpha(TOKENS.parchment, 0.06),
+  tabActiveText: alpha(TOKENS.parchment, 0.95),
+  tabIdleText: alpha(TOKENS.parchment, 0.4),
+  closeBtnBg: alpha(TOKENS.ink, 0.7),
+  closeBtnBorder: alpha(TOKENS.parchment, 0.15),
+  closeBtnText: alpha(TOKENS.parchment, 0.7),
+  scrollbar: alpha(TOKENS.parchment, 0.15),
+  cardBg: alpha(TOKENS.parchment, 0.06),
+  cardBorder: alpha(TOKENS.parchment, 0.08),
+  labelText: alpha(TOKENS.parchment, 0.4),
+  valueText: alpha(TOKENS.parchment, 0.85),
+  titleText: alpha(TOKENS.parchment, 0.95),
+  bodyText: alpha(TOKENS.parchment, 0.6),
+  phoneText: alpha(TOKENS.parchment, 0.7),
+  sectionLabel: alpha(TOKENS.parchment, 0.35),
+  vineyardAccent: TOKENS.vividGreen,
+  vineyardAccentSoft: alpha(TOKENS.vividGreen, 0.12),
+  vineyardAccentBorder: alpha(TOKENS.vividGreen, 0.35),
+  vineyardAccentMuted: alpha(TOKENS.vividGreen, 0.5),
+  hoverAccent: TOKENS.electricBlue,
+  hoverAccentSoft: alpha(TOKENS.electricBlue, 0.1),
+  hoverAccentBorder: alpha(TOKENS.electricBlue, 0.55),
+  hoverAccentMuted: alpha(TOKENS.electricBlue, 0.9),
+  subtleDivider: alpha(TOKENS.parchment, 0.06),
+  faintText: alpha(TOKENS.parchment, 0.45),
+  cardTextStrong: alpha(TOKENS.parchment, 0.9),
+  blockBg: alpha(TOKENS.parchment, 0.03),
+  blockBorder: alpha(TOKENS.parchment, 0.1),
+  spinnerBorder: alpha(TOKENS.parchment, 0.15),
+  spinnerTop: alpha(TOKENS.parchment, 0.9),
+  devGroupBg: alpha(TOKENS.ink, 0.8),
+  devGroupBorder: alpha(TOKENS.parchment, 0.14),
+  devPanelBg: alpha(TOKENS.ink, 0.84),
+  devPanelBorder: alpha(TOKENS.parchment, 0.2),
+  devPanelShadow: alpha('black', 0.34),
+  devPanelText: alpha(TOKENS.parchment, 0.96),
+  devHeaderBorder: alpha(TOKENS.parchment, 0.14),
+  devButtonBorder: alpha(TOKENS.parchment, 0.2),
+  devButtonText: alpha(TOKENS.parchment, 0.84),
+  devResetBg: alpha(TOKENS.parchment, 0.08),
+  devResetText: alpha(TOKENS.parchment, 0.92),
+  // Map chrome — raw atmospheric/earth-tone values not derivable from tokens
+  // audit-ignore-start map-chrome-atmosphere
+  mapContainerBg: 'black',
+  popupLabelColor: '#1e293b',
+  wineryHoverBg: 'rgba(72,55,41,0.82)',
+  wineryHoverBorder: '#87CEEB',
+  wineryHoverShadow: 'rgba(46,34,26,0.25)',
+  vineyardHoverBg: 'rgba(32,47,59,0.82)',
+  vineyardHoverShadow: 'rgba(15,23,42,0.25)',
+  avaBadgeBg: 'rgba(46,34,26,0.88)',
+  avaBadgeShadow: 'rgba(46,34,26,0.35)',
+  // audit-ignore-end
 };
 
 export const LISTING_FILTER_MODES = {
@@ -92,77 +153,91 @@ export const LISTING_SYMBOLOGY_PRESETS = {
 
 const LISTING_SYMBOLOGY_OPTIONS = [];
 
-const LISTING_SYMBOLOGY_CONFIG = {
+// audit-ignore-start centralized-listing-symbology
+const LISTING_SYMBOLOGY_PALETTES = {
   [LISTING_SYMBOLOGY_PRESETS.estateMinimal]: {
-    clusterMaxZoom: 11,
-    clusterRadius: 34,
-    clusterMinPoints: 3,
     clusterCircleColor: [
       'step', ['get', 'point_count'],
       'rgba(234, 236, 233, 0.82)', 10,
       'rgba(218, 223, 217, 0.84)', 30,
       'rgba(196, 204, 198, 0.88)',
     ],
-    clusterCircleRadius: ['step', ['get', 'point_count'], 14, 10, 19, 30, 24],
     clusterStrokeColor: 'rgba(41, 49, 42, 0.52)',
-    clusterStrokeWidth: 1.3,
     clusterCountColor: '#1F2A22',
     clusterCountHaloColor: 'rgba(250,247,242,0.72)',
     markerFillColor: '#304437',
-    markerRadius: ['interpolate', ['linear'], ['zoom'], 10, 5.8, 14, 8.4],
     markerStrokeColor: 'rgba(250,247,242,0.82)',
-    markerStrokeWidth: 1.6,
     markerTextColor: '#F5EFE3',
     markerTextHaloColor: 'rgba(16,22,18,0.42)',
     focusAccentColor: '#6FB78D',
   },
   [LISTING_SYMBOLOGY_PRESETS.topoModern]: {
-    clusterMaxZoom: 12,
-    clusterRadius: 31,
-    clusterMinPoints: 3,
     clusterCircleColor: [
       'step', ['get', 'point_count'],
       'rgba(226, 238, 244, 0.82)', 10,
       'rgba(204, 227, 236, 0.84)', 30,
       'rgba(177, 210, 224, 0.88)',
     ],
-    clusterCircleRadius: ['step', ['get', 'point_count'], 13, 10, 18, 30, 23],
     clusterStrokeColor: 'rgba(44, 72, 88, 0.46)',
-    clusterStrokeWidth: 1.4,
     clusterCountColor: '#203744',
     clusterCountHaloColor: 'rgba(239,247,250,0.78)',
     markerFillColor: '#255A73',
-    markerRadius: ['interpolate', ['linear'], ['zoom'], 10, 5.7, 14, 8.2],
     markerStrokeColor: 'rgba(235,246,252,0.86)',
-    markerStrokeWidth: 1.6,
     markerTextColor: '#EDF8FF',
     markerTextHaloColor: 'rgba(16,38,49,0.44)',
     focusAccentColor: '#38BDF8',
   },
   [LISTING_SYMBOLOGY_PRESETS.heritagePremium]: {
-    clusterMaxZoom: 12,
-    clusterRadius: 37,
-    clusterMinPoints: 2,
     clusterCircleColor: [
       'step', ['get', 'point_count'],
       'rgba(228, 213, 188, 0.82)', 10,
       'rgba(214, 193, 161, 0.84)', 30,
       'rgba(190, 163, 124, 0.88)',
     ],
-    clusterCircleRadius: ['step', ['get', 'point_count'], 15, 10, 20, 30, 25],
     clusterStrokeColor: 'rgba(74, 52, 30, 0.55)',
-    clusterStrokeWidth: 1.45,
     clusterCountColor: '#3B2613',
     clusterCountHaloColor: 'rgba(246,235,214,0.76)',
     markerFillColor: '#6A4C2D',
-    markerRadius: ['interpolate', ['linear'], ['zoom'], 10, 6.2, 14, 8.9],
     markerStrokeColor: 'rgba(245,229,203,0.86)',
-    markerStrokeWidth: 1.7,
     markerTextColor: '#FFF6E8',
     markerTextHaloColor: 'rgba(40,26,14,0.44)',
     focusAccentColor: '#B88A4A',
   },
 };
+
+const LISTING_SYMBOLOGY_CONFIG = {
+  [LISTING_SYMBOLOGY_PRESETS.estateMinimal]: {
+    clusterMaxZoom: 11,
+    clusterRadius: 34,
+    clusterMinPoints: 3,
+    ...LISTING_SYMBOLOGY_PALETTES[LISTING_SYMBOLOGY_PRESETS.estateMinimal],
+    clusterCircleRadius: ['step', ['get', 'point_count'], 14, 10, 19, 30, 24],
+    clusterStrokeWidth: 1.3,
+    markerRadius: ['interpolate', ['linear'], ['zoom'], 10, 5.8, 14, 8.4],
+    markerStrokeWidth: 1.6,
+  },
+  [LISTING_SYMBOLOGY_PRESETS.topoModern]: {
+    clusterMaxZoom: 12,
+    clusterRadius: 31,
+    clusterMinPoints: 3,
+    ...LISTING_SYMBOLOGY_PALETTES[LISTING_SYMBOLOGY_PRESETS.topoModern],
+    clusterCircleRadius: ['step', ['get', 'point_count'], 13, 10, 18, 30, 23],
+    clusterStrokeWidth: 1.4,
+    markerRadius: ['interpolate', ['linear'], ['zoom'], 10, 5.7, 14, 8.2],
+    markerStrokeWidth: 1.6,
+  },
+  [LISTING_SYMBOLOGY_PRESETS.heritagePremium]: {
+    clusterMaxZoom: 12,
+    clusterRadius: 37,
+    clusterMinPoints: 2,
+    ...LISTING_SYMBOLOGY_PALETTES[LISTING_SYMBOLOGY_PRESETS.heritagePremium],
+    clusterCircleRadius: ['step', ['get', 'point_count'], 15, 10, 20, 30, 25],
+    clusterStrokeWidth: 1.45,
+    markerRadius: ['interpolate', ['linear'], ['zoom'], 10, 6.2, 14, 8.9],
+    markerStrokeWidth: 1.7,
+  },
+};
+// audit-ignore-end centralized-listing-symbology
 
 const DEFAULT_LISTING_SYMBOLOGY = LISTING_SYMBOLOGY_PRESETS.topoModern;
 const LISTING_BASE_LAYER_IDS = [
@@ -238,7 +313,7 @@ function addListingsSourceAndBaseLayers(map, geojsonData, preset, isVisible) {
       'circle-color': config.markerFillColor,
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3.5, 14, 5.5],
       'circle-stroke-width': 1.5,
-      'circle-stroke-color': '#ffffff',
+      'circle-stroke-color': UI.white,
       'circle-opacity': 0.2,
       'circle-stroke-opacity': 0.85,
     },
@@ -517,22 +592,23 @@ function setListingSoftFocus(map, isSoftFocused) {
 
 function setVineyardReferenceSoftFocus(map, isSoftFocused) {
   const referenceFillOpacity = isSoftFocused ? 0.003 : 0.06;
-  const referenceLineOpacity = isSoftFocused ? 0.14 : 0.5;
-  const passiveFillOpacity = isSoftFocused ? 0.1 : 0.18;
-  const passivePatternOpacity = isSoftFocused ? 0.08 : 0.2;
-  const passiveLineOpacity = isSoftFocused ? 0.18 : 0.34;
-  const passiveLineWidth = isSoftFocused ? 0.6 : 0.85;
-  const linkedLineOpacity = isSoftFocused ? 0.24 : 0.86;
-  const linkedFillOpacity = isSoftFocused ? 0.008 : 0.03;
-  const hoverLineOpacity = isSoftFocused ? 0.6 : 1;
-  const passiveHoverLineOpacity = isSoftFocused ? 0.4 : 0.7;
-  const referenceLineWidth = isSoftFocused ? 0.9 : 1.1;
-  const linkedLineWidth = isSoftFocused ? 1.05 : 1.4;
-  const hoverLineWidth = isSoftFocused ? 2.6 : 3.0;
-  const passiveHoverLineWidth = isSoftFocused ? 1.2 : 1.8;
-  const referenceLineColor = isSoftFocused ? '#D8E3F0' : '#C7D6E8';
+  const referenceLineOpacity = isSoftFocused ? 0.04 : 0.5;
+  const passiveFillOpacity = isSoftFocused ? 0.04 : 0.18;
+  const passivePatternOpacity = isSoftFocused ? 0.03 : 0.2;
+  const passiveLineOpacity = isSoftFocused ? 0.05 : 0.34;
+  const passiveLineWidth = isSoftFocused ? 0.5 : 0.85;
+  const linkedLineOpacity = isSoftFocused ? 0.008 : 0.86;
+  const linkedFillOpacity = isSoftFocused ? 0.001 : 0.03;
+  const hoverLineOpacity = isSoftFocused ? 0.35 : 1;
+  const passiveHoverLineOpacity = isSoftFocused ? 0.22 : 0.7;
+  const referenceLineWidth = isSoftFocused ? 0.7 : 1.1;
+  const linkedLineWidth = isSoftFocused ? 0.6 : 1.4;
+  const hoverLineWidth = isSoftFocused ? 2.0 : 3.0;
+  const passiveHoverLineWidth = isSoftFocused ? 1.0 : 1.8;
+  const referenceLineColor = isSoftFocused ? '#E8EEF5' : '#C7D6E8';
   const passiveLineColor = '#FFFFFF';
-  const linkedLineColor = isSoftFocused ? '#73BC94' : '#3FAF79';
+  const linkedLineColor = isSoftFocused ? '#D2DDD5' : '#3FAF79';
+  const linkedFillColor = isSoftFocused ? '#D2DDD5' : '#22C55E';
 
   if (map.getLayer('vineyards-reference-fill')) {
     map.setPaintProperty('vineyards-reference-fill', 'fill-opacity', referenceFillOpacity);
@@ -559,6 +635,7 @@ function setVineyardReferenceSoftFocus(map, isSoftFocused) {
     map.setPaintProperty('vineyards-linked-line', 'line-opacity', linkedLineOpacity);
   }
   if (map.getLayer('vineyards-linked-fill')) {
+    map.setPaintProperty('vineyards-linked-fill', 'fill-color', linkedFillColor);
     map.setPaintProperty('vineyards-linked-fill', 'fill-opacity', linkedFillOpacity);
   }
   if (map.getLayer('vineyards-reference-hover-line')) {
@@ -618,13 +695,13 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
       transform: 'translateY(-50%)',
       width: 288,
       maxHeight: 'calc(100vh - 120px)',
-      background: 'rgba(46,34,26,0.92)',
+      background: UI.panelBg,
       backdropFilter: 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
-      border: '1px solid rgba(250,247,242,0.12)',
+      border: `1px solid ${UI.panelBorder}`,
       borderRadius: 14,
-      boxShadow: '0 8px 40px rgba(46,34,26,0.45)',
-      fontFamily: 'Inter, sans-serif',
+      boxShadow: `0 8px 40px ${UI.panelShadow}`,
+      fontFamily: 'var(--font-sans)',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
@@ -634,7 +711,7 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
       {/* ── Header / tab bar ─────────────────────────────────────────── */}
       <div style={{
         padding: hasBoth ? '0' : '12px 14px 0',
-        borderBottom: '1px solid rgba(250,247,242,0.08)',
+        borderBottom: `1px solid ${UI.panelDivider}`,
         flexShrink: 0,
       }}>
         {hasBoth ? (
@@ -652,14 +729,14 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
                   style={{
                     flex: 1,
                     padding: '10px 8px',
-                    background: isActive ? 'rgba(250,247,242,0.06)' : 'transparent',
+                    background: isActive ? UI.tabActiveBg : 'transparent',
                     border: 'none',
                     borderBottom: isActive ? `2px solid ${BRAND.burgundy}` : '2px solid transparent',
-                    color: isActive ? 'rgba(250,247,242,0.95)' : 'rgba(250,247,242,0.4)',
+                    color: isActive ? UI.tabActiveText : UI.tabIdleText,
                     cursor: 'pointer',
                     fontSize: 11,
                     fontWeight: 700,
-                    fontFamily: 'Inter, sans-serif',
+                    fontFamily: 'var(--font-sans)',
                     letterSpacing: '0.04em',
                     display: 'flex',
                     alignItems: 'center',
@@ -699,10 +776,10 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
                 {resolvedTab === 'listing' ? (cat?.icon ?? '📍') : getLayerIcon(activeLayer)}
               </span>
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(250,247,242,0.4)', lineHeight: 1, marginBottom: 2 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: UI.tabIdleText, lineHeight: 1, marginBottom: 2 }}>
                   {resolvedTab === 'listing' ? cat?.label : 'Active Layer'}
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(250,247,242,0.95)', lineHeight: 1.2 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: UI.tabActiveText, lineHeight: 1.2 }}>
                   {resolvedTab === 'listing' ? listing.title : getLayerLabel(activeLayer)}
                 </div>
               </div>
@@ -710,10 +787,10 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
             <button
               onClick={resolvedTab === 'listing' ? onCloseListing : onCloseLayer}
               style={{
-                background: 'rgba(46,34,26,0.7)',
-                border: '1px solid rgba(250,247,242,0.15)',
+                background: UI.closeBtnBg,
+                border: `1px solid ${UI.closeBtnBorder}`,
                 borderRadius: 8,
-                color: 'rgba(250,247,242,0.7)',
+                color: UI.closeBtnText,
                 width: 28, height: 28,
                 cursor: 'pointer', fontSize: 14,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -725,7 +802,7 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
       </div>
 
       {/* ── Body ─────────────────────────────────────────────────────── */}
-      <div style={{ overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: 'rgba(250,247,242,0.15) transparent' }}>
+      <div style={{ overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: `${UI.scrollbar} transparent` }}>
         {resolvedTab === 'listing' && listing && (
           <ListingTabContent listing={listing} cat={cat} vineyards={vineyards} parcelTopoStats={parcelTopoStats} onVineyardHover={onVineyardHover} onViewAllVineyards={onViewAllVineyards} />
         )}
@@ -749,9 +826,9 @@ function getLayerLabel(id) { return LAYER_META[id]?.label ?? id; }
 
 /* ── Listing tab ──────────────────────────────────────────────────────── */
 function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyardHover, onViewAllVineyards }) {
-  const CARD = { background: 'rgba(250,247,242,0.06)', border: '1px solid rgba(250,247,242,0.08)', borderRadius: 10, padding: '12px 14px', marginBottom: 8 };
-  const LBL  = { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(250,247,242,0.4)', marginBottom: 4 };
-  const VAL  = { fontSize: 12, color: 'rgba(250,247,242,0.85)', lineHeight: 1.5 };
+  const CARD = { background: UI.cardBg, border: `1px solid ${UI.cardBorder}`, borderRadius: 10, padding: '12px 14px', marginBottom: 8 };
+  const LBL  = { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: UI.labelText, marginBottom: 4 };
+  const VAL  = { fontSize: 12, color: UI.valueText, lineHeight: 1.5 };
 
   const [hoveredIdx, setHoveredIdx] = useState(null);
   const [expandedGroupKey, setExpandedGroupKey] = useState(null);
@@ -809,29 +886,29 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
           <span style={{
             width: 24, height: 24, borderRadius: '50%', background: cat.color,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0, marginTop: 2,
+            fontSize: 10, fontWeight: 700, color: UI.white, flexShrink: 0, marginTop: 2,
           }}>
             {listing.num}
           </span>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(250,247,242,0.95)', lineHeight: 1.3 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: UI.titleText, lineHeight: 1.3 }}>
             {listing.title}
           </div>
         </div>
 
         {listing.desc && (
-          <p style={{ fontSize: 12, color: 'rgba(250,247,242,0.6)', lineHeight: 1.6, margin: '0 0 12px 0' }}>
+          <p style={{ fontSize: 12, color: UI.bodyText, lineHeight: 1.6, margin: '0 0 12px 0' }}>
             {listing.desc.slice(0, 300)}{listing.desc.length > 300 ? '…' : ''}
           </p>
         )}
 
         {listing.phone && (
-          <a href={`tel:${listing.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(250,247,242,0.7)', textDecoration: 'none', marginBottom: 10 }}>
+          <a href={`tel:${listing.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: UI.phoneText, textDecoration: 'none', marginBottom: 10 }}>
             📞 {listing.phone}
           </a>
         )}
 
         {listing.url && (
-          <a href={listing.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', padding: '8px 14px', background: cat.color, color: '#fff', borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', textAlign: 'center', marginTop: 4 }}>
+          <a href={listing.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', padding: '8px 14px', background: cat.color, color: UI.white, borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', textAlign: 'center', marginTop: 4 }}>
             Visit Website ↗
           </a>
         )}
@@ -840,20 +917,20 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
         {vineyards && vineyards.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(250,247,242,0.35)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: UI.sectionLabel }}>
                 🍇 Estate Vineyard{vineyards.length > 1 ? 's' : ''}
               </div>
               {vineyards.length > 1 && (
                 <button
                   onClick={() => onViewAllVineyards?.(vineyards)}
                   style={{
-                    background: 'rgba(109,191,138,0.12)',
-                    border: '1px solid rgba(109,191,138,0.35)',
+                    background: UI.vineyardAccentSoft,
+                    border: `1px solid ${UI.vineyardAccentBorder}`,
                     borderRadius: 6,
-                    color: '#6DBF8A',
+                    color: UI.vineyardAccent,
                     fontSize: 10,
                     fontWeight: 700,
-                    fontFamily: 'Inter, sans-serif',
+                    fontFamily: 'var(--font-sans)',
                     letterSpacing: '0.04em',
                     padding: '3px 8px',
                     cursor: 'pointer',
@@ -864,14 +941,14 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                     whiteSpace: 'nowrap',
                   }}
                   onMouseEnter={e => {
-                    e.currentTarget.style.background = 'rgba(56,189,248,0.12)';
-                    e.currentTarget.style.borderColor = 'rgba(56,189,248,0.45)';
-                    e.currentTarget.style.color = '#38BDF8';
+                    e.currentTarget.style.background = UI.hoverAccentSoft;
+                    e.currentTarget.style.borderColor = UI.hoverAccentBorder;
+                    e.currentTarget.style.color = UI.hoverAccent;
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.background = 'rgba(109,191,138,0.12)';
-                    e.currentTarget.style.borderColor = 'rgba(109,191,138,0.35)';
-                    e.currentTarget.style.color = '#6DBF8A';
+                    e.currentTarget.style.background = UI.vineyardAccentSoft;
+                    e.currentTarget.style.borderColor = UI.vineyardAccentBorder;
+                    e.currentTarget.style.color = UI.vineyardAccent;
                   }}
                   title="Fit map to all estate parcels"
                 >
@@ -946,11 +1023,11 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                     ...CARD,
                     cursor: 'pointer',
                     border: isHovered
-                      ? '1px solid rgba(56,189,248,0.55)'
-                      : '1px solid rgba(250,247,242,0.08)',
+                      ? `1px solid ${UI.hoverAccentBorder}`
+                      : `1px solid ${UI.cardBorder}`,
                     background: isHovered
-                      ? 'rgba(56,189,248,0.10)'
-                      : 'rgba(250,247,242,0.06)',
+                      ? UI.hoverAccentSoft
+                      : UI.cardBg,
                     transition: 'border-color 0.15s, background 0.15s',
                     position: 'relative',
                   }}
@@ -969,10 +1046,10 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                   title="Click to view vineyard details and zoom"
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isExpanded ? 8 : 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: isHovered ? '#38BDF8' : '#6DBF8A', transition: 'color 0.15s', flex: 1, paddingRight: 8 }}>{group.name}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: isHovered ? UI.hoverAccent : UI.vineyardAccent, transition: 'color 0.15s', flex: 1, paddingRight: 8 }}>{group.name}</div>
                     <span style={{
                       fontSize: 10,
-                      color: isHovered ? 'rgba(56,189,248,0.9)' : 'rgba(109,191,138,0.5)',
+                      color: isHovered ? UI.hoverAccentMuted : UI.vineyardAccentMuted,
                       transition: 'color 0.15s, transform 0.15s',
                       transform: isHovered ? 'scale(1.15)' : 'scale(1)',
                       flexShrink: 0,
@@ -980,7 +1057,7 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                     }} title={isExpanded ? 'Expanded' : 'Expand and zoom'}>{isExpanded ? '▾' : '▸'}</span>
                   </div>
                   {isExpanded && (
-                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(250,247,242,0.08)' }}>
+                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${UI.cardBorder}` }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                         <div><div style={LBL}>Blocks</div><div style={VAL}>{blockCount}</div></div>
                         {acres && <div><div style={LBL}>Acres</div><div style={VAL}>{acres} ac</div></div>}
@@ -988,21 +1065,21 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                       </div>
 
                       {groupTopoStats && (
-                        <div style={{ marginTop: 8, paddingTop: 7, borderTop: '1px solid rgba(250,247,242,0.06)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        <div style={{ marginTop: 8, paddingTop: 7, borderTop: `1px solid ${UI.subtleDivider}`, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                           {groupTopoStats.elev_min != null && groupTopoStats.elev_max != null && (
-                            <span style={{ fontSize: 10, color: 'rgba(250,247,242,0.45)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <span style={{ fontSize: 10, color: UI.faintText, display: 'flex', alignItems: 'center', gap: 3 }}>
                               <span style={{ opacity: 0.6 }}>↑</span>
                               {Math.round(groupTopoStats.elev_min)}–{Math.round(groupTopoStats.elev_max)} ft
                             </span>
                           )}
                           {groupTopoStats.slope_mean != null && (
-                            <span style={{ fontSize: 10, color: 'rgba(250,247,242,0.45)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <span style={{ fontSize: 10, color: UI.faintText, display: 'flex', alignItems: 'center', gap: 3 }}>
                               <span style={{ opacity: 0.6 }}>⊿</span>
                               {groupTopoStats.slope_mean.toFixed(1)}° slope
                             </span>
                           )}
                           {groupTopoStats.aspect_label && groupTopoStats.aspect_label !== 'Flat' && (
-                            <span style={{ fontSize: 10, color: 'rgba(250,247,242,0.45)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <span style={{ fontSize: 10, color: UI.faintText, display: 'flex', alignItems: 'center', gap: 3 }}>
                               <span style={{ opacity: 0.6 }}>◎</span>
                               {groupTopoStats.aspect_label}
                             </span>
@@ -1016,14 +1093,14 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                             <div
                               key={`${b.name || 'block'}-${bi}`}
                               style={{
-                                border: '1px solid rgba(250,247,242,0.1)',
+                                border: `1px solid ${UI.blockBorder}`,
                                 borderRadius: 6,
                                 padding: '7px 8px',
-                                background: 'rgba(250,247,242,0.03)',
+                                background: UI.blockBg,
                               }}
                             >
-                              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(250,247,242,0.9)' }}>{b.name || `Block ${bi + 1}`}</div>
-                              <div style={{ fontSize: 10, color: 'rgba(250,247,242,0.6)', marginTop: 2 }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: UI.cardTextStrong }}>{b.name || `Block ${bi + 1}`}</div>
+                              <div style={{ fontSize: 10, color: UI.bodyText, marginTop: 2 }}>
                                 {[
                                   b.varieties.size > 0 ? Array.from(b.varieties).slice(0, 2).join(', ') : null,
                                   b.clones.size > 0 ? `Clones: ${Array.from(b.clones).slice(0, 2).join(', ')}` : null,
@@ -1050,18 +1127,18 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                                 }}
                                 style={{
                                   textAlign: 'left',
-                                  border: '1px solid rgba(250,247,242,0.1)',
+                                  border: `1px solid ${UI.blockBorder}`,
                                   borderRadius: 6,
                                   padding: '7px 8px',
-                                  background: 'rgba(250,247,242,0.03)',
-                                  color: 'rgba(250,247,242,0.84)',
+                                  background: UI.blockBg,
+                                  color: UI.valueText,
                                   fontSize: 11,
                                   cursor: 'pointer',
                                 }}
                                 title="Zoom to this block footprint"
                               >
                                 <div style={{ fontWeight: 700 }}>Block {fi + 1}</div>
-                                <div style={{ marginTop: 2, fontSize: 10, color: 'rgba(250,247,242,0.6)' }}>{fAcres || 'No acreage'} • Click to zoom</div>
+                                <div style={{ marginTop: 2, fontSize: 10, color: UI.bodyText }}>{fAcres || 'No acreage'} • Click to zoom</div>
                               </button>
                             );
                           })
@@ -1087,12 +1164,14 @@ const LAYER_INFO_FULL = {
   aspect:    { why: 'The compass direction a slope faces. South- and southwest-facing slopes receive more sunlight in the Northern Hemisphere, producing warmer and more sun-exposed microclimates.', source: 'Derived from USGS DEM', period: 'Static terrain data' },
 };
 
+// audit-ignore-start centralized-colormap-gradients
 const COLORMAP_GRADIENTS = {
   terrain:  'linear-gradient(to right, #0B6623, #90EE90, #F5F5DC, #D2B48C, #8B4513, #FFFFFF)',
   rdylgn_r: 'linear-gradient(to right, #1A9850, #91CF60, #D9EF8B, #FEE08B, #FC8D59, #D73027)',
   hsv:      'linear-gradient(to right, #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000)',
   plasma:   'linear-gradient(to right, #0D0887, #7E03A8, #CC4778, #F89441, #F0F921)',
 };
+// audit-ignore-end centralized-colormap-gradients
 
 function LayerTabContent({ activeLayer, topoStats }) {
   const info = LAYER_INFO_FULL[activeLayer];
@@ -1100,21 +1179,21 @@ function LayerTabContent({ activeLayer, topoStats }) {
 
   const topoConfig = TOPO_LAYER_TYPES[activeLayer];
 
-  const CARD = { background: 'rgba(250,247,242,0.06)', border: '1px solid rgba(250,247,242,0.08)', borderRadius: 10, padding: '12px 14px', marginBottom: 8 };
-  const LBL  = { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(250,247,242,0.4)', marginBottom: 4 };
-  const VAL  = { fontSize: 13, color: 'rgba(250,247,242,0.9)', lineHeight: 1.55 };
+  const CARD = { background: UI.cardBg, border: `1px solid ${UI.cardBorder}`, borderRadius: 10, padding: '12px 14px', marginBottom: 8 };
+  const LBL  = { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: UI.labelText, marginBottom: 4 };
+  const VAL  = { fontSize: 13, color: UI.cardTextStrong, lineHeight: 1.55 };
   const fmt  = (v) => typeof v === 'number' ? v.toFixed(1) : '—';
 
   return (
     <div style={{ padding: '12px 12px 16px' }}>
       <div style={CARD}>
-        <p style={{ fontSize: 12, color: 'rgba(250,247,242,0.55)', lineHeight: 1.7, margin: 0 }}>{info.why}</p>
+        <p style={{ fontSize: 12, color: alpha(TOKENS.parchment, 0.55), lineHeight: 1.7, margin: 0 }}>{info.why}</p>
       </div>
 
       <div style={CARD}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div><div style={LBL}>Period</div><div style={VAL}>{info.period}</div></div>
-          <div><div style={LBL}>Source</div><div style={{ ...VAL, fontSize: 11, color: 'rgba(250,247,242,0.45)' }}>{info.source}</div></div>
+          <div><div style={LBL}>Source</div><div style={{ ...VAL, fontSize: 11, color: UI.faintText }}>{info.source}</div></div>
         </div>
       </div>
 
@@ -1125,8 +1204,8 @@ function LayerTabContent({ activeLayer, topoStats }) {
         return (
           <div style={CARD}>
             <div style={{ ...LBL, marginBottom: 8 }}>Data Range — Willamette Valley</div>
-            <div style={{ height: 10, borderRadius: 6, background: gradient, marginBottom: 4, border: '1px solid rgba(250,247,242,0.1)' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(250,247,242,0.4)', marginBottom: 12 }}>
+            <div style={{ height: 10, borderRadius: 6, background: gradient, marginBottom: 4, border: `1px solid ${alpha(TOKENS.parchment, 0.1)}` }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: UI.labelText, marginBottom: 12 }}>
               <span>{fmt(min)}{unit}</span><span>{fmt(max)}{unit}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -1141,8 +1220,8 @@ function LayerTabContent({ activeLayer, topoStats }) {
 
       {!topoStats && topoConfig && (
         <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(250,247,242,0.15)', borderTopColor: 'rgba(250,247,242,0.9)', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-          <span style={{ fontSize: 11, color: 'rgba(250,247,242,0.4)' }}>Loading data range…</span>
+          <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${UI.spinnerBorder}`, borderTopColor: UI.spinnerTop, animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+          <span style={{ fontSize: 11, color: UI.labelText }}>Loading data range…</span>
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       )}
@@ -1212,8 +1291,8 @@ function DevLayerPanel({
   }, [devPanelOpen]);
 
   const groupStyle = {
-    background: 'rgba(46,34,26,0.8)',
-    border: '1px solid rgba(250,247,242,0.14)',
+    background: UI.devGroupBg,
+    border: `1px solid ${UI.devGroupBorder}`,
     borderRadius: 10,
     padding: '8px 10px',
     marginBottom: 8,
@@ -1225,7 +1304,7 @@ function DevLayerPanel({
     justifyContent: 'space-between',
     marginBottom: 6,
     fontSize: 11,
-    color: 'rgba(250,247,242,0.88)',
+    color: alpha(TOKENS.parchment, 0.88),
     gap: 10,
   };
 
@@ -1248,21 +1327,21 @@ function DevLayerPanel({
       left: position.left,
       zIndex: 55,
       width: devPanelOpen ? 250 : 136,
-      background: 'rgba(24,20,16,0.84)',
+      background: UI.devPanelBg,
       backdropFilter: 'blur(14px)',
       WebkitBackdropFilter: 'blur(14px)',
-      border: '1px solid rgba(250,247,242,0.2)',
+      border: `1px solid ${UI.devPanelBorder}`,
       borderRadius: 12,
-      boxShadow: '0 10px 30px rgba(0,0,0,0.34)',
-      color: 'rgba(250,247,242,0.96)',
-      fontFamily: 'Inter, sans-serif',
+      boxShadow: `0 10px 30px ${UI.devPanelShadow}`,
+      color: UI.devPanelText,
+      fontFamily: 'var(--font-sans)',
       overflow: 'hidden',
     }}>
       <div
         onMouseDown={beginDrag}
         style={{
         padding: '8px 10px',
-        borderBottom: devPanelOpen ? '1px solid rgba(250,247,242,0.14)' : 'none',
+        borderBottom: devPanelOpen ? `1px solid ${UI.devHeaderBorder}` : 'none',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -1275,8 +1354,8 @@ function DevLayerPanel({
           onMouseDown={(event) => event.stopPropagation()}
           style={{
             background: 'transparent',
-            border: '1px solid rgba(250,247,242,0.2)',
-            color: 'rgba(250,247,242,0.84)',
+            border: `1px solid ${UI.devButtonBorder}`,
+            color: UI.devButtonText,
             borderRadius: 6,
             cursor: 'pointer',
             fontSize: 10,
@@ -1317,10 +1396,10 @@ function DevLayerPanel({
             onClick={onReset}
             style={{
               width: '100%',
-              background: 'rgba(250,247,242,0.08)',
-              border: '1px solid rgba(250,247,242,0.2)',
+              background: UI.devResetBg,
+              border: `1px solid ${UI.devPanelBorder}`,
               borderRadius: 8,
-              color: 'rgba(250,247,242,0.92)',
+              color: UI.devResetText,
               fontSize: 11,
               fontWeight: 700,
               cursor: 'pointer',
@@ -1470,6 +1549,13 @@ const WVWAMap = forwardRef(function WVWAMap({
     clearSelectedListing() {
       setSelectedListingRef.current?.(null);
       setHoveredListingRef.current?.(null);
+      // Imperatively reset soft focus now rather than waiting for a React effect cycle,
+      // so the map never stays muted after returning to AVA detail.
+      const map = mapRef.current;
+      if (map && map.isStyleLoaded?.()) {
+        setVineyardReferenceSoftFocus(map, false);
+        setListingSoftFocus(map, false);
+      }
     },
     flyToAva(slug) {
       const map = mapRef.current;
@@ -1991,6 +2077,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       // setFog was removed in MapLibre GL JS v5 — guard to avoid TypeError
       if (typeof map.setFog === 'function') {
         try {
+          // audit-ignore-start globe-fog-colors
           map.setFog({
             'space-color': '#000000',
             'star-intensity': 0.0,
@@ -1998,6 +2085,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             'high-color': 'rgba(10, 30, 80, 0.8)',
             'horizon-blend': 0.08,
           });
+          // audit-ignore-end
         } catch (e) {
           // ignore — unsupported in this MapLibre version
         }
@@ -2033,7 +2121,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         source: 'wine-regions',
         paint: {
           'circle-radius': 3,
-          'circle-color': '#FAF7F2',
+          'circle-color': BRAND.eggshell,
           'circle-opacity': 0.85,
           'circle-stroke-width': 0,
         },
@@ -2065,7 +2153,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           'symbol-placement': 'point',
         },
         paint: {
-          'text-color': '#FAF7F2',
+          'text-color': BRAND.eggshell,
           'text-opacity': 0.9,
           'text-halo-color': 'rgba(0,0,0,0.5)',
           'text-halo-width': 1,
@@ -2092,7 +2180,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         type: 'line',
         source: 'wine-region-lines',
         paint: {
-          'line-color': '#FAF7F2',
+          'line-color': BRAND.eggshell,
           'line-opacity': 0.35,
           'line-width': 1,
         },
@@ -2388,8 +2476,8 @@ const WVWAMap = forwardRef(function WVWAMap({
             line-height: 1.4;
             font-size: 13px;
           ">
-            <div style="font-weight: 600; color: #1e293b;">Winery: <span style="font-weight: 400;">${wineryName}</span></div>
-            ${vineyardName ? `<div style="font-weight: 600; color: #1e293b; margin-top: 2px;">Vineyard: <span style="font-weight: 400;">${vineyardName}</span></div>` : ''}
+            <div style="font-weight: 600; color: ${UI.popupLabelColor};">Winery: <span style="font-weight: 400;">${wineryName}</span></div>
+            ${vineyardName ? `<div style="font-weight: 600; color: ${UI.popupLabelColor}; margin-top: 2px;">Vineyard: <span style="font-weight: 400;">${vineyardName}</span></div>` : ''}
           </div>`;
           if (!vineyardPopupRef.current) {
             vineyardPopupRef.current = new maplibregl.Popup({
@@ -2493,8 +2581,8 @@ const WVWAMap = forwardRef(function WVWAMap({
             line-height: 1.4;
             font-size: 13px;
           ">
-            <div style="font-weight: 600; color: #1e293b;">Winery: <span style="font-weight: 400;">Non-member winery</span></div>
-            <div style="font-weight: 600; color: #1e293b; margin-top: 2px;">Vineyard: <span style="font-weight: 400;">${vineyardName}</span></div>
+            <div style="font-weight: 600; color: ${UI.popupLabelColor};">Winery: <span style="font-weight: 400;">Non-member winery</span></div>
+            <div style="font-weight: 600; color: ${UI.popupLabelColor}; margin-top: 2px;">Vineyard: <span style="font-weight: 400;">${vineyardName}</span></div>
           </div>`;
 
           if (!vineyardPopupRef.current) {
@@ -2620,6 +2708,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
       });
+      // audit-ignore-start ava-hover-layer-paint
       map.addLayer({
         id: 'ava-hover-line',
         type: 'line',
@@ -2630,6 +2719,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           'line-opacity': 1,
         },
       });
+      // audit-ignore-end
 
       // ── GeoJSON source for clustered markers ─────────────────────────
       addListingsSourceAndBaseLayers(
@@ -2645,6 +2735,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
       });
+      // audit-ignore-start listing-highlight-layer-paint
       // Outer glow / halo ring
       map.addLayer({
         id: 'listings-selected-glow',
@@ -2707,6 +2798,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           'circle-opacity': 0.3,
         },
       });
+      // audit-ignore-end
 
       applyListingFocusAccent(map, DEFAULT_LISTING_SYMBOLOGY);
 
@@ -3061,6 +3153,8 @@ const WVWAMap = forwardRef(function WVWAMap({
 
     setLayerVisibility(map, 'vineyards-linked-fill', devLayerToggles.vineyardsLinked);
     setLayerVisibility(map, 'vineyards-linked-line', devLayerToggles.vineyardsLinked);
+    // Re-apply soft focus so linked layer doesn't flash at full green when toggled on during winery detail
+    if (selectedListing) setVineyardReferenceSoftFocus(map, true);
 
     const vineyardHighlightLayerIds = [
       'vineyards-reference-hover-line',
@@ -3121,7 +3215,7 @@ const WVWAMap = forwardRef(function WVWAMap({
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <div ref={mapContainerRef} style={{ width: '100%', height: '100%', background: '#000000' }} />
+      <div ref={mapContainerRef} style={{ width: '100%', height: '100%', background: UI.mapContainerBg }} />
 
       {/* Dev layer panel — hidden; re-enable by uncommenting
       {introComplete && (
@@ -3141,12 +3235,12 @@ const WVWAMap = forwardRef(function WVWAMap({
       {introComplete && hoveredListing && (
         <div style={{
           position: 'absolute', bottom: 40, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(72,55,41,0.82)', backdropFilter: 'blur(12px)',
+          background: UI.wineryHoverBg, backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
-          border: `1.5px solid #87CEEB`, borderRadius: 8,
+          border: `1.5px solid ${UI.wineryHoverBorder}`, borderRadius: 8,
           padding: '5px 14px', fontSize: 13, fontWeight: 600, color: BRAND.eggshell,
-          pointerEvents: 'none', zIndex: 5, fontFamily: 'Inter, sans-serif',
-          boxShadow: '0 4px 20px rgba(46,34,26,0.25)',
+          pointerEvents: 'none', zIndex: 5, fontFamily: 'var(--font-sans)',
+          boxShadow: `0 4px 20px ${UI.wineryHoverShadow}`,
         }}>
           {hoveredListing.title}
         </div>
@@ -3156,12 +3250,12 @@ const WVWAMap = forwardRef(function WVWAMap({
       {!hoveredListing && hoveredVineyardOrganization && (
         <div style={{
           position: 'absolute', bottom: 40, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(32,47,59,0.82)', backdropFilter: 'blur(12px)',
+          background: UI.vineyardHoverBg, backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
-          border: '1.5px solid #38BDF8', borderRadius: 8,
+          border: `1.5px solid ${UI.hoverAccent}`, borderRadius: 8,
           padding: '5px 14px', fontSize: 13, fontWeight: 600, color: BRAND.eggshell,
-          pointerEvents: 'none', zIndex: 5, fontFamily: 'Inter, sans-serif',
-          boxShadow: '0 4px 20px rgba(15,23,42,0.25)',
+          pointerEvents: 'none', zIndex: 5, fontFamily: 'var(--font-sans)',
+          boxShadow: `0 4px 20px ${UI.vineyardHoverShadow}`,
         }}>
           {hoveredVineyardOrganization}
         </div>
@@ -3173,13 +3267,13 @@ const WVWAMap = forwardRef(function WVWAMap({
         return ava ? (
           <div style={{
             position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(46,34,26,0.88)',
+            background: UI.avaBadgeBg,
             backdropFilter: 'blur(16px)',
             WebkitBackdropFilter: 'blur(16px)',
             borderRadius: 12,
             padding: '10px 20px',
-            fontFamily: 'Inter, sans-serif',
-            boxShadow: '0 4px 24px rgba(46,34,26,0.35)',
+            fontFamily: 'var(--font-sans)',
+            boxShadow: `0 4px 24px ${UI.avaBadgeShadow}`,
             border: `1.5px solid ${ava.color}55`,
             zIndex: 10,
             display: 'flex',

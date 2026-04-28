@@ -1,5 +1,14 @@
-import { BRAND } from '../config/brandColors';
+import { BRAND, TOKENS, alpha } from '../styles/tokens';
 import { WV_SUB_AVAS } from '../config/topographyConfig';
+
+// UI constants for modal styling
+const UI = {
+  backdropBg: alpha(TOKENS.ink, 0.55),
+  shadowDark: alpha('black', 0.3),
+  shadowLight: alpha('black', 0.15),
+  subtitle: alpha(TOKENS.parchment, 0.6),
+  closeBtn: alpha(TOKENS.parchment, 0.12),
+};
 
 export default function AVAListModal({ isOpen, onClose, onSelect }) {
   if (!isOpen) return null;
@@ -10,13 +19,13 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(46,34,26,0.55)',
+        background: UI.backdropBg,
         backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 100,
-        fontFamily: 'Inter, sans-serif',
+        fontFamily: 'var(--font-sans)',
       }}
     >
       <div
@@ -27,7 +36,7 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
           width: 420,
           maxHeight: '80vh',
           overflow: 'hidden',
-          boxShadow: '0 20px 60px rgba(46,34,26,0.3), 0 4px 16px rgba(46,34,26,0.15)',
+          boxShadow: `0 20px 60px ${UI.shadowDark}, 0 4px 16px ${UI.shadowLight}`,
           border: `1px solid ${BRAND.border}`,
         }}
       >
@@ -44,12 +53,12 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
               color: BRAND.eggshell,
               fontSize: 18,
               fontWeight: 700,
-              fontFamily: 'Georgia, serif',
+              fontFamily: 'var(--font-display)',
             }}>
               Explore Sub-AVAs
             </div>
             <div style={{
-              color: 'rgba(250,247,242,0.6)',
+              color: UI.subtitle,
               fontSize: 12,
               marginTop: 4,
             }}>
@@ -59,7 +68,7 @@ export default function AVAListModal({ isOpen, onClose, onSelect }) {
           <button
             onClick={onClose}
             style={{
-              background: 'rgba(250,247,242,0.12)',
+              background: UI.closeBtn,
               border: 'none',
               color: BRAND.eggshell,
               width: 32,

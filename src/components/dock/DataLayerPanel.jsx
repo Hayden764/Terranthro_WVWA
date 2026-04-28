@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BRAND } from '../../config/brandColors';
+import { BRAND, TOKENS, alpha } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { MONTH_ABBR } from '../../config/climateConfig';
 import { TOPO_LAYER_TYPES } from '../../config/topographyConfig';
@@ -22,8 +22,8 @@ const TOPO_LAYERS = Object.values(TOPO_LAYER_TYPES).map(t => ({
 
 /* ─── Design tokens ──────────────────────────────────────────────────── */
 const CARD = {
-  background: 'rgba(250,247,242,0.06)',
-  border: `1px solid rgba(250,247,242,0.08)`,
+  background: alpha(TOKENS.parchment, 0.06),
+  border: `1px solid ${alpha(TOKENS.parchment, 0.08)}`,
   borderRadius: 10,
   padding: '10px 12px',
   marginBottom: 8,
@@ -36,6 +36,15 @@ const SECTION_LABEL = {
   letterSpacing: '0.08em',
   color: GLASS.textDim,
   marginBottom: 8,
+};
+
+const UI = {
+  activeBorder: alpha(TOKENS.crimson, 0.5),
+  idleBorder:   alpha(TOKENS.parchment, 0.08),
+  hoverBg:      alpha(TOKENS.parchment, 0.06),
+  lidarText:    alpha(TOKENS.vividGreen, 0.8),
+  lidarBg:      alpha(TOKENS.vividGreen, 0.1),
+  lidarBorder:  alpha(TOKENS.vividGreen, 0.25),
 };
 
 /* ─── Chevron icon ────────────────────────────────────────────────────── */
@@ -95,14 +104,14 @@ export default function DataLayerPanel({
                     textAlign: 'left',
                     padding: '8px 10px',
                     borderRadius: 8,
-                    border: `1.5px solid ${active ? 'rgba(142,21,55,0.5)' : 'rgba(250,247,242,0.08)'}`,
+                    border: `1.5px solid ${active ? UI.activeBorder : UI.idleBorder}`,
                     background: active ? GLASS.accentDim : 'transparent',
                     cursor: 'pointer',
                     transition: 'all 0.15s',
-                    fontFamily: 'Inter, sans-serif',
+                    fontFamily: 'var(--font-sans)',
                   }}
                   onMouseEnter={e => {
-                    if (!active) e.currentTarget.style.background = 'rgba(250,247,242,0.06)';
+                    if (!active) e.currentTarget.style.background = UI.hoverBg;
                   }}
                   onMouseLeave={e => {
                     if (!active) e.currentTarget.style.background = 'transparent';
@@ -157,15 +166,15 @@ export default function DataLayerPanel({
             textAlign: 'left',
             padding: '8px 10px',
             borderRadius: 8,
-            border: `1.5px solid ${listingFilterMode === LISTING_FILTER_MODES.noVineyardsVisualized ? 'rgba(142,21,55,0.5)' : 'rgba(250,247,242,0.08)'}`,
+            border: `1.5px solid ${listingFilterMode === LISTING_FILTER_MODES.noVineyardsVisualized ? UI.activeBorder : UI.idleBorder}`,
             background: listingFilterMode === LISTING_FILTER_MODES.noVineyardsVisualized ? GLASS.accentDim : 'transparent',
             cursor: 'pointer',
             transition: 'all 0.15s',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-sans)',
           }}
           onMouseEnter={e => {
             if (listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized) {
-              e.currentTarget.style.background = 'rgba(250,247,242,0.06)';
+              e.currentTarget.style.background = UI.hoverBg;
             }
           }}
           onMouseLeave={e => {
@@ -205,9 +214,9 @@ export default function DataLayerPanel({
               fontSize: 8,
               fontWeight: 700,
               letterSpacing: '0.06em',
-              color: 'rgba(109,191,138,0.8)',
-              background: 'rgba(109,191,138,0.1)',
-              border: '1px solid rgba(109,191,138,0.25)',
+              color: UI.lidarText,
+              background: UI.lidarBg,
+              border: `1px solid ${UI.lidarBorder}`,
               borderRadius: 4,
               padding: '1px 5px',
               lineHeight: 1.4,
@@ -230,20 +239,20 @@ export default function DataLayerPanel({
                     flex: 1,
                     padding: '8px 4px',
                     borderRadius: 8,
-                    border: `1.5px solid ${active ? 'rgba(142,21,55,0.5)' : 'rgba(250,247,242,0.08)'}`,
+                    border: `1.5px solid ${active ? UI.activeBorder : UI.idleBorder}`,
                     background: active ? GLASS.accentDim : 'transparent',
                     color: active ? GLASS.text : GLASS.textDim,
                     cursor: 'pointer',
                     fontSize: 10,
                     fontWeight: 600,
-                    fontFamily: 'Inter, sans-serif',
+                    fontFamily: 'var(--font-sans)',
                     transition: 'all 0.15s',
                     textAlign: 'center',
                     letterSpacing: '0.03em',
                     textTransform: 'uppercase',
                   }}
                   onMouseEnter={e => {
-                    if (!active) e.currentTarget.style.background = 'rgba(250,247,242,0.06)';
+                    if (!active) e.currentTarget.style.background = UI.hoverBg;
                   }}
                   onMouseLeave={e => {
                     if (!active) e.currentTarget.style.background = active ? GLASS.accentDim : 'transparent';

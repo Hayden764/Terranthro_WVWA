@@ -1,7 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
 import WVWAMap, { LISTING_FILTER_MODES } from '../components/WVWAMap';
 import ExplorerSidebar from '../components/ExplorerSidebar';
-import { BRAND } from '../config/brandColors';
+import { BRAND, TOKENS, alpha } from '../styles/tokens';
+
+const UI = {
+  taglineText:      alpha(TOKENS.parchment, 0.5),
+  btnBorderIdle:    alpha(TOKENS.parchment, 0.25),
+  btnTextIdle:      alpha(TOKENS.parchment, 0.35),
+  btnHoverBg:       alpha(TOKENS.parchment, 0.1),
+  subtleLabel:      alpha(TOKENS.parchment, 0.45),
+  scrimBg:          alpha('black', 0.45),
+  fabShadow:        alpha('black', 0.28),
+};
 import { useIsMobile } from '../lib/useIsMobile';
 
 // ── Entrance Panel (Option B — Dark Cinematic) ───────────────────────────
@@ -35,7 +45,7 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
           color: BRAND.eggshell,
           letterSpacing: '-0.01em',
           lineHeight: 1.15,
-          fontFamily: 'Georgia, "Times New Roman", serif',
+          fontFamily: 'var(--font-display)',
         }}>
           Willamette Valley
         </div>
@@ -45,7 +55,7 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
           color: BRAND.eggshell,
           letterSpacing: '0.04em',
           lineHeight: 1.3,
-          fontFamily: 'Georgia, "Times New Roman", serif',
+          fontFamily: 'var(--font-display)',
           opacity: 0.8,
           marginTop: 4,
         }}>
@@ -59,7 +69,7 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
       {/* Tagline */}
       <div style={{
         fontSize: 12,
-        color: 'rgba(250,247,242,0.5)',
+          color: UI.taglineText,
         fontStyle: 'italic',
         letterSpacing: '0.06em',
         textAlign: 'center',
@@ -78,20 +88,20 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
           width: '100%',
           padding: '13px 0',
           background: 'transparent',
-          border: `1.5px solid ${mapReady ? BRAND.eggshell : 'rgba(250,247,242,0.25)'}`,
+          border: `1.5px solid ${mapReady ? BRAND.eggshell : UI.btnBorderIdle}`,
           borderRadius: 4,
-          color: mapReady ? BRAND.eggshell : 'rgba(250,247,242,0.35)',
+          color: mapReady ? BRAND.eggshell : UI.btnTextIdle,
           fontSize: 13,
           fontWeight: 600,
           letterSpacing: '0.1em',
           textTransform: 'uppercase',
           cursor: mapReady ? 'pointer' : 'default',
-          fontFamily: 'Inter, sans-serif',
+          fontFamily: 'var(--font-sans)',
           transition: 'background 0.2s, color 0.2s, border-color 0.2s',
         }}
         onMouseEnter={e => {
           if (!mapReady) return;
-          e.currentTarget.style.background = 'rgba(250,247,242,0.1)';
+          e.currentTarget.style.background = UI.btnHoverBg;
         }}
         onMouseLeave={e => {
           e.currentTarget.style.background = 'transparent';
@@ -142,7 +152,7 @@ export default function WVWAMapPage() {
   useEffect(() => { if (isMobile && selectedAva) setSidebarOpen(true); }, [isMobile, selectedAva]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', overflow: 'hidden', background: BRAND.eggshell, fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', overflow: 'hidden', background: BRAND.eggshell, fontFamily: 'var(--font-sans)' }}>
 
       {/* ── Slim header ─────────────────────────────────────────────── */}
       <header style={{
@@ -168,7 +178,7 @@ export default function WVWAMapPage() {
             style={{ height: 28, width: 'auto', display: 'block', filter: 'brightness(0) invert(1)' }}
           />
         </a>
-        <div style={{ fontSize: 12, color: 'rgba(250,247,242,0.45)', fontFamily: 'Inter, sans-serif', letterSpacing: '0.02em' }}>
+        <div style={{ fontSize: 12, color: UI.subtleLabel, fontFamily: 'var(--font-sans)', letterSpacing: '0.02em' }}>
           Wineries &amp; AVA Explorer
         </div>
       </header>
@@ -215,7 +225,7 @@ export default function WVWAMapPage() {
             onClick={() => setSidebarOpen(false)}
             style={{
               position: 'fixed', inset: 0,
-              background: 'rgba(0,0,0,0.45)',
+              background: UI.scrimBg,
               zIndex: 199,
             }}
           />
@@ -234,8 +244,8 @@ export default function WVWAMapPage() {
                 background: BRAND.brown, border: 'none', borderRadius: 10,
                 color: BRAND.eggshell, fontSize: 20,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.28)',
-                fontFamily: 'Inter, sans-serif', lineHeight: 1,
+                cursor: 'pointer', boxShadow: `0 2px 8px ${UI.fabShadow}`,
+                fontFamily: 'var(--font-sans)', lineHeight: 1,
               }}
             >
               ☰

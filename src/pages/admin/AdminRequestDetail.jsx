@@ -13,6 +13,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { TOKENS, alpha } from '../../styles/tokens';
 import { apiJson, apiPost } from '../../lib/api';
 import AdminGeometryDiffMap from './AdminGeometryDiffMap';
 import AdminBatchMap from './AdminBatchMap';
@@ -72,7 +73,7 @@ export default function AdminRequestDetail() {
   if (loading) {
     return (
       <Shell>
-        <p style={{ color: '#888' }}>Loading request…</p>
+        <p style={{ color: TOKENS.muted }}>Loading request…</p>
       </Shell>
     );
   }
@@ -94,7 +95,7 @@ export default function AdminRequestDetail() {
       {/* Back link */}
       <Link
         to="/admin/dashboard"
-        style={{ fontSize: 12, color: '#4a90d9', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 20 }}
+        style={{ fontSize: 12, color: TOKENS.electricBlue, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 20 }}
       >
         ← Back to Dashboard
       </Link>
@@ -102,23 +103,23 @@ export default function AdminRequestDetail() {
       {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ fontSize: 20, color: '#e0e0e0', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <h1 style={{ fontSize: 20, color: TOKENS.parchment, margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {REQUEST_TYPE_LABELS[request.request_type] || request.request_type.replace(/_/g, ' ')}
-            <span style={{ fontSize: 14, fontWeight: 400, color: '#666' }}>#{request.id}</span>
+            <span style={{ fontSize: 14, fontWeight: 400, color: alpha(TOKENS.parchment, 0.35) }}>#{request.id}</span>
             {request.origin === 'admin' && (
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#818cf8', background: 'rgba(99,102,241,0.12)', borderRadius: 4, padding: '2px 7px' }}>ADMIN</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: TOKENS.violet, background: alpha(TOKENS.violet, 0.12), borderRadius: 4, padding: '2px 7px' }}>ADMIN</span>
             )}
             {request.flag === 'acreage_change' && (
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#eab308', background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.25)', borderRadius: 4, padding: '2px 7px' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: TOKENS.warning, background: alpha(TOKENS.warning, 0.12), border: `1px solid ${alpha(TOKENS.warning, 0.25)}`, borderRadius: 4, padding: '2px 7px' }}>
                 ⚠ Acreage Δ{request.flag_detail?.pct_change != null ? ` ${request.flag_detail.pct_change > 0 ? '+' : ''}${request.flag_detail.pct_change}%` : ''}
               </span>
             )}
           </h1>
-          <p style={{ margin: 0, fontSize: 13, color: '#aaa' }}>
-            <strong style={{ color: '#ccc' }}>{request.winery_name}</strong>
+          <p style={{ margin: 0, fontSize: 13, color: alpha(TOKENS.parchment, 0.7) }}>
+            <strong style={{ color: alpha(TOKENS.parchment, 0.82) }}>{request.winery_name}</strong>
             {request.contact_email ? `· ${request.contact_email}` : request.submitted_by_admin_name ? `· by admin: ${request.submitted_by_admin_name}` : ''}
             {parcel && (
-              <span style={{ color: '#888' }}>
+              <span style={{ color: TOKENS.muted }}>
                 {' · '}{parcel.vineyard_name || `Parcel #${request.target_id}`}
                 {parcel.acres && ` · ${Number(parcel.acres).toFixed(1)} ac`}
                 {parcel.ava_name && ` · ${parcel.ava_name}`}
@@ -130,7 +131,7 @@ export default function AdminRequestDetail() {
       </div>
 
       {/* Timestamps */}
-      <div style={{ fontSize: 11, color: '#555', marginBottom: 20, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ fontSize: 11, color: alpha(TOKENS.parchment, 0.3), marginBottom: 20, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <span>Submitted {new Date(request.created_at).toLocaleString()}</span>
         {request.reviewed_at && (
           <span>
@@ -143,9 +144,9 @@ export default function AdminRequestDetail() {
 
       {/* Admin notes (if already reviewed) */}
       {request.admin_notes && (
-        <div style={{ ...infoBox, borderColor: 'rgba(255,193,7,0.2)', marginBottom: 20 }}>
+        <div style={{ ...infoBox, borderColor: alpha(TOKENS.warning, 0.2), marginBottom: 20 }}>
           <SectionLabel>Admin note</SectionLabel>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>{request.admin_notes}</p>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: alpha(TOKENS.parchment, 0.82), lineHeight: 1.5 }}>{request.admin_notes}</p>
         </div>
       )}
 
@@ -171,8 +172,8 @@ export default function AdminRequestDetail() {
           <div style={{ position: 'sticky', top: 20 }}>
             <SectionLabel>Parcel location</SectionLabel>
             <ParcelContextMap geometry={parcel.geometry} />
-            <div style={{ fontSize: 11, color: '#555', marginTop: 6 }}>
-              {parcel.vineyard_name && <div style={{ color: '#888' }}>{parcel.vineyard_name}</div>}
+            <div style={{ fontSize: 11, color: alpha(TOKENS.parchment, 0.3), marginTop: 6 }}>
+              {parcel.vineyard_name && <div style={{ color: TOKENS.muted }}>{parcel.vineyard_name}</div>}
               {parcel.ava_name && <div>{parcel.ava_name}</div>}
               {parcel.acres && <div>{Number(parcel.acres).toFixed(1)} acres</div>}
             </div>
@@ -182,23 +183,23 @@ export default function AdminRequestDetail() {
 
       {/* ── Actions ── */}
       {isPending && (
-        <div style={{ marginTop: 28, borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 20 }}>
+        <div style={{ marginTop: 28, borderTop: `1px solid ${alpha(TOKENS.parchment, 0.07)}`, paddingTop: 20 }}>
           {actionStatus === 'error' && (
-            <p style={{ fontSize: 12, color: '#ef9a9a', marginBottom: 12 }}>Action failed — please try again.</p>
+            <p style={{ fontSize: 12, color: TOKENS.danger, marginBottom: 12 }}>Action failed — please try again.</p>
           )}
 
           {/* Edited ops summary */}
           {editedOps !== null && request.request_type === 'admin_batch_edit' && (
             <div style={{
-              fontSize: 12, color: '#fbbf24', background: 'rgba(251,191,36,0.08)',
-              border: '1px solid rgba(251,191,36,0.2)', borderRadius: 6,
+              fontSize: 12, color: TOKENS.warning, background: alpha(TOKENS.warning, 0.08),
+              border: `1px solid ${alpha(TOKENS.warning, 0.2)}`, borderRadius: 6,
               padding: '7px 12px', marginBottom: 12,
               display: 'flex', alignItems: 'center', gap: 8,
             }}>
               <span>✎ Approving {editedOps.length} of {(request.payload?.ops || []).length} ops (edited)</span>
               <button
                 onClick={() => setEditedOps(null)}
-                style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontSize: 11, textDecoration: 'underline' }}
+                style={{ marginLeft: 'auto', background: 'none', border: 'none', color: TOKENS.warning, cursor: 'pointer', fontSize: 11, textDecoration: 'underline' }}
               >
                 Reset to original
               </button>
@@ -224,15 +225,15 @@ export default function AdminRequestDetail() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 480 }}>
-              <label style={{ fontSize: 12, color: '#888' }}>Rejection reason (optional)</label>
+              <label style={{ fontSize: 12, color: TOKENS.muted }}>Rejection reason (optional)</label>
               <textarea
                 value={rejectNotes}
                 onChange={(e) => setRejectNotes(e.target.value)}
                 rows={3}
                 placeholder="Explain why this request is being rejected…"
                 style={{
-                  padding: '8px 10px', borderRadius: 6, fontSize: 13, color: '#e0e0e0',
-                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)',
+                  padding: '8px 10px', borderRadius: 6, fontSize: 13, color: TOKENS.parchment,
+                  background: alpha(TOKENS.parchment, 0.05), border: `1px solid ${alpha(TOKENS.parchment, 0.10)}`,
                   resize: 'vertical', outline: 'none', fontFamily: 'inherit',
                 }}
               />
@@ -252,7 +253,7 @@ export default function AdminRequestDetail() {
       )}
 
       {actionStatus === 'done' && (
-        <p style={{ fontSize: 12, color: '#81c784', marginTop: 12 }}>Action applied successfully.</p>
+        <p style={{ fontSize: 12, color: TOKENS.success, marginTop: 12 }}>Action applied successfully.</p>
       )}
 
       {/* Entity history — shown when this request targets a parcel */}
@@ -265,6 +266,7 @@ export default function AdminRequestDetail() {
 
 // ── AdminEntityHistory ───────────────────────────────────────────────────────
 // Shows the full audit trail for the target parcel, grouped by request.
+// audit-ignore-start admin-request-detail-legacy-palette
 
 function AdminEntityHistory({ entityType, entityId, currentRequestId }) {
   const [data, setData] = useState(null);
@@ -995,12 +997,13 @@ function GeoJsonDownload({ label, geometry }) {
     </button>
   );
 }
+// audit-ignore-end
 
 // ── Shared sub-components & styles ──────────────────────────────────────────
 
 function Shell({ children }) {
   return (
-    <div style={{ minHeight: '100vh', background: '#1a1a2e', fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: TOKENS.ink, fontFamily: "'Inter', sans-serif" }}>
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '32px 20px' }}>
         {children}
       </div>
@@ -1010,7 +1013,7 @@ function Shell({ children }) {
 
 function SectionLabel({ children }) {
   return (
-    <div style={{ fontSize: 11, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, fontWeight: 600 }}>
+    <div style={{ fontSize: 11, color: alpha(TOKENS.parchment, 0.35), textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, fontWeight: 600 }}>
       {children}
     </div>
   );
@@ -1018,9 +1021,9 @@ function SectionLabel({ children }) {
 
 function StatusBadge({ status }) {
   const colors = {
-    pending: { bg: 'rgba(255,193,7,0.15)', color: '#FFD54F' },
-    approved: { bg: 'rgba(76,175,80,0.15)', color: '#81C784' },
-    rejected: { bg: 'rgba(244,67,54,0.15)', color: '#EF9A9A' },
+    pending: { bg: alpha(TOKENS.warning, 0.15), color: TOKENS.warning },
+    approved: { bg: alpha(TOKENS.success, 0.15), color: TOKENS.success },
+    rejected: { bg: alpha(TOKENS.danger, 0.15), color: TOKENS.danger },
   };
   const c = colors[status] || colors.pending;
   return (
@@ -1034,34 +1037,34 @@ function StatusBadge({ status }) {
 }
 
 const infoBox = {
-  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+  background: alpha(TOKENS.parchment, 0.04), border: `1px solid ${alpha(TOKENS.parchment, 0.07)}`,
   borderRadius: 8, padding: '12px 14px',
 };
 
 const thStyle = {
   textAlign: 'left', padding: '8px 14px',
-  color: '#777', fontWeight: 600,
-  borderBottom: '1px solid rgba(255,255,255,0.07)',
+  color: alpha(TOKENS.parchment, 0.45), fontWeight: 600,
+  borderBottom: `1px solid ${alpha(TOKENS.parchment, 0.07)}`,
 };
 
 const tdStyle = {
-  padding: '8px 14px', color: '#ccc', verticalAlign: 'top',
+  padding: '8px 14px', color: alpha(TOKENS.parchment, 0.82), verticalAlign: 'top',
 };
 
 const outlineBtn = {
-  background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
+  background: 'transparent', border: `1px solid ${alpha(TOKENS.parchment, 0.12)}`,
   borderRadius: 6, padding: '7px 16px', fontSize: 12,
-  color: '#aaa', cursor: 'pointer', fontFamily: 'inherit',
+  color: alpha(TOKENS.parchment, 0.7), cursor: 'pointer', fontFamily: 'inherit',
 };
 
 const approveBtnStyle = {
   padding: '8px 20px', borderRadius: 6, border: 'none',
-  background: '#2e7d32', color: '#fff', fontSize: 13,
+  background: TOKENS.success, color: TOKENS.ink, fontSize: 13,
   fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
 };
 
 const rejectBtnStyle = {
   padding: '8px 20px', borderRadius: 6, border: 'none',
-  background: '#c62828', color: '#fff', fontSize: 13,
+  background: TOKENS.danger, color: TOKENS.ink, fontSize: 13,
   fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
 };

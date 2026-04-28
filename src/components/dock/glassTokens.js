@@ -1,19 +1,18 @@
-import { BRAND } from '../../config/brandColors';
-
 /**
- * Glass-morphism design tokens adapted for the WVWA wine palette.
+ * Glass-morphism design tokens — dark surface palette.
+ * Matches the Terranthro design system (--color-surface, --color-border, etc.)
  * Shared across all dock panel components.
  */
 export const GLASS = {
-  bg:          'rgba(72,55,41,0.82)',       // brown glass
-  bgLight:     'rgba(72,55,41,0.60)',
+  bg:          'rgba(15, 18, 25, 0.88)',       // --color-surface at 88%
+  bgLight:     'rgba(15, 18, 25, 0.65)',
   blur:        'blur(16px)',
-  border:      'rgba(250,247,242,0.12)',
-  borderLight: 'rgba(250,247,242,0.08)',
-  shadow:      '0 8px 32px rgba(46,34,26,0.35), 0 2px 8px rgba(46,34,26,0.2)',
-  accent:      BRAND.burgundy,
-  accentDim:   'rgba(142,21,55,0.25)',
-  text:        BRAND.eggshell,
-  textDim:     'rgba(250,247,242,0.55)',
-  textMuted:   'rgba(250,247,242,0.35)',
+  border:      'rgba(26, 29, 40, 0.85)',        // --color-border at 85%
+  borderLight: 'rgba(26, 29, 40, 0.5)',
+  shadow:      '0 8px 32px rgba(8, 10, 15, 0.5), 0 2px 8px rgba(8, 10, 15, 0.3)',
+  accent:      'var(--color-electric-blue)',
+  accentDim:   'rgba(46, 155, 255, 0.18)',
+  text:        'var(--color-parchment)',
+  textDim:     'rgba(232, 226, 214, 0.6)',
+  textMuted:   'rgba(232, 226, 214, 0.35)',
 };

@@ -9,6 +9,7 @@
  */
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
+import { TOKENS, alpha } from '../../styles/tokens';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
@@ -63,6 +64,7 @@ export default function AdminGeometryDiffMap({ oldGeometry, newGeometry, height 
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
     map.on('load', () => {
+      // audit-ignore-start map-style-colors
       if (oldGeometry) {
         map.addSource('old-geom', {
           type: 'geojson',
@@ -100,6 +102,7 @@ export default function AdminGeometryDiffMap({ oldGeometry, newGeometry, height 
           paint: { 'line-color': '#2196f3', 'line-width': 2.5, 'line-dasharray': ['literal', [3, 2]], 'line-opacity': 0.95 },
         });
       }
+      // audit-ignore-end
 
       // Fit to combined bbox
       const validGeoms = [oldGeometry, newGeometry].filter(Boolean);
@@ -116,25 +119,25 @@ export default function AdminGeometryDiffMap({ oldGeometry, newGeometry, height 
   }, []);
 
   return (
-    <div style={{ position: 'relative', borderRadius: 6, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+    <div style={{ position: 'relative', borderRadius: 6, overflow: 'hidden', border: `1px solid ${alpha(TOKENS.parchment, 0.08)}` }}>
       <div ref={containerRef} style={{ height }} />
       {/* Legend */}
       <div style={{
         position: 'absolute', top: 8, left: 8,
-        background: 'rgba(10,10,18,0.80)', backdropFilter: 'blur(4px)',
+        background: alpha(TOKENS.ink, 0.8), backdropFilter: 'blur(4px)',
         borderRadius: 5, padding: '6px 10px',
         display: 'flex', flexDirection: 'column', gap: 4,
         fontSize: 11, fontFamily: "'Inter', sans-serif",
       }}>
         {oldGeometry && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#e8a020' }}>
-            <span style={{ display: 'inline-block', width: 22, height: 2, background: '#e8a020', borderRadius: 1 }} />
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: TOKENS.warning }}>
+            <span style={{ display: 'inline-block', width: 22, height: 2, background: TOKENS.warning, borderRadius: 1 }} />
             Current boundary
           </span>
         )}
         {newGeometry && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#64b5f6' }}>
-            <span style={{ display: 'inline-block', width: 22, height: 2, background: '#64b5f6', borderRadius: 1, borderTop: '2px dashed #64b5f6' }} />
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: TOKENS.electricBlue }}>
+            <span style={{ display: 'inline-block', width: 22, height: 2, background: TOKENS.electricBlue, borderRadius: 1, borderTop: `2px dashed ${TOKENS.electricBlue}` }} />
             Proposed boundary
           </span>
         )}

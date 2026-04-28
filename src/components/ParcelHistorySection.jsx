@@ -9,7 +9,7 @@
  */
 import { useState, useCallback } from 'react';
 import { apiJson } from '../lib/api';
-import { BRAND } from '../config/brandColors';
+import { BRAND, TOKENS } from '../styles/tokens';
 
 const REQUEST_TYPE_LABELS = {
   profile:             'Winery Profile',
@@ -21,9 +21,9 @@ const REQUEST_TYPE_LABELS = {
 };
 
 const STATUS_COLORS = {
-  pending:  { bg: '#FFF8E1', color: '#B8860B' },
-  approved: { bg: '#f0f9e8', color: '#3a5a1f' },
-  rejected: { bg: '#FEF0F0', color: '#A8323A' },
+  pending:  { bg: TOKENS.warningDim, color: TOKENS.warning },
+  approved: { bg: TOKENS.successDim, color: TOKENS.success },
+  rejected: { bg: TOKENS.dangerDim, color: TOKENS.danger },
 };
 
 function formatDate(iso) {

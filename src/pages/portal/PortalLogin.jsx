@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BRAND } from '../../config/brandColors';
+import { BRAND, TOKENS, alpha } from '../../styles/tokens';
 import { apiPost } from '../../lib/api';
 
 const TAB = { MAGIC: 'magic', PASSWORD: 'password' };
@@ -76,7 +76,7 @@ export default function PortalLogin() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontFamily: "'Inter', sans-serif",
+      fontFamily: 'var(--font-sans)',
     }}>
       <div style={{
         background: BRAND.white,
@@ -84,11 +84,11 @@ export default function PortalLogin() {
         padding: '48px 40px',
         width: '100%',
         maxWidth: 420,
-        boxShadow: '0 4px 24px rgba(46,34,26,0.10)',
+        boxShadow: `0 4px 24px ${alpha(TOKENS.ink, 0.1)}`,
         border: `1px solid ${BRAND.border}`,
       }}>
         <h1 style={{
-          fontFamily: "'Georgia', serif",
+          fontFamily: 'var(--font-display)',
           fontSize: 24,
           color: BRAND.brown,
           marginBottom: 8,
@@ -185,11 +185,11 @@ export default function PortalLogin() {
         {tab === TAB.MAGIC && (
           sent ? (
             <div style={{
-              background: '#f0f9e8',
-              border: '1px solid #b5d89a',
+              background: TOKENS.successDim,
+              border: `1px solid ${alpha(TOKENS.success, 0.35)}`,
               borderRadius: 8,
               padding: '20px 16px',
-              color: '#3a5a1f',
+              color: TOKENS.success,
               fontSize: 14,
               lineHeight: 1.6,
             }}>

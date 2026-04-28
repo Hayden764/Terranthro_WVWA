@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { BRAND } from '../../config/brandColors';
+import { BRAND, TOKENS } from '../../styles/tokens';
 import { apiJson, apiPost } from '../../lib/api';
 
 export default function PortalProfile() {
@@ -73,7 +73,7 @@ export default function PortalProfile() {
         <Link to="/portal/dashboard" style={{ color: BRAND.brownLight, fontSize: 13 }}>← Dashboard</Link>
       </div>
 
-      <h1 style={{ fontFamily: "'Georgia', serif", fontSize: 22, color: BRAND.brown, marginBottom: 8 }}>
+      <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: BRAND.brown, marginBottom: 8 }}>
         Edit Profile
       </h1>
       <p style={{ color: BRAND.textMuted, fontSize: 13, marginBottom: 24 }}>
@@ -82,11 +82,11 @@ export default function PortalProfile() {
 
       {submitted ? (
         <div style={{
-          background: '#f0f9e8', border: '1px solid #b5d89a', borderRadius: 8,
-          padding: '20px 16px', color: '#3a5a1f', fontSize: 14, lineHeight: 1.6,
+          background: TOKENS.successDim, border: `1px solid ${TOKENS.success}`, borderRadius: 8,
+          padding: '20px 16px', color: TOKENS.success, fontSize: 14, lineHeight: 1.6,
         }}>
           <strong>Request submitted!</strong> Your changes will be reviewed shortly.{' '}
-          <Link to="/portal/dashboard" style={{ color: '#3a5a1f', fontWeight: 600 }}>
+          <Link to="/portal/dashboard" style={{ color: TOKENS.success, fontWeight: 600 }}>
             Back to dashboard
           </Link>
         </div>
@@ -130,7 +130,7 @@ export default function PortalProfile() {
 
 function Shell({ children }) {
   return (
-    <div style={{ minHeight: '100vh', background: BRAND.eggshell, fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: BRAND.eggshell, fontFamily: 'var(--font-sans)' }}>
       <div style={{
         maxWidth: 600, margin: '0 auto', padding: '40px 20px',
         background: BRAND.white, minHeight: '100vh',
@@ -163,7 +163,7 @@ const inputStyle = {
   color: BRAND.text,
   background: BRAND.eggshell,
   outline: 'none',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: 'var(--font-sans)',
   resize: 'vertical',
 };
 
@@ -221,7 +221,7 @@ function PasswordSection({ hasPassword }) {
 
   return (
     <div>
-      <h2 style={{ fontFamily: "'Georgia', serif", fontSize: 18, color: BRAND.brown, marginBottom: 6 }}>
+      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 18, color: BRAND.brown, marginBottom: 6 }}>
         {hasPassword ? 'Change Password' : 'Set a Password'}
       </h2>
       <p style={{ color: BRAND.textMuted, fontSize: 13, marginBottom: 20 }}>
@@ -232,8 +232,8 @@ function PasswordSection({ hasPassword }) {
 
       {pwSuccess ? (
         <div style={{
-          background: '#f0f9e8', border: '1px solid #b5d89a', borderRadius: 8,
-          padding: '14px 16px', color: '#3a5a1f', fontSize: 14,
+          background: TOKENS.successDim, border: `1px solid ${TOKENS.success}`, borderRadius: 8,
+          padding: '14px 16px', color: TOKENS.success, fontSize: 14,
         }}>
           Password {hasPassword ? 'updated' : 'set'} successfully.
         </div>

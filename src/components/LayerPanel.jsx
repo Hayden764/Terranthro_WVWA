@@ -1,6 +1,6 @@
 import { MONTH_ABBR } from '../config/climateConfig';
 import { TOPO_LAYER_TYPES } from '../config/topographyConfig';
-import { BRAND } from '../config/brandColors';
+import { BRAND } from '../styles/tokens';
 
 const CLIMATE_LAYERS = [
   { id: 'tdmean', label: 'Mean Temperature', sub: 'PRISM 30-yr normals' },
@@ -26,7 +26,7 @@ export default function LayerPanel({ activeLayer, onLayerChange, currentMonth, o
       boxShadow: '0 4px 24px rgba(46,34,26,0.14), 0 1px 4px rgba(46,34,26,0.08)',
       border: `1px solid ${BRAND.border}`,
       overflow: 'hidden',
-      fontFamily: 'Inter, sans-serif',
+      fontFamily: 'var(--font-sans)',
       zIndex: 10,
     }}>
       {/* Header */}

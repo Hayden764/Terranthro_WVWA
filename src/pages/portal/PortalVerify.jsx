@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { BRAND } from '../../config/brandColors';
+import { BRAND, TOKENS, alpha } from '../../styles/tokens';
 import { apiFetch } from '../../lib/api';
 
 export default function PortalVerify() {
@@ -42,7 +42,7 @@ export default function PortalVerify() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontFamily: "'Inter', sans-serif",
+      fontFamily: 'var(--font-sans)',
     }}>
       <div style={{
         background: BRAND.white,
@@ -50,7 +50,7 @@ export default function PortalVerify() {
         padding: '48px 40px',
         width: '100%',
         maxWidth: 420,
-        boxShadow: '0 4px 24px rgba(46,34,26,0.10)',
+        boxShadow: `0 4px 24px ${alpha(TOKENS.ink, 0.1)}`,
         border: `1px solid ${BRAND.border}`,
         textAlign: 'center',
       }}>
@@ -63,7 +63,7 @@ export default function PortalVerify() {
         {status === 'success' && (
           <>
             <div style={{ fontSize: 32, marginBottom: 16 }}>✓</div>
-            <p style={{ color: '#3a5a1f', fontWeight: 600 }}>Signed in! Redirecting…</p>
+            <p style={{ color: TOKENS.success, fontWeight: 600 }}>Signed in! Redirecting…</p>
           </>
         )}
         {status === 'error' && (

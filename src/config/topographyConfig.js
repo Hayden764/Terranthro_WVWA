@@ -1,3 +1,5 @@
+import { TOKENS } from '../styles/tokens';
+
 import { TITILER_URL } from './climateConfig';
 
 export const TOPO_COG_BASE_URL = 'https://pub-9686f7c1467c4989896000832d9500b0.r2.dev';
@@ -47,20 +49,20 @@ export const AVA_TOPO_REGISTRY = {
 
 // Retained for reference only (no longer used as topo sources)
 export const WV_SUB_AVAS = [
-  { slug: 'chehalem-mountains',       name: 'Chehalem Mountains',       file: '/data/chehalem_mountains.geojson',       color: '#C9A84C',
+  { slug: 'chehalem-mountains',       name: 'Chehalem Mountains',       file: '/data/chehalem_mountains.geojson',       color: TOKENS.amber,
     subAvas: ['ribbon-ridge', 'laurelwood-district'] },
-  { slug: 'laurelwood-district',      name: 'Laurelwood District',      file: '/data/laurelwood_district.geojson',      color: '#C9A84C',
+  { slug: 'laurelwood-district',      name: 'Laurelwood District',      file: '/data/laurelwood_district.geojson',      color: TOKENS.amber,
     parentAva: 'chehalem-mountains' },
-  { slug: 'ribbon-ridge',             name: 'Ribbon Ridge',             file: '/data/ribbon_ridge.geojson',             color: '#C9A84C',
+  { slug: 'ribbon-ridge',             name: 'Ribbon Ridge',             file: '/data/ribbon_ridge.geojson',             color: TOKENS.amber,
     parentAva: 'chehalem-mountains' },
-  { slug: 'dundee-hills',             name: 'Dundee Hills',             file: '/data/dundee_hills.geojson',             color: '#C9A84C' },
-  { slug: 'eola-amity-hills',         name: 'Eola-Amity Hills',         file: '/data/eola_amity_hills.geojson',         color: '#C9A84C' },
-  { slug: 'lower-long-tom',           name: 'Lower Long Tom',           file: '/data/lower_long_tom.geojson',           color: '#C9A84C' },
-  { slug: 'mcminnville',              name: 'McMinneville',              file: '/data/mcminnville.geojson',              color: '#C9A84C' },
-  { slug: 'mount-pisgah-polk-county', name: 'Mount Pisgah/Polk County', file: '/data/mount_pisgah_polk_county.geojson', color: '#C9A84C' },
-  { slug: 'tualatin-hills',           name: 'Tualatin Hills',           file: '/data/tualatin_hills.geojson',           color: '#C9A84C' },
-  { slug: 'van-duzer-corridor',       name: 'Van Duzer Corridor',       file: '/data/van_duzer_corridor.geojson',       color: '#C9A84C' },
-  { slug: 'yamhill-carlton',          name: 'Yamhill-Carlton',          file: '/data/yamhill_carlton.geojson',          color: '#C9A84C' },
+  { slug: 'dundee-hills',             name: 'Dundee Hills',             file: '/data/dundee_hills.geojson',             color: TOKENS.amber },
+  { slug: 'eola-amity-hills',         name: 'Eola-Amity Hills',         file: '/data/eola_amity_hills.geojson',         color: TOKENS.amber },
+  { slug: 'lower-long-tom',           name: 'Lower Long Tom',           file: '/data/lower_long_tom.geojson',           color: TOKENS.amber },
+  { slug: 'mcminnville',              name: 'McMinneville',              file: '/data/mcminnville.geojson',              color: TOKENS.amber },
+  { slug: 'mount-pisgah-polk-county', name: 'Mount Pisgah/Polk County', file: '/data/mount_pisgah_polk_county.geojson', color: TOKENS.amber },
+  { slug: 'tualatin-hills',           name: 'Tualatin Hills',           file: '/data/tualatin_hills.geojson',           color: TOKENS.amber },
+  { slug: 'van-duzer-corridor',       name: 'Van Duzer Corridor',       file: '/data/van_duzer_corridor.geojson',       color: TOKENS.amber },
+  { slug: 'yamhill-carlton',          name: 'Yamhill-Carlton',          file: '/data/yamhill_carlton.geojson',          color: TOKENS.amber },
 ];
 
 /**

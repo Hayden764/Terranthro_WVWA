@@ -1,12 +1,34 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { LISTING_CATEGORIES } from './WVWAMap';
-import { BRAND } from '../config/brandColors';
+import { BRAND, TOKENS, alpha, mix } from '../styles/tokens';
 
 // Category order for display
 const CATEGORY_ORDER = ['winery', 'tasting', 'restaurant', 'hotel', 'other'];
 
+const UI = {
+  modalBg: alpha(TOKENS.ink, 0.96),
+  modalHeaderBg: alpha(TOKENS.ink, 0.97),
+  panelBorder: alpha(TOKENS.surfaceRaised, 0.85),
+  panelBorderLight: alpha(TOKENS.surfaceRaised, 0.5),
+  textDim: alpha(TOKENS.parchment, 0.45),
+  textMuted: alpha(TOKENS.parchment, 0.35),
+  textSoft: alpha(TOKENS.parchment, 0.6),
+  textFaint: alpha(TOKENS.parchment, 0.25),
+  textVeryFaint: alpha(TOKENS.parchment, 0.2),
+  chipBg: alpha(TOKENS.parchment, 0.08),
+  chipBgActive: alpha(TOKENS.parchment, 0.05),
+  rowHover: alpha(TOKENS.parchment, 0.06),
+  overlayBg: alpha('black', 0.55),
+  modalShadow: alpha('black', 0.55),
+  closeHoverBg: alpha(TOKENS.parchment, 0.15),
+  rowNumberText: alpha(BRAND.white, 0.95),
+  rowNumberBorder: alpha(TOKENS.parchment, 0.25),
+  rowNumberShadow: alpha('black', 0.3),
+  rowTitleIdle: alpha(TOKENS.parchment, 0.88),
+  rowDesc: alpha(TOKENS.parchment, 0.38),
+};
+
 export default function ListingsModal({ isOpen, onClose, onSelectListing, listings = [] }) {
-  const [query, setQuery]           = useState('');
   const [activeTab, setActiveTab]   = useState('all'); // 'all' | category key
   const searchRef = useRef(null);
 
@@ -62,7 +84,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
   if (!isOpen) return null;
 
   const glass = {
-    background: 'rgba(46,34,26,0.96)',
+    background: UI.modalBg,
     backdropFilter: 'blur(20px)',
     WebkitBackdropFilter: 'blur(20px)',
   };
@@ -74,12 +96,12 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.55)',
+        background: UI.overlayBg,
         zIndex: 200,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: 'Inter, sans-serif',
+        fontFamily: 'var(--font-sans)',
       }}
     >
       {/* Modal */}
@@ -87,13 +109,13 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
         onClick={e => e.stopPropagation()}
         style={{
           ...glass,
-          border: '1px solid rgba(250,247,242,0.12)',
+          border: `1px solid ${UI.panelBorder}`,
           borderRadius: 16,
           width: 'min(780px, 95vw)',
           maxHeight: '85vh',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
+          boxShadow: `0 24px 80px ${UI.modalShadow}`,
           overflow: 'hidden',
         }}
       >
@@ -109,30 +131,30 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
                 fontSize: 20,
                 fontWeight: 700,
                 color: BRAND.eggshell,
-                fontFamily: 'Georgia, serif',
+                fontFamily: 'var(--font-display)',
                 letterSpacing: '-0.01em',
               }}>
                 <span style={{ color: BRAND.burgundy }}>W</span>illamette Valley Directory
               </h2>
-              <p style={{ margin: '3px 0 0', fontSize: 12, color: 'rgba(250,247,242,0.45)' }}>
+              <p style={{ margin: '3px 0 0', fontSize: 12, color: UI.textDim }}>
                 {listings.length} places · click any listing to locate on map
               </p>
             </div>
             <button
               onClick={onClose}
               style={{
-                background: 'rgba(250,247,242,0.08)',
-                border: '1px solid rgba(250,247,242,0.14)',
+                background: UI.chipBg,
+                border: `1px solid ${UI.panelBorderLight}`,
                 borderRadius: 8,
-                color: 'rgba(250,247,242,0.6)',
+                color: UI.textSoft,
                 cursor: 'pointer',
                 fontSize: 18,
                 lineHeight: 1,
                 padding: '4px 10px',
                 transition: 'background 0.15s',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(250,247,242,0.15)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(250,247,242,0.08)'}
+              onMouseEnter={e => e.currentTarget.style.background = UI.closeHoverBg}
+              onMouseLeave={e => e.currentTarget.style.background = UI.chipBg}
             >
               ✕
             </button>
@@ -146,7 +168,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
               top: '50%',
               transform: 'translateY(-50%)',
               fontSize: 14,
-              color: 'rgba(250,247,242,0.35)',
+              color: UI.textMuted,
               pointerEvents: 'none',
             }}>🔍</span>
             <input
@@ -158,18 +180,18 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
               style={{
                 width: '100%',
                 boxSizing: 'border-box',
-                background: 'rgba(250,247,242,0.07)',
-                border: '1px solid rgba(250,247,242,0.15)',
+                background: UI.chipBgActive,
+                border: `1px solid ${UI.panelBorderLight}`,
                 borderRadius: 10,
                 padding: '10px 12px 10px 36px',
                 fontSize: 13,
                 color: BRAND.eggshell,
                 outline: 'none',
-                fontFamily: 'Inter, sans-serif',
+                fontFamily: 'var(--font-sans)',
                 transition: 'border-color 0.15s',
               }}
               onFocus={e => e.target.style.borderColor = BRAND.burgundy}
-              onBlur={e => e.target.style.borderColor = 'rgba(250,247,242,0.15)'}
+              onBlur={e => e.target.style.borderColor = UI.panelBorderLight}
             />
             {query && (
               <button
@@ -181,7 +203,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
                   transform: 'translateY(-50%)',
                   background: 'none',
                   border: 'none',
-                  color: 'rgba(250,247,242,0.4)',
+                  color: UI.textDim,
                   cursor: 'pointer',
                   fontSize: 14,
                   padding: 2,
@@ -208,13 +230,14 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
                     gap: 6,
                     padding: '5px 12px',
                     borderRadius: 20,
-                    border: `1px solid ${isActive ? tab.color : 'rgba(250,247,242,0.12)'}`,
-                    background: isActive ? `${tab.color}22` : 'rgba(250,247,242,0.05)',
-                    color: isActive ? tab.color : 'rgba(250,247,242,0.5)',
+                    border: `1px solid ${isActive ? tab.color : UI.panelBorder}`,
+                    background: isActive ? `${tab.color}22` : UI.chipBgActive,
+                    background: isActive ? alpha(tab.color, 0.13) : UI.chipBgActive,
+                    color: isActive ? tab.color : UI.textDim,
                     cursor: 'pointer',
                     fontSize: 11,
                     fontWeight: isActive ? 700 : 500,
-                    fontFamily: 'Inter, sans-serif',
+                    fontFamily: 'var(--font-sans)',
                     transition: 'all 0.15s',
                     whiteSpace: 'nowrap',
                   }}
@@ -222,18 +245,18 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
                   {tab.key !== 'all' && (
                     <span style={{
                       width: 8, height: 8, borderRadius: '50%',
-                      background: isActive ? tab.color : 'rgba(250,247,242,0.3)',
+                      background: isActive ? tab.color : UI.textFaint,
                       display: 'inline-block', flexShrink: 0,
                     }} />
                   )}
                   {tab.label}
                   <span style={{
-                    background: isActive ? `${tab.color}33` : 'rgba(250,247,242,0.08)',
+                    background: isActive ? alpha(tab.color, 0.2) : UI.chipBg,
                     borderRadius: 10,
                     padding: '1px 6px',
                     fontSize: 10,
                     fontWeight: 600,
-                    color: isActive ? tab.color : 'rgba(250,247,242,0.35)',
+                    color: isActive ? tab.color : UI.textMuted,
                   }}>{count}</span>
                 </button>
               );
@@ -244,7 +267,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
         {/* ── Scrollable list ── */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 20px' }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '48px 0', color: 'rgba(250,247,242,0.35)', fontSize: 14 }}>
+            <div style={{ textAlign: 'center', padding: '48px 0', color: UI.textMuted, fontSize: 14 }}>
               No listings match "{query}"
             </div>
           ) : activeTab === 'all' ? (
@@ -264,7 +287,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
                     paddingTop: 4,
                     position: 'sticky',
                     top: 0,
-                    background: 'rgba(46,34,26,0.97)',
+                    background: UI.modalHeaderBg,
                     zIndex: 1,
                     paddingBottom: 6,
                   }}>
@@ -275,7 +298,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
                     <span style={{ fontSize: 11, fontWeight: 700, color: cat.color, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                       {cat.label}
                     </span>
-                    <span style={{ fontSize: 11, color: 'rgba(250,247,242,0.25)', fontWeight: 500 }}>
+                    <span style={{ fontSize: 11, color: UI.textFaint, fontWeight: 500 }}>
                       {items.length}
                     </span>
                   </div>
@@ -331,8 +354,8 @@ function ListingRow({ listing, cat, query, onClick }) {
         borderRadius: 10,
         cursor: 'pointer',
         marginBottom: 2,
-        background: hovered ? 'rgba(250,247,242,0.06)' : 'transparent',
-        border: `1px solid ${hovered ? 'rgba(250,247,242,0.1)' : 'transparent'}`,
+        background: hovered ? UI.rowHover : 'transparent',
+        border: `1px solid ${hovered ? UI.panelBorderLight : 'transparent'}`,
         transition: 'background 0.12s, border-color 0.12s',
       }}
     >
@@ -347,11 +370,11 @@ function ListingRow({ listing, cat, query, onClick }) {
         justifyContent: 'center',
         fontSize: 10,
         fontWeight: 700,
-        color: 'rgba(255,255,255,0.95)',
+        color: UI.rowNumberText,
         flexShrink: 0,
         marginTop: 1,
-        border: '1.5px solid rgba(255,255,255,0.25)',
-        boxShadow: `0 1px 4px rgba(0,0,0,0.3), 0 0 0 1px ${cat.color}66`,
+        border: `1.5px solid ${UI.rowNumberBorder}`,
+        boxShadow: `0 1px 4px ${UI.rowNumberShadow}, 0 0 0 1px ${alpha(cat.color, 0.4)}`,
       }}>
         {listing.num}
       </div>
@@ -362,14 +385,14 @@ function ListingRow({ listing, cat, query, onClick }) {
           <span style={{
             fontSize: 13,
             fontWeight: 600,
-            color: hovered ? BRAND.eggshell : 'rgba(250,247,242,0.88)',
+            color: hovered ? BRAND.eggshell : UI.rowTitleIdle,
             lineHeight: 1.3,
           }}>
             <Highlight text={listing.title} query={query} color={cat.color} />
           </span>
         </div>
         {descSnippet && (
-          <div style={{ fontSize: 11, color: 'rgba(250,247,242,0.38)', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 11, color: UI.rowDesc, lineHeight: 1.5 }}>
             <Highlight text={descSnippet} query={query} color={cat.color} />
           </div>
         )}
@@ -378,7 +401,7 @@ function ListingRow({ listing, cat, query, onClick }) {
       {/* Arrow */}
       <div style={{
         fontSize: 13,
-        color: hovered ? cat.color : 'rgba(250,247,242,0.2)',
+        color: hovered ? cat.color : UI.textVeryFaint,
         transition: 'color 0.12s',
         flexShrink: 0,
         alignSelf: 'center',

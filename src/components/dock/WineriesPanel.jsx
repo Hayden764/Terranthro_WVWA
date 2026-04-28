@@ -1,5 +1,22 @@
+import { TOKENS, alpha } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { LISTING_CATEGORIES, LISTING_FILTER_MODES } from '../WVWAMap';
+
+/* ─── Design tokens ──────────────────────────────────────────────────── */
+const UI = {
+  filterIdleBorder: alpha(TOKENS.parchment, 0.12),
+  filterIdleBg:     alpha(TOKENS.parchment, 0.04),
+  filterDotIdle:    alpha(TOKENS.parchment, 0.25),
+  filterTextActive: alpha(TOKENS.parchment, 0.9),
+  filterTextIdle:   alpha(TOKENS.parchment, 0.35),
+  subtleText:       alpha(TOKENS.parchment, 0.45),
+  emptyText:        alpha(TOKENS.parchment, 0.3),
+  rowBorder:        alpha(TOKENS.parchment, 0.07),
+  rowBg:            alpha(TOKENS.parchment, 0.04),
+  rowHoverBg:       alpha(TOKENS.parchment, 0.09),
+  rowTitleText:     alpha(TOKENS.parchment, 0.88),
+  badgeText:        'white',
+};
 
 /**
  * WineriesPanel — "Wineries" dock panel.
@@ -44,8 +61,8 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
             gap: 5,
             padding: '4px 10px',
             borderRadius: 20,
-            border: `1px solid ${isAllMode ? wineryCategory.color + '99' : 'rgba(250,247,242,0.12)'}`,
-            background: isAllMode ? wineryCategory.color + '28' : 'rgba(250,247,242,0.04)',
+            border: `1px solid ${isAllMode ? wineryCategory.color + '99' : UI.filterIdleBorder}`,
+            background: isAllMode ? wineryCategory.color + '28' : UI.filterIdleBg,
             cursor: 'pointer',
             outline: 'none',
             transition: 'all 0.15s ease',
@@ -55,13 +72,13 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
             width: 7,
             height: 7,
             borderRadius: '50%',
-            background: isAllMode ? wineryCategory.color : 'rgba(250,247,242,0.25)',
+            background: isAllMode ? wineryCategory.color : UI.filterDotIdle,
             flexShrink: 0,
           }} />
           <span style={{
             fontSize: 10,
             fontWeight: 600,
-            color: isAllMode ? 'rgba(250,247,242,0.9)' : 'rgba(250,247,242,0.35)',
+            color: isAllMode ? UI.filterTextActive : UI.filterTextIdle,
             whiteSpace: 'nowrap',
             letterSpacing: '0.01em',
           }}>
@@ -77,8 +94,8 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
             gap: 5,
             padding: '4px 10px',
             borderRadius: 20,
-            border: `1px solid ${hasPolygonMode ? wineryCategory.color + '99' : 'rgba(250,247,242,0.12)'}`,
-            background: hasPolygonMode ? wineryCategory.color + '28' : 'rgba(250,247,242,0.04)',
+            border: `1px solid ${hasPolygonMode ? wineryCategory.color + '99' : UI.filterIdleBorder}`,
+            background: hasPolygonMode ? wineryCategory.color + '28' : UI.filterIdleBg,
             cursor: 'pointer',
             outline: 'none',
             transition: 'all 0.15s ease',
@@ -88,13 +105,13 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
             width: 7,
             height: 7,
             borderRadius: '50%',
-            background: hasPolygonMode ? wineryCategory.color : 'rgba(250,247,242,0.25)',
+            background: hasPolygonMode ? wineryCategory.color : UI.filterDotIdle,
             flexShrink: 0,
           }} />
           <span style={{
             fontSize: 10,
             fontWeight: 600,
-            color: hasPolygonMode ? 'rgba(250,247,242,0.9)' : 'rgba(250,247,242,0.35)',
+            color: hasPolygonMode ? UI.filterTextActive : UI.filterTextIdle,
             whiteSpace: 'nowrap',
             letterSpacing: '0.01em',
           }}>
@@ -110,8 +127,8 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
             gap: 5,
             padding: '4px 10px',
             borderRadius: 20,
-            border: `1px solid ${noPolygonMode ? wineryCategory.color + '99' : 'rgba(250,247,242,0.12)'}`,
-            background: noPolygonMode ? wineryCategory.color + '28' : 'rgba(250,247,242,0.04)',
+            border: `1px solid ${noPolygonMode ? wineryCategory.color + '99' : UI.filterIdleBorder}`,
+            background: noPolygonMode ? wineryCategory.color + '28' : UI.filterIdleBg,
             cursor: 'pointer',
             outline: 'none',
             transition: 'all 0.15s ease',
@@ -121,13 +138,13 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
             width: 7,
             height: 7,
             borderRadius: '50%',
-            background: noPolygonMode ? wineryCategory.color : 'rgba(250,247,242,0.25)',
+            background: noPolygonMode ? wineryCategory.color : UI.filterDotIdle,
             flexShrink: 0,
           }} />
           <span style={{
             fontSize: 10,
             fontWeight: 600,
-            color: noPolygonMode ? 'rgba(250,247,242,0.9)' : 'rgba(250,247,242,0.35)',
+            color: noPolygonMode ? UI.filterTextActive : UI.filterTextIdle,
             whiteSpace: 'nowrap',
             letterSpacing: '0.01em',
           }}>
@@ -143,8 +160,8 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
             gap: 5,
             padding: '4px 10px',
             borderRadius: 20,
-            border: `1px solid ${noWineriesVisualizedMode ? wineryCategory.color + '99' : 'rgba(250,247,242,0.12)'}`,
-            background: noWineriesVisualizedMode ? wineryCategory.color + '28' : 'rgba(250,247,242,0.04)',
+            border: `1px solid ${noWineriesVisualizedMode ? wineryCategory.color + '99' : UI.filterIdleBorder}`,
+            background: noWineriesVisualizedMode ? wineryCategory.color + '28' : UI.filterIdleBg,
             cursor: 'pointer',
             outline: 'none',
             transition: 'all 0.15s ease',
@@ -154,13 +171,13 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
             width: 7,
             height: 7,
             borderRadius: '50%',
-            background: noWineriesVisualizedMode ? wineryCategory.color : 'rgba(250,247,242,0.25)',
+            background: noWineriesVisualizedMode ? wineryCategory.color : UI.filterDotIdle,
             flexShrink: 0,
           }} />
           <span style={{
             fontSize: 10,
             fontWeight: 600,
-            color: noWineriesVisualizedMode ? 'rgba(250,247,242,0.9)' : 'rgba(250,247,242,0.35)',
+            color: noWineriesVisualizedMode ? UI.filterTextActive : UI.filterTextIdle,
             whiteSpace: 'nowrap',
             letterSpacing: '0.01em',
           }}>
@@ -171,7 +188,7 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
 
       <div style={{
         fontSize: 10,
-        color: 'rgba(250,247,242,0.45)',
+        color: UI.subtleText,
         marginTop: -6,
         marginBottom: 10,
       }}>
@@ -196,7 +213,7 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
         <div style={{
           padding: '20px 0',
           textAlign: 'center',
-          color: 'rgba(250,247,242,0.3)',
+          color: UI.emptyText,
           fontSize: 12,
         }}>
           No winery listings match this mode
@@ -215,8 +232,8 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
                   gap: 10,
                   padding: '8px 10px',
                   borderRadius: 8,
-                  border: '1px solid rgba(250,247,242,0.07)',
-                  background: 'rgba(250,247,242,0.04)',
+                  border: `1px solid `,
+                  background: UI.filterIdleBg,
                   cursor: 'pointer',
                   textAlign: 'left',
                   outline: 'none',
@@ -224,11 +241,11 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
                   transition: 'background 0.12s ease',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = 'rgba(250,247,242,0.09)';
+                  e.currentTarget.style.background = UI.rowHoverBg;
                   onHoverListing?.(listing);
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background = 'rgba(250,247,242,0.04)';
+                  e.currentTarget.style.background = UI.filterIdleBg;
                   onHoverListing?.(null);
                 }}
               >
@@ -243,7 +260,7 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
                   justifyContent: 'center',
                   fontSize: 9,
                   fontWeight: 700,
-                  color: '#fff',
+                  color: UI.badgeText,
                   flexShrink: 0,
                 }}>
                   {listing.num}
@@ -253,7 +270,7 @@ export default function WineriesPanel({ listings = [], listingFilterMode, onList
                   <div style={{
                     fontSize: 12,
                     fontWeight: 600,
-                    color: 'rgba(250,247,242,0.88)',
+                    color: UI.rowTitleText,
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',

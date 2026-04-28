@@ -24,18 +24,18 @@ export async function sendMagicLinkEmail(toEmail, token, wineryName) {
     to: toEmail,
     subject: `Sign in to your ${wineryName} portal`,
     html: `
-      <div style="font-family: Georgia, serif; max-width: 520px; margin: 0 auto; color: #483729;">
-        <h2 style="color: #483729;">Terranthro — Winery Portal</h2>
+      <div style="font-family: serif; max-width: 520px; margin: 0 auto; color: rgb(8, 10, 15);">
+        <h2 style="color: rgb(8, 10, 15);">Terranthro — Winery Portal</h2>
         <p>Hi,</p>
         <p>Click below to sign in to the <strong>${escapeHtml(wineryName)}</strong> portal:</p>
         <p style="margin: 24px 0;">
           <a href="${link}"
-             style="background: #6B8F3C; color: #fff; padding: 12px 28px;
+             style="background: rgb(0, 196, 79); color: white; padding: 12px 28px;
                     border-radius: 6px; text-decoration: none; font-size: 16px;">
             Sign In
           </a>
         </p>
-        <p style="font-size: 13px; color: #888;">
+        <p style="font-size: 13px; color: rgb(64, 69, 88);">
           This link expires in 15 minutes. If you didn't request this, you can safely ignore it.
         </p>
       </div>

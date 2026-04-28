@@ -1,6 +1,7 @@
 import { alpha, TOKENS, TYPE } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { TOPO_LAYER_TYPES } from '../../config/topographyConfig';
+import TerroirDataChips from '../TerroirDataChips';
 
 /**
  * ScalePanel — "Scale" panel content.
@@ -95,20 +96,13 @@ export default function ScalePanel({ activeLayer, topoStats }) {
         {/* Stats summary — only shown when real data is available */}
         {hasStats && (
           <div style={CARD}>
-            <div style={LABEL}>AVA Statistics</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {[
-                { key: 'Min',  val: `${Math.round(realMin)}${unit}` },
-                { key: 'Max',  val: `${Math.round(realMax)}${unit}` },
-                { key: 'Mean', val: `${Math.round(realMean)}${unit}` },
-                { key: 'Std',  val: `±${Math.round(realStd)}${unit}` },
-              ].map(({ key, val }) => (
-                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, color: GLASS.textDim }}>{key}</span>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: GLASS.text }}>{val}</span>
-                </div>
-              ))}
-            </div>
+            <div style={{ ...LABEL, marginBottom: 8 }}>AVA Statistics</div>
+            <TerroirDataChips variant="glass" chips={[
+              { label: 'Min',  value: `${Math.round(realMin)}${unit}`,  tone: 'blue',     glow: true  },
+              { label: 'Max',  value: `${Math.round(realMax)}${unit}`,  tone: 'amber',    glow: true  },
+              { label: 'Mean', value: `${Math.round(realMean)}${unit}`, tone: 'green',    glow: true  },
+              { label: 'Std',  value: `±${Math.round(realStd)}${unit}`,  tone: 'parchment', glow: false },
+            ]} />
           </div>
         )}
 

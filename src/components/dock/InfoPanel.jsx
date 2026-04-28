@@ -2,6 +2,7 @@ import React from 'react';
 import { alpha, TOKENS, TYPE } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { WV_SUB_AVAS } from '../../config/topographyConfig';
+import TerroirDataChips from '../TerroirDataChips';
 
 /**
  * InfoPanel — "Info" panel content (right side).
@@ -170,6 +171,26 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
   // AVAs shown in the "siblings" list — exclude self, and for double-nested exclude
   // the parent (shown separately in breadcrumb)
   const siblingAvas = WV_SUB_AVAS.filter(a => a.slug !== selectedAva);
+  const topLevelAvas = WV_SUB_AVAS.filter(a => !a.parentAva);
+
+  const selectedAvaChips = [
+    { label: 'Tier', value: isDoubleNested ? 'Double' : 'Nested', tone: 'blue', glow: true },
+    { label: 'Sub-AVAs', value: String(subAvas.length), tone: 'green', glow: true },
+    { label: 'Siblings', value: String(siblingAvas.length), tone: 'amber', glow: false },
+    {
+      label: 'Parent',
+      value: isDoubleNested ? (parentAva?.name || 'Willamette Valley') : 'Willamette Valley',
+      tone: 'parchment',
+      glow: false,
+    },
+  ];
+
+  const valleyChips = [
+    { label: 'Nested AVAs', value: String(WV_SUB_AVAS.length), tone: 'green', glow: true },
+    { label: 'Parent AVAs', value: String(topLevelAvas.length), tone: 'blue', glow: true },
+    { label: 'Region', value: 'Oregon', tone: 'parchment', glow: false },
+    { label: 'Known For', value: 'Pinot Noir', tone: 'amber', glow: false },
+  ];
 
   return (
     <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -237,6 +258,11 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
                 ? `${parentAva.name} · Willamette Valley, Oregon`
                 : 'Willamette Valley, Oregon'}
             </div>
+          </div>
+
+          <div style={CARD}>
+            <div style={{ ...LBL, marginBottom: 8 }}>AVA Snapshot</div>
+            <TerroirDataChips chips={selectedAvaChips} variant="glass" />
           </div>
 
           {/* ── Sub-AVAs (shown only for Chehalem Mountains) ─────────── */}
@@ -385,16 +411,8 @@ export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
           </div>
 
           <div style={CARD}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div>
-                <div style={LBL}>Region</div>
-                <div style={VAL}>Oregon, USA</div>
-              </div>
-              <div>
-                <div style={LBL}>Known For</div>
-                <div style={VAL}>Pinot Noir</div>
-              </div>
-            </div>
+            <div style={{ ...LBL, marginBottom: 8 }}>Valley Snapshot</div>
+            <TerroirDataChips chips={valleyChips} variant="glass" />
           </div>
         </>
       )}

@@ -1,6 +1,7 @@
 import { alpha, TOKENS, TYPE } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../../config/topographyConfig';
+import TerroirDataChips from '../TerroirDataChips';
 
 /**
  * LayerDetailPanel — right-side context panel shown when a data layer is active.
@@ -225,25 +226,13 @@ export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, 
                 <span>{fmt(max)}{unit}</span>
               </div>
 
-              {/* Stats grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <div>
-                  <div style={LBL}>Min</div>
-                  <div style={VAL}>{fmt(min)}{unit}</div>
-                </div>
-                <div>
-                  <div style={LBL}>Max</div>
-                  <div style={VAL}>{fmt(max)}{unit}</div>
-                </div>
-                <div>
-                  <div style={LBL}>Mean</div>
-                  <div style={VAL}>{fmt(mean)}{unit}</div>
-                </div>
-                <div>
-                  <div style={LBL}>Std Dev</div>
-                  <div style={VAL}>±{fmt(std)}{unit}</div>
-                </div>
-              </div>
+              {/* Stats chips */}
+              <TerroirDataChips variant="glass" chips={[
+                { label: 'Min',     value: `${fmt(min)}${unit}`,   tone: 'blue',     glow: true  },
+                { label: 'Max',     value: `${fmt(max)}${unit}`,   tone: 'amber',    glow: true  },
+                { label: 'Mean',    value: `${fmt(mean)}${unit}`,  tone: 'green',    glow: true  },
+                { label: 'Std Dev', value: `±${fmt(std)}${unit}`,  tone: 'parchment', glow: false },
+              ]} />
             </div>
           );
         })()}

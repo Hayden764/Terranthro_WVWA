@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { border, ink, muted, parchment, TOKENS } from '../../styles/tokens';
 import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
+import TerroirDataChips from '../../components/TerroirDataChips';
 
 export default function PortalDashboard() {
   const navigate = useNavigate();
@@ -126,6 +127,13 @@ export default function PortalDashboard() {
                 aspect_dominant_deg: topoList[0].aspect_dominant_deg,
               } : null;
 
+              const terroirChips = [
+                { label: 'Acres', value: `${totalAcres.toFixed(1)} ac`, tone: 'amber', glow: false },
+                { label: 'Elev', value: topo ? `${Math.round(topo.elevation_mean_ft)} ft` : '—', tone: 'parchment', glow: false },
+                { label: 'Slope', value: topo ? `${topo.slope_mean_deg.toFixed(1)}°` : '—', tone: 'green', glow: true },
+                { label: 'Aspect', value: topo ? degToCardinal(topo.aspect_dominant_deg) : '—', tone: 'blue', glow: true },
+              ];
+
               return (
                 <Link
                   key={group.name}
@@ -142,15 +150,8 @@ export default function PortalDashboard() {
                     {group.parcels.length > 1 && ` · ${group.parcels.length} parcels`}
                     {totalBlocks > 0 && ` · ${totalBlocks} blocks`}
                   </div>
-                  <div style={{ fontSize: 12, color: muted, marginTop: 6, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                    <span>{totalAcres.toFixed(1)} ac</span>
-                    {topo && (
-                      <>
-                        <span>{Math.round(topo.elevation_mean_ft)} ft elev</span>
-                        <span>{topo.slope_mean_deg.toFixed(1)}° slope</span>
-                        <span>{degToCardinal(topo.aspect_dominant_deg)} aspect</span>
-                      </>
-                    )}
+                  <div style={{ marginTop: 10 }}>
+                    <TerroirDataChips chips={terroirChips} />
                   </div>
                 </Link>
               );

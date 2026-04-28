@@ -9,6 +9,7 @@ maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile.bind(pmtilesProtocol));
 import ClimateLayer from './ClimateLayer';
 import TopographyLayer from './TopographyLayer';
 import MapControls from './MapControls';
+import TerroirDataChips from './TerroirDataChips';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { AVA_CAMERA, WV_CAMERA } from '../config/avaCameraConfig';
 import { alpha, border, crimson, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
@@ -1215,12 +1216,12 @@ function LayerTabContent({ activeLayer, topoStats }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: UI.labelText, marginBottom: 12 }}>
               <span>{fmt(min)}{unit}</span><span>{fmt(max)}{unit}</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div><div style={LBL}>Min</div><div style={VAL}>{fmt(min)}{unit}</div></div>
-              <div><div style={LBL}>Max</div><div style={VAL}>{fmt(max)}{unit}</div></div>
-              <div><div style={LBL}>Mean</div><div style={VAL}>{fmt(mean)}{unit}</div></div>
-              <div><div style={LBL}>Std Dev</div><div style={VAL}>±{fmt(std)}{unit}</div></div>
-            </div>
+            <TerroirDataChips variant="glass" chips={[
+              { label: 'Min',     value: `${fmt(min)}${unit}`,   tone: 'blue',      glow: true  },
+              { label: 'Max',     value: `${fmt(max)}${unit}`,   tone: 'amber',     glow: true  },
+              { label: 'Mean',    value: `${fmt(mean)}${unit}`,  tone: 'green',     glow: true  },
+              { label: 'Std Dev', value: `±${fmt(std)}${unit}`,   tone: 'parchment', glow: false },
+            ]} />
           </div>
         );
       })()}

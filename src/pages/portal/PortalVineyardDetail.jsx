@@ -7,6 +7,7 @@ import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import EditableBlocksTable from '../../components/EditableBlocksTable';
 import ParcelHistorySection from '../../components/ParcelHistorySection';
+import TerroirDataChips from '../../components/TerroirDataChips';
 
 export default function PortalVineyardDetail() {
   const { id } = useParams();
@@ -166,6 +167,25 @@ export default function PortalVineyardDetail() {
     return <Shell><p style={{ color: muted }}>Loading…</p></Shell>;
   }
 
+  const elevationMean = vineyard.topo_stats?.elevation_mean_ft != null
+    ? `${Math.round(Number(vineyard.topo_stats.elevation_mean_ft))} ft`
+    : null;
+
+  const gst = vineyard.gst_f ?? vineyard.growing_season_temp_f ?? null;
+  const gstValue = gst != null ? `${Number(gst).toFixed(1)}°F` : null;
+
+  const winkler = vineyard.winkler_index ?? vineyard.gdd ?? null;
+  const winklerValue = winkler != null ? Number(winkler).toLocaleString('en-US') : null;
+
+  const soil = vineyard.soil_series || vineyard.soil_type || vineyard.soil || null;
+
+  const terroirChips = [
+    { label: 'Winkler', value: winklerValue || '—', tone: 'blue', glow: true },
+    { label: 'GST', value: gstValue || '—', tone: 'green', glow: true },
+    { label: 'Soil', value: soil || '—', tone: 'amber', glow: false },
+    { label: 'Elev', value: elevationMean || '—', tone: 'parchment', glow: false },
+  ];
+
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'var(--font-sans)', background: parchment }}>
 
@@ -231,6 +251,10 @@ export default function PortalVineyardDetail() {
           <InfoRow label="Address" value={[vineyard.situs_address, vineyard.situs_city, vineyard.situs_zip].filter(Boolean).join(', ') || '—'} />
           <InfoRow label="Owner" value={vineyard.owner_name || '—'} />
           <InfoRow label="Varietals" value={vineyard.varietals_list || '—'} />
+        </Section>
+
+        <Section title="Terroir Snapshot">
+          <TerroirDataChips chips={terroirChips} />
         </Section>
 
         {/* Topo stats (read-only) */}

@@ -17,6 +17,7 @@ import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import EditableBlocksTable from '../../components/EditableBlocksTable';
 import ParcelHistorySection from '../../components/ParcelHistorySection';
+import TerroirDataChips from '../../components/TerroirDataChips';
 
 export default function PortalVineyardGroup() {
   const [searchParams] = useSearchParams();
@@ -79,6 +80,29 @@ export default function PortalVineyardGroup() {
 
   const totalAcres = parcels.reduce((s, v) => s + Number(v.acres || 0), 0);
   const totalBlocks = parcels.reduce((s, v) => s + (v.blocks?.length || 0), 0);
+
+  const meanElevations = parcels
+    .map((p) => Number(p.topo_stats?.elevation_mean_ft))
+    .filter((n) => Number.isFinite(n));
+  const groupElevation = meanElevations.length
+    ? `${Math.round(meanElevations.reduce((a, b) => a + b, 0) / meanElevations.length)} ft`
+    : null;
+
+  const firstWithClimate = parcels.find((p) => p.gst_f != null || p.growing_season_temp_f != null || p.winkler_index != null || p.gdd != null);
+  const gstRaw = firstWithClimate?.gst_f ?? firstWithClimate?.growing_season_temp_f ?? null;
+  const winklerRaw = firstWithClimate?.winkler_index ?? firstWithClimate?.gdd ?? null;
+  const gstValue = gstRaw != null ? `${Number(gstRaw).toFixed(1)}°F` : null;
+  const winklerValue = winklerRaw != null ? Number(winklerRaw).toLocaleString('en-US') : null;
+
+  const firstWithSoil = parcels.find((p) => p.soil_series || p.soil_type || p.soil);
+  const soilValue = firstWithSoil?.soil_series || firstWithSoil?.soil_type || firstWithSoil?.soil || null;
+
+  const groupChips = [
+    { label: 'Winkler', value: winklerValue || '—', tone: 'blue', glow: true },
+    { label: 'GST', value: gstValue || '—', tone: 'green', glow: true },
+    { label: 'Soil', value: soilValue || '—', tone: 'amber', glow: false },
+    { label: 'Elev', value: groupElevation || '—', tone: 'parchment', glow: false },
+  ];
 
   async function submitGeometry() {
     if (!pendingGeometry) return;
@@ -233,6 +257,10 @@ export default function PortalVineyardGroup() {
           {totalBlocks > 0 && ` · ${totalBlocks} blocks`}
         </p>
 
+        <div style={{ marginBottom: 18 }}>
+          <TerroirDataChips chips={groupChips} />
+        </div>
+
         {/* Per-parcel cards with nested blocks */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {parcels.map((parcel) => (
@@ -336,6 +364,33 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
   const address = [parcel.situs_address, parcel.situs_city, parcel.situs_zip]
     .filter(Boolean).join(', ');
 
+  const parcelChips = parcel.topo_stats ? [
+    {
+      label: 'Elev',
+      value: `${Number(parcel.topo_stats.elevation_min_ft).toFixed(0)}-${Number(parcel.topo_stats.elevation_max_ft).toFixed(0)} ft`,
+      tone: 'parchment',
+      glow: false,
+    },
+    {
+      label: 'Slope',
+      value: `${Number(parcel.topo_stats.slope_mean_deg).toFixed(1)}° avg`,
+      tone: 'green',
+      glow: true,
+    },
+    {
+      label: 'Aspect',
+      value: `${Number(parcel.topo_stats.aspect_dominant_deg).toFixed(0)}°`,
+      tone: 'blue',
+      glow: true,
+    },
+    {
+      label: 'Acres',
+      value: parcel.acres ? `${Number(parcel.acres).toFixed(1)} ac` : '—',
+      tone: 'amber',
+      glow: false,
+    },
+  ] : null;
+
   return (
     <div
       id={`parcel-${parcel.id}`}
@@ -384,16 +439,9 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
       </div>
 
       {/* Topo stats */}
-      {parcel.topo_stats && (
-        <div style={{
-          margin: '0 16px 12px',
-          padding: '8px 12px', borderRadius: 6,
-          background: parchment, fontSize: 12, color: muted,
-          display: 'flex', gap: 16, flexWrap: 'wrap',
-        }}>
-          <span>Elev: {Number(parcel.topo_stats.elevation_min_ft).toFixed(0)}–{Number(parcel.topo_stats.elevation_max_ft).toFixed(0)} ft</span>
-          <span>Slope: {Number(parcel.topo_stats.slope_mean_deg).toFixed(1)}° avg</span>
-          <span>Aspect: {Number(parcel.topo_stats.aspect_dominant_deg).toFixed(0)}°</span>
+      {parcelChips && (
+        <div style={{ margin: '0 16px 12px' }}>
+          <TerroirDataChips chips={parcelChips} />
         </div>
       )}
 

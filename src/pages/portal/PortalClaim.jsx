@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { border, ink, muted, parchment, TOKENS } from '../../styles/tokens';
 import { apiJson, apiPost } from '../../lib/api';
+import TerroirDataChips from '../../components/TerroirDataChips';
 
 export default function PortalClaim() {
   const navigate = useNavigate();
@@ -118,6 +119,16 @@ export default function PortalClaim() {
                     <div style={{ fontSize: 12, color: muted, marginTop: 2 }}>
                       {r.nested_ava || r.ava_name || '—'} · {Number(r.acres || 0).toFixed(1)} acres
                       {r.situs_city && ` · ${r.situs_city}`}
+                    </div>
+                    <div style={{ marginTop: 10, marginBottom: 4 }}>
+                      <TerroirDataChips chips={[
+                        { label: 'Acres', value: `${Number(r.acres || 0).toFixed(1)} ac`, tone: 'amber', glow: false },
+                        { label: 'AVA',   value: r.nested_ava || r.ava_name || '—',          tone: 'blue',  glow: true  },
+                        { label: 'Elev',  value: r.topo_stats?.elevation_mean_ft
+                            ? `${Math.round(r.topo_stats.elevation_mean_ft)} ft` : '—',       tone: 'parchment', glow: false },
+                        { label: 'Slope', value: r.topo_stats?.slope_mean_deg
+                            ? `${Number(r.topo_stats.slope_mean_deg).toFixed(1)}°` : '—',   tone: 'green', glow: true  },
+                      ]} />
                     </div>
 
                     {submitted === r.id ? (

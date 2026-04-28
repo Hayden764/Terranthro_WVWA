@@ -4,6 +4,8 @@ import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
 import { MONTH_ABBR } from '../config/climateConfig';
+import TerroirDataChips from './TerroirDataChips';
+import { apiJson } from '../lib/api';
 
 // ── Design tokens (light‑mode, eggshell base) ────────────────────────────
 const T = {
@@ -135,6 +137,24 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, onL
     : listings.filter(l => l.category === 'winery');
   const withPolygons = inside.filter(l => vineyardRecidSet.has(l.id));
 
+  const [climateStats, setClimateStats] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    setClimateStats(null);
+    apiJson(`/api/climate/${ava.slug}/stats`)
+      .then(data => { if (!cancelled) setClimateStats(data.stats || null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [ava.slug]);
+
+  const tdmean = climateStats?.tdmean;
+  const climateChips = tdmean ? [
+    { label: 'GS Temp Mean', value: `${tdmean.mean.toFixed(1)}${tdmean.unit}`, tone: 'amber', glow: true },
+    { label: 'GS Temp Max',  value: `${tdmean.max.toFixed(1)}${tdmean.unit}`,  tone: 'green', glow: true },
+    { label: 'GS Temp Min',  value: `${tdmean.min.toFixed(1)}${tdmean.unit}`,  tone: 'blue',  glow: true },
+    { label: 'Std Dev',      value: `±${tdmean.std_dev.toFixed(1)}${tdmean.unit}`, tone: 'parchment', glow: false },
+  ] : null;
+
   return (
     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
       {onBack && <BackBtn onClick={onBack} />}
@@ -152,28 +172,14 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, onL
 
       <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-        {/* Stats row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {meta.established && (
-            <div style={{ background: parchment, borderRadius: 8, padding: '10px 12px' }}>
-              <div style={T.sectionLabel}>Established</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: ink, marginTop: 3 }}>{meta.established}</div>
-            </div>
-          )}
-          {meta.acres && (
-            <div style={{ background: parchment, borderRadius: 8, padding: '10px 12px' }}>
-              <div style={T.sectionLabel}>Approx. Acres</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: ink, marginTop: 3 }}>{meta.acres}</div>
-            </div>
-          )}
-          <div style={{ background: parchment, borderRadius: 8, padding: '10px 12px' }}>
-            <div style={T.sectionLabel}>Member Wineries</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: ink, marginTop: 3 }}>{inside.length}</div>
-          </div>
-          <div style={{ background: parchment, borderRadius: 8, padding: '10px 12px' }}>
-            <div style={T.sectionLabel}>Mapped Wineries</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: ink, marginTop: 3 }}>{withPolygons.length}</div>
-          </div>
+        <div>
+          <div style={{ ...T.sectionLabel, marginBottom: 8 }}>AVA Snapshot</div>
+          <TerroirDataChips chips={[
+            { label: 'Established', value: meta.established ? String(meta.established) : '—', tone: 'amber', glow: false },
+            { label: 'Acres', value: meta.acres || '—', tone: 'parchment', glow: false },
+            { label: 'Members', value: String(inside.length), tone: 'green', glow: true },
+            { label: 'Mapped', value: String(withPolygons.length), tone: 'blue', glow: true },
+          ]} />
         </div>
 
         {/* Highlights */}
@@ -181,6 +187,14 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, onL
           <div>
             <div style={{ ...T.sectionLabel, marginBottom: 6 }}>About</div>
             <p style={{ fontSize: 13, color: ink, lineHeight: 1.65, margin: 0 }}>{meta.highlights}</p>
+          </div>
+        )}
+
+        {/* Live climate data */}
+        {climateChips && (
+          <div>
+            <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Growing Season Climate</div>
+            <TerroirDataChips chips={climateChips} />
           </div>
         )}
 
@@ -406,6 +420,35 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                     };
                   })();
 
+                  const terroirChips = [
+                    {
+                      label: 'Elev',
+                      value: groupTopoStats?.elev_min != null && groupTopoStats?.elev_max != null
+                        ? `${Math.round(groupTopoStats.elev_min)}-${Math.round(groupTopoStats.elev_max)} ft`
+                        : '—',
+                      tone: 'parchment',
+                      glow: false,
+                    },
+                    {
+                      label: 'Slope',
+                      value: groupTopoStats?.slope_mean != null ? `${groupTopoStats.slope_mean.toFixed(1)}°` : '—',
+                      tone: 'green',
+                      glow: true,
+                    },
+                    {
+                      label: 'Aspect',
+                      value: groupTopoStats?.aspect_card || '—',
+                      tone: 'blue',
+                      glow: true,
+                    },
+                    {
+                      label: 'Blocks',
+                      value: String(blockRows.length || group.features.length),
+                      tone: 'amber',
+                      glow: false,
+                    },
+                  ];
+
                   // AVA section divider
                   if (avaLabel !== lastAvaLabel) {
                     lastAvaLabel = avaLabel;
@@ -453,38 +496,10 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                       {/* Expanded content */}
                       {isExpanded && (
                         <div style={{ padding: '0 12px 12px', borderTop: `1px solid ${border}` }}>
-                          {/* Stats grid */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 12px', paddingTop: 10 }}>
-                            {acres && (
-                              <div>
-                                <div style={T.sectionLabel}>Acres</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>{acres} ac</div>
-                              </div>
-                            )}
-                            <div>
-                              <div style={T.sectionLabel}>Blocks</div>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>{blockRows.length || group.features.length}</div>
-                            </div>
-                            {groupTopoStats?.elev_min != null && groupTopoStats?.elev_max != null && (
-                              <div>
-                                <div style={T.sectionLabel}>Elev. Range</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>
-                                  {Math.round(groupTopoStats.elev_min)}–{Math.round(groupTopoStats.elev_max)} ft
-                                </div>
-                              </div>
-                            )}
-                            {groupTopoStats?.slope_mean != null && (
-                              <div>
-                                <div style={T.sectionLabel}>Avg. Slope</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>{groupTopoStats.slope_mean.toFixed(1)}°</div>
-                              </div>
-                            )}
-                            {groupTopoStats?.aspect_card && (
-                              <div>
-                                <div style={T.sectionLabel}>Avg. Aspect</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: ink }}>{groupTopoStats.aspect_card}</div>
-                              </div>
-                            )}
+                          {/* Terroir snapshot */}
+                          <div style={{ paddingTop: 10 }}>
+                            <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Terroir Snapshot</div>
+                            <TerroirDataChips chips={terroirChips} />
                           </div>
 
                           {/* Block list */}
@@ -659,12 +674,12 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
                       <span>{topoStats.min?.toFixed(1)}{topoConfig.unit}</span>
                       <span>{topoStats.max?.toFixed(1)}{topoConfig.unit}</span>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                      <div><div style={T.sectionLabel}>Min</div><div style={{ fontSize: 12, fontWeight: 600, color: ink }}>{fmt(topoStats.min)}{topoConfig.unit}</div></div>
-                      <div><div style={T.sectionLabel}>Max</div><div style={{ fontSize: 12, fontWeight: 600, color: ink }}>{fmt(topoStats.max)}{topoConfig.unit}</div></div>
-                      <div><div style={T.sectionLabel}>Mean</div><div style={{ fontSize: 12, fontWeight: 600, color: ink }}>{fmt(topoStats.mean)}{topoConfig.unit}</div></div>
-                      <div><div style={T.sectionLabel}>Std Dev</div><div style={{ fontSize: 12, fontWeight: 600, color: ink }}>±{fmt(topoStats.std)}{topoConfig.unit}</div></div>
-                    </div>
+                    <TerroirDataChips chips={[
+                      { label: 'Min',     value: `${fmt(topoStats.min)}${topoConfig.unit}`,  tone: 'blue',      glow: true  },
+                      { label: 'Max',     value: `${fmt(topoStats.max)}${topoConfig.unit}`,  tone: 'amber',     glow: true  },
+                      { label: 'Mean',    value: `${fmt(topoStats.mean)}${topoConfig.unit}`, tone: 'green',     glow: true  },
+                      { label: 'Std Dev', value: `±${fmt(topoStats.std)}${topoConfig.unit}`,  tone: 'parchment', glow: false },
+                    ]} />
                   </>
                 )}
                 {!topoStats && (

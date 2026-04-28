@@ -109,3 +109,28 @@ export const alpha = (color, opacity) => (
 export const mix = (primary, primaryWeight, secondary) => (
   `color-mix(in srgb, ${primary} ${toPercent(primaryWeight)}%, ${secondary})`
 );
+
+// ─── Map surface (opaque parchment card) ─────────────────────────────────────
+// Single source of truth for all on-map chrome (controls, badges, hover pills,
+// FAB) AND the MapLibre vineyard hover popup. Solid parchment fill + visible
+// ghost-gray edge + lifted shadow — reads as a physical card, matching the
+// wineries-page left panel and the vineyard popup so every surface that floats
+// over the map looks like the same object.
+export const MAP_GLASS = {
+  bg:           parchment,
+  bgStrong:     parchment,
+  bgHover:      mix(parchment, 92, ink),     // subtle darken on hover
+  bgActive:     crimson,
+  border:       ghost,
+  borderStrong: alpha(ink, 0.22),
+  borderActive: alpha(crimson, 0.55),
+  text:         alpha(ink, 0.88),
+  textMuted:    alpha(ink, 0.55),
+  textFaint:    alpha(ink, 0.35),
+  textActive:   parchment,
+  // Lifted card shadow — matches .maplibregl-popup-content
+  shadow:       `0 8px 32px ${alpha(ink, 0.18)}, 0 2px 8px ${alpha(ink, 0.10)}`,
+  radius:       8,
+  radiusCard:   10,
+  radiusPill:   999,
+};

@@ -1,45 +1,36 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { alpha, ink, mix, TOKENS } from '../styles/tokens';
+import { alpha, MAP_GLASS, TOKENS } from '../styles/tokens';
 
 const MAX_PITCH_FLAT = 85;
 const MAX_PITCH_WITH_TERRAIN = 71;
 
-// UI constants for map control styling
+// UI constants for map control styling — all surfaces consume the shared
+// MAP_GLASS token family so every floating map element stays consistent.
 const UI = {
-  btnBorder: alpha(TOKENS.parchment, 0.18),
-  btnBg: mix(TOKENS.ink, 82, TOKENS.parchment),
-  btnText: alpha(TOKENS.parchment, 0.88),
-  btnActiveBg: alpha(TOKENS.crimson, 0.78),
-  btnActiveBorder: alpha(TOKENS.crimson, 0.55),
-  btnActiveText: alpha(TOKENS.parchment, 0.98),
-  separator: alpha(TOKENS.parchment, 0.1),
-  pitchLabel: alpha(TOKENS.parchment, 0.6),
-  compassBg: mix(TOKENS.ink, 82, TOKENS.parchment),
-  compassNeedle: alpha(TOKENS.danger, 0.92),
-  compassBack: alpha(TOKENS.parchment, 0.55),
-  compassCircle: alpha(TOKENS.parchment, 0.1),
-  compassNorth: alpha(TOKENS.parchment, 0.4),
-  compassMarkFaint: alpha(TOKENS.parchment, 0.18),
-  shadowDark: alpha('black', 0.25),
+  separator:        alpha(TOKENS.ink, 0.08),
+  pitchLabel:       MAP_GLASS.textMuted,
+  compassNeedle:    alpha(TOKENS.crimson, 0.92),
+  compassBack:      alpha(TOKENS.ink, 0.35),
+  compassCircle:    alpha(TOKENS.ink, 0.12),
+  compassNorth:     alpha(TOKENS.ink, 0.5),
+  compassMarkFaint: alpha(TOKENS.ink, 0.2),
 };
 
 const BTN_BASE = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  width: 36, height: 36, borderRadius: 8, cursor: 'pointer',
-  border: `1px solid ${UI.btnBorder}`,
-  background: UI.btnBg,
-  color: UI.btnText,
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
-  boxShadow: `0 2px 8px ${UI.shadowDark}`,
-  transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+  width: 36, height: 36, borderRadius: MAP_GLASS.radius, cursor: 'pointer',
+  border: `1px solid ${MAP_GLASS.border}`,
+  background: MAP_GLASS.bg,
+  color: MAP_GLASS.text,
+  boxShadow: MAP_GLASS.shadow,
+  transition: 'background 0.15s, color 0.15s, border-color 0.15s, transform 0.15s',
 };
 
 const BTN_ACTIVE = {
   ...BTN_BASE,
-  background: UI.btnActiveBg,
-  border: `1px solid ${UI.btnActiveBorder}`,
-  color: UI.btnActiveText,
+  background: MAP_GLASS.bgActive,
+  border: `1px solid ${MAP_GLASS.borderActive}`,
+  color: MAP_GLASS.textActive,
 };
 
 export default function MapControls({ map, mapLoaded, selectedAva, onSelectAva, onResetView }) {
@@ -228,10 +219,9 @@ function CompassDial({ map, bearing, onResetNorth }) {
       style={{
         width: 36, height: 36, borderRadius: '50%',
         cursor: isDragging ? 'grabbing' : 'grab',
-        background: UI.compassBg,
-        border: `1px solid ${UI.btnBorder}`,
-        backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-        boxShadow: `0 2px 8px ${UI.shadowDark}`,
+        background: MAP_GLASS.bg,
+        border: `1px solid ${MAP_GLASS.border}`,
+        boxShadow: MAP_GLASS.shadow,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         userSelect: 'none', touchAction: 'none',
       }}
@@ -252,6 +242,9 @@ function CompassDial({ map, bearing, onResetNorth }) {
 
 function ControlBtn({ style, onClick, title, children }) {
   const [hovered, setHovered] = useState(false);
+  // Only intensify the glass on hover when the button isn't already in an
+  // active (crimson) state — preserves active emphasis.
+  const isActive = style?.background === MAP_GLASS.bgActive;
   return (
     <button
       onClick={onClick}
@@ -260,8 +253,8 @@ function ControlBtn({ style, onClick, title, children }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         ...style,
-        opacity: hovered ? 1 : 0.92,
-        transform: hovered ? 'scale(1.06)' : 'scale(1)',
+        background: hovered && !isActive ? MAP_GLASS.bgHover : style.background,
+        transform: hovered ? 'scale(1.04)' : 'scale(1)',
       }}
     >
       {children}

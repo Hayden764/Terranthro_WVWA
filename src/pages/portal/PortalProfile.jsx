@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { border, crimson, ink, muted, parchment, TOKENS } from '../../styles/tokens';
+import { INPUT_STYLE, btn } from '../../styles/patterns';
 import { apiJson, apiPost } from '../../lib/api';
 
 export default function PortalProfile() {
@@ -97,20 +98,21 @@ export default function PortalProfile() {
               value={form.description}
               onChange={handleChange('description')}
               rows={5}
+              className="ds-input"
               style={inputStyle}
             />
           </Field>
 
           <Field label="Phone">
-            <input type="tel" value={form.phone} onChange={handleChange('phone')} style={inputStyle} />
+            <input type="tel" value={form.phone} onChange={handleChange('phone')} className="ds-input" style={inputStyle} />
           </Field>
 
           <Field label="Website URL">
-            <input type="url" value={form.url} onChange={handleChange('url')} style={inputStyle} />
+            <input type="url" value={form.url} onChange={handleChange('url')} className="ds-input" style={inputStyle} />
           </Field>
 
           <Field label="Image URL">
-            <input type="url" value={form.image_url} onChange={handleChange('image_url')} style={inputStyle} />
+            <input type="url" value={form.image_url} onChange={handleChange('image_url')} className="ds-input" style={inputStyle} />
           </Field>
 
           {error && <p style={{ color: crimson, fontSize: 'var(--type-mono-size)', marginBottom: 12 }}>{error}</p>}
@@ -155,27 +157,13 @@ function Field({ label, children }) {
 }
 
 const inputStyle = {
-  width: '100%',
-  padding: '10px 14px',
-  borderRadius: 8,
-  border: `1px solid ${border}`,
-  fontSize: 'var(--type-body-size)',
-  color: ink,
-  background: parchment,
-  outline: 'none',
-  fontFamily: 'var(--font-sans)',
+  ...INPUT_STYLE,
   resize: 'vertical',
 };
 
 function btnStyle(disabled) {
   return {
-    padding: '10px 28px',
-    borderRadius: 8,
-    border: 'none',
-    background: ink,
-    color: parchment,
-    fontSize: 'var(--type-body-size)',
-    fontWeight: 600,
+    ...btn('primary', { padding: '10px 28px' }),
     cursor: disabled ? 'wait' : 'pointer',
     opacity: disabled ? 0.7 : 1,
   };
@@ -247,6 +235,7 @@ function PasswordSection({ hasPassword }) {
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="••••••••"
+                className="ds-input"
                 style={inputStyle}
               />
             </Field>
@@ -258,6 +247,7 @@ function PasswordSection({ hasPassword }) {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Min. 8 characters"
+              className="ds-input"
               style={inputStyle}
             />
           </Field>
@@ -268,6 +258,7 @@ function PasswordSection({ hasPassword }) {
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               placeholder="••••••••"
+              className="ds-input"
               style={inputStyle}
             />
           </Field>

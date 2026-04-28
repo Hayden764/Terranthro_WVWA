@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { alpha, border, crimson, parchment, TOKENS, TYPE } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
+import { panelCard } from '../../styles/patterns';
 import { MONTH_ABBR } from '../../config/climateConfig';
 import { TOPO_LAYER_TYPES } from '../../config/topographyConfig';
 import { LISTING_FILTER_MODES } from '../WVWAMap';
@@ -21,13 +22,9 @@ const TOPO_LAYERS = Object.values(TOPO_LAYER_TYPES).map(t => ({
 }));
 
 /* ─── Design tokens ──────────────────────────────────────────────────── */
-const CARD = {
-  background: alpha(TOKENS.parchment, 0.06),
-  border: `1px solid ${alpha(TOKENS.parchment, 0.08)}`,
-  borderRadius: 10,
+const CARD = panelCard({
   padding: '10px 12px',
-  marginBottom: 8,
-};
+});
 
 const SECTION_LABEL = {
   ...TYPE.uiLabel,

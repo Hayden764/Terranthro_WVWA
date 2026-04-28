@@ -2,19 +2,16 @@ import { alpha, TOKENS, TYPE } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { TOPO_LAYER_TYPES } from '../../config/topographyConfig';
 import TerroirDataChips from '../TerroirDataChips';
+import { panelCard } from '../../styles/patterns';
 
 /**
  * ScalePanel — "Scale" panel content.
  * Shows the colour ramp / legend for the active data layer.
  */
 
-const CARD = {
-  background: alpha(TOKENS.parchment, 0.06),
-  border: `1px solid ${alpha(TOKENS.parchment, 0.08)}`,
-  borderRadius: 10,
+const CARD = panelCard({
   padding: '10px 12px',
-  marginBottom: 8,
-};
+});
 
 const LABEL = {
   ...TYPE.uiLabel,

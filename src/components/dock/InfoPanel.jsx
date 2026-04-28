@@ -3,6 +3,7 @@ import { alpha, TOKENS, TYPE } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { WV_SUB_AVAS } from '../../config/topographyConfig';
 import TerroirDataChips from '../TerroirDataChips';
+import { panelCard } from '../../styles/patterns';
 
 /**
  * InfoPanel — "Info" panel content (right side).
@@ -10,13 +11,7 @@ import TerroirDataChips from '../TerroirDataChips';
  * When a data layer is active, shows layer description too.
  */
 
-const CARD = {
-  background: alpha(TOKENS.parchment, 0.06),
-  border: `1px solid ${alpha(TOKENS.parchment, 0.08)}`,
-  borderRadius: 10,
-  padding: '12px 14px',
-  marginBottom: 8,
-};
+const CARD = panelCard();
 
 const LBL = {
   ...TYPE.uiLabel,

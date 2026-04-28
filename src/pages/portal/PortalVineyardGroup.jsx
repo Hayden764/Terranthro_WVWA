@@ -13,6 +13,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import lineSplit from '@turf/line-split';
 import { feature as turfFeature } from '@turf/helpers';
 import { border, crimson, ink, muted, parchment, TOKENS } from '../../styles/tokens';
+import { INPUT_STYLE, btn } from '../../styles/patterns';
 import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import EditableBlocksTable from '../../components/EditableBlocksTable';
@@ -322,14 +323,16 @@ export default function PortalVineyardGroup() {
               placeholder="Parcel / vineyard name"
               value={pendingAdd.vineyard_name}
               onChange={(e) => setPendingAdd((p) => ({ ...p, vineyard_name: e.target.value }))}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, border: `1px solid ${border}`, fontSize: 'var(--type-body-size)', fontFamily: 'var(--font-sans)', marginBottom: 8 }}
+              className="ds-input"
+              style={{ ...INPUT_STYLE, width: '100%', boxSizing: 'border-box', padding: '8px 10px', marginBottom: 8 }}
             />
             <textarea
               placeholder="Optional: variety, location notes, etc."
               value={pendingAdd.notes}
               onChange={(e) => setPendingAdd((p) => ({ ...p, notes: e.target.value }))}
               rows={2}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, border: `1px solid ${border}`, fontSize: 'var(--type-body-size)', fontFamily: 'var(--font-sans)', resize: 'vertical', marginBottom: 10 }}
+              className="ds-input"
+              style={{ ...INPUT_STYLE, width: '100%', boxSizing: 'border-box', padding: '8px 10px', resize: 'vertical', marginBottom: 10 }}
             />
             {addSubmitStatus === 'error' && <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>}
             <div style={{ display: 'flex', gap: 8 }}>
@@ -529,7 +532,8 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
             value={removeNotes}
             onChange={(e) => onRemoveNotesChange(e.target.value)}
             rows={2}
-            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, border: `1px solid ${border}`, fontSize: 'var(--type-body-size)', fontFamily: 'var(--font-sans)', resize: 'vertical', marginBottom: 10 }}
+            className="ds-input"
+            style={{ ...INPUT_STYLE, width: '100%', boxSizing: 'border-box', padding: '8px 10px', resize: 'vertical', marginBottom: 10 }}
           />
           {removeSubmitStatus === 'error' && <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>}
           <div style={{ display: 'flex', gap: 8 }}>
@@ -553,7 +557,8 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
             value={pendingSplit.notes}
             onChange={(e) => onSplitNotesChange(e.target.value)}
             rows={2}
-            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, border: `1px solid ${border}`, fontSize: 'var(--type-body-size)', fontFamily: 'var(--font-sans)', resize: 'vertical', marginBottom: 10 }}
+            className="ds-input"
+            style={{ ...INPUT_STYLE, width: '100%', boxSizing: 'border-box', padding: '8px 10px', resize: 'vertical', marginBottom: 10 }}
           />
           {splitSubmitStatus === 'error' && <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>}
           <div style={{ display: 'flex', gap: 8 }}>
@@ -588,10 +593,11 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
             value={pendingGeometry.notes}
             onChange={(e) => onPendingNotesChange(e.target.value)}
             rows={2}
+            className="ds-input"
             style={{
-              width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6,
-              border: `1px solid ${border}`, fontSize: 'var(--type-body-size)',
-              fontFamily: 'var(--font-sans)', resize: 'vertical', marginBottom: 10,
+              ...INPUT_STYLE,
+              width: '100%', boxSizing: 'border-box', padding: '8px 10px',
+              resize: 'vertical', marginBottom: 10,
             }}
           />
           {geoSubmitStatus === 'error' && (
@@ -637,9 +643,8 @@ function Shell({ children }) {
 
 
 const smallBtnStyle = {
-  padding: '5px 12px', borderRadius: 6, border: 'none',
-  background: ink, color: parchment, cursor: 'pointer',
-  fontSize: 'var(--type-body-size)', fontWeight: 500,
+  ...btn('primary', { padding: '5px 12px' }),
+  cursor: 'pointer',
 };
 
 function RequestButton({ vineyard, type, label }) {
@@ -685,10 +690,11 @@ function RequestButton({ vineyard, type, label }) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         rows={3}
+        className="ds-input"
         style={{
-          width: '100%', padding: '8px 10px', borderRadius: 6,
-          border: `1px solid ${border}`, fontSize: 'var(--type-body-size)',
-          fontFamily: 'var(--font-sans)', resize: 'vertical', boxSizing: 'border-box',
+          ...INPUT_STYLE,
+          width: '100%', padding: '8px 10px',
+          resize: 'vertical', boxSizing: 'border-box',
         }}
       />
       <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>

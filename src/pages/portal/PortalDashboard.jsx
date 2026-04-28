@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { border, ink, muted, parchment, TOKENS } from '../../styles/tokens';
+import { btn } from '../../styles/patterns';
 import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import TerroirDataChips from '../../components/TerroirDataChips';
@@ -262,25 +263,12 @@ function StatusBadge({ status }) {
 
 const actionBtnStyle = {
   display: 'inline-block',
-  padding: '8px 20px',
-  borderRadius: 6,
-  background: ink,
-  color: parchment,
-  fontSize: 'var(--type-mono-size)',
-  fontWeight: 600,
+  ...btn('primary', { padding: '8px 20px' }),
   textDecoration: 'none',
-  border: 'none',
-  cursor: 'pointer',
 };
 
 const linkBtnStyle = {
-  background: 'none',
-  border: `1px solid ${border}`,
-  borderRadius: 6,
-  padding: '6px 16px',
-  fontSize: 'var(--type-mono-size)',
-  color: muted,
-  cursor: 'pointer',
+  ...btn('ghost', { padding: '6px 16px' }),
 };
 
 /* ── Helpers ─────────────────────────────────────── */

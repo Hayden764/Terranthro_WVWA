@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '../../styles/tokens';
+import { INPUT_STYLE, btn } from '../../styles/patterns';
 import { apiPost } from '../../lib/api';
 
 const TAB = { MAGIC: 'magic', PASSWORD: 'password' };
@@ -49,16 +50,8 @@ export default function PortalLogin() {
   }
 
   const inputStyle = {
-    width: '100%',
-    padding: '10px 14px',
-    borderRadius: 8,
-    border: `1px solid ${border}`,
-    fontSize: 'var(--type-display-italic-size)',
-    color: ink,
-    background: parchment,
-    outline: 'none',
+    ...INPUT_STYLE,
     marginBottom: 16,
-    boxSizing: 'border-box',
   };
 
   const labelStyle = {
@@ -139,6 +132,7 @@ export default function PortalLogin() {
               value={pwEmail}
               onChange={(e) => setPwEmail(e.target.value)}
               placeholder="winery@example.com"
+              className="ds-input"
               style={inputStyle}
             />
             <label style={labelStyle}>Password</label>
@@ -148,6 +142,7 @@ export default function PortalLogin() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
+              className="ds-input"
               style={inputStyle}
             />
 
@@ -161,14 +156,7 @@ export default function PortalLogin() {
               type="submit"
               disabled={loading}
               style={{
-                width: '100%',
-                padding: '12px 0',
-                borderRadius: 8,
-                border: 'none',
-                background: ink,
-                color: parchment,
-                fontSize: 'var(--type-display-italic-size)',
-                fontWeight: 600,
+                ...btn('primary', { width: '100%' }),
                 cursor: loading ? 'wait' : 'pointer',
                 opacity: loading ? 0.7 : 1,
               }}
@@ -205,6 +193,7 @@ export default function PortalLogin() {
                 value={mlEmail}
                 onChange={(e) => setMlEmail(e.target.value)}
                 placeholder="winery@example.com"
+                className="ds-input"
                 style={inputStyle}
               />
 
@@ -218,14 +207,7 @@ export default function PortalLogin() {
                 type="submit"
                 disabled={loading}
                 style={{
-                  width: '100%',
-                  padding: '12px 0',
-                  borderRadius: 8,
-                  border: 'none',
-                  background: ink,
-                  color: parchment,
-                  fontSize: 'var(--type-display-italic-size)',
-                  fontWeight: 600,
+                  ...btn('primary', { width: '100%' }),
                   cursor: loading ? 'wait' : 'pointer',
                   opacity: loading ? 0.7 : 1,
                 }}

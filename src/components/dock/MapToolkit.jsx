@@ -1,6 +1,7 @@
 import { alpha, border, crimson, parchment, TOKENS, TYPE } from '../../styles/tokens';
 import { GLASS } from './glassTokens';
 import { WV_SUB_AVAS } from '../../config/topographyConfig';
+import { panelCard } from '../../styles/patterns';
 
 /**
  * MapToolkit — "View" panel content.
@@ -12,13 +13,9 @@ const MAX_PITCH_FLAT = 85;
 const MAX_PITCH_WITH_TERRAIN = 71;
 
 /* ─── Shared card style ─────────────────────────────────────────────── */
-const CARD = {
-  background: alpha(TOKENS.parchment, 0.06),
-  border: `1px solid ${alpha(TOKENS.parchment, 0.08)}`,
-  borderRadius: 10,
+const CARD = panelCard({
   padding: '10px 12px',
-  marginBottom: 8,
-};
+});
 
 const LABEL = {
   ...TYPE.uiLabel,

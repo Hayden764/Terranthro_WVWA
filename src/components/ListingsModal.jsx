@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { LISTING_CATEGORIES } from './WVWAMap';
-import { alpha, border, crimson, ink, mix, parchment, TOKENS } from '../styles/tokens';
 import { alpha, border, crimson, ink, mix, parchment, TOKENS, TYPE } from '../styles/tokens';
+import { GLASS_CARD } from '../styles/patterns';
 
 // Category order for display
 const CATEGORY_ORDER = ['winery', 'tasting', 'restaurant', 'hotel', 'other'];
@@ -85,7 +85,7 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
   if (!isOpen) return null;
 
   const glass = {
-    background: UI.modalBg,
+    ...GLASS_CARD,
     backdropFilter: 'blur(20px)',
     WebkitBackdropFilter: 'blur(20px)',
   };
@@ -110,7 +110,6 @@ export default function ListingsModal({ isOpen, onClose, onSelectListing, listin
         onClick={e => e.stopPropagation()}
         style={{
           ...glass,
-          border: `1px solid ${UI.panelBorder}`,
           borderRadius: 16,
           width: 'min(780px, 95vw)',
           maxHeight: '85vh',

@@ -1,4 +1,4 @@
-import { TYPE, TOKENS, alpha } from '../styles/tokens';
+import { TOKENS } from '../styles/tokens';
 
 const TONE = {
   blue: {
@@ -36,25 +36,32 @@ export default function TerroirDataChips({ chips = [], variant = 'light' }) {
           <div
             key={chip.label}
             style={{
-              background: glass ? alpha(TOKENS.parchment, 0.06) : alpha(TOKENS.ink, 0.03),
-              border: glass
-                ? `1px solid ${alpha(TOKENS.parchment, 0.12)}`
-                : `1px solid ${alpha(TOKENS.ink, 0.12)}`,
-              borderRadius: 8,
-              padding: '8px 10px',
+              // Per terranthro-design-system.html `.chip`
+              background: 'var(--color-surface-raised)',
+              border: `0.5px solid ${glass ? 'rgba(255, 255, 255, 0.07)' : 'var(--color-border)'}`,
+              borderRadius: 6,
+              padding: '8px 12px',
             }}
           >
             <div style={{
-              ...TYPE.uiLabel,
-              color: glass ? alpha(TOKENS.parchment, 0.72) : TOKENS.muted,
-              marginBottom: 4,
+              // `.chip-label`: 9px / 0.14em / uppercase / ghost
+              fontFamily: 'var(--font-sans)',
+              fontSize: 9,
+              fontWeight: 500,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: glass ? 'rgba(232, 226, 214, 0.72)' : TOKENS.ghost,
+              marginBottom: 3,
             }}>
               {chip.label}
             </div>
             <div style={{
-              ...TYPE.displayItalic,
-              lineHeight: 1.15,
+              // `.chip-value`: Cormorant Garamond 18px / 500 (non-italic)
+              fontFamily: 'var(--font-display)',
+              fontSize: 18,
+              fontWeight: 500,
               fontStyle: 'normal',
+              lineHeight: 1.15,
               color: tone.color,
               textShadow: chip.glow ? tone.glow : 'none',
               whiteSpace: 'nowrap',

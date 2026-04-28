@@ -25,7 +25,72 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* MapLibre popup overrides — warm eggshell card */
+.ds-card-glass {
+  background: rgba(255, 255, 255, 0.025);
+  border: 0.5px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+}
+
+/* Per terranthro-design-system.html `.btn` */
+.ds-btn {
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  padding: 10px 22px;
+  transition: box-shadow 0.2s ease;
+}
+
+.ds-btn-primary {
+  background: var(--color-electric-blue);
+  color: var(--color-ink);
+}
+.ds-btn-primary:hover { box-shadow: var(--glow-blue); }
+
+.ds-btn-ghost {
+  background: transparent;
+  color: var(--color-electric-blue);
+  border: 0.5px solid var(--color-electric-blue);
+}
+.ds-btn-ghost:hover { box-shadow: var(--glow-blue); }
+
+.ds-btn-danger {
+  background: transparent;
+  color: var(--color-crimson);
+  border: 0.5px solid var(--color-crimson);
+}
+.ds-btn-danger:hover { box-shadow: var(--glow-crimson); }
+
+/* Per terranthro-design-system.html `.input-preview` */
+.ds-input {
+  width: 100%;
+  background: var(--color-surface);
+  border: 0.5px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-parchment);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 300;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.ds-input::placeholder {
+  color: var(--color-ghost);
+}
+
+.ds-input:focus {
+  border-color: var(--color-electric-blue);
+}
+
+/* MapLibre popup overrides — uses the same recipe as MAP_GLASS in tokens.js
+   so the popup, control rail, AVA badge, hover pills and FAB all read as the
+   same physical card hovering over the map. */
 .maplibregl-popup-content {
   padding: 0 !important;
   border-radius: 10px !important;

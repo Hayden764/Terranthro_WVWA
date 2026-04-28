@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import lineSplit from '@turf/line-split';
 import { lineString, polygon as turfPolygon, feature as turfFeature } from '@turf/helpers';
 import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '../../styles/tokens';
+import { INPUT_STYLE, btn } from '../../styles/patterns';
 import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import EditableBlocksTable from '../../components/EditableBlocksTable';
@@ -316,6 +317,7 @@ export default function PortalVineyardDetail() {
                 value={pendingGeometry.notes}
                 onChange={(e) => setPendingGeometry((p) => ({ ...p, notes: e.target.value }))}
                 rows={2}
+                className="ds-input"
                 style={textareaStyle}
               />
               {geoSubmitStatus === 'error' && (
@@ -351,6 +353,7 @@ export default function PortalVineyardDetail() {
                 value={pendingSplit.notes}
                 onChange={(e) => setPendingSplit((p) => ({ ...p, notes: e.target.value }))}
                 rows={2}
+                className="ds-input"
                 style={textareaStyle}
               />
               {splitSubmitStatus === 'error' && (
@@ -399,6 +402,7 @@ export default function PortalVineyardDetail() {
                 value={removeNotes}
                 onChange={(e) => setRemoveNotes(e.target.value)}
                 rows={2}
+                className="ds-input"
                 style={textareaStyle}
               />
               {removeSubmitStatus === 'error' && (
@@ -432,6 +436,7 @@ export default function PortalVineyardDetail() {
                 placeholder="Parcel / vineyard name"
                 value={pendingAdd.vineyard_name}
                 onChange={(e) => setPendingAdd((p) => ({ ...p, vineyard_name: e.target.value }))}
+                className="ds-input"
                 style={{ ...textareaStyle, resize: 'none', marginBottom: 8 }}
               />
               <textarea
@@ -439,6 +444,7 @@ export default function PortalVineyardDetail() {
                 value={pendingAdd.notes}
                 onChange={(e) => setPendingAdd((p) => ({ ...p, notes: e.target.value }))}
                 rows={2}
+                className="ds-input"
                 style={textareaStyle}
               />
               {addSubmitStatus === 'error' && (
@@ -580,10 +586,12 @@ function RequestButton({ vineyard, type, label }) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         rows={3}
+        className="ds-input"
         style={{
-          width: '100%', padding: '8px 12px', borderRadius: 6,
-          border: `1px solid ${border}`, fontSize: 'var(--type-mono-size)',
-          fontFamily: 'var(--font-sans)', resize: 'vertical',
+          ...INPUT_STYLE,
+          width: '100%',
+          padding: '8px 12px',
+          resize: 'vertical',
         }}
       />
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -635,13 +643,7 @@ function InfoRow({ label, value }) {
 
 
 const smallBtnStyle = {
-  padding: '6px 16px',
-  borderRadius: 6,
-  border: 'none',
-  background: ink,
-  color: parchment,
-  fontSize: 'var(--type-body-size)',
-  fontWeight: 600,
+  ...btn('primary', { padding: '6px 16px' }),
   cursor: 'pointer',
 };
 
@@ -661,13 +663,10 @@ const pendingCardStyle = {
 };
 
 const textareaStyle = {
+  ...INPUT_STYLE,
   width: '100%',
   boxSizing: 'border-box',
   padding: '8px 10px',
-  borderRadius: 6,
-  border: `1px solid ${border}`,
-  fontSize: 'var(--type-body-size)',
-  fontFamily: 'var(--font-sans)',
   resize: 'vertical',
   marginBottom: 10,
 };

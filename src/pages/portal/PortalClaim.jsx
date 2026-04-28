@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { border, ink, muted, parchment, TOKENS } from '../../styles/tokens';
+import { INPUT_STYLE, btn } from '../../styles/patterns';
 import { apiJson, apiPost } from '../../lib/api';
 import TerroirDataChips from '../../components/TerroirDataChips';
 
@@ -84,16 +85,15 @@ export default function PortalClaim() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by vineyard or owner name…"
+            className="ds-input"
             style={{
-              flex: 1, padding: '10px 14px', borderRadius: 8,
-              border: `1px solid ${border}`, fontSize: 'var(--type-body-size)',
-              color: ink, background: parchment, outline: 'none',
+              ...INPUT_STYLE,
+              flex: 1,
             }}
           />
           <button type="submit" disabled={loading} style={{
-            padding: '10px 20px', borderRadius: 8, border: 'none',
-            background: ink, color: parchment, fontSize: 'var(--type-body-size)',
-            fontWeight: 600, cursor: 'pointer',
+            ...btn('primary'),
+            cursor: 'pointer',
           }}>
             Search
           </button>
@@ -142,10 +142,11 @@ export default function PortalClaim() {
                           value={claimNotes}
                           onChange={(e) => setClaimNotes(e.target.value)}
                           rows={2}
+                          className="ds-input"
                           style={{
-                            width: '100%', padding: '6px 10px', borderRadius: 6,
-                            border: `1px solid ${border}`, fontSize: 'var(--type-body-size)',
-                            fontFamily: 'var(--font-sans)', resize: 'vertical',
+                            ...INPUT_STYLE,
+                            padding: '6px 10px',
+                            resize: 'vertical',
                             marginBottom: 6,
                           }}
                         />
@@ -194,6 +195,7 @@ export default function PortalClaim() {
                   required
                   value={newForm.vineyard_name}
                   onChange={(e) => setNewForm((p) => ({ ...p, vineyard_name: e.target.value }))}
+                  className="ds-input"
                   style={inputStyle}
                 />
               </div>
@@ -203,6 +205,7 @@ export default function PortalClaim() {
                   type="text"
                   value={newForm.ava_name}
                   onChange={(e) => setNewForm((p) => ({ ...p, ava_name: e.target.value }))}
+                  className="ds-input"
                   style={inputStyle}
                 />
               </div>
@@ -212,6 +215,7 @@ export default function PortalClaim() {
                   value={newForm.notes}
                   onChange={(e) => setNewForm((p) => ({ ...p, notes: e.target.value }))}
                   rows={3}
+                  className="ds-input"
                   style={inputStyle}
                 />
               </div>
@@ -230,16 +234,13 @@ export default function PortalClaim() {
 }
 
 const smallBtn = {
-  padding: '6px 16px', borderRadius: 6, border: 'none',
-  background: ink, color: parchment, fontSize: 'var(--type-body-size)',
-  fontWeight: 600, cursor: 'pointer',
+  ...btn('primary', { padding: '6px 16px' }),
+  cursor: 'pointer',
 };
 
 const labelStyle = { display: 'block', fontSize: 'var(--type-body-size)', color: muted, marginBottom: 4 };
 
 const inputStyle = {
-  width: '100%', padding: '8px 12px', borderRadius: 6,
-  border: `1px solid ${border}`, fontSize: 'var(--type-mono-size)',
-  fontFamily: 'var(--font-sans)', color: ink,
-  background: parchment, resize: 'vertical',
+  ...INPUT_STYLE,
+  resize: 'vertical',
 };

@@ -12,7 +12,7 @@ import MapControls from './MapControls';
 import TerroirDataChips from './TerroirDataChips';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { AVA_CAMERA, WV_CAMERA } from '../config/avaCameraConfig';
-import { alpha, border, crimson, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
+import { alpha, border, crimson, ink, MAP_GLASS, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 // In dev, always use relative API paths through the Vite proxy.
 // In production, use VITE_API_BASE_URL if provided.
@@ -128,13 +128,6 @@ const UI = {
   // audit-ignore-start map-chrome-atmosphere
   mapContainerBg: 'black',
   popupLabelColor: '#1e293b',
-  wineryHoverBg: 'rgba(72,55,41,0.82)',
-  wineryHoverBorder: '#87CEEB',
-  wineryHoverShadow: 'rgba(46,34,26,0.25)',
-  vineyardHoverBg: 'rgba(32,47,59,0.82)',
-  vineyardHoverShadow: 'rgba(15,23,42,0.25)',
-  avaBadgeBg: 'rgba(46,34,26,0.88)',
-  avaBadgeShadow: 'rgba(46,34,26,0.35)',
   // audit-ignore-end
 };
 
@@ -144,6 +137,12 @@ const MAP_AMBER = '#C28A3A';
 const toMapLibreColor = (color, fallback) => (
   typeof color === 'string' && color.startsWith('var(') ? fallback : color
 );
+
+// Shared listing hover/selection accent — used by the on-map dot/glow paint
+// AND the bottom-center HoverPill so both stay visually linked.
+// audit-ignore-start map-chrome-atmosphere
+export const LISTING_HOVER_COLOR = '#38BDF8';
+// audit-ignore-end
 
 export const LISTING_FILTER_MODES = {
   allWineries: 'allWineries',
@@ -1451,6 +1450,34 @@ function DevLayerPanel({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── HoverPill ─────────────────────────────────────────────────────────────
+// Transient bottom-center label shown on map marker / vineyard hover.
+// Uses the shared MAP_GLASS surface; identity comes from a colored leading
+// dot (crimson for wineries, vivid green for vineyards) rather than a tinted
+// background, keeping every on-map element visually consistent.
+function HoverPill({ dotColor, children }) {
+  return (
+    <div style={{
+      position: 'absolute', bottom: 40, left: '50%', transform: 'translateX(-50%)',
+      background: MAP_GLASS.bg,
+      border: `1px solid ${MAP_GLASS.border}`,
+      borderRadius: MAP_GLASS.radiusPill,
+      padding: '6px 14px 6px 10px',
+      display: 'flex', alignItems: 'center', gap: 8,
+      fontSize: 'var(--type-mono-size)', fontWeight: 600,
+      color: MAP_GLASS.text,
+      pointerEvents: 'none', zIndex: 5, fontFamily: 'var(--font-sans)',
+      boxShadow: MAP_GLASS.shadow,
+      whiteSpace: 'nowrap',
+    }}>
+      <span style={{
+        width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0,
+      }} />
+      {children}
     </div>
   );
 }
@@ -2798,7 +2825,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           'circle-color': 'transparent',
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 10, 14, 14],
           'circle-stroke-width': 1.5,
-          'circle-stroke-color': '#38BDF8',
+          'circle-stroke-color': LISTING_HOVER_COLOR,
           'circle-stroke-opacity': 0.25,
           'circle-opacity': 0,
           'circle-blur': 0.5,
@@ -2810,7 +2837,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         type: 'circle',
         source: 'selected-listing',
         paint: {
-          'circle-color': '#38BDF8',
+          'circle-color': LISTING_HOVER_COLOR,
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 4, 14, 6],
           'circle-stroke-width': 1,
           'circle-stroke-color': '#ffffff',
@@ -2832,7 +2859,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           'circle-color': 'transparent',
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 10, 14, 14],
           'circle-stroke-width': 1.5,
-          'circle-stroke-color': '#38BDF8',
+          'circle-stroke-color': LISTING_HOVER_COLOR,
           'circle-stroke-opacity': 0.22,
           'circle-opacity': 0,
           'circle-blur': 0.4,
@@ -3305,34 +3332,14 @@ const WVWAMap = forwardRef(function WVWAMap({
       )}
       */}
 
-      {/* Winery marker hover label */}
+      {/* Winery marker hover label — light glass pill, dot color matches the on-map hover dot */}
       {introComplete && hoveredListing && (
-        <div style={{
-          position: 'absolute', bottom: 40, left: '50%', transform: 'translateX(-50%)',
-          background: UI.wineryHoverBg, backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          border: `1.5px solid ${UI.wineryHoverBorder}`, borderRadius: 8,
-          padding: '5px 14px', fontSize: 'var(--type-mono-size)', fontWeight: 600, color: parchment,
-          pointerEvents: 'none', zIndex: 5, fontFamily: 'var(--font-sans)',
-          boxShadow: `0 4px 20px ${UI.wineryHoverShadow}`,
-        }}>
-          {hoveredListing.title}
-        </div>
+        <HoverPill dotColor={LISTING_HOVER_COLOR}>{hoveredListing.title}</HoverPill>
       )}
 
-      {/* Vineyard organization hover label */}
+      {/* Vineyard organization hover label — light glass pill, green dot */}
       {!hoveredListing && hoveredVineyardOrganization && (
-        <div style={{
-          position: 'absolute', bottom: 40, left: '50%', transform: 'translateX(-50%)',
-          background: UI.vineyardHoverBg, backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          border: `1.5px solid ${UI.hoverAccent}`, borderRadius: 8,
-          padding: '5px 14px', fontSize: 'var(--type-mono-size)', fontWeight: 600, color: parchment,
-          pointerEvents: 'none', zIndex: 5, fontFamily: 'var(--font-sans)',
-          boxShadow: `0 4px 20px ${UI.vineyardHoverShadow}`,
-        }}>
-          {hoveredVineyardOrganization}
-        </div>
+        <HoverPill dotColor={TOKENS.vividGreen}>{hoveredVineyardOrganization}</HoverPill>
       )}
 
       {/* Selected AVA badge — top center focal point when an AVA is selected */}
@@ -3341,21 +3348,18 @@ const WVWAMap = forwardRef(function WVWAMap({
         return ava ? (
           <div style={{
             position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
-            background: UI.avaBadgeBg,
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            borderRadius: 12,
+            background: MAP_GLASS.bgStrong,
+            borderRadius: MAP_GLASS.radiusCard,
             padding: '10px 20px',
             fontFamily: 'var(--font-sans)',
-            boxShadow: `0 4px 24px ${UI.avaBadgeShadow}`,
-            border: `1.5px solid ${ava.color}55`,
+            boxShadow: MAP_GLASS.shadow,
+            border: `1px solid ${MAP_GLASS.border}`,
             zIndex: 10,
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
             whiteSpace: 'nowrap',
           }}>
-            <span style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: parchment, letterSpacing: '0.01em' }}>
+            <span style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: MAP_GLASS.text, letterSpacing: '0.01em' }}>
               {ava.name}
             </span>
           </div>

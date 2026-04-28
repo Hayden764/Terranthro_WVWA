@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import WVWAMap, { LISTING_FILTER_MODES } from '../components/WVWAMap';
 import ExplorerSidebar from '../components/ExplorerSidebar';
-import { alpha, border, crimson, ink, parchment, TOKENS, TYPE } from '../styles/tokens';
+import { alpha, border, crimson, ink, MAP_GLASS, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 const UI = {
   taglineText:      alpha(TOKENS.parchment, 0.5),
@@ -10,7 +10,6 @@ const UI = {
   btnHoverBg:       alpha(TOKENS.parchment, 0.1),
   subtleLabel:      alpha(TOKENS.parchment, 0.45),
   scrimBg:          alpha('black', 0.45),
-  fabShadow:        alpha('black', 0.28),
 };
 import { useIsMobile } from '../lib/useIsMobile';
 
@@ -232,7 +231,7 @@ export default function WVWAMapPage() {
 
         {/* Map */}
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          {/* Mobile hamburger FAB */}
+          {/* Mobile hamburger FAB — MAP_GLASS card to match the rail / badge / pills / popup */}
           {isMobile && !isIntro && (
             <button
               onClick={() => setSidebarOpen(true)}
@@ -240,10 +239,14 @@ export default function WVWAMapPage() {
               style={{
                 position: 'absolute', top: 12, left: 12, zIndex: 100,
                 width: 42, height: 42,
-                background: ink, border: 'none', borderRadius: 10,
-                color: parchment, fontSize: 'var(--type-display-italic-size)',
+                background: MAP_GLASS.bg,
+                border: `1px solid ${MAP_GLASS.border}`,
+                borderRadius: MAP_GLASS.radiusCard,
+                color: MAP_GLASS.text,
+                fontSize: 'var(--type-display-italic-size)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', boxShadow: `0 2px 8px ${UI.fabShadow}`,
+                cursor: 'pointer',
+                boxShadow: MAP_GLASS.shadow,
                 fontFamily: 'var(--font-sans)', lineHeight: 1,
               }}
             >

@@ -134,6 +134,7 @@ export default function DesktopDock({
   listings,
   selectedAva,
   onSelectAva,
+  onResetView,
   activeLayer,
   onLayerChange,
   currentMonth,
@@ -279,6 +280,7 @@ export default function DesktopDock({
             mapLoaded={mapLoaded}
             selectedAva={selectedAva}
             onSelectAva={onSelectAva}
+            onResetView={onResetView}
             listingSymbologyPreset={listingSymbologyPreset}
             onListingSymbologyPresetChange={onListingSymbologyPresetChange}
             listingSymbologyOptions={listingSymbologyOptions}

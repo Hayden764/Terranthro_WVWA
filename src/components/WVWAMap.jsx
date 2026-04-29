@@ -9,9 +9,11 @@ maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile.bind(pmtilesProtocol));
 import ClimateLayer from './ClimateLayer';
 import TopographyLayer from './TopographyLayer';
 import MapControls from './MapControls';
+import CameraDebug from './CameraDebug';
 import TerroirDataChips from './TerroirDataChips';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { AVA_CAMERA, WV_CAMERA } from '../config/avaCameraConfig';
+import { FLY_PRESETS, flyToAva, flyToCoords, flyToVineyardBounds, flyToWillamette, flyToIntro, WV_BOUNDS } from '../config/flyTo';
 import { alpha, border, crimson, ink, MAP_GLASS, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 // In dev, always use relative API paths through the Vite proxy.
@@ -343,7 +345,7 @@ function applyListingFocusAccent(map, preset) {
 
 
 // Willamette Valley approximate bounding box
-const WV_BOUNDS = [[-123.8, 44.0], [-122.0, 45.9]];
+// WV_BOUNDS is imported from '../config/flyTo'
 
 // Build a GeoJSON FeatureCollection for the listings source, filtered to
 // winery records with optional vineyard polygon and AVA restrictions.
@@ -515,38 +517,8 @@ function raiseListingLayers(map) {
   }
 }
 
-/**
- * Fit the camera to the bounding box of a set of vineyard polygon features.
- * Returns true if bounds were valid and fitBounds was called; false if caller
- * should fall back to a point-based navigation.
- */
-function flyToVineyardBounds(map, features) {
-  if (!features?.length) return false;
-  let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
-  for (const feature of features) {
-    const rings = feature.geometry.type === 'Polygon'
-      ? feature.geometry.coordinates
-      : feature.geometry.coordinates.flat();
-    for (const ring of rings) {
-      for (const [lng, lat] of ring) {
-        if (lng < minLng) minLng = lng;
-        if (lat < minLat) minLat = lat;
-        if (lng > maxLng) maxLng = lng;
-        if (lat > maxLat) maxLat = lat;
-      }
-    }
-  }
-  if (![minLng, minLat, maxLng, maxLat].every(Number.isFinite)) return false;
-  map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
-    padding: { top: 100, bottom: 100, left: 80, right: 80 },
-    maxZoom: features.length === 1 ? 16.2 : 14.8,
-    pitch: 40,
-    curve: 1.4,
-    speed: 0.55,
-    essential: true,
-  });
-  return true;
-}
+// flyToVineyardBounds, flyToAva, flyToCoords, flyToWillamette, flyToIntro
+// are imported from '../config/flyTo'.
 
 /**
  * blinkMapLayer — pulse a paint property through a sequence of timed values.
@@ -1053,6 +1025,8 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                   elev_min: min('elevation_min_ft'),
                   elev_max: max('elevation_max_ft'),
                   slope_mean: avg('slope_mean_deg'),
+                  slope_p10: min('slope_p10_deg'),
+                  slope_p90: max('slope_p90_deg'),
                   aspect_label: rows[0]?.aspect_label ?? null,
                 };
               })();
@@ -1112,10 +1086,14 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                               {Math.round(groupTopoStats.elev_min)}–{Math.round(groupTopoStats.elev_max)} ft
                             </span>
                           )}
-                          {groupTopoStats.slope_mean != null && (
+                          {(groupTopoStats.slope_p10 != null && groupTopoStats.slope_p90 != null
+                            ? true
+                            : groupTopoStats.slope_mean != null) && (
                             <span style={{ fontSize: 'var(--type-ui-label-size)', color: UI.faintText, display: 'flex', alignItems: 'center', gap: 3 }}>
                               <span style={{ opacity: 0.6 }}>⊿</span>
-                              {groupTopoStats.slope_mean.toFixed(1)}° slope
+                              {groupTopoStats.slope_p10 != null && groupTopoStats.slope_p90 != null
+                                ? `${groupTopoStats.slope_p10.toFixed(1)}–${groupTopoStats.slope_p90.toFixed(1)}° slope`
+                                : `${groupTopoStats.slope_mean.toFixed(1)}° slope`}
                             </span>
                           )}
                           {groupTopoStats.aspect_label && groupTopoStats.aspect_label !== 'Flat' && (
@@ -1582,36 +1560,39 @@ const WVWAMap = forwardRef(function WVWAMap({
         map.setPaintProperty('wine-region-leader-lines', 'line-opacity', 0);
       }
 
-      // ── Leg 1: fly from globe to Oregon state overview ─────────────
-      // Centered over Oregon's geographic center so the user can read
-      // the state's shape, the coast, and the Cascades before zooming in.
-      map.flyTo({
-        center:   [-120.5, 44.0],
-        zoom:     5.0,
-        pitch:    12,
-        bearing:  0,
-        duration: 3500,
-        curve:    1.6,
-        easing:   t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2,
-        essential: true,
+      // ── Two-leg cinematic entrance: globe → Oregon → Willamette Valley ──
+      flyToIntro(map, {
+        onComplete: () => { setIntroComplete(true); setMarkersVisible(true); },
       });
-
-      // ── Leg 2: after a brief pause, fly into the Willamette Valley ────
-      map.once('moveend', () => {
-        setTimeout(() => {
-          map.flyTo({
-            center:   [WV_CAMERA.lng, WV_CAMERA.lat],
-            zoom:     WV_CAMERA.zoom,
-            pitch:    WV_CAMERA.pitch,
-            bearing:  WV_CAMERA.bearing,
-            duration: 2800,
-            curve:    1.2,
-            easing:   t => 1 - Math.pow(1 - t, 3),
-            essential: true,
-          });
-          map.once('moveend', () => { setIntroComplete(true); setMarkersVisible(true); });
-        }, 1000);
+    },
+    /**
+     * Dev-only fast path: jump straight to the Willamette Valley camera
+     * without playing the rotating-globe → Oregon → WV cinematic sequence.
+     * Used when ?skipIntro=1 is in the URL or when sessionStorage indicates
+     * the user has already seen the intro this tab session.
+     */
+    skipEntranceAnimation() {
+      if (rotationAnimRef.current) {
+        cancelAnimationFrame(rotationAnimRef.current);
+        rotationAnimRef.current = null;
+      }
+      const map = mapRef.current;
+      if (!map) return;
+      // Hide entrance callouts immediately (no fade)
+      for (const layerId of ['wine-region-dots', 'wine-region-labels', 'wine-region-leader-lines']) {
+        if (map.getLayer(layerId)) {
+          const prop = layerId === 'wine-region-labels' ? 'text-opacity' : (layerId === 'wine-region-leader-lines' ? 'line-opacity' : 'circle-opacity');
+          map.setPaintProperty(layerId, prop, 0);
+        }
+      }
+      map.jumpTo({
+        center:  [WV_CAMERA.lng, WV_CAMERA.lat],
+        zoom:    WV_CAMERA.zoom,
+        pitch:   WV_CAMERA.pitch,
+        bearing: WV_CAMERA.bearing,
       });
+      setIntroComplete(true);
+      setMarkersVisible(true);
     },
     clearSelectedListing() {
       setSelectedListingRef.current?.(null);
@@ -1625,35 +1606,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       }
     },
     flyToAva(slug) {
-      const map = mapRef.current;
-      if (!map || !slug) return;
-      const cam = AVA_CAMERA[slug];
-      if (cam) {
-        map.flyTo({
-          center:   [cam.lng, cam.lat],
-          zoom:     cam.zoom,
-          pitch:    cam.pitch   ?? 40,
-          bearing:  cam.bearing ?? 0,
-          curve:    1.85,
-          speed:    0.45,
-          easing:   t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2,
-          essential: true,
-        });
-      } else {
-        const avaSource = map.getSource(`ava-${slug}`);
-        if (avaSource && avaSource._data) {
-          try {
-            const bounds = new maplibregl.LngLatBounds();
-            const addCoords = (coords) => {
-              if (typeof coords[0] === 'number') bounds.extend(coords);
-              else coords.forEach(addCoords);
-            };
-            const features = avaSource._data.features || [avaSource._data];
-            features.forEach(f => addCoords(f.geometry.coordinates));
-            map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, pitch: 40, curve: 1.85, speed: 0.45, freezeElevation: true });
-          } catch (e) { /* ignore */ }
-        }
-      }
+      flyToAva(mapRef.current, slug);
     },
     selectListingById(id) {
       const listing = listingsRef.current.find((l) => l.id === id);
@@ -1672,7 +1625,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       }
 
       if (!flyToVineyardBounds(map, vineyardFeatures)) {
-        map.flyTo({ center: [listing.lng, listing.lat], zoom: 14, curve: 1.4, speed: 0.55, essential: true });
+        flyToCoords(map, { lng: listing.lng, lat: listing.lat });
       }
       map.once('moveend', () => {
         const BLINK = [
@@ -1727,7 +1680,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           raiseListingLayers(map);
         }
         if (!flyToVineyardBounds(map, features)) {
-          map.flyTo({ center: [lng, lat], zoom: 14, curve: 1.4, speed: 0.55, essential: true });
+          flyToCoords(map, { lng, lat });
         }
         map.once('moveend', () => {
           if (map.getLayer('vineyards-selected-fill'))
@@ -1761,7 +1714,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           raiseListingLayers(map);
         }
         if (!flyToVineyardBounds(map, features)) {
-          map.flyTo({ center: [lng, lat], zoom: 14, curve: 1.4, speed: 0.55, essential: true });
+          flyToCoords(map, { lng, lat });
         }
         map.once('moveend', () => {
           const WHITE_LINE = [
@@ -1784,9 +1737,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       }
     },
     flyToCoords({ lng, lat, zoom = 14 }) {
-      if (mapRef.current) {
-        mapRef.current.flyTo({ center: [lng, lat], zoom, curve: 1.4, speed: 0.55, essential: true });
-      }
+      flyToCoords(mapRef.current, { lng, lat, zoom });
     },
     // Called by ExplorerSidebar's onVineyardHover to highlight parcels on map
     hoverVineyards(features) {
@@ -2351,7 +2302,21 @@ const WVWAMap = forwardRef(function WVWAMap({
             VINEYARD_ALL_BY_NAME[vname].push(feature);
           }
         }
-        setVineyardRecidSet(new Set(Object.keys(VINEYARD_BY_RECID).map((id) => Number(id)).filter(Number.isFinite)));
+        setVineyardRecidSet(new Map(
+          Object.entries(VINEYARD_BY_RECID)
+            .map(([id, features]) => {
+              const numId = Number(id);
+              if (!Number.isFinite(numId)) return null;
+              // Count unique vineyard groups by name (mirrors WineryDetailView grouping)
+              const keys = new Set(features.map((f, i) => {
+                const p = f.properties || {};
+                const name = (p.vineyard_name || p.Vineyard_Name || p.A1_VineyardName || '').trim();
+                return name ? `name:${name.toLowerCase()}` : `block:${i}`;
+              }));
+              return [numId, keys.size];
+            })
+            .filter(Boolean)
+        ));
 
         LINKED_VINEYARD_BY_RECID = {};
         for (const feature of vineyardFeatures) {
@@ -3023,17 +2988,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         blinkMapLayer(map, `ava-${_avaSlugForBlink}-fill`, 'fill-opacity', BLINK);
       };
       if (cam) {
-        map.flyTo({
-          center:   [cam.lng, cam.lat],
-          zoom:     cam.zoom,
-          pitch:    cam.pitch   ?? 40,
-          bearing:  cam.bearing ?? 0,
-          curve:    1.85,
-          speed:    0.45,
-          easing:   t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2,
-          essential: true,
-        });
-        map.once('moveend', _onAvaMoveEnd);
+        flyToAva(map, selectedAva, { onMoveEnd: _onAvaMoveEnd });
       } else {
         // Fallback: fit the AVA's own bounding box
         const avaSource = map.getSource(`ava-${selectedAva}`);
@@ -3046,7 +3001,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             };
             const features = avaSource._data.features || [avaSource._data];
             features.forEach(f => addCoords(f.geometry.coordinates));
-            map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, pitch: 40, curve: 1.85, speed: 0.45, freezeElevation: true });
+            map.fitBounds(bounds, FLY_PRESETS.avaBounds);
             map.once('moveend', _onAvaMoveEnd);
           } catch (e) { /* ignore */ }
         }
@@ -3074,16 +3029,7 @@ const WVWAMap = forwardRef(function WVWAMap({
 
       // ── Restore all listings layers — handled by listing filter effect ──
 
-      map.flyTo({
-        center:   [WV_CAMERA.lng, WV_CAMERA.lat],
-        zoom:     WV_CAMERA.zoom,
-        pitch:    WV_CAMERA.pitch   ?? 35,
-        bearing:  WV_CAMERA.bearing ?? 0,
-        curve:    1.85,
-        speed:    0.45,
-        easing:   t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2,
-        essential: true,
-      });
+      flyToWillamette(map);
     }
   }, [selectedAva, mapLoaded]);
 
@@ -3176,7 +3122,7 @@ const WVWAMap = forwardRef(function WVWAMap({
     if (map) {
       const vineyardFeatures = VINEYARD_BY_RECID[listing.id] ?? [];
       if (!flyToVineyardBounds(map, vineyardFeatures)) {
-        map.flyTo({ center: [listing.lng, listing.lat], zoom: 14, curve: 1.4, speed: 0.55, essential: true });
+        flyToCoords(map, { lng: listing.lng, lat: listing.lat });
       }
     }
   }, [setSelectedListingBoth]);
@@ -3283,34 +3229,12 @@ const WVWAMap = forwardRef(function WVWAMap({
     if (selectedListing?.lat != null && selectedListing?.lng != null) {
       const vineyardFeatures = VINEYARD_BY_RECID[selectedListing.id] ?? [];
       if (!flyToVineyardBounds(map, vineyardFeatures)) {
-        map.flyTo({ center: [selectedListing.lng, selectedListing.lat], zoom: 14, curve: 1.4, speed: 0.55, essential: true });
+        flyToCoords(map, { lng: selectedListing.lng, lat: selectedListing.lat });
       }
     } else if (selectedAva) {
-      const cam = AVA_CAMERA[selectedAva];
-      if (cam) {
-        map.flyTo({
-          center:  [cam.lng, cam.lat],
-          zoom:    cam.zoom,
-          pitch:   cam.pitch ?? 40,
-          bearing: cam.bearing ?? 0,
-          curve:   1.85,
-          speed:   0.45,
-          easing:  t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2,
-          essential: true,
-        });
-      } else {
-        const avaSource = map.getSource(`ava-${selectedAva}`);
-        if (avaSource?._data) {
-          try {
-            const bounds = new maplibregl.LngLatBounds();
-            const addCoords = (c) => { if (typeof c[0] === 'number') bounds.extend(c); else c.forEach(addCoords); };
-            (avaSource._data.features || [avaSource._data]).forEach(f => addCoords(f.geometry.coordinates));
-            map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, pitch: 40, curve: 1.85, speed: 0.45 });
-          } catch (e) { /* ignore */ }
-        }
-      }
+      flyToAva(map, selectedAva);
     } else {
-      map.fitBounds(WV_BOUNDS, { padding: 40, pitch: 30, bearing: 0, curve: 1.85, speed: 0.45 });
+      flyToWillamette(map);
     }
   }, [selectedAva, selectedListing]);
 
@@ -3398,6 +3322,9 @@ const WVWAMap = forwardRef(function WVWAMap({
           onResetView={handleResetView}
         />
       )}
+
+      {/* Dev camera debug overlay — only rendered in development */}
+      <CameraDebug map={mapRef.current} mapLoaded={mapLoaded} />
     </div>
   );
 });

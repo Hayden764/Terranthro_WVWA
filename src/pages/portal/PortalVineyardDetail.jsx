@@ -180,11 +180,47 @@ export default function PortalVineyardDetail() {
 
   const soil = vineyard.soil_series || vineyard.soil_type || vineyard.soil || null;
 
+  const ts = vineyard.topo_stats;
+  const blockCount = vineyard.blocks?.length ?? 0;
+
   const terroirChips = [
-    { label: 'Winkler', value: winklerValue || '—', tone: 'blue', glow: true },
-    { label: 'GST', value: gstValue || '—', tone: 'green', glow: true },
-    { label: 'Soil', value: soil || '—', tone: 'amber', glow: false },
-    { label: 'Elev', value: elevationMean || '—', tone: 'parchment', glow: false },
+    // Top-left: Blocks
+    {
+      label: 'Blocks',
+      value: blockCount > 0 ? String(blockCount) : '—',
+      tone: 'amber',
+      glow: false,
+    },
+    // Top-right: Elevation
+    {
+      label: 'Elevation',
+      value: ts?.elevation_mean_ft != null ? `${Math.round(Number(ts.elevation_mean_ft))} ft` : '—',
+      subValue: ts?.elevation_min_ft != null
+        ? `${Math.round(Number(ts.elevation_min_ft))}–${Math.round(Number(ts.elevation_max_ft))} ft range`
+        : null,
+      tone: 'parchment',
+      glow: false,
+    },
+    // Bottom-left: Aspect
+    {
+      label: 'Aspect',
+      value: ts?.aspect_dominant_deg != null ? degToCardinal(ts.aspect_dominant_deg) : '—',
+      subValue: ts?.aspect_dominant_deg != null
+        ? `${Math.round(Number(ts.aspect_dominant_deg))}° dom · ${Math.round(Number(ts.aspect_mean_deg))}° avg`
+        : null,
+      tone: 'blue',
+      glow: true,
+    },
+    // Bottom-right: Slope
+    {
+      label: 'Slope',
+      value: ts?.slope_mean_deg != null ? `${Number(ts.slope_mean_deg).toFixed(1)}°` : '—',
+      subValue: ts?.slope_p10_deg != null
+        ? `${Number(ts.slope_p10_deg).toFixed(1)}–${Number(ts.slope_p90_deg).toFixed(1)}° range`
+        : null,
+      tone: 'green',
+      glow: true,
+    },
   ];
 
   return (
@@ -255,7 +291,7 @@ export default function PortalVineyardDetail() {
         </Section>
 
         <Section title="Terroir Snapshot">
-          <TerroirDataChips chips={terroirChips} />
+          <TerroirDataChips chips={terroirChips} columns={2} />
         </Section>
 
         {/* Topo stats (read-only) */}
@@ -604,6 +640,11 @@ function RequestButton({ vineyard, type, label }) {
       </div>
     </div>
   );
+}
+
+function degToCardinal(deg) {
+  const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  return dirs[Math.round(Number(deg) / 22.5) % 16];
 }
 
 function Shell({ children }) {

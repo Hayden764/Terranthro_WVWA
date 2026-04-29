@@ -26,10 +26,11 @@ const PORT = process.env.PORT || 8000;
 // Trust Railway/Vercel reverse proxy so express-rate-limit can read X-Forwarded-For
 app.set('trust proxy', 1);
 
-// Rate limiting
+// Rate limiting (skip in development)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100
+  max: 1000,
+  skip: () => process.env.NODE_ENV !== 'production',
 });
 
 // Middleware

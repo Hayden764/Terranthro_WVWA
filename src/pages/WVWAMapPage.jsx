@@ -118,13 +118,35 @@ export default function WVWAMapPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // ── Entrance state ───────────────────────────────────────────────────
-  const [isIntro, setIsIntro]     = useState(true);
+  // Skip intro on reload if the user has already seen it this tab session,
+  // or if `?skipIntro=1` is in the URL. This keeps dev iteration fast and
+  // lets us share deep-link URLs that bypass the cinematic.
+  const shouldSkipIntro = () => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('skipIntro') === '1') return true;
+      return window.sessionStorage.getItem('wvwa:introSeen') === '1';
+    } catch {
+      return false;
+    }
+  };
+  const [isIntro, setIsIntro]     = useState(() => !shouldSkipIntro());
   const [mapReady, setMapReady]   = useState(false);
 
   function handleEnter() {
     mapRef.current?.startEntranceAnimation?.();
+    try { window.sessionStorage.setItem('wvwa:introSeen', '1'); } catch { /* ignore */ }
     setIsIntro(false);
   }
+
+  // When the map is ready and we've decided to skip the intro, jump
+  // straight to the WV camera instead of playing the entrance.
+  useEffect(() => {
+    if (mapReady && !isIntro) {
+      mapRef.current?.skipEntranceAnimation?.();
+    }
+  }, [mapReady, isIntro]);
 
   // ── AVA selection ────────────────────────────────────────────────────
   const [selectedAva, setSelectedAva]         = useState(null);

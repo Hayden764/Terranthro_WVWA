@@ -2,13 +2,8 @@ import { alpha, border, crimson, parchment, TOKENS, TYPE } from '../../styles/to
 import { GLASS } from './glassTokens';
 import { WV_SUB_AVAS } from '../../config/topographyConfig';
 import { panelCard } from '../../styles/patterns';
+import { WV_BOUNDS } from '../../config/flyTo';
 
-/**
- * MapToolkit — "View" panel content.
- * Zoom in/out, reset view, 3D terrain toggle, bearing/pitch.
- */
-
-const WV_BOUNDS = [[-123.8, 44.0], [-122.0, 45.9]];
 const MAX_PITCH_FLAT = 85;
 const MAX_PITCH_WITH_TERRAIN = 71;
 
@@ -29,6 +24,7 @@ export default function MapToolkit({
   mapLoaded,
   selectedAva,
   onSelectAva,
+  onResetView,
   listingSymbologyPreset,
   onListingSymbologyPresetChange,
   listingSymbologyOptions = [],
@@ -39,10 +35,13 @@ export default function MapToolkit({
   const handleZoomOut = () => map.zoomOut({ duration: 300 });
 
   const handleResetView = () => {
-    if (selectedAva) {
-      onSelectAva(null);
+    if (onResetView) {
+      onResetView();
+    } else {
+      // Fallback: fitBounds the valley (only reached if prop not wired)
+      if (selectedAva) onSelectAva(null);
+      map.fitBounds(WV_BOUNDS, { padding: 40, duration: 1200, pitch: 30, bearing: 0 });
     }
-    map.fitBounds(WV_BOUNDS, { padding: 40, duration: 1200, pitch: 30, bearing: 0 });
   };
 
   const handleToggleTerrain = () => {

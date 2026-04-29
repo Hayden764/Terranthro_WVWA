@@ -20,16 +20,21 @@ const CATEGORY_ICON = {
   ava:        '◇',
 };
 
+// Dark-surface palette: text reads in parchment tones, crimson stays the accent.
+const TEXT_PRIMARY = TOKENS.parchment;
+const TEXT_MUTED   = alpha(TOKENS.parchment, 0.6);
+const TEXT_FAINT   = alpha(TOKENS.parchment, 0.4);
+
 const UI = {
-  activeRowBg: alpha(TOKENS.crimson, 0.12),
-  collapsedBtnBg: alpha(TOKENS.ink, 0.07),
-  collapsedBtnBorder: alpha(TOKENS.ink, 0.18),
+  activeRowBg: alpha(TOKENS.crimson, 0.18),
+  collapsedBtnBg: alpha(TOKENS.parchment, 0.06),
+  collapsedBtnBorder: alpha(TOKENS.parchment, 0.18),
   inputBorderIdle: TOKENS.border,
-  inputGlow: alpha(TOKENS.electricBlue, 0.22),
-  inputFocusRing: alpha(TOKENS.electricBlue, 0.2),
-  inputShadow: alpha(TOKENS.ink, 0.08),
-  dropdownShadow: alpha(TOKENS.ink, 0.16),
-  spinnerBorder: alpha(TOKENS.ink, 0.2),
+  inputGlow: alpha(TOKENS.crimson, 0.22),
+  inputFocusRing: alpha(TOKENS.crimson, 0.2),
+  inputShadow: alpha(TOKENS.ink, 0.4),
+  dropdownShadow: alpha(TOKENS.ink, 0.6),
+  spinnerBorder: alpha(TOKENS.parchment, 0.2),
 };
 
 function categoryLabel(r) {
@@ -221,12 +226,21 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           transition: 'background 0.1s',
         }}
       >
-        <span style={{ fontSize: 'var(--type-display-italic-size)', flexShrink: 0, width: 20, textAlign: 'center' }}>{icon}</span>
+        <span style={{
+          fontSize: r.type === 'ava' ? 'calc(var(--type-display-italic-size) * 1.15)' : 'var(--type-display-italic-size)',
+          flexShrink: 0,
+          width: 20,
+          textAlign: 'center',
+          // AVA glyph is text (not emoji), so it needs an explicit color to read on dark surface
+          color: r.type === 'ava' ? crimson : TEXT_PRIMARY,
+          fontWeight: r.type === 'ava' ? 700 : 400,
+          lineHeight: 1,
+        }}>{icon}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontSize: 'var(--type-mono-size)',
             fontWeight: 600,
-            color: isActive ? crimson : ink,
+            color: isActive ? crimson : TEXT_PRIMARY,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -234,7 +248,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           }}>
             {r.label}
           </div>
-          <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1, lineHeight: 1.2 }}>
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: TEXT_MUTED, marginTop: 1, lineHeight: 1.2 }}>
             {label}
           </div>
         </div>
@@ -258,7 +272,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          color: ink,
+          color: TEXT_PRIMARY,
           flexShrink: 0,
         }}
       >
@@ -302,7 +316,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           : `0 2px 8px ${UI.inputShadow}`,
         transition: 'border-color 0.15s, border-radius 0.1s, box-shadow 0.15s',
       }}>
-        <span style={{ color: open ? crimson : muted, flexShrink: 0, display: 'flex', transition: 'color 0.15s' }}>
+        <span style={{ color: open ? crimson : TEXT_MUTED, flexShrink: 0, display: 'flex', transition: 'color 0.15s' }}>
           {loading
             ? <SpinnerIcon />
             : <SearchIcon />}
@@ -324,7 +338,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
             outline: 'none',
             background: 'transparent',
             fontSize: 'var(--type-mono-size)',
-            color: parchment,
+            color: TEXT_PRIMARY,
             fontFamily: 'var(--font-sans)',
             caretColor: crimson,
           }}
@@ -344,7 +358,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
             style={{
               background: 'none',
               border: 'none',
-              color: muted,
+              color: TEXT_MUTED,
               cursor: 'pointer',
               fontSize: 'var(--type-body-size)',
               lineHeight: 1,
@@ -364,7 +378,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
             style={{
               background: 'none',
               border: 'none',
-              color: muted,
+              color: TEXT_MUTED,
               cursor: 'pointer',
               fontSize: 'var(--type-ui-label-size)',
               lineHeight: 1,
@@ -398,7 +412,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
             <div style={{
               padding: '14px 16px',
               fontSize: 'var(--type-mono-size)',
-              color: muted,
+              color: TEXT_MUTED,
               textAlign: 'center',
             }}>
               No results for &ldquo;{query}&rdquo;
@@ -440,7 +454,7 @@ function SectionHeader({ label }) {
       ...TYPE.uiLabel,
       padding: '5px 14px 3px',
       fontSize: 'var(--type-ui-label-size)',
-      color: muted,
+      color: TEXT_FAINT,
       borderTop: `1px solid ${border}`,
     }}
       dangerouslySetInnerHTML={{ __html: label }}

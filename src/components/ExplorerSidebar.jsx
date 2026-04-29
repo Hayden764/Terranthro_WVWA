@@ -9,16 +9,18 @@ import { apiJson } from '../lib/api';
 
 // ── Design tokens (light‑mode, eggshell base) ────────────────────────────
 const T = {
-  sidebarBg:    parchment,
-  headerBg:     ink,
-  headerText:   parchment,
-  border:       border,
-  sectionLabel: { ...TYPE.uiLabel, color: muted },
-  itemText:     { fontSize: 'var(--type-mono-size)', color: ink, lineHeight: 1.45 },
-  itemTextMuted:{ fontSize: 'var(--type-body-size)', color: muted, lineHeight: 1.4 },
-  accent:       crimson,
-  hoverBg:      parchment,
-  activeBg:     TOKENS.dangerDim,
+  sidebarBg:     parchment,
+  headerBg:      ink,
+  headerText:    parchment,
+  border:        border,
+  sectionLabel:  { ...TYPE.uiLabel, color: muted },
+  itemText:      { fontSize: 'var(--type-mono-size)', color: ink, lineHeight: 1.45 },
+  itemTextMuted: { fontSize: 'var(--type-body-size)', color: muted, lineHeight: 1.4 },
+  accent:        crimson,
+  hoverBg:       parchment,
+  activeBg:      TOKENS.dangerDim,
+  // Shared hover color for card name text (vineyard groups, AVA cards, winery cards)
+  cardNameHover: TOKENS.electricBlue,
 };
 
 const UI = {
@@ -159,17 +161,6 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, onL
     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
       {onBack && <BackBtn onClick={onBack} />}
 
-      {/* Hero */}
-      <div style={{ background: ink, padding: '18px 16px 14px' }}>
-        <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, fontFamily: 'var(--font-display)', color: parchment, lineHeight: 1.2 }}>
-          {ava.name}
-        </div>
-        <div style={{ fontSize: 'var(--type-ui-label-size)', color: UI.parchment55, marginTop: 4 }}>
-          American Viticultural Area
-          {ava.parentAva && <span> · Nested in {WV_SUB_AVAS.find(a => a.slug === ava.parentAva)?.name}</span>}
-        </div>
-      </div>
-
       <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         <div>
@@ -202,28 +193,42 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, onL
         {inside.length > 0 && (
           <div>
             <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Wineries in this AVA</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {inside.map(l => (
-                <button
-                  key={l.id}
-                  onClick={() => onListingClick(l)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '8px 10px', borderRadius: 8,
-                    background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left',
-                    fontFamily: 'var(--font-sans)',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = parchment; onListingHover?.(l); }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'none'; onListingHover?.(null); }}
-                >
-                  <span style={{
-                    width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                    background: vineyardRecidSet.has(l.id) ? UI.mapped : muted,
-                  }} />
-                  <span style={{ fontSize: 'var(--type-mono-size)', color: ink, flex: 1 }}>{l.title}</span>
-                  <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>›</span>
-                </button>
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {inside.map(l => {
+                const vineyardCount = vineyardRecidSet.get(l.id) ?? 0;
+                const vineyardLabel = vineyardCount === 0 ? 'No vineyard map'
+                  : vineyardCount === 1 ? 'Vineyard mapped'
+                  : `${vineyardCount} vineyards mapped`;
+                return (
+                  <div
+                    key={l.id}
+                    onClick={() => onListingClick(l)}
+                    style={{
+                      border: `1px solid ${border}`,
+                      borderRadius: 10, background: parchment,
+                      cursor: 'pointer', overflow: 'hidden',
+                      transition: 'border-color 0.15s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = T.cardNameHover + '55'; const n = e.currentTarget.querySelector('.winery-card-name'); if (n) n.style.color = T.cardNameHover; onListingHover?.(l); }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = border; const n = e.currentTarget.querySelector('.winery-card-name'); if (n) n.style.color = ink; onListingHover?.(null); }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px 8px' }}>
+                      <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                        <div className="winery-card-name" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {l.title}
+                        </div>
+                        <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
+                          {vineyardLabel}
+                        </div>
+                      </div>
+                      <span style={{
+                        width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                        background: vineyardCount > 0 ? UI.mapped : muted,
+                      }} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -323,16 +328,6 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
         </div>
       )}
 
-      {/* Header */}
-      <div style={{ background: ink, padding: '16px 16px 12px' }}>
-        <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, fontFamily: 'var(--font-display)', color: parchment, lineHeight: 1.25 }}>
-          {listing.title}
-        </div>
-        <div style={{ fontSize: 'var(--type-ui-label-size)', color: UI.parchment55, marginTop: 5 }}>
-          Winery &amp; Vineyard
-        </div>
-      </div>
-
       <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         {listing.desc && (
@@ -411,41 +406,62 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                     const avg = k => { const v = vals(k); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
                     const mn  = k => { const v = vals(k); return v.length ? Math.min(...v) : null; };
                     const mx  = k => { const v = vals(k); return v.length ? Math.max(...v) : null; };
-                    const aspectDeg = avg('aspect_mean_deg');
+                    const aspectMeanDeg = avg('aspect_mean_deg');
+                    const aspectDomDeg  = avg('aspect_dominant_deg');
                     return {
-                      elev_min:    mn('elevation_min_ft'),
-                      elev_max:    mx('elevation_max_ft'),
-                      slope_mean:  avg('slope_mean_deg'),
-                      aspect_card: degToCardinal(aspectDeg),
+                      elev_min:       mn('elevation_min_ft'),
+                      elev_max:       mx('elevation_max_ft'),
+                      slope_mean:     avg('slope_mean_deg'),
+                      slope_p10:      mn('slope_p10_deg'),
+                      slope_p90:      mx('slope_p90_deg'),
+                      aspect_card:    degToCardinal(aspectMeanDeg),
+                      aspect_dom_deg: aspectDomDeg,
+                      aspect_mean_deg: aspectMeanDeg,
                     };
                   })();
 
                   const terroirChips = [
-                    {
-                      label: 'Elev',
-                      value: groupTopoStats?.elev_min != null && groupTopoStats?.elev_max != null
-                        ? `${Math.round(groupTopoStats.elev_min)}-${Math.round(groupTopoStats.elev_max)} ft`
-                        : '—',
-                      tone: 'parchment',
-                      glow: false,
-                    },
-                    {
-                      label: 'Slope',
-                      value: groupTopoStats?.slope_mean != null ? `${groupTopoStats.slope_mean.toFixed(1)}°` : '—',
-                      tone: 'green',
-                      glow: true,
-                    },
-                    {
-                      label: 'Aspect',
-                      value: groupTopoStats?.aspect_card || '—',
-                      tone: 'blue',
-                      glow: true,
-                    },
+                    // Top-left: Blocks
                     {
                       label: 'Blocks',
                       value: String(blockRows.length || group.features.length),
                       tone: 'amber',
                       glow: false,
+                    },
+                    // Top-right: Elevation
+                    {
+                      label: 'Elev',
+                      value: groupTopoStats?.elev_min != null && groupTopoStats?.elev_max != null
+                        ? `${Math.round((groupTopoStats.elev_min + groupTopoStats.elev_max) / 2)} ft`
+                        : '—',
+                      subValue: groupTopoStats?.elev_min != null && groupTopoStats?.elev_max != null
+                        ? `${Math.round(groupTopoStats.elev_min)}–${Math.round(groupTopoStats.elev_max)} ft range`
+                        : null,
+                      tone: 'parchment',
+                      glow: false,
+                    },
+                    // Bottom-left: Aspect
+                    {
+                      label: 'Aspect',
+                      value: groupTopoStats?.aspect_card || '—',
+                      subValue: groupTopoStats?.aspect_dom_deg != null && groupTopoStats?.aspect_mean_deg != null
+                        ? `${Math.round(groupTopoStats.aspect_dom_deg)}° dom · ${Math.round(groupTopoStats.aspect_mean_deg)}° avg`
+                        : null,
+                      tone: 'blue',
+                      glow: true,
+                    },
+                    // Bottom-right: Slope
+                    {
+                      label: 'Slope',
+                      value: groupTopoStats?.slope_mean != null ? `${groupTopoStats.slope_mean.toFixed(1)}°` : '—',
+                      subValue: (() => {
+                        const p10 = groupTopoStats?.slope_p10;
+                        const p90 = groupTopoStats?.slope_p90;
+                        if (p10 != null && p90 != null) return `${p10.toFixed(1)}–${p90.toFixed(1)}° range`;
+                        return null;
+                      })(),
+                      tone: 'green',
+                      glow: true,
                     },
                   ];
 
@@ -468,9 +484,9 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                     <div
                       key={group.key}
                       style={{
-                        border: `1px solid ${isHovered ? UI.vineyardGroupHoverBorder : border}`,
-                        borderRadius: 10, background: isHovered ? UI.vineyardGroupHoverBg : parchment,
-                        transition: 'border-color 0.15s, background 0.15s', cursor: 'pointer',
+                        border: `1px solid ${border}`,
+                        borderRadius: 10, background: parchment,
+                        transition: 'color 0.15s', cursor: 'pointer',
                         overflow: 'hidden', marginBottom: 6,
                       }}
                       onMouseEnter={() => { setHoveredGroup(i); onVineyardHover?.(group.features); }}
@@ -480,7 +496,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                       {/* Collapsed header */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px 8px' }}>
                         <div style={{ flex: 1, paddingRight: 8, minWidth: 0 }}>
-                          <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: isHovered ? UI.mapped : ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: isHovered ? T.cardNameHover : ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {group.name}
                           </div>
                           {acres && (
@@ -499,7 +515,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                           {/* Terroir snapshot */}
                           <div style={{ paddingTop: 10 }}>
                             <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Terroir Snapshot</div>
-                            <TerroirDataChips chips={terroirChips} />
+                            <TerroirDataChips chips={terroirChips} columns={2} />
                           </div>
 
                           {/* Block list */}
@@ -727,7 +743,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
   ];
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Filter pills */}
       <div style={{ padding: '10px 16px 8px', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: `1px solid ${border}` }}>
         {pills.map(p => {
@@ -758,33 +774,48 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
       )}
 
       {/* Winery list */}
-      <div style={{ overflowY: 'auto', maxHeight: 340 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px' }}>
         {visible.length === 0 && (
-          <div style={{ padding: '20px 16px', textAlign: 'center', color: muted, fontSize: 'var(--type-mono-size)' }}>
+          <div style={{ padding: '20px 4px', textAlign: 'center', color: muted, fontSize: 'var(--type-mono-size)' }}>
             {listings.length === 0 ? 'Loading…' : 'No wineries match this filter.'}
           </div>
         )}
-        {visible.map((l) => (
-          <button
-            key={l.id}
-            onClick={() => onListingClick(l)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              width: '100%', padding: '9px 16px', background: 'none',
-              border: 'none', borderBottom: `1px solid ${border}`, cursor: 'pointer',
-              fontFamily: 'var(--font-sans)', textAlign: 'left',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = parchment; onListingHover?.(l); }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'none'; onListingHover?.(null); }}
-          >
-            <span style={{
-              width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-              background: vineyardRecidSet.has(l.id) ? UI.mapped : muted,
-            }} />
-            <span style={{ fontSize: 'var(--type-mono-size)', color: ink, flex: 1, lineHeight: 1.3 }}>{l.title}</span>
-            <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>›</span>
-          </button>
-        ))}
+        {visible.map((l) => {
+          const vineyardCount = vineyardRecidSet.get(l.id) ?? 0;
+          const vineyardLabel = vineyardCount === 0 ? 'No vineyard map'
+            : vineyardCount === 1 ? 'Vineyard mapped'
+            : `${vineyardCount} vineyards mapped`;
+          return (
+            <div
+              key={l.id}
+              onClick={() => onListingClick(l)}
+              style={{
+                border: `1px solid ${border}`,
+                borderRadius: 10, background: parchment,
+                cursor: 'pointer', overflow: 'hidden',
+                transition: 'border-color 0.15s',
+                marginBottom: 6,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = T.cardNameHover + '55'; const n = e.currentTarget.querySelector('.winery-card-name'); if (n) n.style.color = T.cardNameHover; onListingHover?.(l); }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = border; const n = e.currentTarget.querySelector('.winery-card-name'); if (n) n.style.color = ink; onListingHover?.(null); }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px 8px' }}>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                  <div className="winery-card-name" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {l.title}
+                  </div>
+                  <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
+                    {vineyardLabel}
+                  </div>
+                </div>
+                <span style={{
+                  width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                  background: vineyardCount > 0 ? UI.mapped : muted,
+                }} />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -982,9 +1013,9 @@ export default function ExplorerSidebar({
       boxShadow: isMobile && isOpen ? `4px 0 24px ${UI.mobileShadow}` : undefined,
     }}>
 
-      {/* Sidebar header */}
-      <div style={{ background: T.headerBg, padding: '16px 16px 14px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+      {/* Sidebar header — search bar + optional back button on same line */}
+      <div style={{ background: T.headerBg, padding: '10px 12px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {!isOnHome && (
             <button
               onClick={handleBack}
@@ -998,15 +1029,12 @@ export default function ExplorerSidebar({
               ‹
             </button>
           )}
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: isOnHome ? 'var(--type-body-size)' : 'var(--type-mono-size)', fontWeight: 700, color: T.headerText, fontFamily: 'var(--font-display)', lineHeight: 1.2 }}>
-              {isOnHome ? 'Willamette Valley' : viewTitle}
-            </div>
-            {isOnHome && (
-              <div style={{ ...TYPE.uiLabel, color: UI.parchment55, marginTop: 2 }}>
-                Wineries &amp; AVA Explorer
-              </div>
-            )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <SearchBar inline mapRef={mapRef} onSelectAva={(slug) => {
+              const ava = WV_SUB_AVAS.find(a => a.slug === slug);
+              if (ava) handleAvaClick(ava);
+              else onSelectAva(slug);
+            }} />
           </div>
           {isMobile && (
             <button
@@ -1023,11 +1051,6 @@ export default function ExplorerSidebar({
             </button>
           )}
         </div>
-        <SearchBar inline mapRef={mapRef} onSelectAva={(slug) => {
-          const ava = WV_SUB_AVAS.find(a => a.slug === slug);
-          if (ava) handleAvaClick(ava);
-          else onSelectAva(slug);
-        }} />
       </div>
 
       {/* 3-panel sliding content area */}
@@ -1042,42 +1065,39 @@ export default function ExplorerSidebar({
         }}>
 
           {/* ── Panel 0: Home menu ── */}
-          <div style={{ width: '33.333%', height: '100%', overflowY: 'auto', flexShrink: 0 }}>
+          <div style={{ width: '33.333%', height: '100%', overflow: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
 
-            {/* Hero welcome card */}
+            {/* Hero welcome card — light, stretches to fill remaining space */}
             <div style={{
-              background: `linear-gradient(155deg, ${ink} 0%, ${ink} 55%, ${TOKENS.surfaceRaised} 100%)`,
-              padding: '18px 16px 16px',
+              background: parchment,
+              padding: '16px 16px 14px',
               borderBottom: `1px solid ${border}`,
-              position: 'relative',
-              overflow: 'hidden',
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
             }}>
-              {/* Decorative background circles */}
-              <div style={{ position: 'absolute', top: -28, right: -28, width: 110, height: 110, borderRadius: '50%', background: UI.danger20, pointerEvents: 'none' }} />
-              <div style={{ position: 'absolute', bottom: -18, right: 18, width: 65, height: 65, borderRadius: '50%', background: UI.danger13, pointerEvents: 'none' }} />
-              <div style={{ position: 'absolute', top: 10, right: 55, width: 28, height: 28, borderRadius: '50%', background: UI.decorativeCircle, pointerEvents: 'none' }} />
-
-              <p style={{ fontSize: 'var(--type-body-size)', color: UI.parchment68, margin: '0 0 14px', lineHeight: 1.65, position: 'relative', paddingRight: 24 }}>
+              <p style={{ fontSize: 'var(--type-body-size)', color: muted, margin: '0 0 14px', lineHeight: 1.65 }}>
                 Explore 11 nested American Viticultural Areas across Oregon's Northern Willamette Valley — with vineyard mapping, topographic analysis, and 30-year climate data.
               </p>
 
               {/* Stat chips grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, position: 'relative' }}>
-                <div style={{ background: UI.parchment10, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.parchment12}` }}>
-                  <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: parchment, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{WV_SUB_AVAS.length}</div>
-                  <div style={{ ...T.sectionLabel, color: UI.parchment52, marginTop: 3, fontWeight: 600 }}>Nested AVAs</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div style={{ background: parchment, borderRadius: 8, padding: '9px 12px', border: `1px solid ${border}` }}>
+                  <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: ink, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{WV_SUB_AVAS.length}</div>
+                  <div style={{ ...T.sectionLabel, marginTop: 3, fontWeight: 600 }}>Nested AVAs</div>
                 </div>
-                <div style={{ background: UI.parchment10, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.parchment12}` }}>
-                  <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: parchment, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{wineryCount > 0 ? wineryCount : '—'}</div>
-                  <div style={{ ...T.sectionLabel, color: UI.parchment52, marginTop: 3, fontWeight: 600 }}>Wineries</div>
+                <div style={{ background: parchment, borderRadius: 8, padding: '9px 12px', border: `1px solid ${border}` }}>
+                  <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: ink, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{wineryCount > 0 ? wineryCount : '—'}</div>
+                  <div style={{ ...T.sectionLabel, marginTop: 3, fontWeight: 600 }}>Wineries</div>
                 </div>
-                <div style={{ background: UI.mappedChipBg, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.mappedChipBorder}` }}>
+                <div style={{ background: alpha(TOKENS.success, 0.07), borderRadius: 8, padding: '9px 12px', border: `1px solid ${alpha(TOKENS.success, 0.25)}` }}>
                   <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: UI.mapped, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{mappedCount > 0 ? mappedCount : '—'}</div>
-                  <div style={{ ...T.sectionLabel, color: UI.parchment52, marginTop: 3, fontWeight: 600 }}>Wineries Mapped</div>
+                  <div style={{ ...T.sectionLabel, marginTop: 3, fontWeight: 600 }}>Mapped</div>
                 </div>
-                <div style={{ background: UI.parchment10, borderRadius: 8, padding: '9px 12px', border: `1px solid ${UI.parchment12}` }}>
-                  <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: parchment, fontFamily: 'var(--font-display)', lineHeight: 1 }}>26k+</div>
-                  <div style={{ ...T.sectionLabel, color: UI.parchment52, marginTop: 3, fontWeight: 600 }}>Vineyard Acres</div>
+                <div style={{ background: parchment, borderRadius: 8, padding: '9px 12px', border: `1px solid ${border}` }}>
+                  <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: ink, fontFamily: 'var(--font-display)', lineHeight: 1 }}>26k+</div>
+                  <div style={{ ...T.sectionLabel, marginTop: 3, fontWeight: 600 }}>Vineyard Acres</div>
                 </div>
               </div>
             </div>
@@ -1205,7 +1225,7 @@ export default function ExplorerSidebar({
           </div>
 
           {/* ── Panel 1: List view ── */}
-          <div style={{ width: '33.333%', height: '100%', overflowY: 'auto', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: '33.333%', height: '100%', overflow: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
             {panel1Type === 'winery' ? (
               <WineriesSection
                 listings={listings}
@@ -1218,33 +1238,58 @@ export default function ExplorerSidebar({
                 onListingHover={(l) => mapRef.current?.hoverListing(l)}
               />
             ) : (
-              <div style={{ padding: '4px 0 8px', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '8px 16px 4px' }}>
-                  <span style={T.sectionLabel}>Nested AVAs ({WV_SUB_AVAS.length})</span>
-                </div>
+              <div style={{ flex: 1, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden' }}>
                 {WV_SUB_AVAS.map(ava => {
                   const isSelected = selectedAva === ava.slug;
+                  const avaMeta = AVA_META[ava.slug] || {};
+                  const subtitle = [
+                    avaMeta.established ? `Est. ${avaMeta.established}` : null,
+                    avaMeta.acres ? `${avaMeta.acres} ac` : null,
+                  ].filter(Boolean).join(' · ') || 'AVA';
                   return (
-                    <button
-                      key={ava.slug}
-                      onClick={() => handleAvaClick(ava)}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        width: '100%', padding: `8px 16px 8px ${ava.parentAva ? '28px' : '16px'}`,
-                        background: isSelected ? T.activeBg : 'none', border: 'none',
-                        cursor: 'pointer', fontFamily: 'var(--font-sans)', textAlign: 'left',
-                      }}
-                      onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = T.hoverBg; mapRef.current?.hoverAva(ava.slug); }}
-                      onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'none'; mapRef.current?.hoverAva(null); }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {ava.parentAva && <span style={{ width: 8, fontSize: 'var(--type-ui-label-size)', color: muted }}>└</span>}
-                        <span style={{ fontSize: 'var(--type-mono-size)', color: isSelected ? crimson : ink, fontWeight: isSelected ? 600 : 400 }}>
-                          {ava.name}
-                        </span>
+                    <div key={ava.slug} style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {ava.parentAva && (
+                        <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted, flexShrink: 0, lineHeight: 1, userSelect: 'none' }}>└</span>
+                      )}
+                      <div
+                        onClick={() => handleAvaClick(ava)}
+                        className="ava-card"
+                        style={{
+                          flex: 1,
+                          height: '100%',
+                          border: `1px solid ${isSelected ? crimson + '55' : border}`,
+                          borderRadius: 10,
+                          background: isSelected ? T.activeBg : parchment,
+                          cursor: 'pointer', overflow: 'hidden',
+                          transition: 'border-color 0.15s',
+                          display: 'flex', alignItems: 'center',
+                        }}
+                        onMouseEnter={e => {
+                          if (!isSelected) e.currentTarget.style.borderColor = T.cardNameHover + '55';
+                          const nameEl = e.currentTarget.querySelector('.ava-card-name');
+                          if (nameEl && !isSelected) nameEl.style.color = T.cardNameHover;
+                          mapRef.current?.hoverAva(ava.slug);
+                        }}
+                        onMouseLeave={e => {
+                          if (!isSelected) e.currentTarget.style.borderColor = border;
+                          const nameEl = e.currentTarget.querySelector('.ava-card-name');
+                          if (nameEl && !isSelected) nameEl.style.color = ink;
+                          mapRef.current?.hoverAva(null);
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', width: '100%' }}>
+                          <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                            <div className="ava-card-name" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: isSelected ? crimson : ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {ava.name}
+                            </div>
+                            <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
+                              {subtitle}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted, flexShrink: 0 }}>›</span>
+                        </div>
                       </div>
-                      <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>›</span>
-                    </button>
+                    </div>
                   );
                 })}
               </div>

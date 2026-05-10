@@ -1,0 +1,35 @@
+# Everything except the server source and root config files
+data-pipeline/
+public/
+src/
+scripts/
+database/
+topography-data/
+dist/
+node_modules/
+server/node_modules/
+
+# Large data files
+*.pmtiles
+*.tif
+*.tiff
+*.geotiff
+*.gpkg
+
+# Python
+*.pyc
+__pycache__/
+.venv/
+
+# Dev/editor
+.vscode/
+.idea/
+.DS_Store
+._*
+
+# Secrets
+.env
+.env.local
+server/.env
+server/.env.local
+server/.env.docker

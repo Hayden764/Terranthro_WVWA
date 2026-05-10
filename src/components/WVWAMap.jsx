@@ -1483,7 +1483,19 @@ const WVWAMap = forwardRef(function WVWAMap({
 
   // When controlled props are provided, sync internal state to them
   // so all existing useEffects continue to work unchanged.
-  useEffect(() => { if (selectedListingProp !== undefined) setSelectedListing(selectedListingProp); }, [selectedListingProp]);
+  useEffect(() => {
+    if (selectedListingProp === undefined) return;
+    setSelectedListing(selectedListingProp);
+    // Eagerly clear soft focus when the prop is cleared externally (e.g. navigating
+    // away from winery detail), rather than waiting for the async useEffect cycle.
+    if (!selectedListingProp) {
+      const map = mapRef.current;
+      if (map && map.isStyleLoaded?.()) {
+        setVineyardReferenceSoftFocus(map, false);
+        setListingSoftFocus(map, false);
+      }
+    }
+  }, [selectedListingProp]);
   useEffect(() => { if (activeLayerProp !== undefined) setActiveLayer(activeLayerProp); }, [activeLayerProp]);
   useEffect(() => { if (currentMonthProp !== undefined) setCurrentMonth(currentMonthProp); }, [currentMonthProp]);
   useEffect(() => { if (listingFilterModeProp !== undefined) setListingFilterMode(listingFilterModeProp); }, [listingFilterModeProp]);
@@ -2854,6 +2866,11 @@ const WVWAMap = forwardRef(function WVWAMap({
 
     // Clear any selected listing when changing AVA context
     setSelectedListingBoth(null);
+    // Eagerly reset soft focus — don't wait for the async useEffect cycle.
+    if (map.isStyleLoaded?.()) {
+      setVineyardReferenceSoftFocus(map, false);
+      setListingSoftFocus(map, false);
+    }
 
     if (selectedAva) {
       // ── Style layers: highlight selected, hide others ─────────────

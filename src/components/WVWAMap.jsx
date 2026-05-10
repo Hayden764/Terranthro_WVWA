@@ -2495,24 +2495,10 @@ const WVWAMap = forwardRef(function WVWAMap({
           if (linkedListing) {
             setSelectedListingRef.current?.(linkedListing);
           }
-          // Zoom to the clicked parcel's geometry bounds
-          const geom = clickedFeature.geometry;
-          if (geom) {
-            const coords = geom.type === 'Polygon' ? geom.coordinates.flat()
-              : geom.type === 'MultiPolygon' ? geom.coordinates.flat(2)
-              : [];
-            if (coords.length) {
-              let [minLng, minLat, maxLng, maxLat] = [Infinity, Infinity, -Infinity, -Infinity];
-              for (const [lng, lat] of coords) {
-                if (lng < minLng) minLng = lng;
-                if (lat < minLat) minLat = lat;
-                if (lng > maxLng) maxLng = lng;
-                if (lat > maxLat) maxLat = lat;
-              }
-              map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
-                padding: { top: 80, bottom: 80, left: 60, right: 60 }, maxZoom: 17, pitch: 40, curve: 1.4, speed: 0.55, essential: true,
-              });
-            }
+          // Zoom to all parcels for this winery (matches card-click behaviour)
+          const allParcels = VINEYARD_BY_RECID[wineryRecid] ?? [];
+          if (!flyToVineyardBounds(map, allParcels.length ? allParcels : [clickedFeature])) {
+            if (linkedListing) flyToCoords(map, { lng: linkedListing.lng, lat: linkedListing.lat });
           }
         });
         map.on('mouseleave', 'vineyards-linked-fill', () => {

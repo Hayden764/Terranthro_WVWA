@@ -116,8 +116,8 @@ export default function AdminRequestDetail() {
             )}
           </h1>
           <p style={{ ...TYPE.mono, margin: 0, color: alpha(TOKENS.parchment, 0.7) }}>
-            <strong style={{ color: alpha(TOKENS.parchment, 0.82) }}>{request.winery_name}</strong>
-            {request.contact_email ? `· ${request.contact_email}` : request.submitted_by_admin_name ? `· by admin: ${request.submitted_by_admin_name}` : ''}
+            <strong style={{ color: alpha(TOKENS.parchment, 0.82) }}>{request.winery_name || 'Independent vineyard'}</strong>
+            {request.contact_email ? ` · ${request.contact_email}` : request.submitted_by_admin_name ? ` · by admin: ${request.submitted_by_admin_name}` : ''}
             {parcel && (
               <span style={{ color: TOKENS.muted }}>
                 {' · '}{parcel.vineyard_name || `Parcel #${request.target_id}`}

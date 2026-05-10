@@ -32,14 +32,15 @@ const router = express.Router();
  */
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) {
+  if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
   try {
+    const normalizedEmail = email.trim().toLowerCase();
     const { rows } = await pool.query(
       `SELECT id, email, password_hash, display_name, role FROM admin_accounts WHERE LOWER(email) = $1`,
-      [email.trim().toLowerCase()]
+      [normalizedEmail]
     );
 
     if (rows.length === 0) {
@@ -47,7 +48,19 @@ router.post('/login', async (req, res) => {
     }
 
     const admin = rows[0];
-    const valid = await bcrypt.compare(password, admin.password_hash);
+    // If a row has a malformed or missing hash, fail closed instead of throwing.
+    const storedHash = typeof admin.password_hash === 'string' ? admin.password_hash : '';
+    if (!storedHash.startsWith('$2')) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    let valid = false;
+    try {
+      valid = await bcrypt.compare(password, storedHash);
+    } catch {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
     if (!valid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -69,6 +82,15 @@ router.post('/login', async (req, res) => {
     res.json({ success: true, display_name: admin.display_name, role: admin.role });
   } catch (err) {
     console.error('Admin login error:', err);
+
+    if (err?.code === '42P01') {
+      return res.status(503).json({ error: 'Admin auth is not initialized (missing admin_accounts table)' });
+    }
+
+    if (err?.message?.includes('ADMIN_JWT_SECRET')) {
+      return res.status(503).json({ error: 'Admin auth is not configured on the server' });
+    }
+
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -122,12 +144,12 @@ router.get('/requests', async (req, res) => {
          er.target_id, er.payload, er.status, er.admin_notes,
          er.reviewed_at, er.created_at,
          er.origin, er.flag, er.flag_detail,
-         w.title AS winery_name,
+         COALESCE(w.title, 'Independent vineyard') AS winery_name,
          wa.contact_email,
          aa.display_name AS reviewed_by_name,
          sa.display_name AS submitted_by_admin_name
        FROM edit_requests er
-       JOIN wineries w ON w.id = er.winery_id
+       LEFT JOIN wineries w ON w.id = er.winery_id
        LEFT JOIN winery_accounts wa ON wa.id = er.account_id
        LEFT JOIN admin_accounts aa ON aa.id = er.reviewed_by
        LEFT JOIN admin_accounts sa ON sa.id = er.submitted_by_admin
@@ -371,10 +393,11 @@ router.post('/requests/:id/approve', async (req, res) => {
             if (!['Polygon', 'MultiPolygon'].includes(geomType)) continue;
 
             const { rows: oldRow } = await client.query(
-              `SELECT ST_AsGeoJSON(geometry)::json AS geom, acres FROM vineyard_parcels WHERE id = $1`,
+              `SELECT ST_AsGeoJSON(geometry)::json AS geom, acres, winery_id FROM vineyard_parcels WHERE id = $1`,
               [pid]
             );
             if (oldRow.length === 0) continue;
+            const logWineryId = oldRow[0].winery_id ?? request.winery_id;
 
             await client.query(
               `UPDATE vineyard_parcels
@@ -388,7 +411,7 @@ router.post('/requests/:id/approve', async (req, res) => {
                  (winery_id, admin_id, request_id, table_name, record_id, field_name,
                   old_value, new_value, entity_type, entity_id)
                VALUES ($1, $2, $3, 'vineyard_parcels', $4, 'geometry', $5, $6, 'vineyard_parcel', $4)`,
-              [request.winery_id, adminId, requestId,
+              [logWineryId, adminId, requestId,
                pid,
                oldRow[0].geom ? JSON.stringify(oldRow[0].geom) : null,
                JSON.stringify(opItem.geometry)]
@@ -404,9 +427,10 @@ router.post('/requests/:id/approve', async (req, res) => {
             if (Object.keys(updates).length === 0) continue;
 
             const { rows: oldMeta } = await client.query(
-              `SELECT ${Object.keys(updates).join(', ')} FROM vineyard_parcels WHERE id = $1`,
+              `SELECT winery_id, ${Object.keys(updates).join(', ')} FROM vineyard_parcels WHERE id = $1`,
               [pid]
             );
+            const logWineryId = oldMeta[0]?.winery_id ?? request.winery_id;
 
             const setClauses = Object.keys(updates).map((col, i) => `${col} = $${i + 1}`);
             const vals = [...Object.values(updates), pid];
@@ -422,7 +446,7 @@ router.post('/requests/:id/approve', async (req, res) => {
                      (winery_id, admin_id, request_id, table_name, record_id, field_name,
                       old_value, new_value, entity_type, entity_id)
                    VALUES ($1, $2, $3, 'vineyard_parcels', $4, $5, $6, $7, 'vineyard_parcel', $4)`,
-                  [request.winery_id, adminId, requestId, pid, col,
+                  [logWineryId, adminId, requestId, pid, col,
                    oldMeta[0][col] != null ? String(oldMeta[0][col]) : null,
                    updates[col]    != null ? String(updates[col])    : null]
                 );
@@ -432,7 +456,6 @@ router.post('/requests/:id/approve', async (req, res) => {
             const geomType = opItem.geometry.type;
             if (!['Polygon', 'MultiPolygon'].includes(geomType)) continue;
             const wineryId = opItem.winery_id ? parseInt(opItem.winery_id, 10) : request.winery_id;
-            if (!wineryId) continue;
 
             const fields = opItem.fields || {};
             const sanitized = {};
@@ -552,7 +575,7 @@ router.post('/requests/:id/reject', async (req, res) => {
  * review pass.
  *
  * Body: {
- *   winery_id: number,          — which winery "owns" these parcels (for display)
+ *   winery_id?: number|null,    — optional for independent parcels
  *   ops: [
  *     { op: 'geometry', parcel_id: number, geometry: GeoJSON,
  *       before_geom?: GeoJSON, before_acres?: number, after_acres?: number },
@@ -564,18 +587,21 @@ router.post('/requests/batch', async (req, res) => {
   const { adminId } = req.adminAccount;
   const { winery_id, ops } = req.body;
 
-  if (!winery_id || !Array.isArray(ops) || ops.length === 0) {
-    return res.status(400).json({ error: 'winery_id and a non-empty ops array are required' });
+  if (!Array.isArray(ops) || ops.length === 0) {
+    return res.status(400).json({ error: 'A non-empty ops array is required' });
   }
 
-  const wineryIdInt = parseInt(winery_id, 10);
-  if (isNaN(wineryIdInt)) return res.status(400).json({ error: 'Invalid winery_id' });
+  let wineryIdInt = null;
+  if (winery_id != null && winery_id !== '') {
+    wineryIdInt = parseInt(winery_id, 10);
+    if (isNaN(wineryIdInt)) return res.status(400).json({ error: 'Invalid winery_id' });
 
-  // Validate winery exists
-  const { rows: wineryRows } = await pool.query(
-    `SELECT id FROM wineries WHERE id = $1`, [wineryIdInt]
-  );
-  if (wineryRows.length === 0) return res.status(404).json({ error: 'Winery not found' });
+    // Validate winery exists when provided
+    const { rows: wineryRows } = await pool.query(
+      `SELECT id FROM wineries WHERE id = $1`, [wineryIdInt]
+    );
+    if (wineryRows.length === 0) return res.status(404).json({ error: 'Winery not found' });
+  }
 
   // ── Enrich geometry ops with server-computed acres ────────────────────────
   // after_acres: PostGIS ST_Area on the submitted geometry (authoritative)
@@ -660,12 +686,12 @@ router.get('/requests/:id', async (req, res) => {
          er.target_id, er.payload, er.status, er.admin_notes,
          er.reviewed_at, er.created_at,
          er.origin, er.flag, er.flag_detail,
-         w.title AS winery_name,
+         COALESCE(w.title, 'Independent vineyard') AS winery_name,
          wa.contact_email,
          aa.display_name AS reviewed_by_name,
          sa.display_name AS submitted_by_admin_name
        FROM edit_requests er
-       JOIN wineries w ON w.id = er.winery_id
+       LEFT JOIN wineries w ON w.id = er.winery_id
        LEFT JOIN winery_accounts wa ON wa.id = er.account_id
        LEFT JOIN admin_accounts aa ON aa.id = er.reviewed_by
        LEFT JOIN admin_accounts sa ON sa.id = er.submitted_by_admin

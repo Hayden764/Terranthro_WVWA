@@ -182,8 +182,8 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <div style={{ fontSize: 'var(--type-body-size)', color: alpha(TOKENS.parchment, 0.7), marginTop: 4 }}>
-                      <strong style={{ color: alpha(TOKENS.parchment, 0.82) }}>{r.winery_name}</strong>
-                      {' · '}{r.contact_email}
+                      <strong style={{ color: alpha(TOKENS.parchment, 0.82) }}>{r.winery_name || 'Independent vineyard'}</strong>
+                      {r.contact_email && <> {' · '}{r.contact_email}</>}
                       {r.target_id && <span style={{ color: alpha(TOKENS.parchment, 0.35) }}> · Parcel #{r.target_id}</span>}
                     </div>
                     <div style={{ fontSize: 'var(--type-ui-label-size)', color: alpha(TOKENS.parchment, 0.3), marginTop: 6 }}>

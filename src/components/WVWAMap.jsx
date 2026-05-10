@@ -11,10 +11,16 @@ import TopographyLayer from './TopographyLayer';
 import MapControls from './MapControls';
 import CameraDebug from './CameraDebug';
 import TerroirDataChips from './TerroirDataChips';
+import HoverPill from './map/HoverPill';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { AVA_CAMERA, WV_CAMERA } from '../config/avaCameraConfig';
 import { FLY_PRESETS, flyToAva, flyToCoords, flyToVineyardBounds, flyToWillamette, flyToIntro, WV_BOUNDS } from '../config/flyTo';
 import { alpha, border, crimson, ink, MAP_GLASS, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
+import { getVineyardFeatureBounds } from '../lib/vineyardBounds';
+import {
+  buildInteractiveReferenceVineyardFilter,
+  buildPassiveReferenceVineyardFilter,
+} from '../lib/datasetFilters';
 
 // In dev, always use relative API paths through the Vite proxy.
 // In production, use VITE_API_BASE_URL if provided.
@@ -465,24 +471,6 @@ function setLayerVisibility(map, layerId, isVisible) {
   map.setLayoutProperty(layerId, 'visibility', isVisible ? 'visible' : 'none');
 }
 
-function buildDatasetFilter(datasets) {
-  if (!datasets.length) return null;
-  return ['in', ['get', 'source_dataset'], ['literal', datasets]];
-}
-
-function buildInteractiveReferenceVineyardFilter(devLayerToggles) {
-  const enabledDatasets = [];
-  if (devLayerToggles.vineyardsAdelsheimReference) enabledDatasets.push('adelsheim');
-  return buildDatasetFilter(enabledDatasets);
-}
-
-function buildPassiveReferenceVineyardFilter(devLayerToggles) {
-  const enabledDatasets = [];
-  if (devLayerToggles.vineyardsDundeeChehalem) enabledDatasets.push('chehalem-dundee');
-  if (devLayerToggles.vineyardsYC) enabledDatasets.push('yamhill-carlton');
-  return buildDatasetFilter(enabledDatasets);
-}
-
 function ensureVineyardHatchPattern(map) {
   if (map.hasImage(VINEYARD_HATCH_PATTERN_ID)) return;
 
@@ -515,6 +503,17 @@ function raiseListingLayers(map) {
   for (const layerId of LISTING_LAYER_ORDER) {
     if (map.getLayer(layerId)) map.moveLayer(layerId);
   }
+}
+
+function raiseBasemapLabelLayers(map, basemapLabelLayerIds = []) {
+  for (const layerId of basemapLabelLayerIds) {
+    if (map.getLayer(layerId)) map.moveLayer(layerId);
+  }
+}
+
+function normalizeOverlayAndLabelOrder(map, basemapLabelLayerIds = []) {
+  raiseListingLayers(map);
+  raiseBasemapLabelLayers(map, basemapLabelLayerIds);
 }
 
 // flyToVineyardBounds, flyToAva, flyToCoords, flyToWillamette, flyToIntro
@@ -1432,34 +1431,6 @@ function DevLayerPanel({
   );
 }
 
-// ── HoverPill ─────────────────────────────────────────────────────────────
-// Transient bottom-center label shown on map marker / vineyard hover.
-// Uses the shared MAP_GLASS surface; identity comes from a colored leading
-// dot (crimson for wineries, vivid green for vineyards) rather than a tinted
-// background, keeping every on-map element visually consistent.
-function HoverPill({ dotColor, children }) {
-  return (
-    <div style={{
-      position: 'absolute', bottom: 40, left: '50%', transform: 'translateX(-50%)',
-      background: MAP_GLASS.bg,
-      border: `1px solid ${MAP_GLASS.border}`,
-      borderRadius: MAP_GLASS.radiusPill,
-      padding: '6px 14px 6px 10px',
-      display: 'flex', alignItems: 'center', gap: 8,
-      fontSize: 'var(--type-mono-size)', fontWeight: 600,
-      color: MAP_GLASS.text,
-      pointerEvents: 'none', zIndex: 5, fontFamily: 'var(--font-sans)',
-      boxShadow: MAP_GLASS.shadow,
-      whiteSpace: 'nowrap',
-    }}>
-      <span style={{
-        width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0,
-      }} />
-      {children}
-    </div>
-  );
-}
-
 const WVWAMap = forwardRef(function WVWAMap({
   selectedAva, onSelectAva, onMarkerClick, panelHoveredAva, onPanelHoverAva,
   // Lifted / controlled state
@@ -1534,6 +1505,7 @@ const WVWAMap = forwardRef(function WVWAMap({
   const setHoveredListingRef  = useRef(null); // stable ref for map closure hover
   const selectedAvaRef        = useRef(selectedAva);  // always-current read in imperative callbacks
   const panelHoveredAvaRef    = useRef(null);
+  const basemapLabelLayerIdsRef = useRef([]);
 
   // Expose imperative methods for the SearchBar (and any external consumer)
   useImperativeHandle(externalRef, () => ({
@@ -1621,7 +1593,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       const vineyardsSrc = map.getSource('vineyards-selected');
       if (vineyardsSrc) {
         vineyardsSrc.setData({ type: 'FeatureCollection', features: vineyardFeatures });
-        raiseListingLayers(map);
+        normalizeOverlayAndLabelOrder(map, basemapLabelLayerIdsRef.current);
       }
 
       if (!flyToVineyardBounds(map, vineyardFeatures)) {
@@ -1677,7 +1649,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         const src = map.getSource('vineyards-selected');
         if (src) {
           src.setData({ type: 'FeatureCollection', features });
-          raiseListingLayers(map);
+          normalizeOverlayAndLabelOrder(map, basemapLabelLayerIdsRef.current);
         }
         if (!flyToVineyardBounds(map, features)) {
           flyToCoords(map, { lng, lat });
@@ -1711,7 +1683,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         const src = map.getSource('vineyards-passive-hover');
         if (src) {
           src.setData({ type: 'FeatureCollection', features });
-          raiseListingLayers(map);
+          normalizeOverlayAndLabelOrder(map, basemapLabelLayerIdsRef.current);
         }
         if (!flyToVineyardBounds(map, features)) {
           flyToCoords(map, { lng, lat });
@@ -1746,7 +1718,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       const src = map.getSource('vineyards-hovered');
       if (src) {
         src.setData({ type: 'FeatureCollection', features: features || [] });
-        raiseListingLayers(map);
+        normalizeOverlayAndLabelOrder(map, basemapLabelLayerIdsRef.current);
       }
     },
     // Called by ExplorerSidebar's onViewAllVineyards to zoom to parcel bounds
@@ -1755,24 +1727,11 @@ const WVWAMap = forwardRef(function WVWAMap({
       if (!map || !features?.length) return;
       setVineyardFocusMode(true);
 
-      let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
-      for (const feature of features) {
-        const rings = feature.geometry.type === 'Polygon'
-          ? feature.geometry.coordinates
-          : feature.geometry.coordinates.flat();
-        for (const ring of rings) {
-          for (const [lng, lat] of ring) {
-            if (lng < minLng) minLng = lng;
-            if (lat < minLat) minLat = lat;
-            if (lng > maxLng) maxLng = lng;
-            if (lat > maxLat) maxLat = lat;
-          }
-        }
-      }
-      if (![minLng, minLat, maxLng, maxLat].every(Number.isFinite)) return;
+      const bounds = getVineyardFeatureBounds(features);
+      if (!bounds) return;
 
       const isSingle = features.length === 1;
-      map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
+      map.fitBounds(bounds, {
         padding: { top: 80, bottom: 80, left: 60, right: 60 },
         maxZoom: isSingle ? 16.2 : 14.8,
         pitch: 40,
@@ -1844,27 +1803,13 @@ const WVWAMap = forwardRef(function WVWAMap({
     if (!map || !features?.length) return;
     setVineyardFocusMode(true);
 
-    let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
-    for (const feature of features) {
-      const rings = feature.geometry.type === 'Polygon'
-        ? feature.geometry.coordinates
-        : feature.geometry.coordinates.flat();
-      for (const ring of rings) {
-        for (const [lng, lat] of ring) {
-          if (lng < minLng) minLng = lng;
-          if (lat < minLat) minLat = lat;
-          if (lng > maxLng) maxLng = lng;
-          if (lat > maxLat) maxLat = lat;
-        }
-      }
-    }
-
-    if (![minLng, minLat, maxLng, maxLat].every(Number.isFinite)) return;
+    const bounds = getVineyardFeatureBounds(features);
+    if (!bounds) return;
 
     const isSingleFeature = features.length === 1;
 
     map.fitBounds(
-      [[minLng, minLat], [maxLng, maxLat]],
+      bounds,
       {
         padding: { top: 80, bottom: 80, left: 60, right: 60 },
         maxZoom: isSingleFeature ? 16.2 : 14.8,
@@ -2039,7 +1984,7 @@ const WVWAMap = forwardRef(function WVWAMap({
     src.setData({ type: 'FeatureCollection', features });
 
     // Keep selected parcel layers on top
-    raiseListingLayers(map);
+    normalizeOverlayAndLabelOrder(map, basemapLabelLayerIdsRef.current);
   }, [selectedListing, mapLoaded]);
 
   // ── Fetch 1m LiDAR topo stats for each selected parcel ───────────────
@@ -2093,6 +2038,10 @@ const WVWAMap = forwardRef(function WVWAMap({
     // Compass is rendered by the custom MapControls component
 
     map.on('load', async () => {
+      basemapLabelLayerIdsRef.current = (map.getStyle()?.layers || [])
+        .filter((layer) => layer.type === 'symbol')
+        .map((layer) => layer.id);
+
       // 3D terrain
       map.addSource('terrainSource', {
         type: 'raster-dem',
@@ -2851,7 +2800,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       // AVA layers load asynchronously and can end up above the highlight
       // layers. Move all highlight layers to the top of the stack now that
       // all sources/layers have been added.
-      raiseListingLayers(map);
+      normalizeOverlayAndLabelOrder(map, basemapLabelLayerIdsRef.current);
 
       // ── Cluster click → zoom in ───────────────────────────────────
       map.on('click', 'listings-clusters', (e) => {
@@ -3068,7 +3017,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         if (!didAdd) return;
         applyListingFocusAccent(map, listingSymbologyPreset);
         setListingSoftFocus(map, !!selectedListing);
-        raiseListingLayers(map);
+        normalizeOverlayAndLabelOrder(map, basemapLabelLayerIdsRef.current);
       } catch (error) {
         // Style transitions can briefly make addSource/addLayer unavailable.
         // Swallow and let the next style event retry.

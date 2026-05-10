@@ -31,9 +31,9 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
     }}>
       {/* Logo */}
       <img
-        src="/willamette-logo.svg"
-        alt="Willamette Valley Wine Country"
-        style={{ height: 48, width: 'auto', marginBottom: 36, filter: 'brightness(0) invert(1)', opacity: 0.92 }}
+        src="/terranthro-logo.svg"
+        alt="Terranthro"
+        style={{ height: 48, width: 'auto', marginBottom: 36, opacity: 0.92 }}
       />
 
       {/* Headline */}
@@ -186,18 +186,33 @@ export default function WVWAMapPage() {
         zIndex: 20,
         position: 'relative',
       }}>
-        <a
-          href="https://www.willamettewines.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ display: 'flex', alignItems: 'center', lineHeight: 0 }}
-        >
-          <img
-            src="/willamette-logo.svg"
-            alt="Willamette Valley Wine Country"
-            style={{ height: 28, width: 'auto', display: 'block', filter: 'brightness(0) invert(1)' }}
-          />
-        </a>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <a
+            href="https://www.willamettewines.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: 'flex', alignItems: 'center', lineHeight: 0 }}
+          >
+            <img
+              src="/willamette-logo.svg"
+              alt="Willamette Valley Wine Country"
+              style={{ height: 26, width: 'auto', display: 'block', filter: 'brightness(0) invert(1)', opacity: 0.85 }}
+            />
+          </a>
+          <span style={{ color: alpha(TOKENS.parchment, 0.3), fontSize: 13, fontWeight: 300, lineHeight: 1, userSelect: 'none' }}>×</span>
+          <a
+            href="https://terranthro.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: 'flex', alignItems: 'center', lineHeight: 0 }}
+          >
+            <img
+              src="/terrantrho-logo-text.svg"
+              alt="Terranthro"
+              style={{ height: 18, width: 'auto', display: 'block', opacity: 0.85 }}
+            />
+          </a>
+        </div>
         <div style={{ fontSize: 'var(--type-body-size)', color: UI.subtleLabel, fontFamily: 'var(--font-sans)', letterSpacing: '0.02em' }}>
           Wineries &amp; AVA Explorer
         </div>

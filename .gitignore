@@ -7,6 +7,7 @@ server/node_modules/
 .env.local
 server/.env
 server/.env.local
+server/.env.docker
 
 # Build output
 dist/
@@ -32,6 +33,8 @@ public/data/vineyards.geojson
 
 # Data pipeline raw data (large raster/vector source files — not for git)
 data-pipeline/data/
+data-pipeline/ml/checkpoints/
+data-pipeline/ml/logs/
 data-pipeline/.wrangler/
 data-pipeline/terrain-cogs.log
 data-pipeline/.venv/

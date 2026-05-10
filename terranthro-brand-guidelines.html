@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terranthro — Brand & Design Guidelines</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink:            #080A0F;
+    --surface:        #0F1219;
+    --surface-raised: #13161F;
+    --border:         #1A1D28;
+    --parchment:      #E8E2D6;
+    --muted:          #6B7185;
+    --ghost:          #2A2E3C;
+
+    --electric-blue:  #2E9BFF;
+    --vivid-green:    #00C44F;
+    --crimson:        #E03040;
+    --amber:          #C87D4A;
+    --violet:         #8A7AE8;
+
+    --glow-blue:    0 0 20px rgba(46,155,255,0.45), 0 0 5px rgba(46,155,255,0.3);
+    --glow-green:   0 0 18px rgba(0,196,79,0.4),    0 0 4px rgba(0,196,79,0.3);
+    --glow-crimson: 0 0 18px rgba(224,48,64,0.4),   0 0 4px rgba(224,48,64,0.3);
+    --glow-amber:   0 0 14px rgba(200,125,74,0.3);
+    --glow-violet:  0 0 16px rgba(138,122,232,0.35);
+  }
+
+  html {
+    background: var(--ink);
+    color: var(--parchment);
+    font-family: 'Inter', sans-serif;
+    font-weight: 300;
+    line-height: 1.7;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ── */
+  .page { max-width: 960px; margin: 0 auto; padding: 80px 48px 160px; }
+  .section { margin-bottom: 110px; animation: fadeUp 0.6s ease both; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px; }
+
+  /* ── Section chrome ── */
+  .section-label {
+    font-size: 10px; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--ghost); margin-bottom: 40px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 0.5px; background: var(--border); }
+  .section-num { font-family: 'Cormorant Garamond', serif; font-size: 13px; color: var(--ghost); font-style: italic; }
+
+  /* ── Hero ── */
+  .hero {
+    padding: 80px 0 96px;
+    border-bottom: 0.5px solid var(--border);
+    margin-bottom: 110px;
+    animation: fadeUp 0.9s ease both;
+  }
+  .wordmark {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(56px, 9vw, 104px);
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    line-height: 1;
+    color: var(--parchment);
+    margin-bottom: 14px;
+  }
+  .tagline {
+    font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 10px;
+  }
+  .version-badge {
+    display: inline-block;
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--electric-blue); text-shadow: var(--glow-blue);
+    border: 0.5px solid var(--electric-blue);
+    border-radius: 3px; padding: 3px 10px; margin-bottom: 48px;
+  }
+  .hero-descriptor {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 21px; font-weight: 300; font-style: italic;
+    color: var(--muted); max-width: 540px; line-height: 1.65;
+  }
+  .doc-meta {
+    margin-top: 48px; padding-top: 32px; border-top: 0.5px solid var(--border);
+    display: flex; gap: 48px;
+  }
+  .doc-meta-item { display: flex; flex-direction: column; gap: 5px; }
+  .doc-meta-label { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ghost); }
+  .doc-meta-value { font-size: 12px; color: var(--muted); }
+
+  /* ── Principles ── */
+  .principles-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+  .principle-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    padding: 32px 28px;
+    position: relative;
+  }
+  .principle-number {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 11px; font-style: italic; color: var(--ghost);
+    margin-bottom: 18px;
+  }
+  .principle-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px; font-weight: 500; color: var(--parchment);
+    margin-bottom: 12px; letter-spacing: 0.02em;
+  }
+  .principle-body {
+    font-size: 12px; color: var(--muted); line-height: 1.8; margin-bottom: 18px;
+  }
+  .principle-rule {
+    font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--electric-blue); text-shadow: var(--glow-blue);
+    padding-top: 16px; border-top: 0.5px solid var(--border);
+    line-height: 1.8;
+  }
+  .principle-accent {
+    position: absolute; top: 28px; right: 28px;
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+
+  /* ── Voice & Tone ── */
+  .voice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+  .voice-cell {
+    background: var(--surface); border: 0.5px solid var(--border); padding: 28px;
+  }
+  .voice-cell-label {
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ghost); margin-bottom: 18px;
+  }
+  .voice-pair { margin-bottom: 18px; }
+  .voice-pair:last-child { margin-bottom: 0; }
+  .voice-do   { font-size: 12px; color: var(--vivid-green); margin-bottom: 4px; }
+  .voice-dont { font-size: 12px; color: var(--crimson); text-decoration: line-through; opacity: 0.6; }
+  .voice-note { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.6; }
+  .adjective-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .adjective-tag {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 15px; font-weight: 500; color: var(--parchment);
+    background: var(--surface-raised); border: 0.5px solid var(--border);
+    padding: 6px 16px;
+  }
+
+  /* ── Colors ── */
+  .color-group-label {
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ghost); margin-bottom: 12px;
+  }
+  .color-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 2px; margin-bottom: 28px; }
+  .color-card {
+    background: var(--surface); padding: 22px 16px 16px;
+    display: flex; flex-direction: column; gap: 6px;
+    border: 0.5px solid var(--border);
+  }
+  .color-swatch { width: 32px; height: 32px; border-radius: 50%; margin-bottom: 5px; }
+  .color-name  { font-size: 11px; font-weight: 500; color: var(--parchment); }
+  .color-token { font-family: monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.04em; }
+  .color-hex   { font-family: monospace; font-size: 10px; color: var(--ghost); }
+  .color-role  { font-size: 10px; color: var(--ghost); line-height: 1.6; margin-top: 3px; }
+
+  /* Glow table */
+  .glow-grid { display: flex; flex-direction: column; gap: 2px; }
+  .glow-row {
+    background: var(--surface); border: 0.5px solid var(--border);
+    padding: 14px 20px; display: grid;
+    grid-template-columns: 28px 200px 1fr 120px; align-items: center; gap: 20px;
+  }
+  .glow-dot  { width: 12px; height: 12px; border-radius: 50%; }
+  .glow-token { font-family: monospace; font-size: 11px; color: var(--muted); }
+  .glow-value { font-family: monospace; font-size: 9px; color: var(--ghost); line-height: 1.6; }
+  .glow-use { font-size: 10px; color: var(--ghost); }
+
+  /* Semantic status */
+  .status-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px; margin-top: 4px; }
+  .status-card { background: var(--surface); border: 0.5px solid var(--border); padding: 20px; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 12px; border-radius: 4px; font-size: 11px; font-weight: 500;
+    letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px;
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .status-name { font-size: 11px; color: var(--parchment); margin-bottom: 4px; }
+  .status-tokens { font-family: monospace; font-size: 9px; color: var(--ghost); line-height: 1.8; }
+
+  /* ── Typography ── */
+  .type-row {
+    display: grid; grid-template-columns: 200px 1fr; gap: 40px;
+    align-items: start; padding: 32px 0; border-bottom: 0.5px solid var(--border);
+  }
+  .type-row:last-child { border-bottom: none; }
+  .type-meta-name   { font-size: 11px; font-weight: 500; color: var(--parchment); margin-bottom: 6px; }
+  .type-meta-detail { font-size: 10px; color: var(--ghost); line-height: 1.8; }
+  .t-display { font-family: 'Cormorant Garamond', serif; font-size: 64px; font-weight: 400; color: var(--parchment); letter-spacing: 0.04em; line-height: 1; }
+  .t-sub     { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 500; color: var(--parchment); letter-spacing: 0.03em; line-height: 1.2; }
+  .t-italic  { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 300; font-style: italic; color: var(--muted); line-height: 1.5; }
+  .t-label   { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--electric-blue); text-shadow: var(--glow-blue); }
+  .t-body    { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 300; color: var(--muted); line-height: 1.8; max-width: 440px; }
+  .t-mono    { font-family: monospace; font-size: 13px; color: var(--electric-blue); letter-spacing: 0.06em; }
+
+  .type-rules { margin-top: 40px; background: var(--surface); border: 0.5px solid var(--border); padding: 28px; }
+  .type-rule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 48px; }
+  .type-rule-item { }
+  .type-rule-label { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ghost); margin-bottom: 7px; }
+  .type-rule-body  { font-size: 12px; color: var(--muted); line-height: 1.7; }
+
+  /* ── Spacing ── */
+  .space-grid { display: flex; flex-direction: column; gap: 2px; }
+  .space-row {
+    background: var(--surface); border: 0.5px solid var(--border);
+    padding: 12px 20px; display: grid;
+    grid-template-columns: 80px 120px 80px 1fr; align-items: center; gap: 20px;
+  }
+  .space-bar  { background: var(--electric-blue); height: 3px; border-radius: 2px; opacity: 0.4; }
+  .space-token { font-family: monospace; font-size: 11px; color: var(--muted); }
+  .space-val   { font-family: monospace; font-size: 11px; color: var(--ghost); }
+  .space-use   { font-size: 10px; color: var(--ghost); }
+
+  /* ── Components ── */
+  .component-cell {
+    background: var(--surface); padding: 28px;
+    border: 0.5px solid var(--border);
+  }
+  .component-cell-label {
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ghost); margin-bottom: 20px;
+  }
+
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .btn {
+    font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 500;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    padding: 10px 22px; border-radius: 6px; cursor: pointer;
+    transition: box-shadow 0.2s; border: none;
+  }
+  .btn-primary { background: var(--electric-blue); color: var(--ink); }
+  .btn-primary:hover { box-shadow: var(--glow-blue); }
+  .btn-ghost   { background: transparent; color: var(--electric-blue); border: 0.5px solid var(--electric-blue); }
+  .btn-ghost:hover { box-shadow: var(--glow-blue); }
+  .btn-danger  { background: transparent; color: var(--crimson); border: 0.5px solid var(--crimson); }
+  .btn-danger:hover { box-shadow: var(--glow-crimson); }
+  .btn-sm { padding: 7px 16px; font-size: 9px; }
+
+  .btn-rule { font-size: 10px; color: var(--ghost); margin-top: 14px; line-height: 1.7; }
+
+  .chip-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    background: var(--surface-raised); border: 0.5px solid var(--border);
+    border-radius: 6px; padding: 8px 12px;
+  }
+  .chip-label { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ghost); margin-bottom: 3px; }
+  .chip-value { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 500; }
+
+  .glass-card {
+    background: rgba(255,255,255,0.025);
+    border: 0.5px solid rgba(255,255,255,0.07);
+    border-radius: 10px; padding: 20px 22px;
+  }
+  .glass-card-ava   { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--electric-blue); margin-bottom: 6px; text-shadow: var(--glow-blue); }
+  .glass-card-title { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 500; color: var(--parchment); margin-bottom: 8px; }
+  .glass-card-body  { font-size: 12px; color: var(--muted); line-height: 1.7; }
+
+  .input-label   { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ghost); margin-bottom: 8px; }
+  .input-preview {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: 6px; padding: 10px 14px;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 300;
+    color: var(--parchment); width: 100%; outline: none;
+    transition: border-color 0.2s;
+  }
+  .input-preview:focus { border-color: var(--electric-blue); }
+
+  .nav-preview {
+    background: var(--ink); border: 0.5px solid var(--border);
+    border-radius: 8px; padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .nav-wordmark { font-family: 'Cormorant Garamond', serif; font-size: 14px; font-weight: 400; letter-spacing: 0.14em; color: var(--parchment); }
+  .nav-items { display: flex; gap: 24px; }
+  .nav-item  { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ghost); }
+  .nav-item.active { color: var(--electric-blue); text-shadow: var(--glow-blue); }
+
+  /* ── Elevation / surface layering ── */
+  .elevation-stack { display: flex; flex-direction: column; gap: 2px; }
+  .elev-row {
+    border: 0.5px solid var(--border); padding: 16px 20px;
+    display: grid; grid-template-columns: 48px 160px 1fr; align-items: center; gap: 20px;
+  }
+  .elev-swatch { width: 28px; height: 28px; border-radius: 4px; }
+  .elev-token  { font-family: monospace; font-size: 11px; color: var(--muted); }
+  .elev-desc   { font-size: 11px; color: var(--ghost); line-height: 1.6; }
+
+  /* ── Motion ── */
+  .motion-grid { display: flex; flex-direction: column; gap: 2px; }
+  .motion-row {
+    background: var(--surface); border: 0.5px solid var(--border);
+    padding: 16px 20px; display: grid;
+    grid-template-columns: 200px 160px 1fr; align-items: center; gap: 20px;
+  }
+  .motion-name  { font-size: 11px; font-weight: 500; color: var(--parchment); }
+  .motion-value { font-family: monospace; font-size: 11px; color: var(--electric-blue); }
+  .motion-desc  { font-size: 11px; color: var(--ghost); }
+
+  /* ── Cross-product ── */
+  .product-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px; }
+  .product-card { background: var(--surface); border: 0.5px solid var(--border); padding: 28px 24px; }
+  .product-eyebrow {
+    font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--ghost); margin-bottom: 12px;
+  }
+  .product-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px; font-weight: 500; color: var(--parchment);
+    margin-bottom: 12px; letter-spacing: 0.04em;
+  }
+  .product-desc { font-size: 11px; color: var(--muted); line-height: 1.75; margin-bottom: 20px; }
+  .product-token-list { display: flex; flex-direction: column; gap: 6px; }
+  .product-token { display: flex; align-items: center; gap: 10px; font-size: 10px; color: var(--ghost); }
+  .product-token-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── Do / Don't ── */
+  .do-dont-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+  .do-cell   { background: var(--surface); border: 0.5px solid var(--border); padding: 28px; border-top: 2px solid var(--vivid-green); }
+  .dont-cell { background: var(--surface); border: 0.5px solid var(--border); padding: 28px; border-top: 2px solid var(--crimson); }
+  .dd-label  { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 18px; }
+  .do-label  { color: var(--vivid-green); }
+  .dont-label { color: var(--crimson); }
+  .dd-list   { display: flex; flex-direction: column; gap: 10px; }
+  .dd-item   { font-size: 12px; color: var(--muted); line-height: 1.6; padding-left: 14px; border-left: 1px solid var(--border); }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 700px) {
+    .page { padding: 48px 24px 80px; }
+    .principles-grid, .two-col, .three-col, .product-grid,
+    .do-dont-grid, .voice-grid, .status-grid { grid-template-columns: 1fr; }
+    .type-row { grid-template-columns: 1fr; gap: 12px; }
+    .glow-row { grid-template-columns: 28px 180px 1fr; }
+    .glow-use { display: none; }
+    .space-row { grid-template-columns: 60px 100px 60px 1fr; }
+    .motion-row { grid-template-columns: 1fr; gap: 8px; }
+    .elev-row { grid-template-columns: 40px 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══════════════════════════════════════ HERO ══════════════════════════════════════ -->
+  <div class="hero">
+    <div class="wordmark">TERRANTHRO</div>
+    <div class="tagline">Brand & Design Guidelines</div>
+    <div class="version-badge">v2.0 · May 2026</div>
+    <div class="hero-descriptor">New wave cartography — the authority of historical mapping tradition, rendered in a medium that glows. This document is the single source of truth for every design decision across all Terranthro products.</div>
+    <div class="doc-meta">
+      <div class="doc-meta-item">
+        <div class="doc-meta-label">Audience</div>
+        <div class="doc-meta-value">Product designers, engineers, partners</div>
+      </div>
+      <div class="doc-meta-item">
+        <div class="doc-meta-label">Scope</div>
+        <div class="doc-meta-value">Web, map interfaces, portals, data tools</div>
+      </div>
+      <div class="doc-meta-item">
+        <div class="doc-meta-label">Status</div>
+        <div class="doc-meta-value" style="color:var(--electric-blue); text-shadow:var(--glow-blue);">Draft — For Review</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════ 01 · BRAND PHILOSOPHY ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label"><span class="section-num">01</span> Brand Philosophy</div>
+
+    <p style="font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:300; font-style:italic; color:var(--muted); line-height:1.65; max-width:620px; margin-bottom:48px;">
+      Terranthro sits at the intersection of two powerful ideas: the timeless authority of cartographic tradition and the analytical precision of modern geospatial data. The aesthetic must honour both equally.
+    </p>
+
+    <div class="principles-grid">
+
+      <div class="principle-card">
+        <div class="principle-accent" style="background:var(--electric-blue); box-shadow:var(--glow-blue);"></div>
+        <div class="principle-number">Principle 01</div>
+        <div class="principle-title">Heritage Meets Signal</div>
+        <div class="principle-body">Old-world cartographic credibility — serif letterforms, parchment tones, dense spatial information — expressed through a dark, electric medium. The contrast between warm parchment text and deep ink backgrounds echoes the look of maps examined under lamplight.</div>
+        <div class="principle-rule">Never sacrifice readability for atmosphere · Glows are signals, not decoration</div>
+      </div>
+
+      <div class="principle-card">
+        <div class="principle-accent" style="background:var(--vivid-green); box-shadow:var(--glow-green);"></div>
+        <div class="principle-number">Principle 02</div>
+        <div class="principle-title">Data Is Beautiful</div>
+        <div class="principle-body">Scientific data — climate statistics, soil types, growing degree days — is the product. Every design decision should make data easier to read and trust, not obscure it. Accent colors are semantically assigned to data categories and must remain consistent across every surface.</div>
+        <div class="principle-rule">Each accent maps to a domain · Never use accent colors arbitrarily · Glows indicate active/live data states</div>
+      </div>
+
+      <div class="principle-card">
+        <div class="principle-accent" style="background:var(--amber); box-shadow:var(--glow-amber);"></div>
+        <div class="principle-number">Principle 03</div>
+        <div class="principle-title">Purposeful Restraint</div>
+        <div class="principle-body">The dark palette creates an observatory-like environment: the map and its data become the light source, everything else recedes. UI chrome should be near-invisible — thin borders, low-contrast backgrounds — so that content surfaces naturally.</div>
+        <div class="principle-rule">0.5px borders only · Surface layering in 3-step increments · Never use white for backgrounds</div>
+      </div>
+
+      <div class="principle-card">
+        <div class="principle-accent" style="background:var(--violet); box-shadow:var(--glow-violet);"></div>
+        <div class="principle-number">Principle 04</div>
+        <div class="principle-title">Spatial Authority</div>
+        <div class="principle-body">Every product Terranthro makes is grounded in place. The visual language should reinforce geographic precision: monospaced coordinates, micro-tracked uppercase labels, and data chips that look like instrument readouts rather than generic UI badges.</div>
+        <div class="principle-rule">Coordinates always in mono · Labels always tracked uppercase · AVA / geography always leads in hierarchy</div>
+      </div>
+
+      <div class="principle-card">
+        <div class="principle-accent" style="background:var(--crimson); box-shadow:var(--glow-crimson);"></div>
+        <div class="principle-number">Principle 05</div>
+        <div class="principle-title">Quiet Confidence</div>
+        <div class="principle-body">The brand does not shout. Typography is light-weight, spacing is generous, interactions are smooth. The product's authority comes from the quality and depth of its information, not from aggressive visual noise. Animations are subtle and directional — never decorative.</div>
+        <div class="principle-rule">Font weight 300 for body · Animations ≤ 0.3s ease · No drop shadows on type</div>
+      </div>
+
+      <div class="principle-card" style="background:transparent; border-color:transparent;">
+        <div style="height:100%; display:flex; flex-direction:column; justify-content:flex-end; padding-bottom:4px;">
+          <div style="font-family:'Cormorant Garamond',serif; font-size:16px; font-weight:300; font-style:italic; color:var(--ghost); line-height:1.8;">
+            "Every vineyard block is a data point.<br>Every data point deserves to be read clearly."
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════ 02 · VOICE & TONE ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label"><span class="section-num">02</span> Voice & Tone</div>
+
+    <div style="margin-bottom: 32px;">
+      <div class="adjective-row">
+        <div class="adjective-tag">Precise</div>
+        <div class="adjective-tag">Authoritative</div>
+        <div class="adjective-tag">Understated</div>
+        <div class="adjective-tag">Scientific</div>
+        <div class="adjective-tag">Earthy</div>
+        <div class="adjective-tag">Curious</div>
+      </div>
+    </div>
+
+    <div class="voice-grid">
+      <div class="voice-cell">
+        <div class="voice-cell-label">Writing</div>
+        <div class="voice-pair">
+          <div class="voice-do">✓ Jory series over basalt parent material. Southwest aspect, 412 ft.</div>
+          <div class="voice-dont">× Sandy loam soil with a southwest-facing slope at 412 feet above sea level.</div>
+          <div class="voice-note">Lead with the technical noun. Use geological vocabulary naturally, without over-explanation.</div>
+        </div>
+        <div class="voice-pair">
+          <div class="voice-do">✓ GDD 2,847 · Winkler II · GST 57.4°F</div>
+          <div class="voice-dont">× Growing degree days: 2847, which means the vines receive a moderate amount of heat.</div>
+          <div class="voice-note">Data speaks for itself. Label it clearly, present the number, move on.</div>
+        </div>
+        <div class="voice-pair">
+          <div class="voice-do">✓ Planted 1972. Volcanic soils.</div>
+          <div class="voice-dont">× This amazing vineyard was planted back in 1972 and features incredible volcanic soils!</div>
+          <div class="voice-note">Declarative, not promotional. Trust the facts.</div>
+        </div>
+      </div>
+
+      <div class="voice-cell">
+        <div class="voice-cell-label">UI Copy</div>
+        <div class="voice-pair">
+          <div class="voice-do">✓ View Atlas</div>
+          <div class="voice-dont">× Explore the Map Now →</div>
+          <div class="voice-note">Short, noun-based CTAs. Avoid urgency language.</div>
+        </div>
+        <div class="voice-pair">
+          <div class="voice-do">✓ No parcels found in this AVA</div>
+          <div class="voice-dont">× Oops! We couldn't find anything here.</div>
+          <div class="voice-note">Empty states are factual, not apologetic.</div>
+        </div>
+        <div class="voice-pair">
+          <div class="voice-do">✓ Search vineyards</div>
+          <div class="voice-dont">× Search for your favorite vineyard...</div>
+          <div class="voice-note">Labels are sparse directives, not conversational prompts.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════ 03 · COLOR SYSTEM ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label"><span class="section-num">03</span> Color System</div>
+
+    <div class="color-group-label">Base palette — surfaces, text, borders</div>
+    <div class="color-grid">
+      <div class="color-card">
+        <div class="color-swatch" style="background:#080A0F; border:0.5px solid #1A1D28;"></div>
+        <div class="color-name">Deep Ink</div>
+        <div class="color-token">--color-ink</div>
+        <div class="color-hex">#080A0F</div>
+        <div class="color-role">Primary app background. The void from which everything else emerges.</div>
+      </div>
+      <div class="color-card">
+        <div class="color-swatch" style="background:#0F1219; border:0.5px solid #1A1D28;"></div>
+        <div class="color-name">Surface</div>
+        <div class="color-token">--color-surface</div>
+        <div class="color-hex">#0F1219</div>
+        <div class="color-role">Panels, sidebars, card backgrounds — one step above ink.</div>
+      </div>
+      <div class="color-card">
+        <div class="color-swatch" style="background:#13161F; border:0.5px solid #1A1D28;"></div>
+        <div class="color-name">Surface Raised</div>
+        <div class="color-token">--color-surface-raised</div>
+        <div class="color-hex">#13161F</div>
+        <div class="color-role">Elevated cards, dropdowns, hover states.</div>
+      </div>
+      <div class="color-card">
+        <div class="color-swatch" style="background:#1A1D28;"></div>
+        <div class="color-name">Border</div>
+        <div class="color-token">--color-border</div>
+        <div class="color-hex">#1A1D28</div>
+        <div class="color-role">All borders and dividers. Always 0.5px weight.</div>
+      </div>
+      <div class="color-card">
+        <div class="color-swatch" style="background:#E8E2D6;"></div>
+        <div class="color-name">Parchment</div>
+        <div class="color-token">--color-parchment</div>
+        <div class="color-hex">#E8E2D6</div>
+        <div class="color-role">Primary text, headings, wordmarks. Warm off-white — never pure white.</div>
+      </div>
+      <div class="color-card">
+        <div class="color-swatch" style="background:#6B7185;"></div>
+        <div class="color-name">Muted</div>
+        <div class="color-token">--color-muted</div>
+        <div class="color-hex">#6B7185</div>
+        <div class="color-role">Body text, secondary descriptions, captions.</div>
+      </div>
+      <div class="color-card">
+        <div class="color-swatch" style="background:#2A2E3C;"></div>
+        <div class="color-name">Ghost</div>
+        <div class="color-token">--color-ghost</div>
+        <div class="color-hex">#2A2E3C</div>
+        <div class="color-role">Tertiary copy, placeholders, inactive states.</div>
+      </div>
+    </div>
+
+    <div class="color-group-label" style="margin-top:8px;">Accent palette — data domains & interactive states</div>
+    <p style="font-size:11px; color:var(--ghost); margin-bottom:14px; max-width:600px; line-height:1.7;">
+      Each accent is semantically bound to a data domain. Use them consistently across all products — never reassign them to unrelated meanings.
+    </p>
+    <div class="color-grid">
+      <div class="color-card">
+        <div class="color-swatch" style="background:#2E9BFF; box-shadow:var(--glow-blue);"></div>
+        <div class="color-name">Electric Blue</div>
+        <div class="color-token">--color-electric-blue</div>
+        <div class="color-hex">#2E9BFF</div>
+        <div class="color-role">Primary interactive accent. Active states, CTAs, climate data, UI highlights.</div>
+      </div>
+      <div class="color-card">
+        <div class="color-swatch" style="background:#00C44F; box-shadow:var(--glow-green);"></div>
+        <div class="color-name">Vivid Green</div>
+        <div class="color-token">--color-vivid-green</div>
+        <div class="color-hex">#00C44F</div>
+        <div class="color-role">Vegetation, canopy, GDD layers. Success states.</div>
+      </div>
+      <div class="color-card">
+        <div class="color-swatch" style="background:#E03040; box-shadow:var(--glow-crimson);"></div>
+        <div class="color-name">Crimson</div>
+        <div class="color-token">--color-crimson</div>
+        <div class="color-hex">#E03040</div>
+        <div class="color-role">Wine, volcanic soil, danger/error states, heat stress indicators.</div>
+      </div>
+      <div class="color-card">
+        <div class="color-swatch" style="background:#C87D4A; box-shadow:var(--glow-amber);"></div>
+        <div class="color-name">Terroir Amber</div>
+        <div class="color-token">--color-amber</div>
+        <div class="color-hex">#C87D4A</div>
+        <div class="color-role">Soil, geology, sediment data. Warning states.</div>
+      </div>
+      <div class="color-card">
+        <div class="color-swatch" style="background:#8A7AE8; box-shadow:var(--glow-violet);"></div>
+        <div class="color-name">Vintage Violet</div>
+        <div class="color-token">--color-violet</div>
+        <div class="color-hex">#8A7AE8</div>
+        <div class="color-role">AVA boundaries, hydrology layers, boundary overlays.</div>
+      </div>
+    </div>
+
+    <div class="color-group-label" style="margin-top:8px;">Semantic status tokens</div>
+    <div class="status-grid">
+      <div class="status-card">
+        <div class="status-pill" style="background:rgba(0,196,79,0.1); color:var(--vivid-green);">
+          <div class="status-dot" style="background:var(--vivid-green); box-shadow:var(--glow-green);"></div>
+          Success
+        </div>
+        <div class="status-tokens">--color-success<br>--color-success-dim<br>rgba(0,196,79,0.12) — bg fills</div>
+      </div>
+      <div class="status-card">
+        <div class="status-pill" style="background:rgba(200,125,74,0.1); color:var(--amber);">
+          <div class="status-dot" style="background:var(--amber); box-shadow:var(--glow-amber);"></div>
+          Warning
+        </div>
+        <div class="status-tokens">--color-warning<br>--color-warning-dim<br>rgba(200,125,74,0.12) — bg fills</div>
+      </div>
+      <div class="status-card">
+        <div class="status-pill" style="background:rgba(224,48,64,0.1); color:var(--crimson);">
+          <div class="status-dot" style="background:var(--crimson); box-shadow:var(--glow-crimson);"></div>
+          Danger
+        </div>
+        <div class="status-tokens">--color-danger<br>--color-danger-dim<br>rgba(224,48,64,0.12) — bg fills</div>
+      </div>
+    </div>
+
+    <div class="color-group-label" style="margin-top:28px;">Glow system</div>
+    <p style="font-size:11px; color:var(--ghost); margin-bottom:14px; max-width:600px; line-height:1.7;">
+      Glows are applied as <code style="font-size:10px; color:var(--electric-blue);">box-shadow</code> or <code style="font-size:10px; color:var(--electric-blue);">text-shadow</code> on active or highlighted elements. They simulate the luminescence of screen-rendered data — use them to indicate <em>live, selected, or important</em> states. Never apply glows to decorative elements.
+    </p>
+    <div class="glow-grid">
+      <div class="glow-row">
+        <div class="glow-dot" style="background:#2E9BFF; box-shadow:var(--glow-blue);"></div>
+        <div class="glow-token">--glow-blue</div>
+        <div class="glow-value">0 0 20px rgba(46,155,255,0.45), 0 0 5px rgba(46,155,255,0.3)</div>
+        <div class="glow-use">Active nav · CTA hover · Live data</div>
+      </div>
+      <div class="glow-row">
+        <div class="glow-dot" style="background:#00C44F; box-shadow:var(--glow-green);"></div>
+        <div class="glow-token">--glow-green</div>
+        <div class="glow-value">0 0 18px rgba(0,196,79,0.4), 0 0 4px rgba(0,196,79,0.3)</div>
+        <div class="glow-use">Vegetation pins · Success chips</div>
+      </div>
+      <div class="glow-row">
+        <div class="glow-dot" style="background:#E03040; box-shadow:var(--glow-crimson);"></div>
+        <div class="glow-token">--glow-crimson</div>
+        <div class="glow-value">0 0 18px rgba(224,48,64,0.4), 0 0 4px rgba(224,48,64,0.3)</div>
+        <div class="glow-use">Error states · Danger buttons · Soil pins</div>
+      </div>
+      <div class="glow-row">
+        <div class="glow-dot" style="background:#C87D4A; box-shadow:var(--glow-amber);"></div>
+        <div class="glow-token">--glow-amber</div>
+        <div class="glow-value">0 0 14px rgba(200,125,74,0.3)</div>
+        <div class="glow-use">Geology layer highlights</div>
+      </div>
+      <div class="glow-row">
+        <div class="glow-dot" style="background:#8A7AE8; box-shadow:var(--glow-violet);"></div>
+        <div class="glow-token">--glow-violet</div>
+        <div class="glow-value">0 0 16px rgba(138,122,232,0.35)</div>
+        <div class="glow-use">AVA boundary labels · Hydrology</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════ 04 · TYPOGRAPHY ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label"><span class="section-num">04</span> Typography</div>
+
+    <div>
+      <div class="type-row">
+        <div>
+          <div class="type-meta-name">Display</div>
+          <div class="type-meta-detail">Cormorant Garamond 400<br>68px · ls 0.04em<br><br>Wordmark, hero text, large AVA titles, large vineyard names on map overlays</div>
+        </div>
+        <div class="t-display">Terroir Atlas</div>
+      </div>
+      <div class="type-row">
+        <div>
+          <div class="type-meta-name">Display Medium</div>
+          <div class="type-meta-detail">Cormorant Garamond 500<br>28–30px · ls 0.03em<br><br>Card titles, sidebar headings, AVA names, winery names</div>
+        </div>
+        <div class="t-sub">Dundee Hills · Chehalem Mountains</div>
+      </div>
+      <div class="type-row">
+        <div>
+          <div class="type-meta-name">Display Italic</div>
+          <div class="type-meta-detail">Cormorant Garamond 300 italic<br>20–22px<br><br>Descriptors, taglines, pull quotes, section captions. Always in muted color.</div>
+        </div>
+        <div class="t-italic">A visual terroir atlas for the Willamette Valley and beyond.</div>
+      </div>
+      <div class="type-row">
+        <div>
+          <div class="type-meta-name">UI Label</div>
+          <div class="type-meta-detail">Inter 500 · ALL CAPS<br>10–11px · ls 0.18–0.24em<br><br>Map layer labels, navigation items, data chip labels, section dividers. Primary accent color when active.</div>
+        </div>
+        <div class="t-label">Winkler Index · Growing Degree Days · GST</div>
+      </div>
+      <div class="type-row">
+        <div>
+          <div class="type-meta-name">Body</div>
+          <div class="type-meta-detail">Inter 300<br>13–14px · lh 1.7–1.8<br><br>Card descriptions, sidebar prose, portal UI copy. Always in muted color.</div>
+        </div>
+        <div class="t-body">Soil parent material, elevation, and aspect converge to define the block-level expression of this vineyard. Jory series over basalt, southwest aspect, 412 ft.</div>
+      </div>
+      <div class="type-row">
+        <div>
+          <div class="type-meta-name">Data / Coordinates</div>
+          <div class="type-meta-detail">System monospace 400<br>11–13px · ls 0.05em<br><br>Coordinates, numeric data values, technical strings. Electric blue for interactive/live data.</div>
+        </div>
+        <div class="t-mono">45.3418° N · 123.1854° W · 412 ft · GDD 2847</div>
+      </div>
+    </div>
+
+    <div class="type-rules">
+      <div class="component-cell-label">Typography rules</div>
+      <div class="type-rule-grid">
+        <div class="type-rule-item">
+          <div class="type-rule-label">Font pairing intent</div>
+          <div class="type-rule-body">Cormorant Garamond carries heritage and emotion. Inter carries information and precision. Never use Inter for decorative headings; never use Cormorant for body copy or data labels.</div>
+        </div>
+        <div class="type-rule-item">
+          <div class="type-rule-label">Weight discipline</div>
+          <div class="type-rule-body">Default to light weights (300). Use 400–500 only for headings and emphasis. Never exceed 500. Bold text disrupts the observatory atmosphere.</div>
+        </div>
+        <div class="type-rule-item">
+          <div class="type-rule-label">Line height</div>
+          <div class="type-rule-body">Display: 1.0–1.2. Body: 1.7–1.8. UI labels: normal. Generous line-height on body text aids reading dense scientific copy.</div>
+        </div>
+        <div class="type-rule-item">
+          <div class="type-rule-label">Color discipline</div>
+          <div class="type-rule-body">Primary headings: parchment. Body copy: muted. Labels and tertiary: ghost. Data values: electric blue or domain accent. Never use full white (#FFF).</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════ 05 · SPACING ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label"><span class="section-num">05</span> Spacing</div>
+    <p style="font-size:11px; color:var(--ghost); margin-bottom:20px; line-height:1.7;">Base unit is 8px. All spacing should be a multiple. Internal component padding uses space-1 to space-3; layout gaps use space-4 and above.</p>
+    <div class="space-grid">
+      <div class="space-row">
+        <div class="space-bar" style="width:8px;"></div>
+        <div class="space-token">--space-1 · 8px</div>
+        <div class="space-val">8px</div>
+        <div class="space-use">Icon padding, tight chip gaps, inline gaps</div>
+      </div>
+      <div class="space-row">
+        <div class="space-bar" style="width:16px;"></div>
+        <div class="space-token">--space-2 · 16px</div>
+        <div class="space-val">16px</div>
+        <div class="space-use">Label-to-content gap, list item spacing</div>
+      </div>
+      <div class="space-row">
+        <div class="space-bar" style="width:24px;"></div>
+        <div class="space-token">--space-3 · 24px</div>
+        <div class="space-val">24px</div>
+        <div class="space-use">Card internal padding, nav item gaps</div>
+      </div>
+      <div class="space-row">
+        <div class="space-bar" style="width:32px;"></div>
+        <div class="space-token">--space-4 · 32px</div>
+        <div class="space-val">32px</div>
+        <div class="space-use">Section padding, panel internal margin</div>
+      </div>
+      <div class="space-row">
+        <div class="space-bar" style="width:48px;"></div>
+        <div class="space-token">--space-6 · 48px</div>
+        <div class="space-val">48px</div>
+        <div class="space-use">Between major UI sections, page padding</div>
+      </div>
+      <div class="space-row">
+        <div class="space-bar" style="width:64px;"></div>
+        <div class="space-token">--space-8 · 64px</div>
+        <div class="space-val">64px</div>
+        <div class="space-use">Hero sections, large content breaks</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════ 06 · SURFACE & ELEVATION ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label"><span class="section-num">06</span> Surface & Elevation</div>
+    <p style="font-size:11px; color:var(--ghost); margin-bottom:20px; max-width:580px; line-height:1.7;">
+      Depth is created by incremental lightening of backgrounds, not by drop shadows. There are three surface layers plus the special glass treatment for map overlays. Borders are always 0.5px and use <code style="font-size:10px;">--color-border</code>.
+    </p>
+    <div class="elevation-stack">
+      <div class="elev-row" style="background:var(--ink);">
+        <div class="elev-swatch" style="background:#080A0F; border:0.5px solid #1A1D28;"></div>
+        <div class="elev-token">--color-ink</div>
+        <div class="elev-desc">Layer 0 — App shell, map canvas background, page body</div>
+      </div>
+      <div class="elev-row" style="background:var(--surface);">
+        <div class="elev-swatch" style="background:#0F1219; border:0.5px solid #1A1D28;"></div>
+        <div class="elev-token">--color-surface</div>
+        <div class="elev-desc">Layer 1 — Primary panels, sidebars, section backgrounds, modal overlays</div>
+      </div>
+      <div class="elev-row" style="background:var(--surface-raised);">
+        <div class="elev-swatch" style="background:#13161F; border:0.5px solid #1A1D28;"></div>
+        <div class="elev-token">--color-surface-raised</div>
+        <div class="elev-desc">Layer 2 — Elevated cards, dropdown menus, hover rows, data chips</div>
+      </div>
+      <div class="elev-row" style="background:rgba(255,255,255,0.025);">
+        <div class="elev-swatch" style="background:rgba(255,255,255,0.04); border:0.5px solid rgba(255,255,255,0.07);"></div>
+        <div class="elev-token">glass-card</div>
+        <div class="elev-desc">Layer 3 (special) — Translucent glass treatment for map-overlay cards only. rgba(255,255,255,0.025) bg · rgba(255,255,255,0.07) border</div>
+      </div>
+      <div class="elev-row" style="background:var(--parchment);">
+        <div class="elev-swatch" style="background:#E8E2D6; border:0.5px solid #1A1D28;"></div>
+        <div class="elev-token">--color-parchment</div>
+        <div class="elev-desc">Map surface cards — solid opaque parchment for on-map controls, popup cards, hover pills that must be legible against any map layer</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════ 07 · COMPONENTS ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label"><span class="section-num">07</span> Core Components</div>
+
+    <div class="two-col" style="margin-bottom:2px;">
+
+      <div class="component-cell">
+        <div class="component-cell-label">Navigation</div>
+        <div class="nav-preview">
+          <div class="nav-wordmark">TERRANTHRO</div>
+          <div class="nav-items">
+            <span class="nav-item">National</span>
+            <span class="nav-item">Oregon</span>
+            <span class="nav-item active">Willamette Valley</span>
+          </div>
+        </div>
+        <div class="btn-rule">Wordmark: Cormorant 14px ls 0.14em · Nav items: Inter 10px ALL CAPS ghost · Active: electric-blue + glow · No underlines · Hairline bottom border on scroll</div>
+      </div>
+
+      <div class="component-cell">
+        <div class="component-cell-label">Buttons</div>
+        <div class="btn-row" style="margin-bottom:12px;">
+          <button class="btn btn-primary">View Atlas</button>
+          <button class="btn btn-ghost">Export</button>
+          <button class="btn btn-danger">Remove</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary btn-sm">Save</button>
+          <button class="btn btn-ghost btn-sm">Cancel</button>
+        </div>
+        <div class="btn-rule">10px Inter 500 ALL CAPS · ls 0.16em · 6px radius · 0.5px border (ghost/danger) · hover: glow only, no background shift · sm variant: 7px 16px padding</div>
+      </div>
+
+      <div class="component-cell">
+        <div class="component-cell-label">Data chips — terroir at a glance</div>
+        <div class="chip-row">
+          <div class="chip">
+            <div class="chip-label">Winkler</div>
+            <div class="chip-value" style="color:var(--electric-blue); text-shadow:var(--glow-blue);">2,847</div>
+          </div>
+          <div class="chip">
+            <div class="chip-label">GST</div>
+            <div class="chip-value" style="color:var(--vivid-green); text-shadow:var(--glow-green);">57.4°F</div>
+          </div>
+          <div class="chip">
+            <div class="chip-label">Soil</div>
+            <div class="chip-value" style="color:var(--amber);">Jory</div>
+          </div>
+          <div class="chip">
+            <div class="chip-label">Elev</div>
+            <div class="chip-value" style="color:var(--parchment);">412 ft</div>
+          </div>
+        </div>
+        <div class="btn-rule">Label: 9px ALL CAPS ghost · Value: Cormorant 18px 500 · Color maps to data domain · surface-raised bg · 6px radius</div>
+      </div>
+
+      <div class="component-cell">
+        <div class="component-cell-label">Form inputs</div>
+        <div class="input-label">Search vineyards</div>
+        <input class="input-preview" type="text" placeholder="Adelsheim, Dundee Hills…" />
+        <div class="btn-rule" style="margin-top:10px;">surface bg · 0.5px border · 6px radius · Inter 13px 300 · focus: border-color → electric-blue · no glow ring on focus</div>
+      </div>
+
+    </div>
+
+    <div class="component-cell" style="margin-bottom:2px;">
+      <div class="component-cell-label">Vineyard / AVA card — glass treatment</div>
+      <div style="max-width:380px;">
+        <div class="glass-card">
+          <div class="glass-card-ava">Dundee Hills AVA · Block 4</div>
+          <div class="glass-card-title">Adelsheim Vineyard</div>
+          <div class="glass-card-body">Volcanic Jory soils over basalt parent material. Southwest aspect at 412 ft. Class II Winkler. Planted 1972.</div>
+          <div style="margin-top:14px; padding-top:12px; border-top:0.5px solid rgba(255,255,255,0.05);">
+            <div style="display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); margin-bottom:5px;">
+              <div style="width:7px; height:7px; border-radius:50%; background:var(--electric-blue); box-shadow:var(--glow-blue); flex-shrink:0;"></div>
+              Climate overlay active
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); margin-bottom:5px;">
+              <div style="width:7px; height:7px; border-radius:50%; background:var(--amber); flex-shrink:0;"></div>
+              Soil: Jory series
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted);">
+              <div style="width:7px; height:7px; border-radius:50%; background:var(--violet); flex-shrink:0;"></div>
+              Hydrology layer
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="btn-rule" style="margin-top:16px;">rgba(255,255,255,0.025) bg · rgba(255,255,255,0.07) border · 10px radius · AVA label: 10px electric-blue ALL CAPS + glow · Title: Cormorant 22px 500 · Body: Inter 12px muted · Legend: 7px dots in domain color</div>
+    </div>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════ 08 · MOTION ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label"><span class="section-num">08</span> Motion & Animation</div>
+    <p style="font-size:11px; color:var(--ghost); margin-bottom:20px; max-width:560px; line-height:1.7;">Animations reinforce spatial awareness. Panels slide from their origin edge. Content fades up from slightly below. Map fly-to transitions use camera easing. Nothing bounces or pops.</p>
+    <div class="motion-grid">
+      <div class="motion-row">
+        <div class="motion-name">Page / section entrance</div>
+        <div class="motion-value">0.6s ease</div>
+        <div class="motion-desc">fadeUp — opacity 0→1, translateY 14px→0. Staggers between sibling sections.</div>
+      </div>
+      <div class="motion-row">
+        <div class="motion-name">Hover glow (buttons)</div>
+        <div class="motion-value">box-shadow 0.2s</div>
+        <div class="motion-desc">Glow appears on hover only. No scale or background change.</div>
+      </div>
+      <div class="motion-row">
+        <div class="motion-name">Focus border</div>
+        <div class="motion-value">border-color 0.2s ease</div>
+        <div class="motion-desc">Input border transitions to electric-blue. No glow ring on focus.</div>
+      </div>
+      <div class="motion-row">
+        <div class="motion-name">Panel slide-in</div>
+        <div class="motion-value">0.25s ease</div>
+        <div class="motion-desc">translateX from off-screen edge. Panels never fade in — they slide.</div>
+      </div>
+      <div class="motion-row">
+        <div class="motion-name">Map fly-to</div>
+        <div class="motion-value">1.2s MapLibre easing</div>
+        <div class="motion-desc">Smooth camera transition on AVA / vineyard selection. Never instant jump.</div>
+      </div>
+      <div class="motion-row">
+        <div class="motion-name">Modal / overlay</div>
+        <div class="motion-value">opacity 0.18s ease</div>
+        <div class="motion-desc">Background scrim fades in. Modal itself fades up with 14px y-offset.</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════ 09 · DO / DON'T ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label"><span class="section-num">09</span> Do / Don't</div>
+    <div class="do-dont-grid">
+      <div class="do-cell">
+        <div class="dd-label do-label">Do</div>
+        <div class="dd-list">
+          <div class="dd-item">Use 0.5px borders exclusively — never 1px or thicker for structural chrome</div>
+          <div class="dd-item">Use Cormorant for brand headings and Parchment color for primary text</div>
+          <div class="dd-item">Apply glows only to active, selected, or live-data states</div>
+          <div class="dd-item">Maintain semantic color-to-domain consistency across every product</div>
+          <div class="dd-item">Use Inter 300 weight as the default for all body and UI copy</div>
+          <div class="dd-item">Let data dominate visually — chrome should recede into the background</div>
+          <div class="dd-item">Use monospace for all numeric data, coordinates, and values</div>
+          <div class="dd-item">Maintain parchment (#E8E2D6) as the maximum brightness — never pure white</div>
+        </div>
+      </div>
+      <div class="dont-cell">
+        <div class="dd-label dont-label">Don't</div>
+        <div class="dd-list">
+          <div class="dd-item">Use white (#FFFFFF) anywhere in the UI — parchment is the ceiling</div>
+          <div class="dd-item">Apply a glow to purely decorative elements or static labels</div>
+          <div class="dd-item">Use drop shadows — elevation is communicated through background lightness alone</div>
+          <div class="dd-item">Use accent colors outside their assigned domains (e.g., amber for success)</div>
+          <div class="dd-item">Use font weights above 500 — no bold text in UI copy</div>
+          <div class="dd-item">Add animations that bounce, scale, or attract attention to UI chrome</div>
+          <div class="dd-item">Use Inter for display headings or Cormorant for small labels</div>
+          <div class="dd-item">Use rounded corners larger than 10px — this is a precision instrument, not a consumer app</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════ 10 · CROSS-PRODUCT APPLICATION ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label"><span class="section-num">10</span> Cross-Product Application</div>
+    <p style="font-family:'Cormorant Garamond',serif; font-size:20px; font-weight:300; font-style:italic; color:var(--muted); line-height:1.65; max-width:580px; margin-bottom:40px;">
+      These tokens and principles are not WVWA-specific. Any Terranthro product — national atlas, regional explorer, grower portal, producer-facing tool — uses the same foundation.
+    </p>
+
+    <div class="product-grid">
+
+      <div class="product-card">
+        <div class="product-eyebrow">Current</div>
+        <div class="product-name">WVWA Explorer</div>
+        <div class="product-desc">The Willamette Valley Wine Association's vineyard and AVA atlas. The design reference implementation — all tokens and components defined here originate from this product.</div>
+        <div class="product-token-list">
+          <div class="product-token"><div class="product-token-dot" style="background:var(--electric-blue);"></div>Full accent palette active</div>
+          <div class="product-token"><div class="product-token-dot" style="background:var(--vivid-green);"></div>Climate & vegetation layers</div>
+          <div class="product-token"><div class="product-token-dot" style="background:var(--violet);"></div>AVA boundary overlays</div>
+          <div class="product-token"><div class="product-token-dot" style="background:var(--amber);"></div>Soil & topography layers</div>
+        </div>
+      </div>
+
+      <div class="product-card">
+        <div class="product-eyebrow">Pathway</div>
+        <div class="product-name">National Atlas</div>
+        <div class="product-desc">A broader US wine region explorer. Same token set, same typography pair. Accent domains remain consistent — electric-blue for climate data, amber for geology — regardless of region.</div>
+        <div class="product-token-list">
+          <div class="product-token"><div class="product-token-dot" style="background:var(--electric-blue);"></div>Same base + accent palette</div>
+          <div class="product-token"><div class="product-token-dot" style="background:var(--parchment);"></div>Parchment always primary text</div>
+          <div class="product-token"><div class="product-token-dot" style="background:var(--ghost);"></div>Ghost for inactive regions</div>
+        </div>
+      </div>
+
+      <div class="product-card">
+        <div class="product-eyebrow">Pathway</div>
+        <div class="product-name">Grower Portal</div>
+        <div class="product-desc">Authenticated tool for vineyard owners to manage parcel data, view block-level analytics, and submit edit history. Data-dense UI uses the same components — chips, glass cards, inputs — without the map-explorer chrome.</div>
+        <div class="product-token-list">
+          <div class="product-token"><div class="product-token-dot" style="background:var(--electric-blue);"></div>Electric-blue for CTAs</div>
+          <div class="product-token"><div class="product-token-dot" style="background:var(--vivid-green);"></div>Success / approval states</div>
+          <div class="product-token"><div class="product-token-dot" style="background:var(--crimson);"></div>Error / danger states</div>
+          <div class="product-token"><div class="product-token-dot" style="background:var(--amber);"></div>Warning / pending states</div>
+        </div>
+      </div>
+
+      <div class="product-card">
+        <div class="product-eyebrow">Principle</div>
+        <div class="product-name">New Product Checklist</div>
+        <div class="product-desc">Before shipping any new Terranthro-branded surface, verify:</div>
+        <div class="product-token-list" style="gap:8px; margin-top:4px;">
+          <div class="product-token" style="align-items:flex-start; gap:8px; font-size:10px; line-height:1.5; color:var(--muted);">
+            <div class="product-token-dot" style="background:var(--electric-blue); margin-top:4px; flex-shrink:0;"></div>
+            Ink/Surface/Parchment token trio is in use
+          </div>
+          <div class="product-token" style="align-items:flex-start; gap:8px; font-size:10px; line-height:1.5; color:var(--muted);">
+            <div class="product-token-dot" style="background:var(--electric-blue); margin-top:4px; flex-shrink:0;"></div>
+            Cormorant + Inter type pair is loaded
+          </div>
+          <div class="product-token" style="align-items:flex-start; gap:8px; font-size:10px; line-height:1.5; color:var(--muted);">
+            <div class="product-token-dot" style="background:var(--electric-blue); margin-top:4px; flex-shrink:0;"></div>
+            Accent colors only on their assigned domains
+          </div>
+          <div class="product-token" style="align-items:flex-start; gap:8px; font-size:10px; line-height:1.5; color:var(--muted);">
+            <div class="product-token-dot" style="background:var(--electric-blue); margin-top:4px; flex-shrink:0;"></div>
+            No white, no 1px+ borders, no drop shadows
+          </div>
+          <div class="product-token" style="align-items:flex-start; gap:8px; font-size:10px; line-height:1.5; color:var(--muted);">
+            <div class="product-token-dot" style="background:var(--electric-blue); margin-top:4px; flex-shrink:0;"></div>
+            All numeric data in monospace
+          </div>
+        </div>
+      </div>
+
+      <div class="product-card">
+        <div class="product-eyebrow">Principle</div>
+        <div class="product-name">What Transfers</div>
+        <div class="product-desc">These elements of the design language are product-agnostic and should transfer unchanged to any Terranthro surface:</div>
+        <div class="product-token-list" style="gap:8px; margin-top:4px;">
+          <div class="product-token" style="align-items:flex-start; gap:8px; font-size:10px; line-height:1.5; color:var(--muted);">
+            <div class="product-token-dot" style="background:var(--vivid-green); margin-top:4px; flex-shrink:0;"></div>
+            All CSS custom property tokens
+          </div>
+          <div class="product-token" style="align-items:flex-start; gap:8px; font-size:10px; line-height:1.5; color:var(--muted);">
+            <div class="product-token-dot" style="background:var(--vivid-green); margin-top:4px; flex-shrink:0;"></div>
+            Font pairing and all type roles
+          </div>
+          <div class="product-token" style="align-items:flex-start; gap:8px; font-size:10px; line-height:1.5; color:var(--muted);">
+            <div class="product-token-dot" style="background:var(--vivid-green); margin-top:4px; flex-shrink:0;"></div>
+            ds-btn, ds-input, ds-card-glass classes
+          </div>
+          <div class="product-token" style="align-items:flex-start; gap:8px; font-size:10px; line-height:1.5; color:var(--muted);">
+            <div class="product-token-dot" style="background:var(--vivid-green); margin-top:4px; flex-shrink:0;"></div>
+            Glow system and semantic status tokens
+          </div>
+          <div class="product-token" style="align-items:flex-start; gap:8px; font-size:10px; line-height:1.5; color:var(--muted);">
+            <div class="product-token-dot" style="background:var(--vivid-green); margin-top:4px; flex-shrink:0;"></div>
+            Voice and tone principles
+          </div>
+        </div>
+      </div>
+
+      <div class="product-card">
+        <div class="product-eyebrow">Principle</div>
+        <div class="product-name">What Adapts</div>
+        <div class="product-desc">These elements may be adjusted per-product while remaining within the design language:</div>
+        <div class="product-token-list" style="gap:8px; margin-top:4px;">
+          <div class="product-token" style="align-items:flex-start; gap:8px; font-size:10px; line-height:1.5; color:var(--muted);">
+            <div class="product-token-dot" style="background:var(--amber); margin-top:4px; flex-shrink:0;"></div>
+            Which accent colors are most prominent
+          </div>
+          <div class="product-token" style="align-items:flex-start; gap:8px; font-size:10px; line-height:1.5; color:var(--muted);">
+            <div class="product-token-dot" style="background:var(--amber); margin-top:4px; flex-shrink:0;"></div>
+            Navigation structure and layout patterns
+          </div>
+          <div class="product-token" style="align-items:flex-start; gap:8px; font-size:10px; line-height:1.5; color:var(--muted);">
+            <div class="product-token-dot" style="background:var(--amber); margin-top:4px; flex-shrink:0;"></div>
+            Data chip labels and domain vocabulary
+          </div>
+          <div class="product-token" style="align-items:flex-start; gap:8px; font-size:10px; line-height:1.5; color:var(--muted);">
+            <div class="product-token-dot" style="background:var(--amber); margin-top:4px; flex-shrink:0;"></div>
+            Whether map or data table is primary UI
+          </div>
+          <div class="product-token" style="align-items:flex-start; gap:8px; font-size:10px; line-height:1.5; color:var(--muted);">
+            <div class="product-token-dot" style="background:var(--amber); margin-top:4px; flex-shrink:0;"></div>
+            Tagline and descriptor copy
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════ FOOTER ══════════════════════════════════════ -->
+  <div style="padding-top:64px; border-top:0.5px solid var(--border);">
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:24px;">
+      <div>
+        <div style="font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:400; letter-spacing:0.1em; color:var(--parchment); margin-bottom:8px;">TERRANTHRO</div>
+        <div style="font-size:10px; letter-spacing:0.2em; text-transform:uppercase; color:var(--ghost);">Brand & Design Guidelines · v2.0</div>
+      </div>
+      <div style="font-size:11px; color:var(--ghost); text-align:right; line-height:1.8;">
+        Tokens source: <code style="font-size:10px; color:var(--electric-blue);">src/styles/tokens.css</code><br>
+        JS tokens: <code style="font-size:10px; color:var(--electric-blue);">src/styles/tokens.js</code><br>
+        Patterns: <code style="font-size:10px; color:var(--electric-blue);">src/styles/patterns.js</code>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

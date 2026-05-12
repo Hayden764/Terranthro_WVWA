@@ -13,6 +13,43 @@ const UI = {
 };
 import { useIsMobile } from '../lib/useIsMobile';
 
+// ── Portal Header Button ─────────────────────────────────────────────────
+function PortalHeaderButton() {
+  return (
+    <a
+      href="/portal"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        padding: '5px 12px',
+        border: `1px solid ${alpha(TOKENS.parchment, 0.25)}`,
+        borderRadius: 4,
+        color: alpha(TOKENS.parchment, 0.55),
+        fontSize: 10,
+        fontFamily: 'var(--font-sans)',
+        fontWeight: 500,
+        letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+        textDecoration: 'none',
+        transition: 'border-color 0.2s, color 0.2s',
+        whiteSpace: 'nowrap',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.borderColor = alpha(TOKENS.parchment, 0.6);
+        e.currentTarget.style.color = alpha(TOKENS.parchment, 0.95);
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = alpha(TOKENS.parchment, 0.25);
+        e.currentTarget.style.color = alpha(TOKENS.parchment, 0.55);
+      }}
+    >
+      Winery Portal
+      <span style={{ fontSize: 9, opacity: 0.7 }}>→</span>
+    </a>
+  );
+}
+
 // ── Entrance Panel (Option B — Dark Cinematic) ───────────────────────────
 function EntrancePanel({ onEnter, mapReady, isMobile }) {
   return (
@@ -107,6 +144,26 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
       >
         {mapReady ? 'Begin Exploring' : 'Loading map\u2026'}
       </button>
+
+      {/* Portal sign-in link */}
+      <div style={{ marginTop: 20, textAlign: 'center' }}>
+        <a
+          href="/portal"
+          style={{
+            fontSize: 11,
+            letterSpacing: '0.06em',
+            color: alpha(TOKENS.parchment, 0.35),
+            fontFamily: 'var(--font-sans)',
+            fontStyle: 'italic',
+            textDecoration: 'none',
+            transition: 'color 0.2s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.color = alpha(TOKENS.parchment, 0.8); }}
+          onMouseLeave={e => { e.currentTarget.style.color = alpha(TOKENS.parchment, 0.35); }}
+        >
+          Winery owner? Sign in to your portal
+        </a>
+      </div>
     </div>
   );
 }
@@ -213,8 +270,11 @@ export default function WVWAMapPage() {
             />
           </a>
         </div>
-        <div style={{ fontSize: 'var(--type-body-size)', color: UI.subtleLabel, fontFamily: 'var(--font-sans)', letterSpacing: '0.02em' }}>
-          Wineries &amp; AVA Explorer
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ fontSize: 'var(--type-body-size)', color: UI.subtleLabel, fontFamily: 'var(--font-sans)', letterSpacing: '0.02em' }}>
+            Wineries &amp; AVA Explorer
+          </div>
+          <PortalHeaderButton />
         </div>
       </header>
 

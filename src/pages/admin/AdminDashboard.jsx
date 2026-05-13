@@ -8,6 +8,7 @@ export default function AdminDashboard() {
   const [admin, setAdmin] = useState(null);
   const [requests, setRequests] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [wineries, setWineries] = useState([]);
   const [tab, setTab] = useState('requests');
   const [filter, setFilter] = useState('pending');
   const [loading, setLoading] = useState(true);
@@ -25,12 +26,21 @@ export default function AdminDashboard() {
       const requestUrl = filter === 'flagged'
         ? '/api/admin/requests?flag=acreage_change'
         : `/api/admin/requests?status=${filter}`;
-      const [reqs, accts] = await Promise.all([
+      const [reqs, accts, wineriesList] = await Promise.all([
         apiJson(requestUrl),
         apiJson('/api/admin/accounts'),
+        apiJson('/api/admin/vineyards'),
       ]);
+      const uniqueWineries = Array.from(
+        new Map(
+          wineriesList
+            .filter((w) => Number.isInteger(w.winery_id))
+            .map((w) => [w.winery_id, { winery_id: w.winery_id, winery_name: w.winery_name }])
+        ).values()
+      ).sort((a, b) => a.winery_name.localeCompare(b.winery_name));
       setRequests(reqs);
       setAccounts(accts);
+      setWineries(uniqueWineries);
     } catch {
       navigate('/admin', { replace: true });
     } finally {
@@ -72,6 +82,10 @@ export default function AdminDashboard() {
     return <Shell><p style={{ color: TOKENS.muted }}>Loading…</p></Shell>;
   }
 
+  const availableWineries = wineries.filter(
+    (w) => !accounts.some((a) => a.winery_id === w.winery_id)
+  );
+
   return (
     <Shell>
       {/* Header */}
@@ -100,11 +114,25 @@ export default function AdminDashboard() {
             {t}
           </button>
         ))}
+        {/* Block Manager shortcut */}
+        <Link
+          to="/admin/blocks"
+          style={{
+            marginLeft: 'auto',
+            padding: '7px 18px', borderRadius: 6,
+            background: alpha(TOKENS.amber, 0.12),
+            color: TOKENS.amber,
+            fontSize: 'var(--type-mono-size)', fontWeight: 600,
+            textDecoration: 'none',
+            border: `1px solid ${alpha(TOKENS.amber, 0.25)}`,
+          }}
+        >
+          ⊞ Block Manager
+        </Link>
         {/* Editor shortcut — navigates to the full-screen parcel editor */}
         <Link
           to="/admin/editor"
           style={{
-            marginLeft: 'auto',
             padding: '7px 18px', borderRadius: 6,
             background: alpha(TOKENS.violet, 0.15),
             color: TOKENS.violet,
@@ -216,13 +244,20 @@ export default function AdminDashboard() {
           {showNewAccount && (
             <form onSubmit={handleCreateAccount} style={{ ...cardStyle, marginBottom: 16 }}>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <div style={{ flex: '0 0 100px' }}>
-                  <label style={adminLabel}>Winery ID</label>
-                  <input
-                    type="number" required value={newWineryId}
+                <div style={{ flex: '0 0 auto', minWidth: 200 }}>
+                  <label style={adminLabel}>Winery</label>
+                  <select
+                    required value={newWineryId}
                     onChange={(e) => setNewWineryId(e.target.value)}
                     style={adminInput}
-                  />
+                  >
+                    <option value="">Select a winery…</option>
+                    {availableWineries.map((w) => (
+                      <option key={w.winery_id} value={w.winery_id}>
+                        {w.winery_name} (ID {w.winery_id})
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div style={{ flex: 1, minWidth: 200 }}>
                   <label style={adminLabel}>Contact Email</label>
@@ -233,6 +268,11 @@ export default function AdminDashboard() {
                   />
                 </div>
               </div>
+              {availableWineries.length === 0 && (
+                <p style={{ color: TOKENS.muted, fontSize: 'var(--type-ui-label-size)', marginTop: 8, marginBottom: 0 }}>
+                  All wineries already have a portal email.
+                </p>
+              )}
               <button type="submit" style={{ ...approveBtnStyle, marginTop: 10 }}>Create Account</button>
             </form>
           )}

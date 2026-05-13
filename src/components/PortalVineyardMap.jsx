@@ -10,7 +10,9 @@
  *   editParcelId   {number}   When set, activates vertex-edit mode for that parcel.
  *   onGeometrySave {fn}       Called with (parcelId, geoJSONGeometry) when user saves edits.
  *   onEditCancel   {fn}       Called when user cancels edit mode.
- *   splitParcelId  {number}   When set, activates draw-line mode to split that parcel.
+ *   splitPreview     {Array}    Optional [featureA, featureB] GeoJSON Features to
+ *                             overlay as a split preview (coloured A/B polygons).
+ *   splitParcelId   {number}   When set, activates draw-line mode for that parcel.
  *   onSplitLineSave {fn}      Called with (parcelId, lineGeoJSON) when user saves split line.
  *   onSplitCancel  {fn}       Called when user cancels split mode.
  *   addMode        {boolean}  When true, activates draw-polygon mode for a new parcel.
@@ -27,13 +29,24 @@ import { alpha, border, crimson, ink, mix, muted, parchment, TOKENS } from '../s
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 
+// MapLibre's color parser does not understand CSS variables (var(--…)) or
+// color-mix(), so we use literal hex/rgba values for everything actually
+// passed into MapLibre paint properties. These mirror the tokens.css palette.
+const HEX = {
+  ink:        '#080A0F',
+  parchment:  '#E8E2D6',
+  success:    '#00C44F',
+  danger:     '#E03040',
+  successDark:'#062a1a', // mix(success 60%, ink) — used for stroke
+};
+
 // UI constants for map layer styling
 const UI = {
-  parcelFill: TOKENS.success,
-  parcelHighlight: TOKENS.danger,
-  parcelStrokeBase: mix(TOKENS.success, 60, TOKENS.ink),
-  parcelLabelText: parchment,
-  parcelLabelHalo: alpha('black', 0.65),
+  parcelFill: HEX.success,
+  parcelHighlight: HEX.danger,
+  parcelStrokeBase: HEX.successDark,
+  parcelLabelText: HEX.parchment,
+  parcelLabelHalo: 'rgba(0,0,0,0.65)',
   popupTitle: TOKENS.ink,
   popupSub: muted,
   popupMeta: ink,
@@ -124,6 +137,7 @@ export default function PortalVineyardMap({
   splitParcelId = null,
   onSplitLineSave,
   onSplitCancel,
+  splitPreview = null,
   addMode = false,
   onAddSave,
   onAddCancel,
@@ -141,12 +155,17 @@ export default function PortalVineyardMap({
         // Build a specific label: address if available, otherwise "Parcel #id"
         const address = [p.situs_address, p.situs_city].filter(Boolean).join(', ');
         const parcelLabel = address || `Parcel #${p.id}`;
+        // Display name: prefer per-parcel label, then vineyard name, then fallback
+        const displayName =
+          (p.parcel_label && p.parcel_label.trim()) ||
+          p.vineyard_name ||
+          'Unnamed Parcel';
         return {
           type: 'Feature',
           geometry: p.geometry,
           properties: {
             id: p.id,
-            name: p.vineyard_name || 'Unnamed Parcel',
+            name: displayName,
             parcelLabel,
             acres: p.acres ? Number(p.acres).toFixed(1) : null,
             highlighted: p.id === highlightId ? 1 : 0,
@@ -307,6 +326,63 @@ export default function PortalVineyardMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parcels]);
 
+  // ── Split preview polygons ─────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const apply = () => {
+      // Remove existing preview layers/source
+      ['split-preview-fill-a', 'split-preview-fill-b',
+       'split-preview-line-a', 'split-preview-line-b'].forEach((id) => {
+        if (map.getLayer(id)) map.removeLayer(id);
+      });
+      if (map.getSource('split-preview')) map.removeSource('split-preview');
+
+      if (!splitPreview || splitPreview.length < 2) return;
+
+      const [fA, fB] = splitPreview;
+      const fc = {
+        type: 'FeatureCollection',
+        features: [
+          { ...fA, properties: { piece: 'a' } },
+          { ...fB, properties: { piece: 'b' } },
+        ],
+      };
+
+      map.addSource('split-preview', { type: 'geojson', data: fc });
+
+      map.addLayer({
+        id: 'split-preview-fill-a', type: 'fill', source: 'split-preview',
+        filter: ['==', ['get', 'piece'], 'a'],
+        paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.35 },
+      });
+      map.addLayer({
+        id: 'split-preview-fill-b', type: 'fill', source: 'split-preview',
+        filter: ['==', ['get', 'piece'], 'b'],
+        paint: { 'fill-color': '#f59e0b', 'fill-opacity': 0.35 },
+      });
+      map.addLayer({
+        id: 'split-preview-line-a', type: 'line', source: 'split-preview',
+        filter: ['==', ['get', 'piece'], 'a'],
+        paint: { 'line-color': '#2563eb', 'line-width': 2 },
+      });
+      map.addLayer({
+        id: 'split-preview-line-b', type: 'line', source: 'split-preview',
+        filter: ['==', ['get', 'piece'], 'b'],
+        paint: { 'line-color': '#d97706', 'line-width': 2 },
+      });
+    };
+
+    if (map.isStyleLoaded()) {
+      apply();
+    } else {
+      map.once('load', apply);
+    }
+    return () => { map.off('load', apply); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [splitPreview]);
+
   // Update highlight without re-mounting the map
   useEffect(() => {
     const map = mapRef.current;
@@ -315,6 +391,28 @@ export default function PortalVineyardMap({
     const src = map.getSource('parcels');
     if (src) src.setData(geojson);
   }, [highlightId, buildGeoJSON]);
+
+  // Helper: purge any stale MapboxDraw layers/sources that survived a prior
+  // mount. Needed because in React StrictMode + maplibre's deferred style.load,
+  // MapboxDraw's `onRemove` does not always clear its polling interval, so a
+  // subsequent `onAdd` can race and try to add layers that already exist.
+  const purgeDrawArtifacts = (map) => {
+    if (!map) return;
+    try {
+      const style = map.getStyle && map.getStyle();
+      const layers = style?.layers || [];
+      layers.forEach((l) => {
+        if (l.id && l.id.startsWith('gl-draw-') && map.getLayer(l.id)) {
+          try { map.removeLayer(l.id); } catch (_) {}
+        }
+      });
+      ['mapbox-gl-draw-cold', 'mapbox-gl-draw-hot'].forEach((sid) => {
+        if (map.getSource(sid)) {
+          try { map.removeSource(sid); } catch (_) {}
+        }
+      });
+    } catch (_) { /* ignore */ }
+  };
 
   // ── Draw / edit mode ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -331,6 +429,7 @@ export default function PortalVineyardMap({
         try { map.removeControl(drawRef.current); } catch (_) {}
         drawRef.current = null;
       }
+      purgeDrawArtifacts(map);
 
       const draw = new MapboxDraw({
         displayControlsDefault: false,
@@ -363,6 +462,7 @@ export default function PortalVineyardMap({
         try { map.removeControl(drawRef.current); } catch (_) {}
         drawRef.current = null;
       }
+      purgeDrawArtifacts(map);
     };
 
     if (editParcelId) {
@@ -378,6 +478,9 @@ export default function PortalVineyardMap({
 
     return () => {
       map.off('load', activate);
+      // Always tear down any draw control on cleanup so React StrictMode
+      // (and dep changes) cannot leave stale layers behind.
+      deactivate();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editParcelId]);
@@ -396,6 +499,7 @@ export default function PortalVineyardMap({
         try { map.removeControl(drawRef.current); } catch (_) {}
         drawRef.current = null;
       }
+      purgeDrawArtifacts(map);
 
       const draw = new MapboxDraw({
         displayControlsDefault: false,
@@ -414,6 +518,7 @@ export default function PortalVineyardMap({
         try { map.removeControl(drawRef.current); } catch (_) {}
         drawRef.current = null;
       }
+      purgeDrawArtifacts(map);
     };
 
     if (splitParcelId) {
@@ -428,6 +533,7 @@ export default function PortalVineyardMap({
 
     return () => {
       map.off('load', activate);
+      deactivate();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [splitParcelId]);
@@ -442,6 +548,7 @@ export default function PortalVineyardMap({
         try { map.removeControl(drawRef.current); } catch (_) {}
         drawRef.current = null;
       }
+      purgeDrawArtifacts(map);
 
       const draw = new MapboxDraw({
         displayControlsDefault: false,
@@ -458,6 +565,7 @@ export default function PortalVineyardMap({
         try { map.removeControl(drawRef.current); } catch (_) {}
         drawRef.current = null;
       }
+      purgeDrawArtifacts(map);
     };
 
     if (addMode) {
@@ -472,6 +580,7 @@ export default function PortalVineyardMap({
 
     return () => {
       map.off('load', activate);
+      deactivate();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addMode]);
@@ -558,7 +667,7 @@ export default function PortalVineyardMap({
           zIndex: 10,
         }}>
           <span style={{ color: UI.splitOverlayText, fontSize: 'var(--type-body-size)', lineHeight: 1.4 }}>
-            <strong style={{ color: UI.overlayTitle }}>Draw split line</strong> — click to draw a line across the parcel, then click again to finish
+            <strong style={{ color: UI.overlayTitle }}>Step 1 of 2 — Draw split line</strong> — click to draw a line across the parcel, double-click to finish
           </span>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             <button
@@ -577,7 +686,7 @@ export default function PortalVineyardMap({
               }}
               style={editSaveBtnStyle}
             >
-              Confirm Split →
+              Use This Line →
             </button>
           </div>
         </div>

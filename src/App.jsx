@@ -15,6 +15,9 @@ import PortalClaim from './pages/portal/PortalClaim';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminRequestDetail from './pages/admin/AdminRequestDetail';
+import AdminVineyardBlocks from './pages/admin/AdminVineyardBlocks';
+import AdminVineyardBlockDetail from './pages/admin/AdminVineyardBlockDetail';
+import AdminBulkBlockImport from './pages/admin/AdminBulkBlockImport';
 
 export default function App() {
   return (
@@ -38,6 +41,10 @@ export default function App() {
         <Route path="/admin/requests/:id" element={<AdminRequestDetail />} />
         {/* Parcel editor — admin-only, full-screen */}
         <Route path="/admin/editor" element={<EditorPage />} />
+        {/* Block manager */}
+        <Route path="/admin/blocks" element={<AdminVineyardBlocks />} />
+        <Route path="/admin/blocks/:parcelId" element={<AdminVineyardBlockDetail />} />
+        <Route path="/admin/wineries/:wineryId/bulk-blocks" element={<AdminBulkBlockImport />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

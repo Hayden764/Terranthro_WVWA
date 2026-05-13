@@ -387,7 +387,25 @@ router.get('/parcels/:id/blocks', async (req, res) => {
         vines_per_acre,
         vines,
         acres,
-        year_planted
+        year_planted,
+        fruit_sold_to,
+        CASE
+          WHEN geometry IS NOT NULL
+          THEN ST_AsGeoJSON(geometry)::json
+          ELSE NULL
+        END AS geometry,
+        COALESCE(
+          (SELECT json_agg(json_build_object(
+              'name', bb.buyer_name_raw,
+              'winery_id', bb.buyer_winery_id,
+              'winery_recid', bw.recid,
+              'winery_title', bw.title
+            ) ORDER BY bb.buyer_name_raw)
+           FROM vineyard_block_buyers bb
+           LEFT JOIN wineries bw ON bw.id = bb.buyer_winery_id
+           WHERE bb.block_id = vineyard_blocks.id),
+          '[]'::json
+        ) AS buyers
       FROM vineyard_blocks
       WHERE vineyard_parcel_id = $1
       ORDER BY block_name

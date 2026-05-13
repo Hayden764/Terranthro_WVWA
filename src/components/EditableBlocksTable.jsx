@@ -14,24 +14,27 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiPost } from '../lib/api';
-import { alpha, border, crimson, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
+import { alpha, border, crimson, electricBlue, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 const UI = {
   dirtyRowBg: alpha(TOKENS.crimson, 0.04),
+  hoverRowBg: alpha(electricBlue, 0.06),
   successText: TOKENS.success,
   borderFaded: (color) => alpha(color, 0.09),
   borderVeryFaded: (color) => alpha(color, 0.25),
 };
 
 const COLUMNS = [
-  { key: 'block_name',   label: 'Block',      type: 'text',   width: '14%' },
-  { key: 'variety',      label: 'Variety',    type: 'text',   width: '18%' },
-  { key: 'clone',        label: 'Clone',      type: 'text',   width: '12%' },
-  { key: 'rootstock',    label: 'Rootstock',  type: 'text',   width: '12%' },
-  { key: 'acres',        label: 'Acres',      type: 'number', width: '10%', readonly: true },
-  { key: 'year_planted', label: 'Planted',    type: 'number', width: '10%' },
-  { key: 'rows',         label: 'Rows',       type: 'number', width: '8%'  },
-  { key: 'spacing',      label: 'Spacing',    type: 'text',   width: '8%'  },
+  { key: 'block_name',   label: 'Block',      type: 'text',   width: '13%' },
+  { key: 'variety',      label: 'Variety',    type: 'text',   width: '14%' },
+  { key: 'clone',        label: 'Clone',      type: 'text',   width: '9%' },
+  { key: 'rootstock',    label: 'Rootstock',  type: 'text',   width: '9%' },
+  { key: 'trellis',      label: 'Trellis',    type: 'text',   width: '9%' },
+  { key: 'year_planted', label: 'Planted',    type: 'number', width: '8%' },
+  { key: 'rows',         label: 'Rows',       type: 'number', width: '6%'  },
+  { key: 'vines',        label: 'Vines',      type: 'number', width: '7%'  },
+  { key: 'spacing',      label: 'Spacing',    type: 'text',   width: '7%'  },
+  { key: 'acres',        label: 'Acres',      type: 'number', width: '7%', readonly: true },
 ];
 
 function rowKey(b) { return b.id; }
@@ -55,11 +58,14 @@ function newBlankRow() {
   return COLUMNS.reduce((acc, col) => { acc[col.key] = ''; return acc; }, { _tmpId: `new_${++_tmpSeq}` });
 }
 
-export default function EditableBlocksTable({ parcelId, blocks, editMode = false, onEditCancel, onEditComplete, onSubmit }) {
+export default function EditableBlocksTable({ parcelId, blocks, editMode = false, onEditCancel, onEditComplete, onSubmit, onDirectApply, allowDelete = false }) {
+  const [hoveredRow, setHoveredRow] = useState(null);
   // editMap: {blockId: {col: value, ...}} — only tracks dirty existing rows
   const [editMap, setEditMap] = useState({});
   // newRows: unsaved rows being added
   const [newRows, setNewRows] = useState([]);
+  // deletedIds: block ids marked for deletion (admin only)
+  const [deletedIds, setDeletedIds] = useState([]);
   // submission state
   const [status, setStatus] = useState(null); // null | 'submitting' | 'success' | 'error'
 
@@ -68,6 +74,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
     if (!editMode) {
       setEditMap({});
       setNewRows([]);
+      setDeletedIds([]);
       setStatus(null);
     }
   }, [editMode]);
@@ -99,6 +106,27 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
     setNewRows((prev) => prev.filter((r) => r._tmpId !== tmpId));
   }, []);
 
+  /* Split a row: appends a new row pre-filled from `block`, suffixed " B".
+     The original row is left untouched — user adjusts variety/clone/acres on
+     each side and saves. Useful when one block actually contains two varietals. */
+  const splitRow = useCallback((block) => {
+    const seed = newBlankRow();
+    COLUMNS.forEach((col) => {
+      if (col.readonly) return;
+      const v = block[col.key];
+      seed[col.key] = v != null ? String(v) : '';
+    });
+    // Suffix the cloned row's name so the two are distinguishable.
+    if (seed.block_name) seed.block_name = `${seed.block_name} B`;
+    setNewRows((prev) => [...prev, seed]);
+  }, []);
+
+  const toggleDelete = useCallback((blockId) => {
+    setDeletedIds((prev) =>
+      prev.includes(blockId) ? prev.filter((id) => id !== blockId) : [...prev, blockId]
+    );
+  }, []);
+
   const changedBlocks = (blocks || []).filter((b) => {
     const edited = editMap[b.id];
     return edited && hasChanged(b, edited);
@@ -108,7 +136,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
     COLUMNS.some((col) => !col.readonly && r[col.key] !== '')
   );
 
-  const hasChanges = changedBlocks.length > 0 || pendingNewRows.length > 0;
+  const hasChanges = changedBlocks.length > 0 || pendingNewRows.length > 0 || deletedIds.length > 0;
 
   async function handleSubmit() {
     if (!hasChanges) return;
@@ -140,15 +168,22 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
         return obj;
       });
 
-      await apiPost('/api/portal/requests', {
-        request_type: 'vineyard_blocks',
-        target_id: parcelId,
-        payload: { block_changes: changes, new_blocks: newBlocks },
-      });
+      if (onDirectApply) {
+        // Admin path: apply immediately without an edit_request
+        await onDirectApply({ block_changes: changes, new_blocks: newBlocks, deleted_block_ids: deletedIds });
+      } else {
+        // Portal path: submit for admin review
+        await apiPost('/api/portal/requests', {
+          request_type: 'vineyard_blocks',
+          target_id: parcelId,
+          payload: { block_changes: changes, new_blocks: newBlocks },
+        });
+      }
 
       setStatus('success');
       setEditMap({});
       setNewRows([]);
+      setDeletedIds([]);
       onSubmit?.();
       onEditComplete?.();
     } catch {
@@ -181,7 +216,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                   {col.label}
                 </th>
               ))}
-              <th style={{ width: 32, borderBottom: `1px solid ${border}` }} />
+              <th style={{ width: 96, borderBottom: `1px solid ${border}` }} />
             </tr>
           </thead>
           <tbody>
@@ -190,17 +225,25 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
               const isDirty = editMap[block.id] && hasChanged(block, editMap[block.id]);
               const rowData = editMap[block.id] || blockToStr(block);
               const isLast = idx === (blocks || []).length - 1 && newRows.length === 0;
+              const isHovered = hoveredRow === block.id;
 
               return (
                 <tr
                   key={rowKey(block)}
+                  onMouseEnter={() => setHoveredRow(block.id)}
+                  onMouseLeave={() => setHoveredRow(null)}
                   style={{
                     borderBottom: isLast ? 'none' : `1px solid ${UI.borderFaded(border)}`,
-                    background: isDirty
+                    background: deletedIds.includes(block.id)
+                      ? alpha(crimson, 0.08)
+                      : isDirty
                       ? UI.dirtyRowBg
+                      : isHovered
+                      ? UI.hoverRowBg
                       : 'transparent',
+                    opacity: deletedIds.includes(block.id) ? 0.5 : 1,
                     cursor: 'default',
-                    transition: 'background 0.15s',
+                    transition: 'background 0.12s',
                   }}
                 >
                   {COLUMNS.map((col) => (
@@ -240,7 +283,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                     </td>
                   ))}
                   {/* Row action */}
-                  <td style={{ padding: '0 8px', verticalAlign: 'middle', textAlign: 'center' }}>
+                  <td style={{ padding: '0 4px', verticalAlign: 'middle', textAlign: 'center', whiteSpace: 'nowrap' }}>
                     {isEditing && isDirty ? (
                       <button
                         onClick={(e) => { e.stopPropagation(); revertRow(block.id); }}
@@ -249,6 +292,25 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                       >
                         ✕
                       </button>
+                    ) : isEditing && allowDelete && !isDirty ? (
+                      <>
+                        {!deletedIds.includes(block.id) && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); splitRow(block); }}
+                            title="Split this block — duplicates the row so you can separate it into two varietals"
+                            style={splitBtnStyle}
+                          >
+                            Split
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleDelete(block.id); }}
+                          title={deletedIds.includes(block.id) ? 'Undo delete' : 'Delete this block'}
+                          style={{ ...iconBtnStyle, color: deletedIds.includes(block.id) ? crimson : muted }}
+                        >
+                          {deletedIds.includes(block.id) ? '↩' : '🗑'}
+                        </button>
+                      </>
                     ) : isDirty ? (
                       <span style={{
                         display: 'inline-block', width: 6, height: 6,
@@ -309,7 +371,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
             <button onClick={addNewRow} style={addRowBtnStyle}>+ Add Block</button>
             <p style={{ fontSize: 'var(--type-body-size)', color: muted, margin: 0 }}>
               {hasChanges
-                ? `${changedBlocks.length + pendingNewRows.length} pending — submit for admin review`
+                ? `${changedBlocks.length + pendingNewRows.length} change${changedBlocks.length + pendingNewRows.length !== 1 ? 's' : ''}${deletedIds.length > 0 ? `, ${deletedIds.length} deletion${deletedIds.length !== 1 ? 's' : ''}` : ''} pending${onDirectApply ? '' : ' — submit for admin review'}`
                 : 'Edit cells above · Acres are calculated automatically'}
             </p>
           </div>
@@ -354,6 +416,20 @@ const iconBtnStyle = {
   padding: '2px 4px',
   lineHeight: 1,
   borderRadius: 3,
+};
+
+const splitBtnStyle = {
+  background: alpha(TOKENS.amber, 0.12),
+  border: `1px solid ${alpha(TOKENS.amber, 0.45)}`,
+  color: TOKENS.amber,
+  cursor: 'pointer',
+  fontSize: 11,
+  fontWeight: 600,
+  fontFamily: 'var(--font-sans)',
+  padding: '3px 9px',
+  marginRight: 4,
+  borderRadius: 4,
+  whiteSpace: 'nowrap',
 };
 
 const addRowBtnStyle = {

@@ -22,6 +22,7 @@ const REQUEST_TYPE_LABELS = {
   profile:            'Winery Profile',
   vineyard_varietals: 'Varietals Update',
   vineyard_blocks:    'Block Info Update',
+  vineyard_blocks_bulk: 'Block CSV Bulk Import',
   vineyard_claim:     'Vineyard Claim',
   vineyard_new:       'New Vineyard',
   geometry_update:    'Boundary Edit',

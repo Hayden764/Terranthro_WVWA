@@ -21,6 +21,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import { pool } from '../db/pool.js';
 import { signAdminToken, requireAdminAuth, requireSuperadmin } from '../middleware/adminAuth.js';
+import { bulkApplyBlocks } from '../services/blockBulkApply.js';
 
 const router = express.Router();
 
@@ -368,6 +369,32 @@ router.post('/requests/:id/approve', async (req, res) => {
       // vineyard_new: no auto-apply, admin creates the parcel manually.
       case 'vineyard_new':
         break;
+
+      // ── vineyard_blocks_bulk ─────────────────────────────────────────
+      // Portal-submitted CSV upload. Payload: { rows, column_map }.
+      case 'vineyard_blocks_bulk': {
+        if (!request.winery_id) break;
+        const result = await bulkApplyBlocks({
+          client,
+          wineryId: request.winery_id,
+          rows: Array.isArray(payload.rows) ? payload.rows : [],
+          columnMap: payload.column_map || {},
+          adminId,
+          accountId: request.account_id,
+          requestId,
+          origin: 'portal',
+        });
+        // Attach result summary onto the audit chain via admin_notes append later.
+        // Re-flag if bulk import produced an acreage flag.
+        if (result.flagged_parcels.length > 0) {
+          const top = result.flagged_parcels.reduce((a, b) => (b.pct_change > a.pct_change ? b : a));
+          await client.query(
+            `UPDATE edit_requests SET flag = 'acreage_change', flag_detail = $1 WHERE id = $2`,
+            [JSON.stringify(top), requestId]
+          );
+        }
+        break;
+      }
 
       // ── admin_batch_edit ─────────────────────────────────────────────
       // Each op in payload.ops is applied sequentially.
@@ -914,6 +941,800 @@ router.get('/history/:entityType/:entityId', async (req, res) => {
     res.json({ log, pending });
   } catch (err) {
     console.error('Admin history error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ─── Admin vineyard block management ────────────────────────────
+
+/**
+ * GET /api/admin/vineyards
+ * Returns vineyards GROUPED by (vineyard_name, winery_id). Each row is one
+ * logical vineyard with aggregated parcel + block counts and a representative
+ * parcel_id used as the canonical entry point for the detail page.
+ * Query: ?search=text  (filters by vineyard_name or winery title)
+ */
+router.get('/vineyards', async (req, res) => {
+  const search = req.query.search || null;
+  try {
+    const params = [];
+    let whereClause = '';
+    if (search) {
+      params.push(`%${search}%`);
+      whereClause = `WHERE vp.vineyard_name ILIKE $1 OR w.title ILIKE $1`;
+    }
+
+    const { rows } = await pool.query(
+      `SELECT
+         MIN(vp.id)                                  AS parcel_id,
+         vp.vineyard_name,
+         vp.winery_id,
+         COALESCE(w.title, 'Independent')            AS winery_name,
+         (ARRAY_AGG(DISTINCT vp.ava_name) FILTER (WHERE vp.ava_name IS NOT NULL))[1] AS ava_name,
+         COUNT(DISTINCT vp.id)::int                  AS parcel_count,
+         COUNT(vb.id)::int                           AS block_count,
+         ROUND(SUM(COALESCE(vp.acres, 0))::numeric, 2) AS total_acres
+       FROM vineyard_parcels vp
+       LEFT JOIN wineries w ON w.id = vp.winery_id
+       LEFT JOIN vineyard_blocks vb ON vb.vineyard_parcel_id = vp.id
+       ${whereClause}
+       GROUP BY vp.vineyard_name, vp.winery_id, w.title
+       ORDER BY vp.vineyard_name
+       LIMIT 500`,
+      params
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Admin vineyards list error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * GET /api/admin/vineyards/:parcelId/siblings
+ * Returns all parcels that share the same (vineyard_name, winery_id) as the
+ * given parcel \u2014 lightweight payload for the sibling picker + map overview.
+ */
+router.get('/vineyards/:parcelId/siblings', async (req, res) => {
+  const parcelId = parseInt(req.params.parcelId, 10);
+  if (isNaN(parcelId)) return res.status(400).json({ error: 'Invalid parcel id' });
+
+  try {
+    const { rows } = await pool.query(
+      `WITH target AS (
+         SELECT vineyard_name, winery_id FROM vineyard_parcels WHERE id = $1
+       )
+       SELECT
+         vp.id, vp.vineyard_name, vp.parcel_label, vp.acres, vp.situs_address, vp.situs_city,
+         ST_AsGeoJSON(vp.geometry)::json AS geometry,
+         (SELECT COUNT(*)::int FROM vineyard_blocks vb WHERE vb.vineyard_parcel_id = vp.id) AS block_count
+       FROM vineyard_parcels vp, target t
+       WHERE vp.vineyard_name IS NOT DISTINCT FROM t.vineyard_name
+         AND vp.winery_id    IS NOT DISTINCT FROM t.winery_id
+       ORDER BY vp.id`,
+      [parcelId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Admin siblings error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * GET /api/admin/vineyards/:parcelId/blocks
+ * Returns full parcel data (geometry, topo_stats, all fields) plus blocks.
+ */
+router.get('/vineyards/:parcelId/blocks', async (req, res) => {
+  const parcelId = parseInt(req.params.parcelId, 10);
+  if (isNaN(parcelId)) return res.status(400).json({ error: 'Invalid parcel id' });
+
+  try {
+    const [parcelRes, blocksRes, topoRes] = await Promise.all([
+      pool.query(
+        `SELECT
+           vp.id, vp.vineyard_name, vp.parcel_label, vp.vineyard_org, vp.owner_name,
+           vp.ava_name, vp.nested_ava, vp.nested_nested_ava,
+           vp.situs_address, vp.situs_city, vp.situs_zip,
+           vp.acres, vp.varietals_list, vp.source_dataset, vp.winery_id,
+           ST_AsGeoJSON(vp.geometry)::json AS geometry,
+           COALESCE(w.title, 'Independent') AS winery_name
+         FROM vineyard_parcels vp
+         LEFT JOIN wineries w ON w.id = vp.winery_id
+         WHERE vp.id = $1`,
+        [parcelId]
+      ),
+      pool.query(
+        `SELECT id, vineyard_parcel_id, vineyard_name, block_name, variety, clone,
+                rootstock, rows, spacing, vines_per_acre, vines, acres, year_planted
+         FROM vineyard_blocks
+         WHERE vineyard_parcel_id = $1
+         ORDER BY block_name`,
+        [parcelId]
+      ),
+      pool.query(
+        `SELECT parcel_id, elevation_min_ft, elevation_max_ft, elevation_mean_ft,
+                slope_mean_deg, slope_max_deg, slope_p10_deg, slope_p90_deg,
+                aspect_dominant_deg, aspect_mean_deg
+         FROM vineyard_parcel_topo_stats
+         WHERE parcel_id = $1`,
+        [parcelId]
+      ),
+    ]);
+
+    if (parcelRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Parcel not found' });
+    }
+
+    res.json({
+      parcel: {
+        ...parcelRes.rows[0],
+        blocks: blocksRes.rows,
+        topo_stats: topoRes.rows[0] || null,
+      },
+    });
+  } catch (err) {
+    console.error('Admin parcel blocks error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * POST /api/admin/vineyards/:parcelId/blocks/apply
+ * Directly applies block changes without an approval workflow.
+ * Body: {
+ *   block_changes: [{ id, field_changes: [{ field, old, new }] }],
+ *   new_blocks:    [{ block_name, variety, ... }],
+ *   deleted_block_ids: [number],
+ * }
+ */
+router.post('/vineyards/:parcelId/blocks/apply', async (req, res) => {
+  const parcelId = parseInt(req.params.parcelId, 10);
+  if (isNaN(parcelId)) return res.status(400).json({ error: 'Invalid parcel id' });
+
+  const { adminId } = req.adminAccount;
+  const { block_changes = [], new_blocks = [], deleted_block_ids = [] } = req.body;
+
+  const ALLOWED_COLS = ['block_name', 'variety', 'clone', 'rootstock',
+                        'rows', 'spacing', 'year_planted'];
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Verify parcel exists and fetch winery_id for audit log
+    const { rows: parcelRows } = await client.query(
+      `SELECT id, winery_id, vineyard_name FROM vineyard_parcels WHERE id = $1`,
+      [parcelId]
+    );
+    if (parcelRows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Parcel not found' });
+    }
+    const parcel = parcelRows[0];
+
+    // Apply field-level changes to existing blocks
+    for (const change of block_changes) {
+      if (!change.id || !Array.isArray(change.field_changes)) continue;
+      for (const fc of change.field_changes) {
+        if (!ALLOWED_COLS.includes(fc.field)) continue;
+        await client.query(
+          `UPDATE vineyard_blocks SET ${fc.field} = $1 WHERE id = $2 AND vineyard_parcel_id = $3`,
+          [fc.new ?? null, change.id, parcelId]
+        );
+        await client.query(
+          `INSERT INTO winery_edit_log
+             (winery_id, admin_id, table_name, record_id, field_name,
+              old_value, new_value, entity_type, entity_id)
+           VALUES ($1, $2, 'vineyard_blocks', $3, $4, $5, $6, 'vineyard_block', $3)`,
+          [parcel.winery_id, adminId, change.id, fc.field,
+           fc.old != null ? String(fc.old) : null,
+           fc.new != null ? String(fc.new) : null]
+        );
+      }
+    }
+
+    // Delete blocks
+    for (const blockId of deleted_block_ids) {
+      const id = parseInt(blockId, 10);
+      if (isNaN(id)) continue;
+      const { rows: oldBlock } = await client.query(
+        `SELECT block_name FROM vineyard_blocks WHERE id = $1 AND vineyard_parcel_id = $2`,
+        [id, parcelId]
+      );
+      if (oldBlock.length === 0) continue;
+      await client.query(`DELETE FROM vineyard_blocks WHERE id = $1`, [id]);
+      await client.query(
+        `INSERT INTO winery_edit_log
+           (winery_id, admin_id, table_name, record_id, field_name,
+            old_value, new_value, action, entity_type, entity_id)
+         VALUES ($1, $2, 'vineyard_blocks', $3, 'block_name', $4, NULL, 'delete',
+                 'vineyard_parcel', $5)`,
+        [parcel.winery_id, adminId, id,
+         oldBlock[0].block_name ?? null, parcelId]
+      );
+    }
+
+    // Insert new blocks
+    for (const nb of new_blocks) {
+      const cols = ALLOWED_COLS.filter((c) => nb[c] != null && nb[c] !== '');
+      if (cols.length === 0) continue;
+      const vals = cols.map((c) => nb[c]);
+      const placeholders = cols.map((_, i) => `$${i + 3}`).join(', ');
+      const { rows: inserted } = await client.query(
+        `INSERT INTO vineyard_blocks (vineyard_parcel_id, vineyard_name, ${cols.join(', ')})
+         VALUES ($1, $2, ${placeholders})
+         RETURNING id`,
+        [parcelId, parcel.vineyard_name, ...vals]
+      );
+      const newId = inserted[0]?.id;
+      if (newId) {
+        await client.query(
+          `INSERT INTO winery_edit_log
+             (winery_id, admin_id, table_name, record_id, field_name,
+              old_value, new_value, action, entity_type, entity_id)
+           VALUES ($1, $2, 'vineyard_blocks', $3, 'block_name', NULL, $4, 'insert',
+                   'vineyard_parcel', $5)`,
+          [parcel.winery_id, adminId, newId, nb.block_name ?? null, parcelId]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Admin apply blocks error:', err);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * POST /api/admin/vineyards/:parcelId/split
+ * Renames a subset of sibling parcels (those sharing the same vineyard_name +
+ * winery_id as :parcelId) to new vineyard names — effectively splitting one
+ * vineyard into multiple vineyards.
+ *
+ * Body: { assignments: [{ parcel_id, new_vineyard_name }] }
+ *
+ * Validates that every parcel_id in assignments is currently a sibling of
+ * :parcelId. Updates `vineyard_parcels.vineyard_name` and the denormalized
+ * `vineyard_blocks.vineyard_name` for each parcel whose name actually changes.
+ * Writes one audit log entry per renamed parcel.
+ */
+router.post('/vineyards/:parcelId/split', async (req, res) => {
+  const parcelId = parseInt(req.params.parcelId, 10);
+  if (isNaN(parcelId)) return res.status(400).json({ error: 'Invalid parcel id' });
+
+  const assignments = Array.isArray(req.body?.assignments) ? req.body.assignments : [];
+  if (assignments.length === 0) {
+    return res.status(400).json({ error: 'No assignments provided' });
+  }
+
+  const { adminId } = req.adminAccount;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Look up the source parcel to find the (vineyard_name, winery_id) group.
+    const { rows: srcRows } = await client.query(
+      `SELECT id, vineyard_name, winery_id FROM vineyard_parcels WHERE id = $1`,
+      [parcelId]
+    );
+    if (srcRows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Parcel not found' });
+    }
+    const src = srcRows[0];
+
+    // Fetch all sibling parcels in the same group.
+    const { rows: sibs } = await client.query(
+      `SELECT id, vineyard_name, winery_id
+         FROM vineyard_parcels
+        WHERE vineyard_name IS NOT DISTINCT FROM $1
+          AND winery_id     IS NOT DISTINCT FROM $2`,
+      [src.vineyard_name, src.winery_id]
+    );
+    const sibIds = new Set(sibs.map((r) => r.id));
+    const sibById = new Map(sibs.map((r) => [r.id, r]));
+
+    // Validate every assignment refers to a sibling.
+    for (const a of assignments) {
+      const pid = parseInt(a?.parcel_id, 10);
+      if (isNaN(pid) || !sibIds.has(pid)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: `Parcel ${a?.parcel_id} is not part of this vineyard group`,
+        });
+      }
+      if (typeof a?.new_vineyard_name !== 'string') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Each assignment needs new_vineyard_name' });
+      }
+    }
+
+    let renamedCount = 0;
+    const distinctNamesAfter = new Set();
+    for (const sib of sibs) distinctNamesAfter.add(sib.vineyard_name);
+
+    for (const a of assignments) {
+      const pid = parseInt(a.parcel_id, 10);
+      const newName = a.new_vineyard_name.trim() || null;
+      const old = sibById.get(pid);
+      if (!old) continue;
+      if ((old.vineyard_name ?? null) === (newName ?? null)) continue;
+
+      await client.query(
+        `UPDATE vineyard_parcels SET vineyard_name = $1 WHERE id = $2`,
+        [newName, pid]
+      );
+      // Keep denormalized vineyard_name on blocks in sync.
+      await client.query(
+        `UPDATE vineyard_blocks SET vineyard_name = $1 WHERE vineyard_parcel_id = $2`,
+        [newName, pid]
+      );
+      await client.query(
+        `INSERT INTO winery_edit_log
+           (winery_id, admin_id, table_name, record_id, field_name,
+            old_value, new_value, entity_type, entity_id)
+         VALUES ($1, $2, 'vineyard_parcels', $3, 'vineyard_name', $4, $5,
+                 'vineyard_parcel', $3)`,
+        [src.winery_id, adminId, pid, old.vineyard_name, newName]
+      );
+
+      renamedCount++;
+      distinctNamesAfter.delete(old.vineyard_name);
+      distinctNamesAfter.add(newName);
+    }
+
+    await client.query('COMMIT');
+    res.json({
+      success: true,
+      renamed: renamedCount,
+      group_count: distinctNamesAfter.size,
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Admin split vineyard error:', err);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * PATCH /api/admin/vineyards/:parcelId/label
+ * Updates the per-parcel display label. Body: { parcel_label: string|null }
+ */
+router.patch('/vineyards/:parcelId/label', async (req, res) => {
+  const parcelId = parseInt(req.params.parcelId, 10);
+  if (isNaN(parcelId)) return res.status(400).json({ error: 'Invalid parcel id' });
+
+  const { adminId } = req.adminAccount;
+  let label = req.body?.parcel_label;
+  if (typeof label === 'string') {
+    label = label.trim();
+    if (label.length === 0) label = null;
+    if (label && label.length > 200) {
+      return res.status(400).json({ error: 'Label too long (max 200)' });
+    }
+  } else if (label !== null && label !== undefined) {
+    return res.status(400).json({ error: 'parcel_label must be a string or null' });
+  } else {
+    label = null;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: oldRows } = await client.query(
+      `SELECT parcel_label, winery_id FROM vineyard_parcels WHERE id = $1`,
+      [parcelId]
+    );
+    if (oldRows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Parcel not found' });
+    }
+    const oldLabel = oldRows[0].parcel_label;
+    if ((oldLabel ?? null) === (label ?? null)) {
+      await client.query('ROLLBACK');
+      return res.json({ success: true, parcel_label: label, unchanged: true });
+    }
+    await client.query(
+      `UPDATE vineyard_parcels SET parcel_label = $1 WHERE id = $2`,
+      [label, parcelId]
+    );
+    await client.query(
+      `INSERT INTO winery_edit_log
+         (winery_id, admin_id, table_name, record_id, field_name,
+          old_value, new_value, entity_type, entity_id)
+       VALUES ($1, $2, 'vineyard_parcels', $3, 'parcel_label', $4, $5,
+               'vineyard_parcel', $3)`,
+      [oldRows[0].winery_id, adminId, parcelId, oldLabel, label]
+    );
+    await client.query('COMMIT');
+    res.json({ success: true, parcel_label: label });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Admin parcel label error:', err);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * POST /api/admin/vineyards/:parcelId/split-geometry
+ *
+ * Splits one parcel polygon into two using a drawn LineString blade.
+ * Uses PostGIS ST_Split server-side so the geometry math is exact.
+ *
+ * Body: {
+ *   blade:         GeoJSON LineString   — the drawn split line
+ *   parcel_a_label: string|null         — label for the first piece
+ *   parcel_b_label: string|null         — label for the second piece
+ *   a_block_ids:   number[]             — vineyard_blocks to assign to piece A
+ *   b_block_ids:   number[]             — vineyard_blocks to assign to piece B
+ * }
+ *
+ * Returns: { parcel_a_id, parcel_b_id }
+ */
+router.post('/vineyards/:parcelId/split-geometry', async (req, res) => {
+  const parcelId = parseInt(req.params.parcelId, 10);
+  if (isNaN(parcelId)) return res.status(400).json({ error: 'Invalid parcel id' });
+
+  const { adminId } = req.adminAccount;
+  const { blade, parcel_a_label, parcel_b_label, a_block_ids = [], b_block_ids = [] } = req.body || {};
+
+  if (!blade || blade.type !== 'LineString' || !Array.isArray(blade.coordinates) || blade.coordinates.length < 2) {
+    return res.status(400).json({ error: 'blade must be a GeoJSON LineString with ≥2 coordinates' });
+  }
+
+  const bladeGeoJSON = JSON.stringify(blade);
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Fetch parent parcel — lock it to prevent concurrent edits
+    const { rows: parentRows } = await client.query(
+      `SELECT id, vineyard_name, parcel_label, winery_id, vineyard_org, owner_name,
+              ava_name, nested_ava, nested_nested_ava, situs_address, situs_city, situs_zip,
+              varietals_list, source_dataset, ava_id
+       FROM vineyard_parcels WHERE id = $1 FOR UPDATE`,
+      [parcelId]
+    );
+    if (parentRows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Parcel not found' });
+    }
+    const parent = parentRows[0];
+
+    // Validate parcel is a single Polygon (not MultiPolygon)
+    const { rows: typeRows } = await client.query(
+      `SELECT ST_GeometryType(geometry) AS gtype FROM vineyard_parcels WHERE id = $1`,
+      [parcelId]
+    );
+    if (typeRows[0]?.gtype === 'ST_MultiPolygon') {
+      await client.query('ROLLBACK');
+      return res.status(422).json({
+        error: 'This parcel contains multiple polygons (MultiPolygon). Use the Split Vineyard tool to separate them first, then split individual polygons.',
+      });
+    }
+
+    // Run PostGIS split. ST_Split requires the blade to be snapped to the
+    // polygon first to ensure the line touches the boundary precisely.
+    const { rows: splitRows } = await client.query(
+      `SELECT
+         ST_AsGeoJSON(geom)::json AS geometry,
+         ST_Area(geom::geography) / 4046.86 AS acres
+       FROM (
+         SELECT (ST_Dump(
+           ST_Split(
+             ST_Snap(geometry, ST_GeomFromGeoJSON($2), 0.000001),
+             ST_GeomFromGeoJSON($2)
+           )
+         )).geom
+         FROM vineyard_parcels WHERE id = $1
+       ) parts`,
+      [parcelId, bladeGeoJSON]
+    );
+
+    if (splitRows.length !== 2) {
+      await client.query('ROLLBACK');
+      const n = splitRows.length;
+      return res.status(422).json({
+        error: n < 2
+          ? 'The split line did not cross the parcel boundary at two points. Draw a line that enters and exits the parcel.'
+          : `Split produced ${n} pieces instead of 2. Try a simpler line that crosses the parcel once.`,
+      });
+    }
+
+    const [pieceA, pieceB] = splitRows;
+    const labelA = (typeof parcel_a_label === 'string' && parcel_a_label.trim()) || null;
+    const labelB = (typeof parcel_b_label === 'string' && parcel_b_label.trim()) || null;
+
+    // Copy parent fields into both new parcels.
+    const cols = [
+      'winery_id', 'source_dataset', 'vineyard_name', 'vineyard_org', 'owner_name',
+      'ava_name', 'nested_ava', 'nested_nested_ava', 'situs_address', 'situs_city',
+      'situs_zip', 'varietals_list', 'ava_id',
+    ];
+    const parentVals = cols.map((c) => parent[c] ?? null);
+
+    // Insert parcel A
+    const { rows: rowsA } = await client.query(
+      `INSERT INTO vineyard_parcels (${cols.join(', ')}, acres, parcel_label, geometry)
+       VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}, $${cols.length + 1}, $${cols.length + 2}, ST_GeomFromGeoJSON($${cols.length + 3}))
+       RETURNING id`,
+      [...parentVals, Number(pieceA.acres).toFixed(3), labelA, JSON.stringify(pieceA.geometry)]
+    );
+    const parcelAId = rowsA[0].id;
+
+    // Insert parcel B
+    const { rows: rowsB } = await client.query(
+      `INSERT INTO vineyard_parcels (${cols.join(', ')}, acres, parcel_label, geometry)
+       VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}, $${cols.length + 1}, $${cols.length + 2}, ST_GeomFromGeoJSON($${cols.length + 3}))
+       RETURNING id`,
+      [...parentVals, Number(pieceB.acres).toFixed(3), labelB, JSON.stringify(pieceB.geometry)]
+    );
+    const parcelBId = rowsB[0].id;
+
+    // Reassign blocks
+    const safeAIds = a_block_ids.map(Number).filter((n) => !isNaN(n));
+    const safeBIds = b_block_ids.map(Number).filter((n) => !isNaN(n));
+
+    if (safeAIds.length > 0) {
+      await client.query(
+        `UPDATE vineyard_blocks SET vineyard_parcel_id = $1 WHERE id = ANY($2) AND vineyard_parcel_id = $3`,
+        [parcelAId, safeAIds, parcelId]
+      );
+    }
+    if (safeBIds.length > 0) {
+      await client.query(
+        `UPDATE vineyard_blocks SET vineyard_parcel_id = $1 WHERE id = ANY($2) AND vineyard_parcel_id = $3`,
+        [parcelBId, safeBIds, parcelId]
+      );
+    }
+
+    // Delete original parcel (blocks already reassigned; cascade will clean up any remaining unassigned blocks)
+    await client.query(`DELETE FROM vineyard_parcels WHERE id = $1`, [parcelId]);
+
+    // Audit log — one entry per new parcel, referencing the split origin
+    for (const [newId, newLabel] of [[parcelAId, labelA], [parcelBId, labelB]]) {
+      await client.query(
+        `INSERT INTO winery_edit_log
+           (winery_id, admin_id, table_name, record_id, field_name,
+            old_value, new_value, action, entity_type, entity_id)
+         VALUES ($1, $2, 'vineyard_parcels', $3, 'geometry',
+                 $4, $5, 'insert', 'vineyard_parcel', $3)`,
+        [parent.winery_id, adminId, newId,
+         `split_from:${parcelId}`, newLabel ?? parent.vineyard_name]
+      );
+    }
+    // Mark the original parcel as split-deleted
+    await client.query(
+      `INSERT INTO winery_edit_log
+         (winery_id, admin_id, table_name, record_id, field_name,
+          old_value, new_value, action, entity_type, entity_id)
+       VALUES ($1, $2, 'vineyard_parcels', $3, 'geometry',
+               NULL, $4, 'delete', 'vineyard_parcel', $3)`,
+      [parent.winery_id, adminId, parcelId,
+       `split_into:${parcelAId},${parcelBId}`]
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true, parcel_a_id: parcelAId, parcel_b_id: parcelBId });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Admin split-geometry error:', err);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
+// ─── Bulk block import (admin direct) ────────────────────────────
+
+/**
+ * GET /api/admin/wineries/:wineryId/parcels
+ * Lightweight parcel list scoped to a winery — used by the bulk-import UI to
+ * show "available parcel labels" so the user knows what `hill`/`parcel_label`
+ * values will resolve.
+ */
+router.get('/wineries/:wineryId/parcels', async (req, res) => {
+  const wineryId = parseInt(req.params.wineryId, 10);
+  if (isNaN(wineryId)) return res.status(400).json({ error: 'Invalid winery id' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT vp.id, vp.vineyard_name, vp.parcel_label, vp.acres,
+              (SELECT COUNT(*)::int FROM vineyard_blocks WHERE vineyard_parcel_id = vp.id) AS block_count,
+              w.title AS winery_name
+       FROM vineyard_parcels vp
+       LEFT JOIN wineries w ON w.id = vp.winery_id
+       WHERE vp.winery_id = $1
+       ORDER BY vp.parcel_label NULLS LAST, vp.vineyard_name`,
+      [wineryId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Admin winery parcels error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * POST /api/admin/wineries/:wineryId/blocks/bulk-apply
+ * Body: { rows: [...], column_map?: {}, dry_run?: boolean }
+ * Returns the result summary from blockBulkApply.
+ *
+ * dry_run=true runs the import inside a transaction and rolls it back —
+ * powers the preview / diff UI on the frontend.
+ */
+router.post('/wineries/:wineryId/blocks/bulk-apply', async (req, res) => {
+  const wineryId = parseInt(req.params.wineryId, 10);
+  if (isNaN(wineryId)) return res.status(400).json({ error: 'Invalid winery id' });
+
+  const { rows = [], column_map = {}, dry_run = false } = req.body || {};
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ error: 'rows must be a non-empty array' });
+  }
+  if (rows.length > 5000) {
+    return res.status(413).json({ error: 'Too many rows (max 5000)' });
+  }
+
+  const { adminId } = req.adminAccount;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: wRows } = await client.query(`SELECT id FROM wineries WHERE id = $1`, [wineryId]);
+    if (wRows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Winery not found' });
+    }
+
+    const result = await bulkApplyBlocks({
+      client, wineryId, rows, columnMap: column_map, adminId, origin: 'admin',
+    });
+
+    if (dry_run) {
+      await client.query('ROLLBACK');
+      res.json({ dry_run: true, ...result });
+    } else {
+      await client.query('COMMIT');
+      res.json({ dry_run: false, ...result });
+    }
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Admin bulk-apply blocks error:', err);
+    res.status(500).json({ error: err.message || 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
+// ─── Winery alias management ─────────────────────────────────────
+
+/**
+ * GET /api/admin/wineries/:wineryId/aliases
+ */
+router.get('/wineries/:wineryId/aliases', async (req, res) => {
+  const wineryId = parseInt(req.params.wineryId, 10);
+  if (isNaN(wineryId)) return res.status(400).json({ error: 'Invalid winery id' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, title, COALESCE(aliases, '{}') AS aliases FROM wineries WHERE id = $1`,
+      [wineryId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Winery not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Get aliases error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * POST /api/admin/wineries/:wineryId/aliases
+ * Body: { alias: string }   — adds a single alias (idempotent).
+ */
+router.post('/wineries/:wineryId/aliases', async (req, res) => {
+  const wineryId = parseInt(req.params.wineryId, 10);
+  const { alias } = req.body || {};
+  if (isNaN(wineryId)) return res.status(400).json({ error: 'Invalid winery id' });
+  if (!alias || typeof alias !== 'string' || !alias.trim()) {
+    return res.status(400).json({ error: 'alias is required' });
+  }
+  const trimmed = alias.trim();
+  try {
+    const { rows } = await pool.query(
+      `UPDATE wineries
+       SET aliases = (
+         SELECT ARRAY(SELECT DISTINCT unnest(COALESCE(aliases, '{}') || ARRAY[$1::text]))
+       )
+       WHERE id = $2
+       RETURNING aliases`,
+      [trimmed, wineryId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Winery not found' });
+
+    // Backfill any orphan vineyard_block_buyers rows whose name now matches
+    await pool.query(
+      `UPDATE vineyard_block_buyers
+       SET buyer_winery_id = $1
+       WHERE buyer_winery_id IS NULL
+         AND LOWER(TRIM(buyer_name_raw)) = LOWER(TRIM($2))`,
+      [wineryId, trimmed]
+    );
+
+    res.json({ aliases: rows[0].aliases });
+  } catch (err) {
+    console.error('Add alias error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * DELETE /api/admin/wineries/:wineryId/aliases
+ * Body: { alias: string }
+ */
+router.delete('/wineries/:wineryId/aliases', async (req, res) => {
+  const wineryId = parseInt(req.params.wineryId, 10);
+  const { alias } = req.body || {};
+  if (isNaN(wineryId)) return res.status(400).json({ error: 'Invalid winery id' });
+  if (!alias || typeof alias !== 'string') {
+    return res.status(400).json({ error: 'alias is required' });
+  }
+  try {
+    const { rows } = await pool.query(
+      `UPDATE wineries SET aliases = array_remove(COALESCE(aliases, '{}'), $1)
+       WHERE id = $2 RETURNING aliases`,
+      [alias, wineryId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Winery not found' });
+
+    // Drop reverse links that depended on this alias resolution
+    await pool.query(
+      `UPDATE vineyard_block_buyers
+       SET buyer_winery_id = NULL
+       WHERE buyer_winery_id = $1
+         AND LOWER(TRIM(buyer_name_raw)) = LOWER(TRIM($2))`,
+      [wineryId, alias]
+    );
+
+    res.json({ aliases: rows[0].aliases });
+  } catch (err) {
+    console.error('Remove alias error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * GET /api/admin/buyer-name-suggestions?name=…&limit=10
+ * Returns existing wineries whose title or aliases roughly match the query,
+ * for the inline "Create alias" picker in the import preview.
+ */
+router.get('/buyer-name-suggestions', async (req, res) => {
+  const q = (req.query.name || '').toString().trim();
+  const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
+  if (!q) return res.json([]);
+  try {
+    const like = `%${q}%`;
+    const { rows } = await pool.query(
+      `SELECT id, title FROM wineries
+       WHERE title ILIKE $1
+          OR EXISTS (SELECT 1 FROM unnest(COALESCE(aliases, '{}')) a WHERE a ILIKE $1)
+       ORDER BY title
+       LIMIT $2`,
+      [like, limit]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Buyer suggestions error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

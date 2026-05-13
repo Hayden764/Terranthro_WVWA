@@ -196,6 +196,7 @@ router.get('/:recid', async (req, res) => {
         image_url:   row.image_url,
         category:    row.category,
         parcels:     row.parcels || [],
+        sourced_from: await loadSourcedFrom(row.id),
       },
       geometry: row.geometry,
     });
@@ -204,6 +205,42 @@ router.get('/:recid', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+/**
+ * Returns the list of blocks (at other vineyards) that this winery buys
+ * fruit from, grouped by source vineyard. Powers the "Sourced From" section
+ * on the winery detail page.
+ */
+async function loadSourcedFrom(wineryId) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT
+         vb.id            AS block_id,
+         vb.block_name,
+         vb.variety,
+         vb.clone,
+         vb.acres         AS block_acres,
+         vb.year_planted,
+         vp.id            AS parcel_id,
+         vp.vineyard_name,
+         vp.parcel_label,
+         w.id             AS source_winery_id,
+         w.recid          AS source_winery_recid,
+         COALESCE(w.title, 'Independent vineyard') AS source_winery_name
+       FROM vineyard_block_buyers bb
+       JOIN vineyard_blocks vb   ON vb.id = bb.block_id
+       JOIN vineyard_parcels vp  ON vp.id = vb.vineyard_parcel_id
+       LEFT JOIN wineries w      ON w.id  = vp.winery_id
+       WHERE bb.buyer_winery_id = $1
+       ORDER BY source_winery_name, vp.parcel_label, vb.block_name`,
+      [wineryId]
+    );
+    return rows;
+  } catch (err) {
+    console.error('loadSourcedFrom error:', err);
+    return [];
+  }
+}
 
 function parseBbox(bboxStr) {
   if (!bboxStr) return null;

@@ -5,6 +5,7 @@ import { btn } from '../../styles/patterns';
 import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import TerroirDataChips from '../../components/TerroirDataChips';
+import BulkBlockImport from '../../components/BulkBlockImport';
 
 export default function PortalDashboard() {
   const navigate = useNavigate();
@@ -12,6 +13,8 @@ export default function PortalDashboard() {
   const [vineyards, setVineyards] = useState([]);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulkDone, setBulkDone] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -159,8 +162,9 @@ export default function PortalDashboard() {
             })}
           </div>
         )}
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Link to="/portal/claim" style={actionBtnStyle}>Claim a Vineyard</Link>
+          <button onClick={() => setShowBulk(true)} style={actionBtnStyle}>Bulk import blocks (CSV)</button>
         </div>
       </Section>
 
@@ -186,6 +190,33 @@ export default function PortalDashboard() {
           </div>
         )}
       </Section>
+      {showBulk && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000,
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '40px 16px',
+        }} onClick={() => setShowBulk(false)}>
+          <div style={{ maxWidth: 720, width: '100%' }} onClick={(e) => e.stopPropagation()}>
+            {bulkDone ? (
+              <div style={{ background: parchment, padding: 20, borderRadius: 12, border: `1px solid ${border}` }}>
+                <h2 style={{ marginTop: 0, color: ink }}>Submitted for review</h2>
+                <p style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>
+                  Request #{bulkDone.id} is now pending admin approval. You'll see the changes
+                  applied once approved.
+                </p>
+                <button onClick={() => { setShowBulk(false); setBulkDone(null); load(); }}
+                  style={{ ...actionBtnStyle, marginTop: 8 }}>Close</button>
+              </div>
+            ) : (
+              <BulkBlockImport
+                mode="portal"
+                wineryTitle={profile?.title}
+                onComplete={(res) => setBulkDone(res)}
+                onClose={() => setShowBulk(false)}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </PageShell>
   );
 }

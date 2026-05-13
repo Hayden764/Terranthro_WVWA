@@ -310,7 +310,7 @@ export default function PortalVineyardDetail() {
           ) : (
             <EditableBlocksTable
               parcelId={vineyard.id}
-              blocks={vineyard.blocks.slice(0, 1)}
+              blocks={vineyard.blocks}
               editMode={editingBlocks}
               onEditCancel={() => setEditingBlocks(false)}
               onEditComplete={() => setEditingBlocks(false)}

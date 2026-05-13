@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { alpha, border, crimson, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
+import { alpha, border, crimson, electricBlue, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
@@ -283,9 +283,23 @@ function degToCardinal(deg) {
   return dirs[Math.round(deg / 45) % 8];
 }
 
-function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack, onVineyardHover, onViewAllVineyards }) {
+function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack, onVineyardHover, onViewAllVineyards, onParcelClick }) {
   const [expandedGroupKey, setExpandedGroupKey] = useState(null);
   const [hoveredGroup, setHoveredGroup] = useState(null);
+  const [sourcedFrom, setSourcedFrom] = useState([]);
+
+  // Fetch buyer relationships (blocks at other vineyards that this winery
+  // sources fruit from) when the listing changes.
+  useEffect(() => {
+    let cancelled = false;
+    setSourcedFrom([]);
+    if (!listing?.id) return;
+    fetch(`/api/public/wineries/${listing.id}/sourced-from`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { if (!cancelled && Array.isArray(data)) setSourcedFrom(data); })
+      .catch(() => { /* ignore */ });
+    return () => { cancelled = true; };
+  }, [listing?.id]);
 
   // Group vineyard features by name
   const vineyardGroups = Object.values(
@@ -535,6 +549,35 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                               ))}
                             </div>
                           )}
+
+                          {/* View Blocks deep-dive button */}
+                          {onParcelClick && (() => {
+                            const parcelIds = group.features.map(f => f.properties?.id).filter(Boolean);
+                            if (!parcelIds.length) return null;
+                            const firstFeature = group.features[0];
+                            return (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onParcelClick({
+                                    ids: parcelIds,
+                                    parcel_label: group.name,
+                                    vineyard_name: firstFeature?.properties?.vineyard_name || group.name,
+                                    acres: group.acresCount > 0 ? group.acresTotal : null,
+                                  });
+                                }}
+                                style={{
+                                  marginTop: 10, width: '100%', padding: '7px 0',
+                                  background: 'transparent', border: `1px solid ${border}`,
+                                  borderRadius: 7, fontSize: 'var(--type-mono-size)',
+                                  color: ink, cursor: 'pointer',
+                                  fontFamily: 'var(--font-sans)', fontWeight: 600,
+                                }}
+                              >
+                                View Blocks →
+                              </button>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
@@ -552,12 +595,252 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
             No mapped vineyard parcels
           </div>
         )}
+
+        {sourcedFrom.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ marginBottom: 8 }}>
+              <span style={T.sectionLabel}>🍷 Sourced From</span>
+            </div>
+            {(() => {
+              // Group by source winery
+              const bySource = sourcedFrom.reduce((acc, b) => {
+                const key = `${b.source_winery_id || 'x'}|${b.source_winery_name}`;
+                if (!acc[key]) acc[key] = { name: b.source_winery_name, recid: b.source_winery_recid, blocks: [] };
+                acc[key].blocks.push(b);
+                return acc;
+              }, {});
+              return Object.values(bySource).map((src) => (
+                <div key={src.name} style={{
+                  padding: '8px 10px',
+                  borderRadius: 6,
+                  border: `1px solid ${border}`,
+                  marginBottom: 6,
+                  background: parchment,
+                }}>
+                  <div style={{ fontWeight: 600, fontSize: 'var(--type-mono-size)', color: ink }}>
+                    {src.name}
+                  </div>
+                  <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
+                    {src.blocks.length} block{src.blocks.length !== 1 ? 's' : ''}:
+                    {' '}
+                    {src.blocks.map(b => `${b.parcel_label || b.vineyard_name} · ${b.block_name}`).join(' • ')}
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // ── Data layers section ───────────────────────────────────────────────────
+// ── ParcelBlockView ───────────────────────────────────────────────────────
+/**
+ * Full-panel view for a single vineyard parcel's blocks.
+ * Fetches /api/vineyards/parcels/:id/blocks and renders a sortable table.
+ * Reached by clicking "View Blocks →" on an expanded parcel card.
+ */
+function ParcelBlockView({ parcel, onBack }) {
+  const [blocks, setBlocks] = useState(null); // null = loading
+  const [error, setError]   = useState(null);
+  const [sort, setSort]     = useState({ key: 'block_name', dir: 1 });
+  const [hoveredRow, setHoveredRow] = useState(null);
+
+  useEffect(() => {
+    const ids = parcel?.ids?.length ? parcel.ids : (parcel?.id ? [parcel.id] : []);
+    if (!ids.length) return;
+    let cancelled = false;
+    setBlocks(null);
+    setError(null);
+    Promise.all(
+      ids.map(id =>
+        fetch(`/api/vineyards/parcels/${id}/blocks`)
+          .then(r => r.ok ? r.json() : Promise.reject(r.status))
+          .then(data => Array.isArray(data?.blocks) ? data.blocks : (Array.isArray(data) ? data : []))
+      )
+    )
+      .then(results => {
+        if (!cancelled) setBlocks(results.flat());
+      })
+      .catch(e => { if (!cancelled) setError(`Could not load blocks (${e})`); });
+    return () => { cancelled = true; };
+  }, [parcel?.ids?.join(','), parcel?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function toggleSort(key) {
+    setSort(s => s.key === key ? { key, dir: s.dir * -1 } : { key, dir: 1 });
+  }
+
+  const sorted = blocks
+    ? [...blocks].sort((a, b) => {
+        const av = a[sort.key] ?? '';
+        const bv = b[sort.key] ?? '';
+        if (av === '' && bv !== '') return 1;
+        if (bv === '' && av !== '') return -1;
+        return typeof av === 'number'
+          ? (av - bv) * sort.dir
+          : String(av).localeCompare(String(bv)) * sort.dir;
+      })
+    : [];
+
+  const totalAcres = blocks ? blocks.reduce((s, b) => s + (Number(b.acres) || 0), 0) : 0;
+  const totalVines = blocks ? blocks.reduce((s, b) => s + (Number(b.vines) || 0), 0) : 0;
+
+  // Compute top variety by block count for the summary pill
+  const topVariety = blocks && blocks.length > 0 ? (() => {
+    const counts = {};
+    blocks.forEach(b => { if (b.variety) counts[b.variety] = (counts[b.variety] || 0) + 1; });
+    const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+    return best ? { name: best[0], count: best[1] } : null;
+  })() : null;
+
+  const COL_DEFS = [
+    { key: 'block_name',    label: 'Block',       width: 110, bold: true },
+    { key: 'variety',       label: 'Variety',     width: 120 },
+    { key: 'clone',         label: 'Clone',       width: 70  },
+    { key: 'rootstock',     label: 'Rootstock',   width: 80  },
+    { key: 'year_planted',  label: 'Yr',          width: 44  },
+    { key: 'acres',         label: 'Acres',       width: 54, num: true, fmt: v => v != null ? Number(v).toFixed(2) : '—' },
+    { key: 'rows',          label: 'Rows',        width: 44, num: true },
+  ];
+
+  const thStyle = (key) => ({
+    padding: '6px 8px',
+    textAlign: 'left',
+    fontSize: 'var(--type-ui-label-size)',
+    fontWeight: 700,
+    color: sort.key === key ? ink : muted,
+    background: alpha(ink, 0.03),
+    borderBottom: `1px solid ${border}`,
+    cursor: 'pointer',
+    userSelect: 'none',
+    position: 'sticky',
+    top: 0,
+    whiteSpace: 'nowrap',
+  });
+  const tdStyle = (bold) => ({
+    padding: '6px 8px',
+    fontSize: 'var(--type-mono-size)',
+    color: bold ? ink : muted,
+    fontWeight: bold ? 600 : 400,
+    borderBottom: `1px solid ${alpha(border, 0.5)}`,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: 140,
+  });
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <BackBtn onClick={onBack} />
+
+      {/* Header */}
+      <div style={{ padding: '10px 16px 0' }}>
+        <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: ink, lineHeight: 1.2 }}>
+          {parcel.parcel_label || parcel.vineyard_name}
+        </div>
+        <div style={{ fontSize: 'var(--type-mono-size)', color: muted, marginTop: 2 }}>
+          {parcel.vineyard_name}
+          {parcel.acres ? ` · ${Number(parcel.acres).toFixed(1)} ac` : ''}
+        </div>
+      </div>
+
+      {/* Summary pills */}
+      {blocks && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '10px 16px 0' }}>
+          {[
+            { label: 'Blocks',  val: blocks.length },
+            { label: 'Acres',   val: totalAcres > 0 ? totalAcres.toFixed(1) : null },
+            { label: 'Vines',   val: totalVines > 0 ? totalVines.toLocaleString() : null },
+          ].filter(p => p.val != null).map(p => (
+            <div key={p.label} style={{
+              padding: '4px 10px', borderRadius: 20,
+              background: alpha(ink, 0.05),
+              fontSize: 'var(--type-ui-label-size)', color: ink, fontWeight: 600,
+            }}>
+              {p.val} <span style={{ fontWeight: 400, color: muted }}>{p.label}</span>
+            </div>
+          ))}
+          {topVariety && (
+            <div style={{
+              padding: '4px 10px', borderRadius: 20,
+              background: alpha(ink, 0.05),
+              fontSize: 'var(--type-ui-label-size)', color: ink, fontWeight: 600,
+            }}>
+              {topVariety.name}
+              {topVariety.count > 1 && <span style={{ fontWeight: 400, color: muted }}> ({topVariety.count})</span>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Table */}
+      <div style={{ flex: 1, overflowX: 'auto', padding: '12px 0 0' }}>
+        {error && (
+          <div style={{ padding: '12px 16px', color: crimson, fontSize: 'var(--type-mono-size)' }}>{error}</div>
+        )}
+        {!error && blocks === null && (
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: muted, fontSize: 'var(--type-mono-size)' }}>Loading…</div>
+        )}
+        {!error && blocks !== null && blocks.length === 0 && (
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: muted, fontSize: 'var(--type-mono-size)' }}>No blocks recorded for this parcel.</div>
+        )}
+        {!error && sorted.length > 0 && (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--type-mono-size)' }}>
+            <thead>
+              <tr>
+                {COL_DEFS.map(c => (
+                  <th key={c.key} style={thStyle(c.key)} onClick={() => toggleSort(c.key)}>
+                    {c.label}{sort.key === c.key ? (sort.dir === 1 ? ' ▴' : ' ▾') : ''}
+                  </th>
+                ))}
+                <th style={{ ...thStyle(null), cursor: 'default' }}>Sold To</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map(block => (
+                <tr
+                  key={block.id}
+                  onMouseEnter={() => setHoveredRow(block.id)}
+                  onMouseLeave={() => setHoveredRow(null)}
+                  style={{ background: hoveredRow === block.id ? alpha(electricBlue, 0.06) : 'transparent', transition: 'background 0.12s' }}
+                >
+                  {COL_DEFS.map(c => (
+                    <td key={c.key} style={tdStyle(c.bold)}>
+                      {c.fmt ? c.fmt(block[c.key]) : (block[c.key] ?? '—')}
+                    </td>
+                  ))}
+                  {/* Inline buyers column */}
+                  <td style={{ ...tdStyle(false), maxWidth: 120 }}>
+                    {Array.isArray(block.buyers) && block.buyers.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                        {block.buyers.map(buyer => (
+                          <span key={buyer.name} style={{
+                            padding: '1px 6px', borderRadius: 10,
+                            fontSize: '10px',
+                            background: alpha(ink, 0.07),
+                            color: muted,
+                            fontWeight: 500,
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {buyer.winery_title || buyer.name}
+                          </span>
+                        ))}
+                      </div>
+                    ) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+    </div>
+  );
+}
+
 const CLIMATE_LAYERS = [
   { id: 'tdmean', label: 'Mean Temperature', sub: '30-yr PRISM normals' },
 ];
@@ -876,10 +1159,11 @@ export default function ExplorerSidebar({
 }) {
   const [sections, setSections] = useState({ layers: false, about: false });
 
-  // Navigation stack: 'home' | 'ava-list' | 'winery-list' | 'ava-detail' | 'winery-detail'
+  // Navigation stack: 'home' | 'ava-list' | 'winery-list' | 'ava-detail' | 'winery-detail' | 'parcel-blocks'
   const [viewStack, setViewStack] = useState(['home']);
   const [detailAva, setDetailAva] = useState(null);
   const [detailWinery, setDetailWinery] = useState(null);
+  const [detailParcel, setDetailParcel] = useState(null); // { id, parcel_label, vineyard_name, acres }
   // Tracks what to render in panel 2 (preserved during slide-out animations)
   const [panel2Type, setPanel2Type] = useState(null); // 'ava' | 'winery'
   // Skip-count refs: incremented before an internal setter call so the
@@ -889,8 +1173,8 @@ export default function ExplorerSidebar({
 
   const currentView = viewStack[viewStack.length - 1];
 
-  // Column index for the 3-panel sliding track
-  const VIEW_COL = { home: 0, 'ava-list': 1, 'winery-list': 1, 'ava-detail': 2, 'winery-detail': 2 };
+  // Column index for the 3-panel (+ parcel-blocks) sliding track
+  const VIEW_COL = { home: 0, 'ava-list': 1, 'winery-list': 1, 'ava-detail': 2, 'winery-detail': 2, 'parcel-blocks': 3 };
   const col = VIEW_COL[currentView] ?? 0;
 
   // Panel 1 shows whichever list type is currently in the stack (last one wins)
@@ -984,6 +1268,15 @@ export default function ExplorerSidebar({
     mapRef.current?.selectListingById(listing.id);
   }, [mapRef]);
 
+  const handleParcelClick = useCallback((parcel) => {
+    setDetailParcel(parcel);
+    setViewStack(prev => {
+      const top = prev[prev.length - 1];
+      if (top === 'parcel-blocks') return [...prev.slice(0, -1), 'parcel-blocks'];
+      return [...prev, 'parcel-blocks'];
+    });
+  }, []);
+
   const isOnHome = currentView === 'home';
   const wineryCount = listings.filter(l => l.category === 'winery').length;
   const mappedCount = vineyardRecidSet ? vineyardRecidSet.size : 0;
@@ -991,6 +1284,7 @@ export default function ExplorerSidebar({
     : currentView === 'winery-list' ? 'Wineries'
     : currentView === 'ava-detail' ? (detailAva?.name ?? '')
     : currentView === 'winery-detail' ? (detailWinery?.title ?? '')
+    : currentView === 'parcel-blocks' ? (detailParcel?.parcel_label ?? 'Blocks')
     : '';
 
   return (
@@ -1053,19 +1347,19 @@ export default function ExplorerSidebar({
         </div>
       </div>
 
-      {/* 3-panel sliding content area */}
+      {/* 4-panel sliding content area */}
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         <div style={{
           display: 'flex',
-          width: '300%',
+          width: '400%',
           height: '100%',
-          transform: `translateX(${-(col * (100 / 3)).toFixed(4)}%)`,
+          transform: `translateX(${-(col * (100 / 4)).toFixed(4)}%)`,
           transition: 'transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
           willChange: 'transform',
         }}>
 
           {/* ── Panel 0: Home menu ── */}
-          <div style={{ width: '33.333%', height: '100%', overflow: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: '25%', height: '100%', overflow: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
 
             {/* Hero welcome card — light, stretches to fill remaining space */}
             <div style={{
@@ -1225,7 +1519,7 @@ export default function ExplorerSidebar({
           </div>
 
           {/* ── Panel 1: List view ── */}
-          <div style={{ width: '33.333%', height: '100%', overflow: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: '25%', height: '100%', overflow: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
             {panel1Type === 'winery' ? (
               <WineriesSection
                 listings={listings}
@@ -1297,7 +1591,7 @@ export default function ExplorerSidebar({
           </div>
 
           {/* ── Panel 2: Detail view ── */}
-          <div style={{ width: '33.333%', height: '100%', overflowY: 'auto', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: '25%', height: '100%', overflowY: 'auto', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
             {panel2Type === 'ava' && detailAva && (
               <AvaDetailView
                 ava={detailAva}
@@ -1315,6 +1609,17 @@ export default function ExplorerSidebar({
                 parcelTopoStats={parcelTopoStats}
                 onVineyardHover={onVineyardHover}
                 onViewAllVineyards={onViewAllVineyards}
+                onParcelClick={handleParcelClick}
+              />
+            )}
+          </div>
+
+          {/* ── Panel 3: Parcel blocks ── */}
+          <div style={{ width: '25%', height: '100%', overflowY: 'auto', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+            {detailParcel && (
+              <ParcelBlockView
+                parcel={detailParcel}
+                onBack={() => setViewStack(prev => prev.slice(0, -1))}
               />
             )}
           </div>

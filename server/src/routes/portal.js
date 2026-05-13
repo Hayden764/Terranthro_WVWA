@@ -10,6 +10,7 @@
  */
 import express from 'express';
 import { pool } from '../db/pool.js';
+import { bulkApplyBlocks } from '../services/blockBulkApply.js';
 
 const router = express.Router();
 
@@ -20,6 +21,7 @@ const REQUEST_SCHEMAS = {
   vineyard_blocks: ['block_name', 'variety', 'clone', 'rootstock', 'rows', 'spacing',
                      'vines_per_acre', 'vines', 'acres', 'year_planted',
                      'block_changes', 'new_blocks'],
+  vineyard_blocks_bulk: ['rows', 'column_map', 'filename'],
   vineyard_claim: ['vineyard_name', 'notes'],
   vineyard_new: ['vineyard_name', 'notes', 'ava_name', 'geometry'],
   geometry_update: ['notes', 'geometry_description', 'old_geometry', 'new_geometry'],
@@ -378,6 +380,39 @@ router.get('/vineyards/:id/history', async (req, res) => {
   } catch (err) {
     console.error('Portal history error:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * POST /api/portal/blocks/bulk-preview
+ * Body: { rows, column_map }
+ * Runs the importer in dry-run mode (rolled back) so the winery can review
+ * the diff before submitting an edit request.
+ */
+router.post('/blocks/bulk-preview', async (req, res) => {
+  const { wineryId } = req.portalAccount;
+  const { rows = [], column_map = {} } = req.body || {};
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ error: 'rows must be a non-empty array' });
+  }
+  if (rows.length > 5000) {
+    return res.status(413).json({ error: 'Too many rows (max 5000)' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await bulkApplyBlocks({
+      client, wineryId, rows, columnMap: column_map, origin: 'portal',
+    });
+    await client.query('ROLLBACK');
+    res.json({ dry_run: true, ...result });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Portal bulk-preview error:', err);
+    res.status(500).json({ error: err.message || 'Server error' });
+  } finally {
+    client.release();
   }
 });
 

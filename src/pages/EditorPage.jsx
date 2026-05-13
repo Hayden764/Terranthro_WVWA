@@ -78,6 +78,7 @@ export default function EditorPage() {
 
   const [authChecked, setAuthChecked] = useState(false);
   const [parcels, setParcels] = useState(null);
+  const [wineries, setWineries] = useState([]);
 
   // ── Single-parcel selection ───────────────────────────────────────────────
   const [selectedParcel, setSelectedParcel] = useState(null);
@@ -151,6 +152,24 @@ export default function EditorPage() {
       .then((r) => r.json())
       .then((data) => setParcels(data))
       .catch((err) => console.error('Failed to load parcels:', err));
+  }, [authChecked]);
+
+  // ── Fetch wineries for optional selector in new-block form ─────────────
+  useEffect(() => {
+    if (!authChecked) return;
+    fetch(`${API_BASE}/api/admin/vineyards`, { credentials: 'include', headers: API_HEADERS })
+      .then((r) => r.json())
+      .then((rows) => {
+        const uniq = Array.from(
+          new Map(
+            (Array.isArray(rows) ? rows : [])
+              .filter((w) => Number.isInteger(w.winery_id))
+              .map((w) => [w.winery_id, { winery_id: w.winery_id, winery_name: w.winery_name || `Winery ${w.winery_id}` }])
+          ).values()
+        ).sort((a, b) => a.winery_name.localeCompare(b.winery_name));
+        setWineries(uniq);
+      })
+      .catch((err) => console.error('Failed to load wineries for editor:', err));
   }, [authChecked]);
 
   // ── Initialize map ───────────────────────────────────────────────────────
@@ -612,7 +631,14 @@ export default function EditorPage() {
   const handleSaveNewBlock = useCallback(() => {
     const geom = newBlockGeomRef.current;
     if (!geom) { setStatusMessage('No polygon drawn yet.'); return; }
-    const wineryId = newBlockForm.winery_id ? parseInt(newBlockForm.winery_id, 10) : null;
+    let wineryId = null;
+    if (newBlockForm.winery_id !== '' && newBlockForm.winery_id != null) {
+      wineryId = parseInt(newBlockForm.winery_id, 10);
+      if (Number.isNaN(wineryId)) {
+        setStatusMessage('Winery selection is invalid. Choose a winery or Unknown / Independent.');
+        return;
+      }
+    }
     setStagedOps((prev) => [...prev, {
       op: 'add',
       temp_id: `new_${Date.now()}`,
@@ -909,7 +935,34 @@ export default function EditorPage() {
               <div style={{ color: TOKENS.muted, fontSize: 'var(--type-ui-label-size)', lineHeight: 1.5 }}>{statusMessage}</div>
             )}
             <MetaField label="Block Name" field="vineyard_name" form={newBlockForm} setForm={setNewBlockForm} />
-            <MetaField label="Winery ID" field="winery_id" form={newBlockForm} setForm={setNewBlockForm} type="number" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <label style={{ ...TYPE.uiLabel, color: TOKENS.ghost, fontSize: 'var(--type-ui-label-size)', fontWeight: 600 }}>
+                Winery (optional)
+              </label>
+              <select
+                value={newBlockForm.winery_id ?? ''}
+                onChange={(e) => setNewBlockForm((f) => ({ ...f, winery_id: e.target.value }))}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  background: TOKENS.surface,
+                  border: `1px solid ${TOKENS.border}`,
+                  borderRadius: 5,
+                  color: TOKENS.parchment,
+                  fontSize: 'var(--type-body-size)',
+                  padding: '5px 8px',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <option value="">Unknown / Independent</option>
+                {wineries.map((w) => (
+                  <option key={w.winery_id} value={String(w.winery_id)}>
+                    {w.winery_name} (ID {w.winery_id})
+                  </option>
+                ))}
+              </select>
+            </div>
             <MetaField label="Source Dataset" field="source_dataset" form={newBlockForm} setForm={setNewBlockForm} />
             <MetaField label="AVA Name" field="ava_name" form={newBlockForm} setForm={setNewBlockForm} />
             <MetaField label="Varietals" field="varietals_list" form={newBlockForm} setForm={setNewBlockForm} multiline />

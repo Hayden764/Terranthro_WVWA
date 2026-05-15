@@ -683,6 +683,72 @@ function setVineyardVisualizationVisibility(map, isVisible) {
   }
 }
 
+/**
+ * Apply the user's vineyard filter to the map.
+ *
+ * - Sets feature-state `matched: true` on every parcel whose id is in
+ *   `matchedIds`, and clears it for ids that were previously matched but
+ *   are no longer (passed in `prevMatchedIds`).
+ * - When `filtersActive` is true, dims the base reference layers so the
+ *   crimson `vineyards-matched-*` overlay (driven by feature-state) reads
+ *   strongly against a hushed background.
+ *
+ * Returns the new "previous matched ids" set so the caller can store it.
+ */
+function setVineyardMatchedFeatureStates(map, filtersActive, matchedIds, prevMatchedIds) {
+  if (!map || !map.isStyleLoaded?.()) return prevMatchedIds;
+
+  const sourceId = 'vineyards-reference';
+  if (!map.getSource(sourceId)) return prevMatchedIds;
+
+  const sourceLayer = PMTILES_URL ? 'vineyard_parcels' : undefined;
+  const newSet = new Set(matchedIds || []);
+
+  // Clear feature-state for ids that were matched before but aren't now
+  if (prevMatchedIds) {
+    for (const oldId of prevMatchedIds) {
+      if (!newSet.has(oldId)) {
+        try {
+          map.removeFeatureState(
+            sourceLayer ? { source: sourceId, sourceLayer, id: oldId } : { source: sourceId, id: oldId }
+          );
+        } catch (_) { /* feature may not be loaded yet */ }
+      }
+    }
+  }
+
+  // Set feature-state for currently-matched ids
+  for (const id of newSet) {
+    try {
+      map.setFeatureState(
+        sourceLayer ? { source: sourceId, sourceLayer, id } : { source: sourceId, id },
+        { matched: true }
+      );
+    } catch (_) { /* feature may not be loaded yet — will be reapplied on sourcedata */ }
+  }
+
+  // Dim the base reference layers when filters are active.
+  // We multiply the soft-focus baseline opacities by ~0.3 to make matched
+  // parcels stand out in crimson without entirely hiding the rest of the map.
+  const refFillOp        = filtersActive ? 0.02 : 0.06;
+  const refLineOp        = filtersActive ? 0.18 : 0.5;
+  const passiveFillOp    = filtersActive ? 0.06 : 0.18;
+  const passiveHatchOp   = filtersActive ? 0.07 : 0.2;
+  const passiveLineOp    = filtersActive ? 0.12 : 0.34;
+  const linkedFillOp     = filtersActive ? 0.012 : 0.03;
+  const linkedLineOp     = filtersActive ? 0.32 : 0.86;
+
+  if (map.getLayer('vineyards-reference-fill'))         map.setPaintProperty('vineyards-reference-fill', 'fill-opacity', refFillOp);
+  if (map.getLayer('vineyards-reference-line'))         map.setPaintProperty('vineyards-reference-line', 'line-opacity', refLineOp);
+  if (map.getLayer('vineyards-reference-passive-fill')) map.setPaintProperty('vineyards-reference-passive-fill', 'fill-opacity', passiveFillOp);
+  if (map.getLayer('vineyards-reference-passive-hatch'))map.setPaintProperty('vineyards-reference-passive-hatch', 'fill-opacity', passiveHatchOp);
+  if (map.getLayer('vineyards-reference-passive-line')) map.setPaintProperty('vineyards-reference-passive-line', 'line-opacity', passiveLineOp);
+  if (map.getLayer('vineyards-linked-fill'))            map.setPaintProperty('vineyards-linked-fill', 'fill-opacity', linkedFillOp);
+  if (map.getLayer('vineyards-linked-line'))            map.setPaintProperty('vineyards-linked-line', 'line-opacity', linkedLineOp);
+
+  return newSet;
+}
+
 // ── Right-side tabbed context panel ──────────────────────────────────────
 // Shown whenever a listing is selected, a layer is active, or both.
 // When both are present a tab bar appears; when only one is present no tabs
@@ -1452,12 +1518,17 @@ const WVWAMap = forwardRef(function WVWAMap({
   onInsideIdsChange,
   onVineyardRecidSetChange,
   onMapReady,
+  // Vineyard filter overlay
+  matchedParcelIds = null,   // array of parcel ids that match active filters, or null
+  filtersActive    = false,
 }, externalRef) {
   const mapContainerRef = useRef(null);
   const mapRef          = useRef(null);
   const popupRef        = useRef(null);
   const vineyardPopupRef = useRef(null);
   const avaDataRef      = useRef({});
+  // Tracks the previously-matched parcel ids so we can clear stale feature-state
+  const prevMatchedIdsRef = useRef(new Set());
 
   // Internal state — kept for backwards-compat when no props provided
   const [listings, setListings]         = useState([]);
@@ -1779,6 +1850,39 @@ const WVWAMap = forwardRef(function WVWAMap({
 
   // Keep selectedAvaRef current so the imperative hover handler always reads the latest value
   useEffect(() => { selectedAvaRef.current = selectedAva; }, [selectedAva]);
+
+  // ── Vineyard filter overlay: feature-state matched + dim base layers ────
+  // Re-applies whenever the matched id list or filters-active flag changes.
+  // Also re-applies after the vineyards-reference source loads more tiles
+  // (PMTiles streams in tiles as the user pans/zooms, and feature-state
+  // only sticks for features currently in memory).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!mapLoaded) return;
+
+    const apply = () => {
+      const next = setVineyardMatchedFeatureStates(
+        map,
+        filtersActive,
+        matchedParcelIds || [],
+        prevMatchedIdsRef.current,
+      );
+      if (next) prevMatchedIdsRef.current = next;
+    };
+
+    apply();
+
+    // Re-apply when new tiles arrive for the vineyards-reference source so
+    // newly-loaded matched parcels light up.
+    const onSourceData = (e) => {
+      if (e.sourceId !== 'vineyards-reference') return;
+      if (!e.isSourceLoaded) return;
+      apply();
+    };
+    map.on('sourcedata', onSourceData);
+    return () => { map.off('sourcedata', onSourceData); };
+  }, [matchedParcelIds, filtersActive, mapLoaded]);
 
   // ── Panel hover: swap dedicated highlight source — no moveLayer, no setPaintProperty ──
   const handleMapHoverAva = useCallback((slug) => {
@@ -2305,6 +2409,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           map.addSource('vineyards-reference', {
             type: 'vector',
             url: PMTILES_URL,
+            promoteId: 'id',
           });
           map.addLayer({
             id: 'vineyards-reference-fill',
@@ -2352,6 +2457,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           map.addSource('vineyards-reference', {
             type: 'geojson',
             data: refGeoJSON,
+            promoteId: 'id',
           });
           map.addLayer({
             id: 'vineyards-reference-fill',
@@ -2396,6 +2502,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             type: 'FeatureCollection',
             features: vineyardFeatures,
           },
+          promoteId: 'id',
         });
         map.addLayer({
           id: 'vineyards-linked-fill',
@@ -2415,6 +2522,44 @@ const WVWAMap = forwardRef(function WVWAMap({
             'line-color': '#3FAF79',
             'line-width': 1.4,
             'line-opacity': 0.86,
+          },
+        });
+
+        // ── Filter-match overlay ────────────────────────────────────────────
+        // Highlights vineyard parcels whose feature-state `matched` is true
+        // (set by setVineyardMatchedFeatureStates when the user applies filters).
+        // Sourced from the same vineyards-reference source so it works for
+        // both PMTiles vector and GeoJSON fallback.
+        const matchedSourceLayer = PMTILES_URL ? { 'source-layer': 'vineyard_parcels' } : {};
+        map.addLayer({
+          id: 'vineyards-matched-fill',
+          type: 'fill',
+          source: 'vineyards-reference',
+          ...matchedSourceLayer,
+          paint: {
+            'fill-color': '#DC2626',
+            'fill-opacity': [
+              'case',
+              ['boolean', ['feature-state', 'matched'], false],
+              0.32,
+              0,
+            ],
+          },
+        });
+        map.addLayer({
+          id: 'vineyards-matched-line',
+          type: 'line',
+          source: 'vineyards-reference',
+          ...matchedSourceLayer,
+          paint: {
+            'line-color': '#DC2626',
+            'line-width': 1.6,
+            'line-opacity': [
+              'case',
+              ['boolean', ['feature-state', 'matched'], false],
+              0.92,
+              0,
+            ],
           },
         });
 

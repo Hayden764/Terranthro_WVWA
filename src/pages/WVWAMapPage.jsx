@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import WVWAMap, { LISTING_FILTER_MODES } from '../components/WVWAMap';
 import ExplorerSidebar from '../components/ExplorerSidebar';
+import FilterModal from '../components/FilterModal';
+import { useVineyardFilters } from '../lib/useVineyardFilters';
 import { alpha, border, crimson, ink, MAP_GLASS, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 const UI = {
@@ -224,6 +226,10 @@ export default function WVWAMapPage() {
   const [insideIds, setInsideIds]                   = useState(null);
   const [vineyardRecidSet, setVineyardRecidSet]     = useState(() => new Set());
 
+  // ── Vineyard filter modal (elevation/slope/aspect/variety/AVA/acres) ────
+  const vineyardFilters = useVineyardFilters();
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+
   // Auto-open sidebar on mobile when a map interaction selects content
   useEffect(() => { if (isMobile && selectedListing) setSidebarOpen(true); }, [isMobile, selectedListing]);
   useEffect(() => { if (isMobile && selectedAva) setSidebarOpen(true); }, [isMobile, selectedAva]);
@@ -311,6 +317,9 @@ export default function WVWAMapPage() {
             parcelTopoStats={parcelTopoStats}
             onVineyardHover={(features) => mapRef.current?.hoverVineyards?.(features)}
             onViewAllVineyards={(features) => mapRef.current?.viewAllVineyards?.(features)}
+            onOpenFilters={() => setFilterModalOpen(true)}
+            filterActiveCount={vineyardFilters.activeCount}
+            vineyardFilterResult={vineyardFilters.queryResult}
           />
         )}
 
@@ -375,9 +384,25 @@ export default function WVWAMapPage() {
             onInsideIdsChange={setInsideIds}
             onVineyardRecidSetChange={setVineyardRecidSet}
             onMapReady={() => setMapReady(true)}
+            // Vineyard filter overlay (dimming + matched parcels)
+            matchedParcelIds={vineyardFilters.queryResult?.matching_parcel_ids ?? null}
+            filtersActive={vineyardFilters.isActive}
           />
         </div>
       </div>
+
+      {/* Vineyard filter modal */}
+      <FilterModal
+        open={filterModalOpen}
+        onClose={() => setFilterModalOpen(false)}
+        filters={vineyardFilters.filters}
+        onApply={vineyardFilters.setFilters}
+        onReset={vineyardFilters.resetFilters}
+        liveResultSummary={vineyardFilters.queryResult ? {
+          wineries: vineyardFilters.queryResult.winery_total_count,
+          parcels:  vineyardFilters.queryResult.matching_parcel_total_count,
+        } : null}
+      />
     </div>
   );
 }

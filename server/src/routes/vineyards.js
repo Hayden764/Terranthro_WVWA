@@ -63,6 +63,24 @@ router.get('/parcels', async (req, res) => {
 
   const linkedCondition = linkedOnly ? 'AND vp.winery_id IS NOT NULL' : '';
 
+  // Optional ID allowlist (used by the filter modal to fetch only matching
+  // parcel polygons for the map dimming overlay). Capped at 5000 ids.
+  let idsCondition = '';
+  if (req.query.ids) {
+    const ids = String(req.query.ids)
+      .split(',')
+      .map(s => parseInt(s.trim(), 10))
+      .filter(n => Number.isFinite(n) && n > 0)
+      .slice(0, 5000);
+    if (ids.length > 0) {
+      params.push(ids);
+      idsCondition = `AND vp.id = ANY($${params.length}::int[])`;
+    } else {
+      // Explicit empty list → return zero features
+      return res.json({ type: 'FeatureCollection', features: [] });
+    }
+  }
+
   try {
     const { rows } = await pool.query(
       `
@@ -92,6 +110,7 @@ router.get('/parcels', async (req, res) => {
         ${varietyCondition}
         ${wineryCondition}
         ${linkedCondition}
+        ${idsCondition}
       ORDER BY vp.vineyard_name
       `,
       params

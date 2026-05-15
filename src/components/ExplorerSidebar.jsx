@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { alpha, border, crimson, electricBlue, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import SearchBar from './SearchBar';
@@ -1007,17 +1007,65 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
 }
 
 // ── Wineries section ──────────────────────────────────────────────────────
-function WineriesSection({ listings, listingFilterMode, onListingFilterModeChange, vineyardRecidSet, insideIds, selectedAva, onListingClick, onListingHover }) {
+function WineriesSection({ listings, listingFilterMode, onListingFilterModeChange, vineyardRecidSet, insideIds, selectedAva, onListingClick, onListingHover, vineyardFilterResult }) {
   const ava = selectedAva ? WV_SUB_AVAS.find(a => a.slug === selectedAva) : null;
 
-  const visible = listings.filter(l => {
-    if (l.category !== 'winery') return false;
-    if (listingFilterMode === LISTING_FILTER_MODES.withVineyardPolygons && !vineyardRecidSet.has(l.id)) return false;
-    if (listingFilterMode === LISTING_FILTER_MODES.withoutVineyardPolygons && vineyardRecidSet.has(l.id)) return false;
-    if (listingFilterMode === LISTING_FILTER_MODES.noWineriesVisualized) return false;
-    if (insideIds && !insideIds.includes(l.id)) return false;
-    return true;
-  });
+  // Sort key: 'name' | 'parcels' | 'acres' | 'elevation' | 'ava'
+  const [sortKey, setSortKey] = useState('name');
+
+  // Optional rollup data from active vineyard filters. When present, listings
+  // are restricted to those wineries, and the extra metrics (acres / elevation
+  // / parcel count / ava names) are merged onto each row for display & sort.
+  const filterActive = !!(vineyardFilterResult && Array.isArray(vineyardFilterResult.wineries));
+  const rollupByRecid = useMemo(() => {
+    if (!filterActive) return null;
+    const map = new Map();
+    for (const w of vineyardFilterResult.wineries) {
+      if (w.recid != null) map.set(w.recid, w);
+    }
+    return map;
+  }, [filterActive, vineyardFilterResult]);
+
+  const baseListings = useMemo(() => {
+    return listings.filter(l => {
+      if (l.category !== 'winery') return false;
+      if (listingFilterMode === LISTING_FILTER_MODES.withVineyardPolygons && !vineyardRecidSet.has(l.id)) return false;
+      if (listingFilterMode === LISTING_FILTER_MODES.withoutVineyardPolygons && vineyardRecidSet.has(l.id)) return false;
+      if (listingFilterMode === LISTING_FILTER_MODES.noWineriesVisualized) return false;
+      if (insideIds && !insideIds.includes(l.id)) return false;
+      // When a vineyard-stat filter is active, only show wineries that matched
+      if (filterActive && !rollupByRecid.has(l.id)) return false;
+      return true;
+    }).map(l => {
+      const r = filterActive ? rollupByRecid.get(l.id) : null;
+      return {
+        ...l,
+        _matching_parcel_count: r ? r.matching_parcel_count : (vineyardRecidSet.get?.(l.id) ?? 0),
+        _matching_acres:        r ? r.matching_acres        : null,
+        _elevation_mean_ft:     r ? r.elevation_mean_ft     : null,
+        _ava_names:             r ? (Array.isArray(r.ava_names) ? r.ava_names : []) : [],
+      };
+    });
+  }, [listings, listingFilterMode, vineyardRecidSet, insideIds, filterActive, rollupByRecid]);
+
+  const visible = useMemo(() => {
+    const arr = baseListings.slice();
+    const cmpStr = (a, b) => String(a || '').localeCompare(String(b || ''));
+    const cmpNum = (a, b, dir = 1) => {
+      const av = a == null ? -Infinity : Number(a);
+      const bv = b == null ? -Infinity : Number(b);
+      return dir * (bv - av); // higher first by default
+    };
+    switch (sortKey) {
+      case 'parcels':   arr.sort((a, b) => cmpNum(a._matching_parcel_count, b._matching_parcel_count) || cmpStr(a.title, b.title)); break;
+      case 'acres':     arr.sort((a, b) => cmpNum(a._matching_acres,        b._matching_acres)        || cmpStr(a.title, b.title)); break;
+      case 'elevation': arr.sort((a, b) => cmpNum(a._elevation_mean_ft,     b._elevation_mean_ft)     || cmpStr(a.title, b.title)); break;
+      case 'ava':       arr.sort((a, b) => cmpStr(a._ava_names?.[0],        b._ava_names?.[0])        || cmpStr(a.title, b.title)); break;
+      case 'name':
+      default:          arr.sort((a, b) => cmpStr(a.title, b.title)); break;
+    }
+    return arr;
+  }, [baseListings, sortKey]);
 
   const pills = [
     { id: LISTING_FILTER_MODES.allWineries, label: 'All' },
@@ -1056,18 +1104,64 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
         </div>
       )}
 
+      {/* Filter-results banner */}
+      {filterActive && (
+        <div style={{ padding: '6px 16px', background: TOKENS.dangerDim, borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span style={{ fontSize: 'var(--type-ui-label-size)', color: crimson, fontWeight: 600 }}>
+            {vineyardFilterResult.winery_total_count} winer{vineyardFilterResult.winery_total_count === 1 ? 'y' : 'ies'} match · {vineyardFilterResult.matching_parcel_total_count} parcel{vineyardFilterResult.matching_parcel_total_count === 1 ? '' : 's'}
+          </span>
+        </div>
+      )}
+
+      {/* Sort row */}
+      <div style={{ padding: '8px 16px', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
+          Sort
+        </span>
+        <select
+          value={sortKey}
+          onChange={(e) => setSortKey(e.target.value)}
+          style={{
+            flex: 1,
+            background: parchment,
+            border: `1px solid ${border}`,
+            borderRadius: 6,
+            color: ink,
+            padding: '4px 6px',
+            fontSize: 'var(--type-ui-label-size)',
+            fontFamily: 'var(--font-sans)',
+            cursor: 'pointer',
+            outline: 'none',
+          }}
+        >
+          <option value="name">Name (A–Z)</option>
+          <option value="parcels">{filterActive ? 'Matching parcels' : '# Parcels'} (high → low)</option>
+          {filterActive && <option value="acres">Matching acres (high → low)</option>}
+          {filterActive && <option value="elevation">Mean elevation (high → low)</option>}
+          {filterActive && <option value="ava">AVA</option>}
+        </select>
+      </div>
+
       {/* Winery list */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px' }}>
         {visible.length === 0 && (
           <div style={{ padding: '20px 4px', textAlign: 'center', color: muted, fontSize: 'var(--type-mono-size)' }}>
-            {listings.length === 0 ? 'Loading…' : 'No wineries match this filter.'}
+            {listings.length === 0 ? 'Loading…' : (filterActive ? 'No wineries match the active filters.' : 'No wineries match this filter.')}
           </div>
         )}
         {visible.map((l) => {
           const vineyardCount = vineyardRecidSet.get(l.id) ?? 0;
-          const vineyardLabel = vineyardCount === 0 ? 'No vineyard map'
+          const baseLabel = vineyardCount === 0 ? 'No vineyard map'
             : vineyardCount === 1 ? 'Vineyard mapped'
             : `${vineyardCount} vineyards mapped`;
+          // When a stat-filter is active, show match metrics inline
+          const meta = filterActive
+            ? [
+                `${l._matching_parcel_count} parcel${l._matching_parcel_count === 1 ? '' : 's'}`,
+                l._matching_acres != null ? `${l._matching_acres} ac` : null,
+                l._elevation_mean_ft != null ? `${l._elevation_mean_ft} ft avg` : null,
+              ].filter(Boolean).join(' · ')
+            : baseLabel;
           return (
             <div
               key={l.id}
@@ -1088,12 +1182,12 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
                     {l.title}
                   </div>
                   <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
-                    {vineyardLabel}
+                    {meta}
                   </div>
                 </div>
                 <span style={{
                   width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                  background: vineyardCount > 0 ? UI.mapped : muted,
+                  background: filterActive ? crimson : (vineyardCount > 0 ? UI.mapped : muted),
                 }} />
               </div>
             </div>
@@ -1156,6 +1250,10 @@ export default function ExplorerSidebar({
   isMobile = false,
   isOpen = false,
   onClose,
+  // Vineyard filter modal hooks (optional)
+  onOpenFilters,
+  filterActiveCount = 0,
+  vineyardFilterResult = null,
 }) {
   const [sections, setSections] = useState({ layers: false, about: false });
 
@@ -1324,7 +1422,7 @@ export default function ExplorerSidebar({
             </button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <SearchBar inline mapRef={mapRef} onSelectAva={(slug) => {
+            <SearchBar inline mapRef={mapRef} onOpenFilters={onOpenFilters} activeFilterCount={filterActiveCount} onSelectAva={(slug) => {
               const ava = WV_SUB_AVAS.find(a => a.slug === slug);
               if (ava) handleAvaClick(ava);
               else onSelectAva(slug);
@@ -1359,7 +1457,7 @@ export default function ExplorerSidebar({
         }}>
 
           {/* ── Panel 0: Home menu ── */}
-          <div style={{ width: '25%', height: '100%', overflow: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: '25%', height: '100%', overflowY: 'auto', overflowX: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column', scrollbarWidth: 'thin', scrollbarColor: `${alpha(ink, 0.18)} transparent` }}>
 
             {/* Hero welcome card — light, stretches to fill remaining space */}
             <div style={{
@@ -1530,6 +1628,7 @@ export default function ExplorerSidebar({
                 selectedAva={selectedAva}
                 onListingClick={handleListingClick}
                 onListingHover={(l) => mapRef.current?.hoverListing(l)}
+                vineyardFilterResult={vineyardFilterResult}
               />
             ) : (
               <div style={{ flex: 1, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden' }}>

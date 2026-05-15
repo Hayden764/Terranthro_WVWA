@@ -67,7 +67,7 @@ function groupResults(results) {
   return { avas, wineries, vineyards };
 }
 
-export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
+export default function SearchBar({ mapRef, onSelectAva, inline = false, onOpenFilters, activeFilterCount = 0 }) {
   const [query, setQuery]           = useState('');
   const [results, setResults]       = useState([]);
   const [open, setOpen]             = useState(false);
@@ -370,6 +370,47 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false }) {
           </button>
         )}
 
+        {/* Filter button — opens FilterModal */}
+        {onOpenFilters && (
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); onOpenFilters(); }}
+            aria-label={activeFilterCount > 0 ? `Open filters (${activeFilterCount} active)` : 'Open filters'}
+            title="Filter vineyards by elevation, slope, aspect, variety…"
+            style={{
+              position: 'relative',
+              background: activeFilterCount > 0 ? alpha(TOKENS.crimson, 0.16) : 'none',
+              border: `1px solid ${activeFilterCount > 0 ? alpha(TOKENS.crimson, 0.45) : 'transparent'}`,
+              borderRadius: 6,
+              color: activeFilterCount > 0 ? crimson : TEXT_MUTED,
+              cursor: 'pointer',
+              padding: '3px 6px',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <FilterIcon />
+            {activeFilterCount > 0 && (
+              <span style={{
+                fontSize: 11,
+                fontWeight: 700,
+                background: crimson,
+                color: 'white',
+                borderRadius: 8,
+                padding: '0 5px',
+                minWidth: 14,
+                textAlign: 'center',
+                lineHeight: '14px',
+                fontVariantNumeric: 'tabular-nums',
+              }}>
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        )}
+
         {/* Mobile close button */}
         {window.innerWidth < 640 && (
           <button
@@ -467,6 +508,15 @@ function SearchIcon() {
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="11" cy="11" r="8" />
       <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function FilterIcon() {
+  // Funnel icon
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
     </svg>
   );
 }

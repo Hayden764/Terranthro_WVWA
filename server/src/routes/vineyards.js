@@ -420,4 +420,108 @@ router.get('/parcels/:id/blocks', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/vineyards/varieties
+ *
+ * Returns the distinct grape varieties found across vineyard parcels and
+ * blocks, with usage counts. Used to populate the filter modal's variety
+ * chip picker.
+ *
+ * vineyard_parcels.varietals_list is a free-form delimited string (commas,
+ * pipes, semicolons or " and "), so it is split server-side here. Block-level
+ * vineyard_blocks.variety is a single value per row.
+ */
+router.get('/varieties', async (_req, res) => {
+  try {
+    // Block-level varieties (clean, single-value column)
+    const { rows: blockRows } = await pool.query(
+      `SELECT TRIM(variety) AS name, COUNT(*)::int AS block_count
+         FROM vineyard_blocks
+        WHERE variety IS NOT NULL AND TRIM(variety) <> ''
+     GROUP BY TRIM(variety)`
+    );
+
+    // Parcel-level varieties (delimited string, split client-side here)
+    const { rows: parcelRows } = await pool.query(
+      `SELECT varietals_list FROM vineyard_parcels
+        WHERE varietals_list IS NOT NULL AND TRIM(varietals_list) <> ''`
+    );
+
+    const counts = new Map();
+    const bump = (raw, kind) => {
+      const name = String(raw).trim();
+      if (!name) return;
+      const key = name.toLowerCase();
+      const entry = counts.get(key) || { name, parcel_count: 0, block_count: 0 };
+      entry[kind] += 1;
+      counts.set(key, entry);
+    };
+
+    for (const r of parcelRows) {
+      // Split on commas, pipes, semicolons, slashes, or " and "
+      const parts = String(r.varietals_list).split(/[,;|/]|\s+and\s+/i);
+      for (const p of parts) bump(p, 'parcel_count');
+    }
+    for (const r of blockRows) {
+      // Already split: bump by the actual count not by 1
+      const name = String(r.name).trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      const entry = counts.get(key) || { name, parcel_count: 0, block_count: 0 };
+      entry.block_count += Number(r.block_count) || 0;
+      counts.set(key, entry);
+    }
+
+    const varieties = Array.from(counts.values())
+      .sort((a, b) =>
+        (b.parcel_count + b.block_count) - (a.parcel_count + a.block_count) ||
+        a.name.localeCompare(b.name)
+      );
+
+    res.json({ varieties });
+  } catch (err) {
+    console.error('GET /api/vineyards/varieties error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/vineyards/filter-ranges
+ *
+ * Returns the min/max of filterable numeric columns so the UI can scale its
+ * sliders. Uses 1st/99th percentiles to ignore outlier nodata garbage.
+ */
+router.get('/filter-ranges', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        ROUND(percentile_cont(0.01) WITHIN GROUP (ORDER BY ts.elevation_mean_ft)::numeric, 0) AS elev_p01,
+        ROUND(percentile_cont(0.99) WITHIN GROUP (ORDER BY ts.elevation_mean_ft)::numeric, 0) AS elev_p99,
+        ROUND(percentile_cont(0.01) WITHIN GROUP (ORDER BY ts.slope_mean_deg)::numeric, 1)    AS slope_p01,
+        ROUND(percentile_cont(0.99) WITHIN GROUP (ORDER BY ts.slope_mean_deg)::numeric, 1)    AS slope_p99
+      FROM vineyard_parcel_topo_stats ts
+    `);
+
+    const { rows: acreRows } = await pool.query(`
+      SELECT
+        ROUND(MIN(acres)::numeric, 2) AS acres_min,
+        ROUND(percentile_cont(0.99) WITHIN GROUP (ORDER BY acres)::numeric, 1) AS acres_p99
+      FROM vineyard_parcels
+      WHERE acres IS NOT NULL AND acres > 0
+    `);
+
+    const t = rows[0] || {};
+    const a = acreRows[0] || {};
+
+    res.json({
+      elevation_ft: { min: Number(t.elev_p01) || 0, max: Number(t.elev_p99) || 2000 },
+      slope_deg:    { min: Number(t.slope_p01) || 0, max: Number(t.slope_p99) || 30 },
+      acres:        { min: Number(a.acres_min) || 0, max: Number(a.acres_p99) || 100 },
+    });
+  } catch (err) {
+    console.error('GET /api/vineyards/filter-ranges error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

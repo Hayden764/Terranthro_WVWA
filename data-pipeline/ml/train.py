@@ -257,6 +257,8 @@ def main():
     parser = argparse.ArgumentParser(description="Train U-Net vineyard segmentation model")
     parser.add_argument("--ckpt", type=str, default=None,
                         help="Path to checkpoint to resume training from")
+    parser.add_argument("--weights-only", action="store_true",
+                        help="Load only model weights from --ckpt; start a fresh optimizer/scheduler (fine-tuning)")
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--epochs", type=int, default=60)
@@ -352,7 +354,14 @@ def main():
     )
 
     # ── Train ─────────────────────────────────────────────────────────────────
-    trainer.fit(model, dm, ckpt_path=args.ckpt)
+    if args.ckpt and args.weights_only:
+        # Transfer learning: restore model weights only, fresh optimizer + scheduler
+        raw = torch.load(args.ckpt, map_location="cpu")
+        model.load_state_dict(raw["state_dict"])
+        print(f"Weights loaded from  : {Path(args.ckpt).name}  (fresh optimizer)")
+        trainer.fit(model, dm)
+    else:
+        trainer.fit(model, dm, ckpt_path=args.ckpt)
 
     # ── Summary ───────────────────────────────────────────────────────────────
     best_ckpt  = trainer.checkpoint_callback.best_model_path

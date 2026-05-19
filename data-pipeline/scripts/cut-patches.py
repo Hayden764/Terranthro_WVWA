@@ -424,7 +424,8 @@ def main(naip_dir, blocks_file, output_dir, patch_size, stride, erosion_m,
         sys.exit(1)
 
     # ── Load gold-standard blocks ─────────────────────────────────────────────
-    blocks_gdf  = gpd.read_file(blocks_file)
+    blocks_gdf   = gpd.read_file(blocks_file)
+    blocks_gdf   = blocks_gdf[blocks_gdf.geometry.notna()].reset_index(drop=True)
     total_blocks = len(blocks_gdf)
     logger.info(f"Loaded {total_blocks} gold-standard blocks from {blocks_file.name}")
 

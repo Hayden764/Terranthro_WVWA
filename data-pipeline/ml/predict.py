@@ -80,10 +80,11 @@ def tile_to_tensor(img_path: Path, stats: dict):
     ndvi = np.clip(ndvi, -1.0, 1.0)
 
     channels = [r, g, b, nir, ndvi]
-    names    = ["red", "green", "blue", "nir", "ndvi"]
+    means    = stats["mean"]   # list of 5 floats [red, green, blue, nir, ndvi]
+    stds     = stats["std"]
 
     img = np.stack(
-        [(ch - stats[n]["mean"]) / stats[n]["std"] for ch, n in zip(channels, names)],
+        [(ch - means[i]) / stds[i] for i, ch in enumerate(channels)],
         axis=0,
     ).astype(np.float32)   # (5, H, W)
 

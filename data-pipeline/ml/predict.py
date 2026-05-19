@@ -90,7 +90,7 @@ def tile_to_tensor(img_path: Path, stats: dict):
     return img, profile
 
 
-def sliding_window_predict(model, img: np.ndarray, device, batch_size: int = 64) -> np.ndarray:
+def sliding_window_predict(model, img: np.ndarray, device, batch_size: int = 64, stride: int = STRIDE) -> np.ndarray:
     """
     Run U-Net over `img` (5, H, W) using a sliding 256×256 window.
 
@@ -100,15 +100,15 @@ def sliding_window_predict(model, img: np.ndarray, device, batch_size: int = 64)
     _, H, W = img.shape
 
     # Pad so every window position is fully inside the image
-    pad_h = (STRIDE - (H - PATCH_PX) % STRIDE) % STRIDE
-    pad_w = (STRIDE - (W - PATCH_PX) % STRIDE) % STRIDE
+    pad_h = (stride - (H - PATCH_PX) % stride) % stride
+    pad_w = (stride - (W - PATCH_PX) % stride) % stride
     if pad_h or pad_w:
         img = np.pad(img, ((0, 0), (0, pad_h), (0, pad_w)), mode="reflect")
 
     pH, pW = img.shape[1], img.shape[2]
 
-    ys = range(0, pH - PATCH_PX + 1, STRIDE)
-    xs = range(0, pW - PATCH_PX + 1, STRIDE)
+    ys = range(0, pH - PATCH_PX + 1, stride)
+    xs = range(0, pW - PATCH_PX + 1, stride)
     windows = [(y, x) for y in ys for x in xs]
 
     pred_sum = np.zeros((pH, pW), dtype=np.float32)
@@ -166,9 +166,6 @@ def main():
                         help="Sliding window stride in pixels  [default: 128 = 50%% overlap]")
     args = parser.parse_args()
 
-    global STRIDE
-    STRIDE = args.stride
-
     osip_dir = Path(args.osip_dir)
     out_dir  = Path(args.out_dir)
     ckpt     = Path(args.ckpt)
@@ -213,7 +210,7 @@ def main():
             continue
         try:
             img, profile = tile_to_tensor(tile_path, stats)
-            prob         = sliding_window_predict(model, img, device, batch_size=args.batch_size)
+            prob         = sliding_window_predict(model, img, device, batch_size=args.batch_size, stride=args.stride)
 
             save_geotiff(prob, profile, prob_path, dtype="float32")
 

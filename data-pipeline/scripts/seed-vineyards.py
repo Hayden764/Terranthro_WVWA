@@ -64,22 +64,84 @@ def get_conn():
         password=os.getenv("DB_PASSWORD", "terranthro_pass"),
     )
 
-# ── Category classification (mirrors WVWAMap.jsx classifyListing) ─────────────
-def classify_listing(title: str, description: str) -> str:
-    text = (title + " " + (description or "")).lower()
-    is_hotel      = bool(re.search(r"hotel|silo suite|b&b|bed and breakfast|\blodge\b|resort|inn |overnight|accommodation", text))
-    is_restaurant = bool(re.search(r"restaurant|\bdining\b|bistro|\bcafe\b|culinary|farm-to-table", text))
-    is_winery     = bool(re.search(r"winery|pinot|chardonnay|cellar|vineyard|sparkling|viticulture", text))
+# ── Category classification (kept in sync with server-side listing cleanup) ───
+CATEGORY_OVERRIDES = {
+    67: "hotel",
+    174: "restaurant",
+    226: "hotel",
+    278: "restaurant",
+    379: "hotel",
+    387: "hotel",
+    390: "hotel",
+    403: "hotel",
+    407: "other",
+    450: "restaurant",
+    456: "restaurant",
+    470: "tasting",
+    558: "tasting",
+    902: "hotel",
+    1368: "hotel",
+    2080: "hotel",
+    2135: "restaurant",
+    2328: "restaurant",
+    2441: "hotel",
+    2559: "hotel",
+    2620: "restaurant",
+    2820: "hotel",
+    3141: "hotel",
+    4545: "restaurant",
+    4853: "restaurant",
+    5006: "other",
+    5380: "hotel",
+    5529: "tasting",
+    5753: "hotel",
+    5807: "hotel",
+    5900: "restaurant",
+    6102: "other",
+    6104: "hotel",
+}
 
-    if is_hotel and not is_restaurant and not is_winery:
-        return "hotel"
-    if is_restaurant and not is_winery:
+STRONG_WINERY_RE = re.compile(
+    r"\b(winery|vineyard|vineyards|cellar|cellars|pinot|chardonnay|sparkling|winegrow(?:er|ing)|winemaker|viticulture|estate(?:\s+wine|\s+grown)?|tasting\s+room)\b",
+    re.IGNORECASE,
+)
+TASTING_TITLE_RE = re.compile(r"\b(wine\s+bar|winemakers\s+studio|tasting\s+room|tasting\s+house)\b", re.IGNORECASE)
+RESTAURANT_TITLE_RE = re.compile(r"\b(restaurant|cafe|café|brewery|bistro)\b", re.IGNORECASE)
+HOTEL_TITLE_RE = re.compile(r"\b(hotel|inn|b&b|bed\s*&\s*breakfast|bed and breakfast|lodge|lodging|resort|spa|flats|lofts|retreat|marriott|holiday inn|getaways|house)\b", re.IGNORECASE)
+RESTAURANT_DESC_RE = re.compile(r"\b(restaurant|chef|menu|dining|breakfast|brunch|lunch|dinner|pizza|wood-fired|wood fired|brewery|cocktails)\b", re.IGNORECASE)
+HOTEL_DESC_RE = re.compile(r"\b(hotel|inn|suite|suites|guest ?room|guestroom|accommodation|lodging|vacation rental|vacation home|concierge|resort|spa|overnight|bed and breakfast|farmstay|farm stay)\b", re.IGNORECASE)
+
+
+def winery_signal_count(title: str, description: str) -> int:
+    return len(STRONG_WINERY_RE.findall(f"{title or ''} {description or ''}"))
+
+
+def classify_listing(recid: int, title: str, description: str, category: str | None = None) -> str:
+    if recid in CATEGORY_OVERRIDES:
+        return CATEGORY_OVERRIDES[recid]
+
+    title = title or ""
+    description = description or ""
+    text = f"{title} {description}"
+    signals = winery_signal_count(title, description)
+
+    normalized_category = (category or "").strip().lower()
+    if normalized_category in {"hotel", "restaurant", "tasting", "other"}:
+        return normalized_category
+
+    if TASTING_TITLE_RE.search(title) and signals < 2:
+        return "tasting"
+    if RESTAURANT_TITLE_RE.search(title):
         return "restaurant"
-    if is_winery:
-        return "winery"
-    if is_hotel:
+    if HOTEL_TITLE_RE.search(title) and signals < 3:
         return "hotel"
-    return "winery"
+    if RESTAURANT_DESC_RE.search(text) and signals == 0:
+        return "restaurant"
+    if HOTEL_DESC_RE.search(text) and signals == 0:
+        return "hotel"
+    if signals > 0:
+        return "winery"
+    return normalized_category or "winery"
 
 # ── Name normalization (mirrors link_vineyard_blocks.py) ──────────────────────
 def normalize_vineyard_name(name: str) -> str:
@@ -108,7 +170,7 @@ def seed_wineries(cur):
         url_field = w.get("url")
         url = url_field.get("url") if isinstance(url_field, dict) else (url_field or None)
         image_url = w.get("image_url") or None
-        category  = classify_listing(title, desc)
+        category  = classify_listing(recid, title, desc)
         coords = w.get("loc", {}).get("coordinates", [None, None])
         lng, lat = coords[0], coords[1]
 
@@ -119,7 +181,14 @@ def seed_wineries(cur):
         """
         INSERT INTO wineries (recid, title, description, phone, url, image_url, category, location)
         VALUES %s
-        ON CONFLICT (recid) DO NOTHING
+        ON CONFLICT (recid) DO UPDATE
+        SET title = EXCLUDED.title,
+            description = EXCLUDED.description,
+            phone = EXCLUDED.phone,
+            url = EXCLUDED.url,
+            image_url = EXCLUDED.image_url,
+            category = EXCLUDED.category,
+            location = EXCLUDED.location
         """,
         rows,
         template="(%s, %s, %s, %s, %s, %s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326))",

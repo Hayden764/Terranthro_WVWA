@@ -49,11 +49,8 @@ export default function PortalVineyardGroup() {
 
   const load = useCallback(async () => {
     try {
-      const all = await apiJson('/api/portal/vineyards');
-      const group = all.filter(
-        (v) => (v.vineyard_name || '').toLowerCase() === name.toLowerCase(),
-      );
-      if (group.length === 0) {
+      const group = await apiJson(`/api/portal/vineyards/by-name?name=${encodeURIComponent(name)}`);
+      if (!group || group.length === 0) {
         navigate('/portal/dashboard', { replace: true });
         return;
       }

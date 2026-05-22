@@ -1,5 +1,6 @@
 import express from 'express';
 import { pool } from '../db/pool.js';
+import { classifyListingCategory } from '../lib/listingCategories.js';
 
 const router = express.Router();
 
@@ -73,15 +74,24 @@ router.get('/', async (req, res) => {
       ),
     ]);
 
-    const wineries = wineryRows.rows.map((r) => ({
+    const wineries = wineryRows.rows.map((r) => {
+      const category = classifyListingCategory({
+        recid: r.id,
+        title: r.label,
+        description: '',
+        category: r.category,
+      });
+
+      return ({
       type:     'winery',
       id:       r.id,
       label:    r.label,
-      sublabel: r.category === 'winery' ? 'Winery' : r.category,
-      category: r.category,
+      sublabel: category === 'winery' ? 'Winery' : category,
+      category,
       lng:      r.lng,
       lat:      r.lat,
-    }));
+    });
+    });
 
     const vineyards = vineyardRows.rows.map((r) => ({
       type:     'vineyard',

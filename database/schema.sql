@@ -145,7 +145,7 @@ CREATE INDEX idx_raster_layers_type ON raster_layers(layer_type, layer_name);
 -- ─────────────────────────────────────────────
 -- Wineries / tasting rooms / lodging / restaurants
 -- recid: source ID from the original wineries.json dataset
--- category: winery | hotel | restaurant | other (classified from description text)
+-- category: winery | tasting | hotel | restaurant | other (classified from listing text)
 -- ─────────────────────────────────────────────
 CREATE TABLE wineries (
     id          SERIAL PRIMARY KEY,

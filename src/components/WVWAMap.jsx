@@ -659,6 +659,57 @@ function setVineyardReferenceSoftFocus(map, isSoftFocused) {
   }
 }
 
+/**
+ * Run `fn` once the map style is ready to accept paint/layout writes.
+ *
+ * Soft-focus writes used to be guarded by a bare `isStyleLoaded()` check and
+ * silently dropped when the style wasn't ready (e.g. mid-flyTo). That left the
+ * reference vineyards stuck dimmed after leaving a winery. Deferring to the
+ * next `idle` guarantees the write always lands.
+ */
+function runWhenStyleReady(map, fn) {
+  if (!map) return;
+  if (map.isStyleLoaded?.()) { fn(); return; }
+  map.once('idle', () => fn());
+}
+
+/**
+ * Dim the reference vineyard layers behind an active vineyard filter so the
+ * crimson `vineyards-matched-*` overlay reads against a hushed background.
+ * Opacity-only — callers reset colors/widths via setVineyardReferenceSoftFocus
+ * first so this can layer cleanly on top of either visual state.
+ */
+function applyVineyardFilterDim(map) {
+  if (map.getLayer('vineyards-reference-fill'))          map.setPaintProperty('vineyards-reference-fill', 'fill-opacity', 0.02);
+  if (map.getLayer('vineyards-reference-line'))          map.setPaintProperty('vineyards-reference-line', 'line-opacity', 0.18);
+  if (map.getLayer('vineyards-reference-passive-fill'))  map.setPaintProperty('vineyards-reference-passive-fill', 'fill-opacity', 0.06);
+  if (map.getLayer('vineyards-reference-passive-hatch')) map.setPaintProperty('vineyards-reference-passive-hatch', 'fill-opacity', 0.07);
+  if (map.getLayer('vineyards-reference-passive-line'))  map.setPaintProperty('vineyards-reference-passive-line', 'line-opacity', 0.12);
+  if (map.getLayer('vineyards-linked-fill'))             map.setPaintProperty('vineyards-linked-fill', 'fill-opacity', 0.012);
+  if (map.getLayer('vineyards-linked-line'))             map.setPaintProperty('vineyards-linked-line', 'line-opacity', 0.32);
+}
+
+/**
+ * Single authority for how the reference ("all") vineyards are emphasized.
+ *
+ * Precedence:
+ *   1. filters active  → bright baseline reset, then filter-dim (filters win)
+ *   2. scope 'winery'  → heavy soft-focus so only the selected winery reads
+ *   3. otherwise       → bright; every vineyard visible
+ *
+ * `scope` is derived from the sidebar's current page level, so there is exactly
+ * one input deciding bright-vs-dimmed instead of several racing writers.
+ */
+function applyVineyardEmphasis(map, { scope, filtersActive }) {
+  if (!map || !map.getLayer?.('vineyards-reference-fill')) return;
+  if (filtersActive) {
+    setVineyardReferenceSoftFocus(map, false);
+    applyVineyardFilterDim(map);
+  } else {
+    setVineyardReferenceSoftFocus(map, scope === 'winery');
+  }
+}
+
 function setVineyardVisualizationVisibility(map, isVisible) {
   const visibility = isVisible ? 'visible' : 'none';
   const vineyardLayerIds = [
@@ -689,13 +740,13 @@ function setVineyardVisualizationVisibility(map, isVisible) {
  * - Sets feature-state `matched: true` on every parcel whose id is in
  *   `matchedIds`, and clears it for ids that were previously matched but
  *   are no longer (passed in `prevMatchedIds`).
- * - When `filtersActive` is true, dims the base reference layers so the
- *   crimson `vineyards-matched-*` overlay (driven by feature-state) reads
- *   strongly against a hushed background.
+ * Background dimming for the active-filter state lives in applyVineyardEmphasis
+ * (the single vineyard-emphasis authority); this function only manages the
+ * per-parcel `matched` feature-state that drives the crimson overlay.
  *
  * Returns the new "previous matched ids" set so the caller can store it.
  */
-function setVineyardMatchedFeatureStates(map, filtersActive, matchedIds, prevMatchedIds) {
+function setVineyardMatchedFeatureStates(map, matchedIds, prevMatchedIds) {
   if (!map || !map.isStyleLoaded?.()) return prevMatchedIds;
 
   const sourceId = 'vineyards-reference';
@@ -727,25 +778,9 @@ function setVineyardMatchedFeatureStates(map, filtersActive, matchedIds, prevMat
     } catch (_) { /* feature may not be loaded yet — will be reapplied on sourcedata */ }
   }
 
-  // Dim the base reference layers when filters are active.
-  // We multiply the soft-focus baseline opacities by ~0.3 to make matched
-  // parcels stand out in crimson without entirely hiding the rest of the map.
-  const refFillOp        = filtersActive ? 0.02 : 0.06;
-  const refLineOp        = filtersActive ? 0.18 : 0.5;
-  const passiveFillOp    = filtersActive ? 0.06 : 0.18;
-  const passiveHatchOp   = filtersActive ? 0.07 : 0.2;
-  const passiveLineOp    = filtersActive ? 0.12 : 0.34;
-  const linkedFillOp     = filtersActive ? 0.012 : 0.03;
-  const linkedLineOp     = filtersActive ? 0.32 : 0.86;
-
-  if (map.getLayer('vineyards-reference-fill'))         map.setPaintProperty('vineyards-reference-fill', 'fill-opacity', refFillOp);
-  if (map.getLayer('vineyards-reference-line'))         map.setPaintProperty('vineyards-reference-line', 'line-opacity', refLineOp);
-  if (map.getLayer('vineyards-reference-passive-fill')) map.setPaintProperty('vineyards-reference-passive-fill', 'fill-opacity', passiveFillOp);
-  if (map.getLayer('vineyards-reference-passive-hatch'))map.setPaintProperty('vineyards-reference-passive-hatch', 'fill-opacity', passiveHatchOp);
-  if (map.getLayer('vineyards-reference-passive-line')) map.setPaintProperty('vineyards-reference-passive-line', 'line-opacity', passiveLineOp);
-  if (map.getLayer('vineyards-linked-fill'))            map.setPaintProperty('vineyards-linked-fill', 'fill-opacity', linkedFillOp);
-  if (map.getLayer('vineyards-linked-line'))            map.setPaintProperty('vineyards-linked-line', 'line-opacity', linkedLineOp);
-
+  // Background dimming for the active-filter state is handled by the single
+  // vineyard-emphasis authority (applyVineyardEmphasis), so this writer only
+  // owns the per-parcel `matched` feature-state used by the crimson overlay.
   return newSet;
 }
 
@@ -1521,6 +1556,10 @@ const WVWAMap = forwardRef(function WVWAMap({
   // Vineyard filter overlay
   matchedParcelIds = null,   // array of parcel ids that match active filters, or null
   filtersActive    = false,
+  // Which vineyards to emphasize, derived from the sidebar's page level:
+  //   'all'    → every vineyard visible (default for all non-winery pages)
+  //   'winery' → dim everything except the selected winery's parcels
+  vineyardScope    = 'all',
 }, externalRef) {
   const mapContainerRef = useRef(null);
   const mapRef          = useRef(null);
@@ -1557,15 +1596,9 @@ const WVWAMap = forwardRef(function WVWAMap({
   useEffect(() => {
     if (selectedListingProp === undefined) return;
     setSelectedListing(selectedListingProp);
-    // Eagerly clear soft focus when the prop is cleared externally (e.g. navigating
-    // away from winery detail), rather than waiting for the async useEffect cycle.
-    if (!selectedListingProp) {
-      const map = mapRef.current;
-      if (map && map.isStyleLoaded?.()) {
-        setVineyardReferenceSoftFocus(map, false);
-        setListingSoftFocus(map, false);
-      }
-    }
+    // Vineyard/listing emphasis is no longer derived here — the single
+    // vineyardScope authority effect restores "all vineyards" when the
+    // sidebar leaves the winery page.
   }, [selectedListingProp]);
   useEffect(() => { if (activeLayerProp !== undefined) setActiveLayer(activeLayerProp); }, [activeLayerProp]);
   useEffect(() => { if (currentMonthProp !== undefined) setCurrentMonth(currentMonthProp); }, [currentMonthProp]);
@@ -1652,13 +1685,8 @@ const WVWAMap = forwardRef(function WVWAMap({
     clearSelectedListing() {
       setSelectedListingRef.current?.(null);
       setHoveredListingRef.current?.(null);
-      // Imperatively reset soft focus now rather than waiting for a React effect cycle,
-      // so the map never stays muted after returning to AVA detail.
-      const map = mapRef.current;
-      if (map && map.isStyleLoaded?.()) {
-        setVineyardReferenceSoftFocus(map, false);
-        setListingSoftFocus(map, false);
-      }
+      // Emphasis is restored by the vineyardScope authority effect once the
+      // sidebar's page level leaves winery-detail.
     },
     flyToAva(slug) {
       flyToAva(mapRef.current, slug);
@@ -1864,7 +1892,6 @@ const WVWAMap = forwardRef(function WVWAMap({
     const apply = () => {
       const next = setVineyardMatchedFeatureStates(
         map,
-        filtersActive,
         matchedParcelIds || [],
         prevMatchedIdsRef.current,
       );
@@ -1955,10 +1982,23 @@ const WVWAMap = forwardRef(function WVWAMap({
       map,
       markersVisible && listingFilterMode !== LISTING_FILTER_MODES.noWineriesVisualized,
     );
-    setListingSoftFocus(map, !!selectedListing);
     setVineyardVisualizationVisibility(map, listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized);
-    setVineyardReferenceSoftFocus(map, !!selectedListing);
+    // Vineyard/listing soft-focus is owned by the vineyardScope authority effect below.
   }, [selectedListing, mapLoaded, introComplete, markersVisible, listingFilterMode]);
+
+  // ── Single authority for vineyard + listing emphasis ─────────────────
+  // `vineyardScope` comes straight from the sidebar's current page level, so
+  // this is the one place that decides bright-vs-dimmed. Runs through
+  // runWhenStyleReady so a write is never silently dropped mid-flyTo (the old
+  // bug where leaving a winery left every vineyard stuck dimmed/invisible).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    runWhenStyleReady(map, () => {
+      applyVineyardEmphasis(map, { scope: vineyardScope, filtersActive });
+      setListingSoftFocus(map, vineyardScope === 'winery');
+    });
+  }, [vineyardScope, filtersActive, mapLoaded]);
   const listingFilterModeRef = useRef(LISTING_FILTER_MODES.allWineries);
   const vineyardRecidSetRef = useRef(new Set());
 
@@ -3009,13 +3049,9 @@ const WVWAMap = forwardRef(function WVWAMap({
     if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
     if (vineyardPopupRef.current) { vineyardPopupRef.current.remove(); vineyardPopupRef.current = null; }
 
-    // Clear any selected listing when changing AVA context
+    // Clear any selected listing when changing AVA context. Emphasis is
+    // restored by the vineyardScope authority effect (scope → 'all').
     setSelectedListingBoth(null);
-    // Eagerly reset soft focus — don't wait for the async useEffect cycle.
-    if (map.isStyleLoaded?.()) {
-      setVineyardReferenceSoftFocus(map, false);
-      setListingSoftFocus(map, false);
-    }
 
     if (selectedAva) {
       // ── Style layers: highlight selected, hide others ─────────────
@@ -3285,8 +3321,9 @@ const WVWAMap = forwardRef(function WVWAMap({
 
     setLayerVisibility(map, 'vineyards-linked-fill', devLayerToggles.vineyardsLinked);
     setLayerVisibility(map, 'vineyards-linked-line', devLayerToggles.vineyardsLinked);
-    // Re-apply soft focus so linked layer doesn't flash at full green when toggled on during winery detail
-    if (selectedListing) setVineyardReferenceSoftFocus(map, true);
+    // Re-apply emphasis so layers don't flash at full opacity when toggled on
+    // while a winery is focused or a filter is active.
+    applyVineyardEmphasis(map, { scope: vineyardScope, filtersActive });
 
     const vineyardHighlightLayerIds = [
       'vineyards-reference-hover-line',
@@ -3311,6 +3348,8 @@ const WVWAMap = forwardRef(function WVWAMap({
     vineyardFocusMode,
     introComplete,
     listingFilterMode,
+    vineyardScope,
+    filtersActive,
   ]);
 
   const toggleDevLayer = useCallback((keyName) => {

@@ -225,6 +225,9 @@ export default function WVWAMapPage() {
   const [selectedVineyards, setSelectedVineyards]   = useState([]);
   const [insideIds, setInsideIds]                   = useState(null);
   const [vineyardRecidSet, setVineyardRecidSet]     = useState(() => new Set());
+  // Which vineyards the map emphasizes, driven by the sidebar's page level
+  // ('all' everywhere except a winery page, where it's 'winery').
+  const [vineyardScope, setVineyardScope]           = useState('all');
 
   // ── Vineyard filter modal (elevation/slope/aspect/variety/AVA/acres) ────
   const vineyardFilters = useVineyardFilters();
@@ -317,6 +320,7 @@ export default function WVWAMapPage() {
             parcelTopoStats={parcelTopoStats}
             onVineyardHover={(features) => mapRef.current?.hoverVineyards?.(features)}
             onViewAllVineyards={(features) => mapRef.current?.viewAllVineyards?.(features)}
+            onVineyardScopeChange={setVineyardScope}
             onOpenFilters={() => setFilterModalOpen(true)}
             filterActiveCount={vineyardFilters.activeCount}
             vineyardFilterResult={vineyardFilters.queryResult}
@@ -387,6 +391,7 @@ export default function WVWAMapPage() {
             // Vineyard filter overlay (dimming + matched parcels)
             matchedParcelIds={vineyardFilters.queryResult?.matching_parcel_ids ?? null}
             filtersActive={vineyardFilters.isActive}
+            vineyardScope={vineyardScope}
           />
         </div>
       </div>

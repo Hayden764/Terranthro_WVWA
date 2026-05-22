@@ -1247,6 +1247,7 @@ export default function ExplorerSidebar({
   parcelTopoStats,
   onVineyardHover,
   onViewAllVineyards,
+  onVineyardScopeChange,
   isMobile = false,
   isOpen = false,
   onClose,
@@ -1270,6 +1271,15 @@ export default function ExplorerSidebar({
   const skipAvaRef    = useRef(0);
 
   const currentView = viewStack[viewStack.length - 1];
+
+  // Vineyard emphasis is driven by the page level: only the winery pages
+  // (winery-detail and the parcel-blocks deep-dive reached from one) focus on
+  // a single winery's parcels; every other view shows all vineyards.
+  useEffect(() => {
+    const scope = (currentView === 'winery-detail' || currentView === 'parcel-blocks')
+      ? 'winery' : 'all';
+    onVineyardScopeChange?.(scope);
+  }, [currentView, onVineyardScopeChange]);
 
   // Column index for the 3-panel (+ parcel-blocks) sliding track
   const VIEW_COL = { home: 0, 'ava-list': 1, 'winery-list': 1, 'ava-detail': 2, 'winery-detail': 2, 'parcel-blocks': 3 };

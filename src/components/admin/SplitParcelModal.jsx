@@ -135,6 +135,10 @@ export default function SplitParcelModal({ parcel, blocks = [], onClose, onAppli
   const [labelA, setLabelA] = useState(parcel.parcel_label ? `${parcel.parcel_label} A` : '');
   const [labelB, setLabelB] = useState(parcel.parcel_label ? `${parcel.parcel_label} B` : '');
 
+  // Stable array reference so PortalVineyardMap doesn't tear down and rebuild
+  // its map on every re-render (which would drop the freshly-added preview).
+  const mapParcels = useMemo(() => [parcel], [parcel]);
+
   // ── Step 1 handlers ──────────────────────────────────────────────────────
   function handleLineSave(_parcelId, lineGeometry) {
     setSplitError(null);
@@ -294,7 +298,7 @@ export default function SplitParcelModal({ parcel, blocks = [], onClose, onAppli
           }}>
             {parcel.geometry ? (
               <PortalVineyardMap
-                parcels={[parcel]}
+                parcels={mapParcels}
                 highlightId={parcel.id}
                 height="100%"
                 style={{ height: '100%' }}

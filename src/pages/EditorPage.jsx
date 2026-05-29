@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import SplitParcelModal from '../components/admin/SplitParcelModal';
 import { useNavigate, Link } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
@@ -87,6 +88,9 @@ export default function EditorPage() {
   const [isDrawingNew, setIsDrawingNew] = useState(false);
   const [newBlockForm, setNewBlockForm] = useState({ vineyard_name: '', source_dataset: 'admin' });
   const newBlockGeomRef = useRef(null); // stores drawn GeoJSON geometry
+
+  // Split modal state
+  const [showSplitModal, setShowSplitModal] = useState(false);
 
   // Confirm-delete state
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -850,6 +854,16 @@ export default function EditorPage() {
               </div>
             )}
 
+            {/* Split Polygon button */}
+            {!isEditing && (
+              <button
+                onClick={() => setShowSplitModal(true)}
+                style={{ ...btnStyle(TOKENS.amber, TOKENS.amber), fontSize: 'var(--type-body-size)' }}
+              >
+                ✂️ Split Polygon
+              </button>
+            )}
+
             {/* Tab switcher */}
             <div style={{ display: 'flex', borderRadius: 5, overflow: 'hidden', border: `1px solid ${TOKENS.border}` }}>
               {['geometry', 'metadata'].map((tab) => (
@@ -966,6 +980,33 @@ export default function EditorPage() {
             <MetaField label="Source Dataset" field="source_dataset" form={newBlockForm} setForm={setNewBlockForm} />
             <MetaField label="AVA Name" field="ava_name" form={newBlockForm} setForm={setNewBlockForm} />
             <MetaField label="Varietals" field="varietals_list" form={newBlockForm} setForm={setNewBlockForm} multiline />
+            {/* Clone Metadata Button */}
+            {selectedParcel && (
+              <button
+                onClick={() => {
+                  const props = selectedParcel.properties;
+                  setNewBlockForm((f) => ({
+                    ...f,
+                    vineyard_name: props.vineyard_name ?? '',
+                    vineyard_org: props.vineyard_org ?? '',
+                    owner_name: props.owner_name ?? '',
+                    ava_name: props.ava_name ?? '',
+                    nested_ava: props.nested_ava ?? '',
+                    nested_nested_ava: props.nested_nested_ava ?? '',
+                    situs_address: props.situs_address ?? '',
+                    situs_city: props.situs_city ?? '',
+                    situs_zip: props.situs_zip ?? '',
+                    acres: props.acres != null ? String(props.acres) : '',
+                    varietals_list: props.varietals_list ?? '',
+                    source_dataset: props.source_dataset ?? '',
+                    winery_id: props.winery_id != null ? String(props.winery_id) : '',
+                  }));
+                }}
+                style={{ ...btnStyle(TOKENS.amber, TOKENS.amber), fontSize: 'var(--type-body-size)', margin: '8px 0' }}
+              >
+                📋 Clone Metadata from Selected
+              </button>
+            )}
             <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
               <button onClick={handleSaveNewBlock} disabled={!newBlockGeomRef.current} style={{ ...btnStyle(newBlockGeomRef.current ? TOKENS.success : TOKENS.surfaceRaised, TOKENS.vividGreen), flex: 1, fontSize: 'var(--type-body-size)', opacity: newBlockGeomRef.current ? 1 : 0.5 }}>
                 Stage New Block
@@ -1023,6 +1064,23 @@ export default function EditorPage() {
 
       {/* ── Map ─────────────────────────────────────────────────────────── */}
       <div ref={mapContainerRef} style={{ flex: 1, position: 'relative' }} />
+
+      {/* Split Parcel Modal */}
+      {showSplitModal && selectedParcel && (
+        <SplitParcelModal
+          parcel={{ ...selectedParcel.properties, geometry: selectedParcel.geometry }}
+          blocks={[]}
+          onClose={() => setShowSplitModal(false)}
+          onApplied={() => {
+            setShowSplitModal(false);
+            // Reload parcels after split
+            fetch(`${API_BASE}/api/vineyards/parcels`, { headers: API_HEADERS })
+              .then((r) => r.json())
+              .then((data) => setParcels(data));
+            setSelectedParcel(null);
+          }}
+        />
+      )}
     </div>
   );
 }

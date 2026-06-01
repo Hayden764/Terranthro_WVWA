@@ -44,41 +44,67 @@ Loss Functions
 
 Primary Metric: IoU (Intersection over Union / Jaccard index)
   IoU = TP / (TP + FP + FN)
-  Of all pixels that are vineyard in *either* prediction or label,
-  what fraction are vineyard in *both*?
-  0.0 = no overlap at all.  1.0 = perfect.
   0.65+ = good for agricultural parcel segmentation.  0.75+ = strong.
-  Used for early stopping and checkpoint selection.
+
+Encoder Unfreezing Strategy (gradual, block-by-block)
+------------------------------------------------------
+  Previous approach: unfreeze ALL encoder layers at once → catastrophic
+  forgetting.  The decoder's large accumulated gradients destroyed the
+  pretrained ResNet features before it could adapt.
+
+  New approach — gradual unfreezing with layer-wise LR decay (LLRD):
+    Phase 0  epochs 0 → unfreeze_start-1  : decoder only (warmup)
+    Phase 1  epoch unfreeze_start          : unfreeze layer4 (deepest)
+    Phase 2  epoch unfreeze_start+interval : unfreeze layer3
+    Phase 3  epoch +2×interval            : unfreeze layer2
+    Phase 4  epoch +3×interval            : unfreeze layer1 + stem
+
+  Each block gets a progressively lower LR (LLRD):
+    layer4 → encoder_lr          (most task-specific, largest update)
+    layer3 → encoder_lr / 3
+    layer2 → encoder_lr / 9
+    layer1 + stem → encoder_lr / 27  (most general, barely touched)
+
+  Why: shallow encoder layers encode universal features (edges, colours)
+  that transfer perfectly.  Deep layers encode semantic concepts
+  ("row-crop texture") that benefit from gentle, AVA-specific adaptation.
+
+  With encoder_lr = 5e-6:
+    layer4 LR = 5.0e-06
+    layer3 LR = 1.7e-06
+    layer2 LR = 5.6e-07
+    layer1 LR = 1.9e-07
 
 Optimiser & Schedule
 --------------------
   AdamW with cosine annealing LR.
-  AdamW = Adam + decoupled weight decay (better regularisation).
-  CosineAnnealingLR smoothly decays LR from base_lr → eta_min over
-  T_max epochs.  Helps the model escape shallow local minima in later
-  epochs without aggressive step-decay.
+  CosineAnnealingLR smoothly decays every LR group from its base value
+  → eta_min=1e-7 over T_max epochs.
 
 Hardware
 --------
-  Trainer(accelerator="auto") detects in priority order:
-    CUDA GPU  → fastest (~5-10 min / epoch)
-    MPS (Apple Silicon M-series) → medium (~20-40 min / epoch)
-    CPU       → slow but works (~2-4 hr / epoch on 16-core)
+  Trainer(accelerator="auto") detects: CUDA → MPS → CPU.
 
 Usage
 -----
-  # From data-pipeline/ directory:
+  # Train from scratch on all-vineyard-parcels data:
   .venv/bin/python ml/train.py
 
-  # Resume from checkpoint:
-  .venv/bin/python ml/train.py --ckpt ml/checkpoints/unet-...ckpt
+  # Fine-tune from an existing checkpoint (weights only, fresh optimizer):
+  .venv/bin/python ml/train.py \\
+      --ckpt          ml/checkpoints/unet-resnet34-ep02-iou0.773.ckpt \\
+      --weights-only \\
+      --lr            3e-5 \\
+      --encoder-lr    2e-6
+
+  # Resume a crashed training run (full state restore):
+  .venv/bin/python ml/train.py --ckpt ml/checkpoints/last.ckpt
 """
 
 import argparse
 import sys
 from pathlib import Path
 
-# Allow `from dataset import ...` when run as `python ml/train.py`
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import torch
@@ -96,39 +122,45 @@ from dataset import VineyardDataModule
 
 
 # ---------------------------------------------------------------------------
-# Lightning Module — model + training logic
+# Encoder block registry
+# ---------------------------------------------------------------------------
+
+def _encoder_blocks(encoder):
+    """
+    Return ordered list of (name, [params]) for each ResNet34 encoder block,
+    from deepest (most task-specific) to shallowest (most general).
+
+    LLRD assigns a separate LR to each group so shallow layers barely move
+    while the deepest layer adapts most aggressively to vineyard features.
+    """
+    return [
+        ("layer4", list(encoder.layer4.parameters())),
+        ("layer3", list(encoder.layer3.parameters())),
+        ("layer2", list(encoder.layer2.parameters())),
+        ("stem",   list(encoder.layer1.parameters())
+                 + list(encoder.conv1.parameters())
+                 + list(encoder.bn1.parameters())),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Lightning Module
 # ---------------------------------------------------------------------------
 
 class VineyardSegModel(L.LightningModule):
-    """
-    Wraps the U-Net in Lightning's Module pattern, which separates:
-      1. Model architecture       → __init__
-      2. Forward pass             → forward
-      3. Train / val step logic   → training_step, validation_step
-      4. Optimiser configuration  → configure_optimizers
-
-    Lightning handles the training loop, device placement, gradient
-    accumulation, logging, and checkpointing — we just define the logic.
-    """
 
     def __init__(
         self,
-        lr: float = 3e-4,
+        lr: float          = 1e-4,    # decoder learning rate
+        encoder_lr: float  = 5e-6,    # layer4 LR; shallower blocks get lr/3, /9, /27
         weight_decay: float = 1e-4,
-        t_max: int = 60,
-        freeze_encoder_epochs: int = 5,
+        t_max: int          = 100,    # cosine annealing period (= max_epochs)
+        unfreeze_start: int = 10,     # epoch to unfreeze first encoder block
+        unfreeze_interval: int = 10,  # epochs between successive block unfreeze steps
     ):
         super().__init__()
-        self.save_hyperparameters()   # saves all hparams to ckpt
+        self.save_hyperparameters()
 
-        # ── U-Net model ──────────────────────────────────────────────────────
-        # encoder_name  : which CNN backbone to use as the encoder
-        # encoder_weights: "imagenet" → use pretrained weights (then inflate)
-        # in_channels   : 5 (R, G, B, NIR, NDVI)
-        # classes       : 1 output channel (binary mask probability)
-        # activation    : None → we get raw logits; sigmoid applied manually
-        #                 so the loss functions can use numerically stable
-        #                 log-sum-exp tricks internally
         self.model = smp.Unet(
             encoder_name="resnet34",
             encoder_weights="imagenet",
@@ -137,115 +169,125 @@ class VineyardSegModel(L.LightningModule):
             activation=None,
         )
 
-        # ── Loss functions ───────────────────────────────────────────────────
-        # from_logits=True: DiceLoss applies sigmoid internally (more stable)
         self.dice_loss  = smp.losses.DiceLoss(mode="binary", from_logits=True)
         self.focal_loss = smp.losses.FocalLoss(mode="binary")
 
-        # ── Validation metrics ───────────────────────────────────────────────
-        # torchmetrics objects accumulate predictions across all val batches
-        # then compute the epoch-level metric in one go — no manual averaging.
         self.val_iou  = torchmetrics.JaccardIndex(task="binary", threshold=0.5)
-        # torchmetrics >= 1.0: Dice == F1Score for binary segmentation
         self.val_dice = torchmetrics.F1Score(task="binary", threshold=0.5)
 
-    # ── Encoder warmup ───────────────────────────────────────────────────────
+        # Freeze all encoder params at init; unfrozen gradually in training
+        for p in self.model.encoder.parameters():
+            p.requires_grad_(False)
+
+    # ── Gradual encoder unfreezing ────────────────────────────────────────────
     def on_train_epoch_start(self):
         """
-        Freeze the encoder for the first `freeze_encoder_epochs` epochs so the
-        randomly-initialised decoder learns to use the pretrained ResNet features
-        without corrupting them via large early gradients.
+        Implements the gradual block-by-block unfreeze schedule.
 
-        After the warmup, unfreeze the encoder.  The optimiser already has a
-        separate (10× lower) LR group for encoder params so fine-tuning is
-        gentle — catastrophic forgetting of ImageNet features is avoided.
+        At each trigger epoch, the next encoder block (deepest first) has its
+        parameters unfrozen.  Its optimizer LR group was already configured
+        with the correct LLRD value — no optimizer surgery needed, just flip
+        requires_grad.
+
+        Adam's momentum buffers for previously-frozen params are zero, so
+        the first update after unfreezing is clean and conservative.
         """
-        n = self.hparams.freeze_encoder_epochs
-        if self.current_epoch < n:
-            for p in self.model.encoder.parameters():
-                p.requires_grad_(False)
-            if self.current_epoch == 0:
-                print(f"\n  Encoder FROZEN for epochs 0–{n - 1} (decoder warmup)")
-        elif self.current_epoch == n:
-            for p in self.model.encoder.parameters():
-                p.requires_grad_(True)
-            print(f"\n  Encoder UNFROZEN at epoch {n} — fine-tuning all layers (encoder LR = {self.hparams.lr * 0.1:.1e})")
+        hp    = self.hparams
+        epoch = self.current_epoch
+
+        blocks   = _encoder_blocks(self.model.encoder)
+        schedule = [
+            hp.unfreeze_start + i * hp.unfreeze_interval
+            for i in range(len(blocks))
+        ]
+
+        if epoch == 0:
+            print(f"\n  Encoder FROZEN  — decoder warmup for {hp.unfreeze_start} epochs")
+            print(f"  Unfreeze plan   : layer4 @ ep{schedule[0]}, "
+                  f"layer3 @ ep{schedule[1]}, "
+                  f"layer2 @ ep{schedule[2]}, "
+                  f"stem @ ep{schedule[3]}")
+
+        for trigger, (block_name, block_params) in zip(schedule, blocks):
+            if epoch == trigger:
+                for p in block_params:
+                    p.requires_grad_(True)
+                # Find matching LR from optimizer for the log message
+                lr_val = next(
+                    pg["lr"] for pg in self.optimizers().param_groups
+                    if pg.get("name") == f"enc.{block_name}"
+                )
+                print(f"\n  ✓ Unfroze encoder.{block_name} at epoch {epoch}"
+                      f"  (LR = {lr_val:.2e})")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Returns raw logits (B, 1, H, W).  Apply sigmoid for probabilities."""
         return self.model(x)
 
     def _compute_loss(self, logits, masks):
-        """
-        Shared loss computation for train and val steps.
-        Both losses expect (B, 1, H, W) logits and (B, 1, H, W) targets.
-        """
-        masks_4d = masks.unsqueeze(1)           # (B,H,W) → (B,1,H,W)
+        masks_4d = masks.unsqueeze(1)
         dice  = self.dice_loss(logits, masks_4d)
         focal = self.focal_loss(logits, masks_4d)
         return dice + focal, dice, focal
 
     def training_step(self, batch, batch_idx):
-        imgs, masks = batch                     # (B,5,H,W), (B,H,W)
-        logits = self(imgs)                     # (B,1,H,W)
+        imgs, masks = batch
+        logits = self(imgs)
         loss, dice, focal = self._compute_loss(logits, masks)
-
-        self.log("train_loss",  loss,  prog_bar=True,  on_step=False, on_epoch=True)
-        self.log("train_dice_l", dice, prog_bar=False, on_step=False, on_epoch=True)
-        self.log("train_focal",  focal,prog_bar=False, on_step=False, on_epoch=True)
+        self.log("train_loss",   loss,  prog_bar=True,  on_step=False, on_epoch=True)
+        self.log("train_dice_l", dice,  prog_bar=False, on_step=False, on_epoch=True)
+        self.log("train_focal",  focal, prog_bar=False, on_step=False, on_epoch=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         imgs, masks = batch
         logits = self(imgs)
         loss, _, _ = self._compute_loss(logits, masks)
-
-        # Probabilities for metric computation (sigmoid → [0,1])
-        probs = torch.sigmoid(logits.squeeze(1))   # (B, H, W)
-
-        # Update metric accumulators (Lightning calls .compute() at epoch end)
+        probs = torch.sigmoid(logits.squeeze(1))
         self.val_iou(probs,  masks.long())
         self.val_dice(probs, masks.int())
-
         self.log("val_loss", loss,          prog_bar=True,  on_step=False, on_epoch=True)
         self.log("val_iou",  self.val_iou,  prog_bar=True,  on_step=False, on_epoch=True)
         self.log("val_dice", self.val_dice, prog_bar=True,  on_step=False, on_epoch=True)
 
     def configure_optimizers(self):
         """
-        AdamW with differential LRs + CosineAnnealingLR.
+        Five param groups with layer-wise LR decay (LLRD):
 
-        Differential learning rates prevent catastrophic forgetting of the
-        pretrained encoder:
-          • Decoder params → lr        (e.g. 1e-4)  — learn fast from scratch
-          • Encoder params → lr × 0.1  (e.g. 1e-5)  — fine-tune gently
+          Group       params                 LR
+          ─────────── ────────────────────── ──────────────────
+          decoder     decoder + seg_head     lr          (e.g. 1e-4)
+          enc.layer4  ResNet layer4          encoder_lr  (e.g. 5e-6)
+          enc.layer3  ResNet layer3          encoder_lr/3
+          enc.layer2  ResNet layer2          encoder_lr/9
+          enc.stem    layer1 + conv1 + bn1   encoder_lr/27
 
-        During the freeze warmup epochs the encoder's requires_grad=False so
-        the lower LR is irrelevant; it kicks in properly after unfreezing.
-
-        CosineAnnealingLR decays both LR groups from their base values to
-        eta_min=1e-6 over T_max epochs.
+        All encoder groups start with requires_grad=False and are
+        enabled one-by-one in on_train_epoch_start.  The optimizer
+        tracks them from the start so Adam's state is ready the moment
+        they unfreeze (momentum buffers initialised to zero = clean start).
         """
-        encoder_params = list(self.model.encoder.parameters())
-        encoder_ids    = {id(p) for p in encoder_params}
-        decoder_params = [p for p in self.parameters() if id(p) not in encoder_ids]
+        hp = self.hparams
+        enc = self.model.encoder
+
+        blocks = _encoder_blocks(enc)
+        enc_ids = {id(p) for _, params in blocks for p in params}
+        decoder_params = [p for p in self.parameters() if id(p) not in enc_ids]
 
         param_groups = [
-            {"params": decoder_params, "lr": self.hparams.lr,         "name": "decoder"},
-            {"params": encoder_params, "lr": self.hparams.lr * 0.1,   "name": "encoder"},
+            {"params": decoder_params,  "lr": hp.lr,               "name": "decoder"},
+            {"params": blocks[0][1],    "lr": hp.encoder_lr,        "name": "enc.layer4"},
+            {"params": blocks[1][1],    "lr": hp.encoder_lr / 3,    "name": "enc.layer3"},
+            {"params": blocks[2][1],    "lr": hp.encoder_lr / 9,    "name": "enc.layer2"},
+            {"params": blocks[3][1],    "lr": hp.encoder_lr / 27,   "name": "enc.stem"},
         ]
-        optimizer = torch.optim.AdamW(param_groups, weight_decay=self.hparams.weight_decay)
+
+        optimizer = torch.optim.AdamW(param_groups, weight_decay=hp.weight_decay)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=self.hparams.t_max,
-            eta_min=1e-6,
+            optimizer, T_max=hp.t_max, eta_min=1e-7,
         )
         return {
             "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": scheduler,
-                "interval": "epoch",   # step once per epoch (not per batch)
-            },
+            "lr_scheduler": {"scheduler": scheduler, "interval": "epoch"},
         }
 
 
@@ -255,23 +297,43 @@ class VineyardSegModel(L.LightningModule):
 
 def main():
     parser = argparse.ArgumentParser(description="Train U-Net vineyard segmentation model")
+
+    # ── Checkpoint ────────────────────────────────────────────────────────────
     parser.add_argument("--ckpt", type=str, default=None,
-                        help="Path to checkpoint to resume training from")
+                        help="Checkpoint path — full resume OR weights-only source")
     parser.add_argument("--weights-only", action="store_true",
-                        help="Load only model weights from --ckpt; start a fresh optimizer/scheduler (fine-tuning)")
-    parser.add_argument("--batch-size", type=int, default=16)
-    parser.add_argument("--lr", type=float, default=3e-4)
-    parser.add_argument("--epochs", type=int, default=60)
-    parser.add_argument("--patience", type=int, default=12,
-                        help="Early stopping patience (epochs without val_iou improvement)")
-    parser.add_argument("--freeze-encoder-epochs", type=int, default=5,
-                        help="Freeze encoder for first N epochs (decoder-only warmup)")
+                        help="Load model weights from --ckpt but start a fresh "
+                             "optimizer/scheduler  (use for fine-tuning)")
+
+    # ── Data ─────────────────────────────────────────────────────────────────
+    parser.add_argument("--patches-dir", type=str, default=None,
+                        help="Patches directory  [default: ml/../data/patches]")
+    parser.add_argument("--batch-size",  type=int, default=32)
+    parser.add_argument("--num-workers", type=int, default=4,
+                        help="DataLoader workers  [default: 4; set 0 on macOS]")
+
+    # ── Optimiser ─────────────────────────────────────────────────────────────
+    parser.add_argument("--lr",         type=float, default=1e-4,
+                        help="Decoder learning rate  [default: 1e-4]")
+    parser.add_argument("--encoder-lr", type=float, default=5e-6,
+                        help="Encoder layer4 LR; shallower blocks get /3, /9, /27  [default: 5e-6]")
+    parser.add_argument("--epochs",     type=int,   default=100)
+    parser.add_argument("--patience",   type=int,   default=20,
+                        help="Early-stopping patience in epochs  [default: 20]")
+
+    # ── Encoder unfreezing ────────────────────────────────────────────────────
+    parser.add_argument("--unfreeze-start",    type=int, default=10,
+                        help="Epoch to unfreeze first encoder block (layer4)  [default: 10]")
+    parser.add_argument("--unfreeze-interval", type=int, default=10,
+                        help="Epochs between successive block unfreeze steps  [default: 10]")
+
     args = parser.parse_args()
 
     # ── Paths ─────────────────────────────────────────────────────────────────
-    ml_dir      = Path(__file__).resolve().parent
-    data_dir    = ml_dir.parent / "data"
-    patches_dir = data_dir / "patches"
+    ml_dir   = Path(__file__).resolve().parent
+    data_dir = ml_dir.parent / "data"
+
+    patches_dir = Path(args.patches_dir) if args.patches_dir else data_dir / "patches"
     stats_path  = patches_dir / "stats.json"
     ckpt_dir    = ml_dir / "checkpoints"
     log_dir     = ml_dir / "logs"
@@ -283,36 +345,40 @@ def main():
         patches_dir=patches_dir,
         stats_path=stats_path,
         batch_size=args.batch_size,
-        num_workers=0,   # 0 = load in main process; safe on macOS
-                         # increase to 4 on Linux/GPU machines for speed
+        num_workers=args.num_workers,
     )
     dm.setup()
 
-    print(f"\n{'='*55}")
-    print(f"  Training patches   : {len(dm.train_ds):,}")
-    print(f"  Val patches        : {len(dm.val_ds):,}")
-    print(f"  Batch size         : {args.batch_size}")
-    print(f"  Steps/epoch        : {len(dm.train_ds) // args.batch_size}")
-    print(f"  Max epochs         : {args.epochs}")
-    print(f"  LR (decoder)       : {args.lr:.1e}")
-    print(f"  LR (encoder)       : {args.lr * 0.1:.1e}  (after warmup)")
-    print(f"  Encoder frozen for : epochs 0–{args.freeze_encoder_epochs - 1}")
-    print(f"  Gradient clip      : 1.0")
-    print(f"  Early stop after   : {args.patience} epochs without val_iou gain")
-    print(f"{'='*55}\n")
+    enc_lr = args.encoder_lr
+    us, ui = args.unfreeze_start, args.unfreeze_interval
+
+    print(f"\n{'='*60}")
+    print(f"  Training patches      : {len(dm.train_ds):,}")
+    print(f"  Val patches           : {len(dm.val_ds):,}")
+    print(f"  Batch size            : {args.batch_size}")
+    print(f"  Steps/epoch           : {len(dm.train_ds) // args.batch_size}")
+    print(f"  Max epochs            : {args.epochs}")
+    print(f"  Patience              : {args.patience}")
+    print(f"  Gradient clip         : 1.0")
+    print(f"  LR — decoder          : {args.lr:.1e}")
+    print(f"  LR — enc.layer4       : {enc_lr:.1e}  (unfreezes ep {us})")
+    print(f"  LR — enc.layer3       : {enc_lr/3:.1e}  (unfreezes ep {us+ui})")
+    print(f"  LR — enc.layer2       : {enc_lr/9:.1e}  (unfreezes ep {us+2*ui})")
+    print(f"  LR — enc.stem         : {enc_lr/27:.1e}  (unfreezes ep {us+3*ui})")
+    print(f"{'='*60}\n")
 
     # ── Model ─────────────────────────────────────────────────────────────────
     model = VineyardSegModel(
         lr=args.lr,
+        encoder_lr=args.encoder_lr,
         weight_decay=1e-4,
         t_max=args.epochs,
-        freeze_encoder_epochs=args.freeze_encoder_epochs,
+        unfreeze_start=args.unfreeze_start,
+        unfreeze_interval=args.unfreeze_interval,
     )
 
     # ── Callbacks ─────────────────────────────────────────────────────────────
     callbacks = [
-        # Save the top-3 checkpoints ranked by val_iou (higher = better).
-        # Filename encodes epoch and IoU so you can tell checkpoints apart.
         ModelCheckpoint(
             dirpath=ckpt_dir,
             filename="unet-resnet34-ep{epoch:02d}-iou{val_iou:.3f}",
@@ -321,26 +387,16 @@ def main():
             save_top_k=3,
             verbose=True,
         ),
-        # Stop early if val_iou hasn't improved for `patience` epochs.
-        # Prevents overfitting and saves time.
         EarlyStopping(
             monitor="val_iou",
             mode="max",
             patience=args.patience,
             verbose=True,
         ),
-        # Log the learning rate at each epoch so you can see the cosine decay.
         LearningRateMonitor(logging_interval="epoch"),
     ]
 
     # ── Trainer ───────────────────────────────────────────────────────────────
-    # accelerator="auto" detects hardware in order: CUDA → MPS → CPU.
-    # On an M-series Mac MPS is used automatically (no code changes needed).
-    #
-    # gradient_clip_val=1.0 — clips the global gradient norm to 1.0 before
-    # each optimizer step.  Prevents a single bad batch from producing a huge
-    # parameter update that blows up the model.  Standard practice for U-Nets
-    # on imbalanced segmentation tasks.
     trainer = L.Trainer(
         max_epochs=args.epochs,
         accelerator="auto",
@@ -349,16 +405,15 @@ def main():
         logger=CSVLogger(str(log_dir), name="vineyard_unet"),
         log_every_n_steps=10,
         enable_progress_bar=True,
-        deterministic=False,   # True → reproducible but ~20% slower
-        gradient_clip_val=1.0, # prevent encoder corruption from runaway gradients
+        deterministic=False,
+        gradient_clip_val=1.0,
     )
 
     # ── Train ─────────────────────────────────────────────────────────────────
     if args.ckpt and args.weights_only:
-        # Transfer learning: restore model weights only, fresh optimizer + scheduler
         raw = torch.load(args.ckpt, map_location="cpu")
         model.load_state_dict(raw["state_dict"])
-        print(f"Weights loaded from  : {Path(args.ckpt).name}  (fresh optimizer)")
+        print(f"Weights loaded from   : {Path(args.ckpt).name}  (fresh optimizer)")
         trainer.fit(model, dm)
     else:
         trainer.fit(model, dm, ckpt_path=args.ckpt)
@@ -366,12 +421,12 @@ def main():
     # ── Summary ───────────────────────────────────────────────────────────────
     best_ckpt  = trainer.checkpoint_callback.best_model_path
     best_score = trainer.checkpoint_callback.best_model_score
-    print(f"\n{'='*55}")
+    print(f"\n{'='*60}")
     print(f"  Training complete.")
-    print(f"  Best val IoU : {best_score:.4f}")
-    print(f"  Checkpoint   : {best_ckpt}")
-    print(f"  Training log : {log_dir}/vineyard_unet/")
-    print(f"{'='*55}\n")
+    print(f"  Best val IoU  : {best_score:.4f}")
+    print(f"  Checkpoint    : {best_ckpt}")
+    print(f"  Training log  : {log_dir}/vineyard_unet/")
+    print(f"{'='*60}\n")
     print("Next step — run inference:")
     print("  .venv/bin/python ml/predict.py --ckpt", best_ckpt)
 

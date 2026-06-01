@@ -381,13 +381,17 @@ def compute_channel_stats(image_paths: List[Path]) -> Dict:
 @click.option("--val-side",    type=click.Choice(["east", "west", "north", "south"]),
               default="east", show_default=True,
               help="Which edge of the AVA to use as the validation zone.")
+@click.option("--random-split", is_flag=True, default=False,
+              help="Random block-level train/val split instead of geographic. "
+                   "Recommended for multi-AVA datasets where the east-most blocks "
+                   "are geographically dissimilar from the training set.")
 @click.option("--overwrite",   is_flag=True, default=False,
               help="Delete and recreate the output directory if it already exists.")
 @click.option("--dry-run",     is_flag=True, default=False,
               help="Count patches without writing anything to disk.")
 @click.option("--seed",        type=int, default=RANDOM_SEED, show_default=True)
 def main(naip_dir, blocks_file, output_dir, patch_size, stride, erosion_m,
-         min_pos_pct, neg_ratio, val_pct, val_side, overwrite, dry_run, seed):
+         min_pos_pct, neg_ratio, val_pct, val_side, random_split, overwrite, dry_run, seed):
     """
     Cut 256×256 NAIP patches and binary vineyard masks for U-Net training.
 
@@ -433,26 +437,33 @@ def main(naip_dir, blocks_file, output_dir, patch_size, stride, erosion_m,
     blocks_gdf["_cx"] = blocks_gdf.geometry.apply(lambda g: shape(g).centroid.x)
     blocks_gdf["_cy"] = blocks_gdf.geometry.apply(lambda g: shape(g).centroid.y)
 
-    axis_map = {
-        "east":  ("_cx", False),
-        "west":  ("_cx", True),
-        "north": ("_cy", False),
-        "south": ("_cy", True),
-    }
-    sort_col, ascending = axis_map[val_side]
-
-    blocks_sorted = blocks_gdf.sort_values(sort_col, ascending=ascending).reset_index(drop=True)
-    n_val     = max(1, int(len(blocks_sorted) * val_pct))
-    val_ids   = set(blocks_sorted.iloc[:n_val].index)
-    train_ids = set(blocks_sorted.index) - val_ids
-
-    train_blocks = blocks_gdf.loc[list(train_ids)].reset_index(drop=True)
-    val_blocks   = blocks_gdf.loc[list(val_ids)].reset_index(drop=True)
-
-    logger.info(
-        f"Geographic split ({val_side}-most {val_pct:.0%} → val): "
-        f"{len(train_blocks)} train blocks / {len(val_blocks)} val blocks"
-    )
+    if random_split:
+        blocks_shuffled = blocks_gdf.sample(frac=1, random_state=seed).reset_index(drop=True)
+        n_val           = max(1, int(len(blocks_shuffled) * val_pct))
+        val_blocks      = blocks_shuffled.iloc[:n_val].reset_index(drop=True)
+        train_blocks    = blocks_shuffled.iloc[n_val:].reset_index(drop=True)
+        logger.info(
+            f"Random split (seed={seed}, {val_pct:.0%} → val): "
+            f"{len(train_blocks)} train blocks / {len(val_blocks)} val blocks"
+        )
+    else:
+        axis_map = {
+            "east":  ("_cx", False),
+            "west":  ("_cx", True),
+            "north": ("_cy", False),
+            "south": ("_cy", True),
+        }
+        sort_col, ascending = axis_map[val_side]
+        blocks_sorted = blocks_gdf.sort_values(sort_col, ascending=ascending).reset_index(drop=True)
+        n_val         = max(1, int(len(blocks_sorted) * val_pct))
+        val_ids       = set(blocks_sorted.iloc[:n_val].index)
+        train_ids     = set(blocks_sorted.index) - val_ids
+        train_blocks  = blocks_gdf.loc[list(train_ids)].reset_index(drop=True)
+        val_blocks    = blocks_gdf.loc[list(val_ids)].reset_index(drop=True)
+        logger.info(
+            f"Geographic split ({val_side}-most {val_pct:.0%} → val): "
+            f"{len(train_blocks)} train blocks / {len(val_blocks)} val blocks"
+        )
 
     # ── Set up output dirs ────────────────────────────────────────────────────
     if not dry_run:

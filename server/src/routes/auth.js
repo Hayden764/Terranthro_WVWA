@@ -16,6 +16,18 @@ import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
 
+function portalCookieOptions() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    // Vercel frontend + separate API host requires cross-site cookies in production.
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/',
+  };
+}
+
 // Strict rate limit on magic-link requests: 5 per hour per IP
 const magicLinkLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -131,15 +143,8 @@ router.get('/verify', async (req, res) => {
 
     // Issue session JWT as httpOnly cookie
     const jwt = signPortalToken(row.account_id, row.winery_id);
-    const isProduction = process.env.NODE_ENV === 'production';
 
-    res.cookie('portal_token', jwt, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'strict' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: '/',
-    });
+    res.cookie('portal_token', jwt, portalCookieOptions());
 
     res.json({ success: true, wineryId: row.winery_id });
   } catch (err) {
@@ -201,15 +206,8 @@ router.post('/login', passwordLoginLimiter, async (req, res) => {
     );
 
     const jwt = signPortalToken(account.account_id, account.winery_id);
-    const isProduction = process.env.NODE_ENV === 'production';
 
-    res.cookie('portal_token', jwt, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'strict' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: '/',
-    });
+    res.cookie('portal_token', jwt, portalCookieOptions());
 
     res.json({ success: true, wineryId: account.winery_id });
   } catch (err) {
@@ -270,7 +268,11 @@ router.post('/set-password', requirePortalAuth, async (req, res) => {
  * POST /api/auth/logout
  */
 router.post('/logout', (_req, res) => {
-  res.clearCookie('portal_token', { path: '/' });
+  res.clearCookie('portal_token', {
+    path: '/',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  });
   res.json({ success: true });
 });
 

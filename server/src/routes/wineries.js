@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pool } from '../db/pool.js';
+import { classifyListingCategory } from '../lib/listingCategories.js';
 
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -26,7 +27,12 @@ async function loadLocalWineriesFallback({ bbox, hasParcels, category }) {
   const filtered = features
     .filter((feature) => isPointWithinBbox(feature.geometry, bbox))
     .filter((feature) => {
-      const featureCategory = feature?.properties?.category || 'winery';
+      const featureCategory = classifyListingCategory({
+        recid: feature?.properties?.recid,
+        title: feature?.properties?.title,
+        description: feature?.properties?.description,
+        category: feature?.properties?.category,
+      });
       if (category && featureCategory !== category) return false;
       if (!hasParcels) return true;
       const parcelCount = Number(feature?.properties?.parcel_count ?? feature?.properties?.polygon_count ?? 0);
@@ -45,7 +51,12 @@ async function loadLocalWineriesFallback({ bbox, hasParcels, category }) {
         phone: feature?.properties?.phone || '',
         url: feature?.properties?.url || '',
         image_url: feature?.properties?.image_url || '',
-        category: feature?.properties?.category || 'winery',
+        category: classifyListingCategory({
+          recid: feature?.properties?.recid,
+          title: feature?.properties?.title,
+          description: feature?.properties?.description,
+          category: feature?.properties?.category,
+        }),
         parcel_count: Number(feature?.properties?.parcel_count ?? feature?.properties?.polygon_count ?? 0),
         data_source: 'local_fallback',
       },
@@ -77,10 +88,6 @@ router.get('/', async (req, res) => {
       bboxCondition = `ST_Intersects(w.location, ST_MakeEnvelope($1, $2, $3, $4, 4326))`;
     }
 
-    const categoryCondition = category
-      ? `AND w.category = $${params.push(category)}`
-      : '';
-
     const parcelsCondition = hasParcels
       ? `AND EXISTS (SELECT 1 FROM vineyard_parcels vp WHERE vp.winery_id = w.id)`
       : '';
@@ -100,16 +107,27 @@ router.get('/', async (req, res) => {
         (SELECT COUNT(*) FROM vineyard_parcels vp WHERE vp.winery_id = w.id) AS parcel_count
       FROM wineries w
       WHERE ${bboxCondition}
-        ${categoryCondition}
         ${parcelsCondition}
       ORDER BY w.title
       `,
       params
     );
 
+    const classifiedRows = rows
+      .map((row) => ({
+        ...row,
+        category: classifyListingCategory({
+          recid: row.recid,
+          title: row.title,
+          description: row.description,
+          category: row.category,
+        }),
+      }))
+      .filter((row) => !category || row.category === category);
+
     res.json({
       type: 'FeatureCollection',
-      features: rows.map((row) => ({
+      features: classifiedRows.map((row) => ({
         type: 'Feature',
         properties: {
           id:           row.id,

@@ -11,7 +11,10 @@ import { Resend } from 'resend';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const FROM = process.env.EMAIL_FROM || 'Terranthro <noreply@terranthro.com>';
-const PORTAL_BASE_URL = (process.env.PORTAL_BASE_URL || 'http://localhost:5173').replace(/\/$/, '');
+const DEFAULT_PORTAL_BASE_URL = process.env.NODE_ENV === 'production'
+  ? 'https://terranthrowvwasite.vercel.app'
+  : 'http://localhost:5173';
+const PORTAL_BASE_URL = (process.env.PORTAL_BASE_URL || DEFAULT_PORTAL_BASE_URL).replace(/\/$/, '');
 
 /**
  * Send a magic-link login email to a winery account holder.

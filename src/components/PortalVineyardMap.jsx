@@ -20,7 +20,7 @@
  *   onAddCancel    {fn}       Called when user cancels add mode.
  *   style          {Object}   Extra style overrides on the wrapper div.
  */
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
@@ -126,6 +126,81 @@ function bboxFromGeometries(geometries) {
   return [[minLng, minLat], [maxLng, maxLat]];
 }
 
+// ── Polygon vertex simplification (Ramer–Douglas–Peucker) ───────────────────
+// Used by the "Simplify" control in edit mode to thin out dense / curved
+// boundaries (e.g. parcels traced as arcs with hundreds of points). Operates on
+// raw lng/lat coordinates — planar distance is a fine approximation at the scale
+// of a single parcel.
+
+// Count total coordinate pairs across a Polygon / MultiPolygon (rough indicator
+// of vertex density; includes each ring's closing duplicate).
+function countVertices(geometry) {
+  let n = 0;
+  const walk = (c) => {
+    if (typeof c[0] === 'number') n += 1;
+    else c.forEach(walk);
+  };
+  if (geometry?.coordinates) geometry.coordinates.forEach(walk);
+  return n;
+}
+
+// Perpendicular distance from point p to the segment a→b.
+function perpDistance(p, a, b) {
+  const [px, py] = p, [ax, ay] = a, [bx, by] = b;
+  const dx = bx - ax, dy = by - ay;
+  if (dx === 0 && dy === 0) return Math.hypot(px - ax, py - ay);
+  const t = ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy);
+  const cx = ax + t * dx, cy = ay + t * dy;
+  return Math.hypot(px - cx, py - cy);
+}
+
+function douglasPeucker(points, tolerance) {
+  if (points.length < 3) return points.slice();
+  let maxDist = 0, index = 0;
+  const a = points[0], b = points[points.length - 1];
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const d = perpDistance(points[i], a, b);
+    if (d > maxDist) { maxDist = d; index = i; }
+  }
+  if (maxDist > tolerance) {
+    const left = douglasPeucker(points.slice(0, index + 1), tolerance);
+    const right = douglasPeucker(points.slice(index), tolerance);
+    return left.slice(0, -1).concat(right);
+  }
+  return [a, b];
+}
+
+// Simplify one closed ring; preserves closure and keeps at least a triangle.
+function simplifyRing(ring, tolerance) {
+  if (!Array.isArray(ring) || ring.length <= 4) return ring;
+  const open = ring.slice(0, -1); // drop closing duplicate
+  let simplified = douglasPeucker(open, tolerance);
+  if (simplified.length < 3) simplified = open.slice(0, 3);
+  return [...simplified, simplified[0]];
+}
+
+function simplifyGeometry(geometry, tolerance) {
+  if (!geometry || tolerance <= 0) return geometry;
+  if (geometry.type === 'Polygon') {
+    return { type: 'Polygon', coordinates: geometry.coordinates.map((r) => simplifyRing(r, tolerance)) };
+  }
+  if (geometry.type === 'MultiPolygon') {
+    return {
+      type: 'MultiPolygon',
+      coordinates: geometry.coordinates.map((poly) => poly.map((r) => simplifyRing(r, tolerance))),
+    };
+  }
+  return geometry;
+}
+
+// Map a 0–100 "strength" slider to an RDP tolerance scaled to the parcel's size,
+// so the same strength behaves consistently across small and large parcels.
+function strengthToTolerance(strength, geometry) {
+  const [[minLng, minLat], [maxLng, maxLat]] = bboxFromGeometries([geometry]);
+  const dim = Math.max(maxLng - minLng, maxLat - minLat) || 0.001;
+  return (strength / 100) * dim * 0.05; // up to 5% of the largest dimension
+}
+
 export default function PortalVineyardMap({
   parcels = [],
   highlightId = null,
@@ -147,6 +222,33 @@ export default function PortalVineyardMap({
   const mapRef = useRef(null);
   const popupRef = useRef(null);
   const drawRef = useRef(null);
+
+  // Edit-mode simplify control state
+  const [simplifyStrength, setSimplifyStrength] = useState(30);
+  const [editPointCount, setEditPointCount] = useState(null);
+
+  // Read the current point count off the in-progress draw feature.
+  const refreshPointCount = useCallback(() => {
+    const draw = drawRef.current;
+    if (!draw) { setEditPointCount(null); return; }
+    const feat = draw.getAll().features[0];
+    setEditPointCount(feat ? countVertices(feat.geometry) : null);
+  }, []);
+
+  // Apply RDP simplification to the parcel currently being edited, then re-enter
+  // direct_select so the thinned vertices are immediately draggable. Cumulative:
+  // each click simplifies the current geometry further.
+  const handleSimplify = useCallback(() => {
+    const draw = drawRef.current;
+    if (!draw) return;
+    const feat = draw.getAll().features[0];
+    if (!feat) return;
+    const tol = strengthToTolerance(simplifyStrength, feat.geometry);
+    const newGeom = simplifyGeometry(feat.geometry, tol);
+    draw.add({ type: 'Feature', id: feat.id, geometry: newGeom, properties: feat.properties || {} });
+    draw.changeMode('direct_select', { featureId: String(feat.id) });
+    refreshPointCount();
+  }, [simplifyStrength, refreshPointCount]);
 
   const buildGeoJSON = useCallback(() => {
     const features = parcels
@@ -419,6 +521,24 @@ export default function PortalVineyardMap({
     const map = mapRef.current;
     if (!map) return;
 
+    // Delete selected vertices on Backspace/Delete. MapboxDraw's own keybinding
+    // only fires when the map canvas has DOM focus (and on Mac the key labelled
+    // "delete" reports as Backspace), so we handle it at the document level and
+    // call draw.trash(), which removes the selected vertices in direct_select.
+    const onKeyDown = (e) => {
+      if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+      const draw = drawRef.current;
+      if (!draw) return;
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
+      const selected = draw.getSelectedPoints();
+      if (selected?.features?.length > 0) {
+        e.preventDefault();
+        draw.trash();
+        refreshPointCount();
+      }
+    };
+
     const activate = () => {
       if (!editParcelId) return;
       const parcel = parcels.find((p) => p.id === editParcelId);
@@ -452,12 +572,19 @@ export default function PortalVineyardMap({
         draw.changeMode('direct_select', { featureId: added[0] });
       }
 
+      // Track point count, updating as the user drags/deletes vertices
+      map.on('draw.update', refreshPointCount);
+      document.addEventListener('keydown', onKeyDown);
+      refreshPointCount();
+
       // Fit map to the parcel
-      const { bboxFromGeometries: _ } = {};
       map.fitBounds(bboxFromGeometries([parcel.geometry]), { padding: 80, maxZoom: 17 });
     };
 
     const deactivate = () => {
+      map.off('draw.update', refreshPointCount);
+      document.removeEventListener('keydown', onKeyDown);
+      setEditPointCount(null);
       if (drawRef.current) {
         try { map.removeControl(drawRef.current); } catch (_) {}
         drawRef.current = null;
@@ -629,9 +756,31 @@ export default function PortalVineyardMap({
           zIndex: 10,
         }}>
           <span style={{ color: UI.editOverlayText, fontSize: 'var(--type-body-size)', lineHeight: 1.4 }}>
-            <strong style={{ color: UI.overlayTitle }}>Editing geometry</strong> — drag vertices to reshape the parcel boundary
+            <strong style={{ color: UI.overlayTitle }}>Editing geometry</strong> — drag vertices to reshape · shift-click points then press Delete to remove · or thin dense edges with Simplify
+            {editPointCount != null && (
+              <span style={{ color: UI.overlayTitle, marginLeft: 6 }}>· {editPointCount} pts</span>
+            )}
           </span>
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              color: UI.editOverlayText, fontSize: 'var(--type-mono-size)',
+            }}>
+              <span>Gentle</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={simplifyStrength}
+                onChange={(e) => setSimplifyStrength(Number(e.target.value))}
+                style={{ width: 90, cursor: 'pointer' }}
+                title="Simplify strength"
+              />
+              <span>Aggressive</span>
+            </div>
+            <button onClick={handleSimplify} style={editSimplifyBtnStyle}>
+              Simplify
+            </button>
             <button
               onClick={() => {
                 if (onEditCancel) onEditCancel();
@@ -740,5 +889,12 @@ const editCancelBtnStyle = {
 const editSaveBtnStyle = {
   padding: '6px 16px', borderRadius: 6, border: 'none',
   background: crimson, color: 'white', fontSize: 'var(--type-body-size)', fontWeight: 500,
+  cursor: 'pointer', fontFamily: 'var(--font-sans)',
+};
+
+const editSimplifyBtnStyle = {
+  padding: '6px 14px', borderRadius: 6, border: `1px solid ${UI.cancelBorder}`,
+  background: alpha(parchment, 0.12), color: UI.overlayTitle,
+  fontSize: 'var(--type-body-size)', fontWeight: 500,
   cursor: 'pointer', fontFamily: 'var(--font-sans)',
 };

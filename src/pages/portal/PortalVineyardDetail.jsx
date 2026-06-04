@@ -40,9 +40,7 @@ export default function PortalVineyardDetail() {
 
   const load = useCallback(async () => {
     try {
-      const all = await apiJson('/api/portal/vineyards');
-      const v = all.find((p) => String(p.id) === String(id));
-      if (!v) { navigate('/portal/dashboard', { replace: true }); return; }
+      const v = await apiJson(`/api/portal/vineyards/${id}`);
       setVineyard(v);
     } catch {
       navigate('/portal', { replace: true });

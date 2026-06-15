@@ -43,6 +43,7 @@ const extraOrigins = process.env.CORS_ORIGINS
   : [];
 
 const PROD_ORIGINS = [
+  'https://wvwa.terranthro.com',
   'https://terranthro.com',
   'https://www.terranthro.com',
   ...extraOrigins,

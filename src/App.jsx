@@ -5,6 +5,7 @@ import EditorPage from './pages/EditorPage';
 // Portal pages
 import PortalLogin from './pages/portal/PortalLogin';
 import PortalVerify from './pages/portal/PortalVerify';
+import PortalConfirmEmailChange from './pages/portal/PortalConfirmEmailChange';
 import PortalDashboard from './pages/portal/PortalDashboard';
 import PortalProfile from './pages/portal/PortalProfile';
 import PortalVineyardDetail from './pages/portal/PortalVineyardDetail';
@@ -28,8 +29,7 @@ export default function App() {
 
         {/* Winery portal */}
         <Route path="/portal" element={<PortalLogin />} />
-        <Route path="/portal/verify" element={<PortalVerify />} />
-        <Route path="/portal/dashboard" element={<PortalDashboard />} />
+        <Route path="/portal/verify" element={<PortalVerify />} />          <Route path="/portal/confirm-email-change" element={<PortalConfirmEmailChange />} />        <Route path="/portal/dashboard" element={<PortalDashboard />} />
         <Route path="/portal/profile" element={<PortalProfile />} />
         <Route path="/portal/vineyards/group" element={<PortalVineyardGroup />} />
         <Route path="/portal/vineyards/:id" element={<PortalVineyardDetail />} />

@@ -109,6 +109,16 @@ export default function PortalDashboard() {
         </div>
       </Section>
 
+      {/* Password section — show if not set */}
+      {!profile?.has_password && (
+        <Section title="Secure Login with a Password">
+          <p style={{ color: muted, fontSize: 'var(--type-body-size)', marginBottom: 12 }}>
+            Set a password to log in directly without waiting for an email link. Perfect if you're having trouble with email delivery.
+          </p>
+          <Link to="/portal/profile" style={actionBtnStyle}>Set a Password</Link>
+        </Section>
+      )}
+
       {/* Vineyards — grouped by name */}
       <Section title="Linked Vineyards">
         {vineyards.length === 0 ? (

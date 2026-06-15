@@ -186,6 +186,11 @@ def main():
 
     print(f"After clean     : {len(all_polys)}")
 
+    # Capture area in the NATIVE CRS (metres, EPSG:32610) BEFORE any
+    # reprojection — polygon .area in degrees (EPSG:4326) is meaningless.
+    areas_m2 = [p.area for p in all_polys]
+    total_ha = sum(areas_m2) / 10_000
+
     # Reproject to output CRS if needed
     if args.crs != int(native_crs.to_epsg()):
         from pyproj import Transformer
@@ -198,14 +203,14 @@ def main():
             shp_transform(transformer.transform, p) for p in all_polys
         ]
 
-    # Build GeoJSON
+    # Build GeoJSON — area_m2 carried from the pre-reprojection metres value
     features = [
         {
             "type": "Feature",
             "geometry": mapping(p),
-            "properties": {"area_m2": round(p.area, 1)},
+            "properties": {"area_m2": round(a, 1)},
         }
-        for p in all_polys
+        for p, a in zip(all_polys, areas_m2)
         if p.is_valid and not p.is_empty
     ]
 
@@ -219,7 +224,6 @@ def main():
     with open(out_path, "w") as f:
         json.dump(geojson, f)
 
-    total_ha = sum(p.area for p in all_polys) / 10_000
     print(f"Features written: {len(features)}")
     print(f"Total area      : {total_ha:.1f} ha")
     print(f"Output          : {out_path}")

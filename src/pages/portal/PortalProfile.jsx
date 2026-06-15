@@ -126,6 +126,10 @@ export default function PortalProfile() {
       {/* ── Password ── */}
       <hr style={{ margin: '36px 0', border: 'none', borderTop: `1px solid ${border}` }} />
       <PasswordSection hasPassword={profile.has_password} />
+
+      {/* ── Email ── */}
+      <hr style={{ margin: '36px 0', border: 'none', borderTop: `1px solid ${border}` }} />
+      <EmailSection currentEmail={profile.contact_email} />
     </Shell>
   );
 }
@@ -267,6 +271,95 @@ function PasswordSection({ hasPassword }) {
 
           <button type="submit" disabled={saving} style={btnStyle(saving)}>
             {saving ? 'Saving…' : hasPassword ? 'Update Password' : 'Set Password'}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+function EmailSection({ currentEmail }) {
+  const [newEmail, setNewEmail] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [emailSuccess, setEmailSuccess] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setEmailError('');
+    setEmailSuccess(false);
+
+    if (!newEmail.trim()) {
+      setEmailError('New email is required');
+      return;
+    }
+
+    if (newEmail.trim().toLowerCase() === currentEmail.toLowerCase()) {
+      setEmailError('New email is the same as your current email');
+      return;
+    }
+
+    // Simple email validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch('/api/auth/change-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ newEmail: newEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to request email change');
+      setEmailSuccess(true);
+      setNewEmail('');
+    } catch (err) {
+      setEmailError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink, marginBottom: 6 }}>
+        Change Email
+      </h2>
+      <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 20 }}>
+        Current email: <strong>{currentEmail}</strong>
+        <br />
+        We'll send a verification link to your new email address.
+      </p>
+
+      {emailSuccess ? (
+        <div style={{
+          background: TOKENS.successDim, border: `1px solid ${TOKENS.success}`, borderRadius: 8,
+          padding: '14px 16px', color: TOKENS.success, fontSize: 'var(--type-body-size)',
+        }}>
+          Verification email sent! Please check your inbox and click the link to confirm your new email address.
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} style={{ maxWidth: 340 }}>
+          <Field label="New email">
+            <input
+              type="email"
+              required
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="your.new@email.com"
+              className="ds-input"
+              style={inputStyle}
+            />
+          </Field>
+
+          {emailError && <p style={{ color: crimson, fontSize: 'var(--type-mono-size)', marginBottom: 12 }}>{emailError}</p>}
+
+          <button type="submit" disabled={saving} style={btnStyle(saving)}>
+            {saving ? 'Sending…' : 'Send Verification Link'}
           </button>
         </form>
       )}

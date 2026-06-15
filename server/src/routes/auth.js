@@ -10,7 +10,7 @@ import express from 'express';
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { pool } from '../db/pool.js';
-import { sendMagicLinkEmail } from '../services/email.js';
+import { sendMagicLinkEmail, sendEmailChangeConfirmation } from '../services/email.js';
 import { signPortalToken, requirePortalAuth } from '../middleware/portalAuth.js';
 import rateLimit from 'express-rate-limit';
 
@@ -21,8 +21,9 @@ function portalCookieOptions() {
   return {
     httpOnly: true,
     secure: isProduction,
-    // Vercel frontend + separate API host requires cross-site cookies in production.
-    sameSite: isProduction ? 'none' : 'lax',
+    // Frontend (wvwa.terranthro.com) and API (api.terranthro.com) share the
+    // terranthro.com registrable domain, so requests are same-site — Lax works.
+    sameSite: 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: '/',
   };
@@ -265,12 +266,136 @@ router.post('/set-password', requirePortalAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/auth/change-email
+ * Requires portal session. Body: { newEmail: string }
+ *
+ * Initiates an email change by sending a verification link to the new email.
+ */
+router.post('/change-email', requirePortalAuth, async (req, res) => {
+  const { newEmail } = req.body;
+
+  if (!newEmail || typeof newEmail !== 'string') {
+    return res.status(400).json({ error: 'New email is required' });
+  }
+
+  const normalizedEmail = newEmail.trim().toLowerCase();
+
+  try {
+    // Get current account info
+    const { rows: accountRows } = await pool.query(
+      `SELECT wa.id, wa.contact_email, w.title AS winery_name
+       FROM winery_accounts wa
+       JOIN wineries w ON w.id = wa.winery_id
+       WHERE wa.id = $1`,
+      [req.portalAccount.accountId]
+    );
+
+    if (!accountRows[0]) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    const account = accountRows[0];
+
+    // Prevent changing to the same email
+    if (normalizedEmail === account.contact_email.toLowerCase()) {
+      return res.status(400).json({ error: 'New email is the same as current email' });
+    }
+
+    // Check if new email is already in use
+    const { rows: existingRows } = await pool.query(
+      `SELECT id FROM winery_accounts WHERE LOWER(contact_email) = $1`,
+      [normalizedEmail]
+    );
+
+    if (existingRows.length > 0) {
+      return res.status(409).json({ error: 'This email is already in use' });
+    }
+
+    // Invalidate any previous unused change-email tokens
+    await pool.query(
+      `UPDATE email_change_tokens SET used = TRUE WHERE account_id = $1 AND used = FALSE`,
+      [req.portalAccount.accountId]
+    );
+
+    // Generate a new email change token
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await pool.query(
+      `INSERT INTO email_change_tokens (account_id, new_email, token_hash, expires_at)
+       VALUES ($1, $2, $3, $4)`,
+      [req.portalAccount.accountId, normalizedEmail, tokenHash, expiresAt]
+    );
+
+    // Send verification email to the new email address
+    await sendEmailChangeConfirmation(normalizedEmail, rawToken, account.winery_name);
+
+    res.json({ message: 'Verification email sent to the new address. Please check your email to confirm the change.' });
+  } catch (err) {
+    console.error('Change email error:', err);
+    res.status(500).json({ error: 'Failed to process email change request' });
+  }
+});
+
+/**
+ * POST /api/auth/confirm-email-change?token=<hex>
+ *
+ * Confirms and applies the email change using the token from the verification email.
+ */
+router.post('/confirm-email-change', async (req, res) => {
+  const { token } = req.query;
+  if (!token || typeof token !== 'string') {
+    return res.status(400).json({ error: 'Token is required' });
+  }
+
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, account_id, new_email, expires_at, used
+       FROM email_change_tokens
+       WHERE token_hash = $1`,
+      [tokenHash]
+    );
+
+    if (rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid or expired verification link' });
+    }
+
+    const changeToken = rows[0];
+
+    if (changeToken.used) {
+      return res.status(401).json({ error: 'This link has already been used' });
+    }
+
+    if (new Date(changeToken.expires_at) < new Date()) {
+      return res.status(401).json({ error: 'This link has expired' });
+    }
+
+    // Mark token as used
+    await pool.query(`UPDATE email_change_tokens SET used = TRUE WHERE id = $1`, [changeToken.id]);
+
+    // Update the account email
+    await pool.query(
+      `UPDATE winery_accounts SET contact_email = $1 WHERE id = $2`,
+      [changeToken.new_email, changeToken.account_id]
+    );
+
+    res.json({ success: true, message: 'Email successfully changed. You can now log in with your new email address.' });
+  } catch (err) {
+    console.error('Confirm email change error:', err);
+    res.status(500).json({ error: 'Email change confirmation failed' });
+  }
+});
+
+/**
  * POST /api/auth/logout
  */
 router.post('/logout', (_req, res) => {
   res.clearCookie('portal_token', {
     path: '/',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
   });
   res.json({ success: true });

@@ -24,6 +24,7 @@ import { pool } from '../db/pool.js';
 import { signAdminToken, requireAdminAuth, requireSuperadmin } from '../middleware/adminAuth.js';
 import { bulkApplyBlocks } from '../services/blockBulkApply.js';
 import { sendPortalPasswordEmail } from '../services/email.js';
+import { logAuthEvent } from '../services/authActivity.js';
 
 const router = express.Router();
 
@@ -804,6 +805,18 @@ router.post('/accounts', async (req, res) => {
       [winery_id, email]
     );
 
+    await logAuthEvent({
+      accountId: rows[0].id,
+      wineryId: rows[0].winery_id,
+      identifier: rows[0].contact_email,
+      actorAdminId: req.adminAccount.adminId,
+      eventType: 'admin_account_created',
+      success: true,
+      details: { source: 'admin_console' },
+      ip: req.ip,
+      userAgent: req.get('user-agent') || null,
+    });
+
     res.status(201).json(rows[0]);
   } catch (err) {
     if (err.code === '23505' && err.constraint?.includes('contact_email')) {
@@ -836,10 +849,12 @@ router.post('/accounts/:id/password', requireSuperadmin, async (req, res) => {
     const hash = await bcrypt.hash(password, 12);
     const { rows } = await pool.query(
       `UPDATE winery_accounts
-       SET password_hash = $1
+       SET password_hash = $1,
+           password_must_change = $3,
+           password_last_changed_at = NOW()
        WHERE id = $2
        RETURNING id, winery_id, contact_email`,
-      [hash, id]
+      [hash, id, Boolean(temporary)]
     );
 
     if (rows.length === 0) {
@@ -857,6 +872,18 @@ router.post('/accounts/:id/password', requireSuperadmin, async (req, res) => {
     const wineryName = wineryRows[0]?.winery_name || 'Winery Portal';
 
     await sendPortalPasswordEmail(rows[0].contact_email, wineryName, password, Boolean(temporary));
+
+    await logAuthEvent({
+      accountId: rows[0].id,
+      wineryId: rows[0].winery_id,
+      identifier: rows[0].contact_email,
+      actorAdminId: req.adminAccount.adminId,
+      eventType: temporary ? 'admin_password_reset_temporary' : 'admin_password_reset',
+      success: true,
+      details: { temporary: Boolean(temporary) },
+      ip: req.ip,
+      userAgent: req.get('user-agent') || null,
+    });
 
     res.json({
       success: true,
@@ -878,6 +905,13 @@ router.post('/accounts/:id/password', requireSuperadmin, async (req, res) => {
 router.delete('/accounts/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   try {
+    const { rows: accountRows } = await pool.query(
+      `SELECT wa.id, wa.winery_id, wa.contact_email
+       FROM winery_accounts wa
+       WHERE wa.id = $1`,
+      [id]
+    );
+
     const { rowCount } = await pool.query(
       `DELETE FROM winery_accounts WHERE id = $1`,
       [id]
@@ -885,9 +919,124 @@ router.delete('/accounts/:id', async (req, res) => {
     if (rowCount === 0) {
       return res.status(404).json({ error: 'Account not found' });
     }
+
+    if (accountRows[0]) {
+      await logAuthEvent({
+        accountId: accountRows[0].id,
+        wineryId: accountRows[0].winery_id,
+        identifier: accountRows[0].contact_email,
+        actorAdminId: req.adminAccount?.adminId || null,
+        eventType: 'admin_account_deleted',
+        success: true,
+        details: { source: 'admin_console' },
+        ip: req.ip,
+        userAgent: req.get('user-agent') || null,
+      });
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error('Delete account error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * GET /api/admin/intel
+ * Superadmin activity console data.
+ */
+router.get('/intel', requireSuperadmin, async (req, res) => {
+  const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
+  const searchPattern = `%${search}%`;
+
+  try {
+    const { rows: summaryRows } = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM winery_accounts) AS total_accounts,
+        (SELECT COUNT(*) FROM winery_accounts WHERE password_hash IS NOT NULL) AS password_enabled,
+        (SELECT COUNT(*) FROM winery_accounts WHERE password_must_change = TRUE) AS must_change_password,
+        (SELECT COUNT(*) FROM winery_accounts WHERE last_login >= NOW() - INTERVAL '30 days') AS active_30d,
+        (SELECT COUNT(*) FROM auth_activity_log WHERE event_type IN ('password_login', 'magic_link_verified') AND success = TRUE AND created_at >= NOW() - INTERVAL '7 days') AS successful_logins_7d,
+        (SELECT COUNT(*) FROM auth_activity_log WHERE event_type = 'password_login' AND success = FALSE AND created_at >= NOW() - INTERVAL '7 days') AS failed_logins_7d,
+        (SELECT COUNT(*) FROM auth_activity_log WHERE created_at >= NOW() - INTERVAL '24 hours') AS events_24h
+    `);
+
+    const { rows: accounts } = await pool.query(
+      `WITH recent AS (
+         SELECT
+           account_id,
+           COUNT(*) FILTER (WHERE event_type IN ('password_login', 'magic_link_verified') AND success = TRUE AND created_at >= NOW() - INTERVAL '30 days') AS login_count_30d,
+           COUNT(*) FILTER (WHERE event_type = 'password_login' AND success = FALSE AND created_at >= NOW() - INTERVAL '30 days') AS failed_logins_30d,
+           MAX(created_at) AS last_event_at,
+           (ARRAY_AGG(event_type ORDER BY created_at DESC))[1] AS last_event_type
+         FROM auth_activity_log
+         WHERE account_id IS NOT NULL
+         GROUP BY account_id
+       )
+       SELECT
+         wa.id, wa.winery_id, w.title AS winery_name,
+         wa.contact_email, wa.email_verified, wa.last_login, wa.created_at,
+         (wa.password_hash IS NOT NULL) AS has_password,
+         wa.password_must_change, wa.password_last_changed_at,
+         COALESCE(recent.login_count_30d, 0) AS login_count_30d,
+         COALESCE(recent.failed_logins_30d, 0) AS failed_logins_30d,
+         recent.last_event_at,
+         recent.last_event_type
+       FROM winery_accounts wa
+       JOIN wineries w ON w.id = wa.winery_id
+       LEFT JOIN recent ON recent.account_id = wa.id
+       WHERE LOWER(w.title) LIKE $1 OR LOWER(wa.contact_email) LIKE $1
+       ORDER BY w.title
+       LIMIT 200`,
+      [searchPattern]
+    );
+
+    res.json({ summary: summaryRows[0], accounts });
+  } catch (err) {
+    console.error('Admin intel load error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * GET /api/admin/intel/accounts/:id/events
+ */
+router.get('/intel/accounts/:id/events', requireSuperadmin, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const limit = Math.min(Math.max(parseInt(req.query.limit || '100', 10) || 100, 1), 200);
+  const eventType = typeof req.query.type === 'string' && req.query.type.trim() ? req.query.type.trim() : null;
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'Valid account id is required' });
+  }
+
+  try {
+    const params = [id];
+    let typeSql = '';
+    if (eventType) {
+      params.push(eventType);
+      typeSql = ` AND e.event_type = $${params.length}`;
+    }
+    params.push(limit);
+
+    const { rows } = await pool.query(
+      `SELECT
+         e.id, e.event_type, e.success, e.identifier, e.details,
+         e.ip, e.user_agent, e.created_at,
+         e.actor_admin_id,
+         aa.display_name AS actor_admin_name,
+         aa.email AS actor_admin_email
+       FROM auth_activity_log e
+       LEFT JOIN admin_accounts aa ON aa.id = e.actor_admin_id
+       WHERE e.account_id = $1${typeSql}
+       ORDER BY e.created_at DESC
+       LIMIT $${params.length}`,
+      params
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error('Admin intel events error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

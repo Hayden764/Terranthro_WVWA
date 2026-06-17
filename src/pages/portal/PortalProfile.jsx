@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { border, crimson, ink, muted, parchment, TOKENS } from '../../styles/tokens';
 import { INPUT_STYLE, btn } from '../../styles/patterns';
 import { apiJson, apiPost } from '../../lib/api';
 
 export default function PortalProfile() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const mustChangePassword = Boolean(location.state?.mustChangePassword);
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState({ description: '', phone: '', url: '', image_url: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -80,6 +82,21 @@ export default function PortalProfile() {
       <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 24 }}>
         Changes are submitted for review and applied once approved.
       </p>
+
+      {mustChangePassword && (
+        <div style={{
+          background: TOKENS.warningDim,
+          border: `1px solid ${TOKENS.warning}`,
+          borderRadius: 8,
+          padding: '14px 16px',
+          color: TOKENS.warning,
+          fontSize: 'var(--type-body-size)',
+          lineHeight: 1.6,
+          marginBottom: 18,
+        }}>
+          <strong>Password update required.</strong> Use the password section below to replace the temporary password before continuing.
+        </div>
+      )}
 
       {submitted ? (
         <div style={{

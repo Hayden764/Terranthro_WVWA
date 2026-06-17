@@ -164,6 +164,21 @@ export default function AdminDashboard() {
         >
           ✎ Parcel Editor
         </Link>
+        {admin?.role === 'superadmin' && (
+          <Link
+            to="/admin/intel"
+            style={{
+              padding: '7px 18px', borderRadius: 6,
+              background: alpha(TOKENS.success, 0.15),
+              color: TOKENS.success,
+              fontSize: 'var(--type-mono-size)', fontWeight: 600,
+              textDecoration: 'none',
+              border: `1px solid ${alpha(TOKENS.success, 0.25)}`,
+            }}
+          >
+            ⦿ Account Intel
+          </Link>
+        )}
       </div>
 
       {/* Requests tab */}

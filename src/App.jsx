@@ -19,6 +19,7 @@ import AdminRequestDetail from './pages/admin/AdminRequestDetail';
 import AdminVineyardBlocks from './pages/admin/AdminVineyardBlocks';
 import AdminVineyardBlockDetail from './pages/admin/AdminVineyardBlockDetail';
 import AdminBulkBlockImport from './pages/admin/AdminBulkBlockImport';
+import AdminAccountIntel from './pages/admin/AdminAccountIntel';
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
         {/* Admin console */}
         <Route path="/admin" element={<AdminLogin />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/intel" element={<AdminAccountIntel />} />
         <Route path="/admin/requests/:id" element={<AdminRequestDetail />} />
         {/* Parcel editor — admin-only, full-screen */}
         <Route path="/admin/editor" element={<EditorPage />} />

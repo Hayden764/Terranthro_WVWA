@@ -12,6 +12,7 @@ import bcrypt from 'bcryptjs';
 import { pool } from '../db/pool.js';
 import { sendMagicLinkEmail, sendEmailChangeConfirmation } from '../services/email.js';
 import { signPortalToken, requirePortalAuth } from '../middleware/portalAuth.js';
+import { logAuthEvent } from '../services/authActivity.js';
 import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
@@ -63,6 +64,14 @@ router.post('/magic-link', magicLinkLimiter, async (req, res) => {
     );
 
     if (rows.length === 0) {
+      await logAuthEvent({
+        identifier: normalizedEmail,
+        eventType: 'magic_link_requested',
+        success: true,
+        details: { found: false },
+        ip: req.ip,
+        userAgent: req.get('user-agent') || null,
+      });
       // Don't reveal whether the email exists
       return res.json({ message: 'If that email is registered, a login link has been sent.' });
     }
@@ -88,9 +97,28 @@ router.post('/magic-link', magicLinkLimiter, async (req, res) => {
     // Send the email
     await sendMagicLinkEmail(normalizedEmail, rawToken, account.winery_name);
 
+    await logAuthEvent({
+      accountId: account.account_id,
+      wineryId: account.winery_id,
+      identifier: normalizedEmail,
+      eventType: 'magic_link_requested',
+      success: true,
+      details: { found: true, emailed: true },
+      ip: req.ip,
+      userAgent: req.get('user-agent') || null,
+    });
+
     res.json({ message: 'If that email is registered, a login link has been sent.' });
   } catch (err) {
     console.error('Magic link error:', err);
+    await logAuthEvent({
+      identifier: normalizedEmail,
+      eventType: 'magic_link_requested',
+      success: false,
+      details: { error: 'delivery_failed' },
+      ip: req.ip,
+      userAgent: req.get('user-agent') || null,
+    });
     // Still return success to avoid leaking info
     res.json({ message: 'If that email is registered, a login link has been sent.' });
   }
@@ -142,6 +170,16 @@ router.get('/verify', async (req, res) => {
       [row.account_id]
     );
 
+    await logAuthEvent({
+      accountId: row.account_id,
+      wineryId: row.winery_id,
+      eventType: 'magic_link_verified',
+      success: true,
+      details: { token_used: true },
+      ip: req.ip,
+      userAgent: req.get('user-agent') || null,
+    });
+
     // Issue session JWT as httpOnly cookie
     const jwt = signPortalToken(row.account_id, row.winery_id);
 
@@ -179,7 +217,7 @@ router.post('/login', passwordLoginLimiter, async (req, res) => {
 
   try {
     const { rows } = await pool.query(
-      `SELECT wa.id AS account_id, wa.winery_id, wa.password_hash
+      `SELECT wa.id AS account_id, wa.winery_id, wa.password_hash, wa.password_must_change
        FROM winery_accounts wa
        WHERE LOWER(wa.contact_email) = $1`,
       [normalizedEmail]
@@ -191,11 +229,29 @@ router.post('/login', passwordLoginLimiter, async (req, res) => {
 
     if (!rows[0]?.password_hash) {
       await bcrypt.compare(password, dummyHash);
+      await logAuthEvent({
+        identifier: normalizedEmail,
+        eventType: 'password_login',
+        success: false,
+        details: { reason: 'no_password' },
+        ip: req.ip,
+        userAgent: req.get('user-agent') || null,
+      });
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     const valid = await bcrypt.compare(password, storedHash);
     if (!valid) {
+      await logAuthEvent({
+        accountId: rows[0].account_id,
+        wineryId: rows[0].winery_id,
+        identifier: normalizedEmail,
+        eventType: 'password_login',
+        success: false,
+        details: { reason: 'invalid_password' },
+        ip: req.ip,
+        userAgent: req.get('user-agent') || null,
+      });
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -206,11 +262,22 @@ router.post('/login', passwordLoginLimiter, async (req, res) => {
       [account.account_id]
     );
 
+    await logAuthEvent({
+      accountId: account.account_id,
+      wineryId: account.winery_id,
+      identifier: normalizedEmail,
+      eventType: 'password_login',
+      success: true,
+      details: { password_must_change: Boolean(rows[0].password_must_change) },
+      ip: req.ip,
+      userAgent: req.get('user-agent') || null,
+    });
+
     const jwt = signPortalToken(account.account_id, account.winery_id);
 
     res.cookie('portal_token', jwt, portalCookieOptions());
 
-    res.json({ success: true, wineryId: account.winery_id });
+    res.json({ success: true, wineryId: account.winery_id, mustChangePassword: Boolean(rows[0].password_must_change) });
   } catch (err) {
     console.error('Password login error:', err);
     res.status(500).json({ error: 'Login failed' });
@@ -233,7 +300,8 @@ router.post('/set-password', requirePortalAuth, async (req, res) => {
 
   try {
     const { rows } = await pool.query(
-      `SELECT password_hash FROM winery_accounts WHERE id = $1`,
+      `SELECT password_hash, password_must_change, winery_id, contact_email
+       FROM winery_accounts WHERE id = $1`,
       [req.portalAccount.accountId]
     );
 
@@ -254,11 +322,26 @@ router.post('/set-password', requirePortalAuth, async (req, res) => {
 
     const hash = await bcrypt.hash(password, 12);
     await pool.query(
-      `UPDATE winery_accounts SET password_hash = $1 WHERE id = $2`,
+      `UPDATE winery_accounts
+       SET password_hash = $1,
+           password_must_change = FALSE,
+           password_last_changed_at = NOW()
+       WHERE id = $2`,
       [hash, req.portalAccount.accountId]
     );
 
-    res.json({ success: true });
+    await logAuthEvent({
+      accountId: req.portalAccount.accountId,
+      wineryId: rows[0].winery_id,
+      identifier: rows[0].contact_email,
+      eventType: rows[0].password_must_change ? 'password_reset_completed' : 'password_changed',
+      success: true,
+      details: { changed_via: 'portal' },
+      ip: req.ip,
+      userAgent: req.get('user-agent') || null,
+    });
+
+    res.json({ success: true, mustChangePassword: false });
   } catch (err) {
     console.error('Set-password error:', err);
     res.status(500).json({ error: 'Failed to update password' });
@@ -328,6 +411,17 @@ router.post('/change-email', requirePortalAuth, async (req, res) => {
       [req.portalAccount.accountId, normalizedEmail, tokenHash, expiresAt]
     );
 
+    await logAuthEvent({
+      accountId: req.portalAccount.accountId,
+      wineryId: account.winery_id,
+      identifier: account.contact_email,
+      eventType: 'email_change_requested',
+      success: true,
+      details: { new_email: normalizedEmail },
+      ip: req.ip,
+      userAgent: req.get('user-agent') || null,
+    });
+
     // Send verification email to the new email address
     await sendEmailChangeConfirmation(normalizedEmail, rawToken, account.winery_name);
 
@@ -381,6 +475,16 @@ router.post('/confirm-email-change', async (req, res) => {
       `UPDATE winery_accounts SET contact_email = $1 WHERE id = $2`,
       [changeToken.new_email, changeToken.account_id]
     );
+
+    await logAuthEvent({
+      accountId: changeToken.account_id,
+      identifier: changeToken.new_email,
+      eventType: 'email_change_completed',
+      success: true,
+      details: { new_email: changeToken.new_email },
+      ip: req.ip,
+      userAgent: req.get('user-agent') || null,
+    });
 
     res.json({ success: true, message: 'Email successfully changed. You can now log in with your new email address.' });
   } catch (err) {

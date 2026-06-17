@@ -40,8 +40,12 @@ export default function PortalLogin() {
     setError('');
     setLoading(true);
     try {
-      await apiPost('/api/auth/login', { email: pwEmail, password });
-      navigate('/portal/dashboard');
+      const result = await apiPost('/api/auth/login', { email: pwEmail, password });
+      if (result.mustChangePassword) {
+        navigate('/portal/profile', { state: { mustChangePassword: true } });
+      } else {
+        navigate('/portal/dashboard');
+      }
     } catch (err) {
       setError(err.message || 'Invalid email or password');
     } finally {

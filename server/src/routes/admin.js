@@ -23,6 +23,7 @@ import bcrypt from 'bcryptjs';
 import { pool } from '../db/pool.js';
 import { signAdminToken, requireAdminAuth, requireSuperadmin } from '../middleware/adminAuth.js';
 import { bulkApplyBlocks } from '../services/blockBulkApply.js';
+import { sendPortalPasswordEmail } from '../services/email.js';
 
 const router = express.Router();
 
@@ -845,13 +846,25 @@ router.post('/accounts/:id/password', requireSuperadmin, async (req, res) => {
       return res.status(404).json({ error: 'Account not found' });
     }
 
+    const { rows: wineryRows } = await pool.query(
+      `SELECT w.title AS winery_name
+       FROM winery_accounts wa
+       JOIN wineries w ON w.id = wa.winery_id
+       WHERE wa.id = $1`,
+      [id]
+    );
+
+    const wineryName = wineryRows[0]?.winery_name || 'Winery Portal';
+
+    await sendPortalPasswordEmail(rows[0].contact_email, wineryName, password, Boolean(temporary));
+
     res.json({
       success: true,
       account: rows[0],
       temporary: Boolean(temporary),
       message: temporary
-        ? 'Temporary password set. The user can sign in and change it from their profile.'
-        : 'Password updated successfully.',
+        ? 'Temporary password set and emailed to the user.'
+        : 'Password updated and emailed to the user.',
     });
   } catch (err) {
     console.error('Set winery account password error:', err);

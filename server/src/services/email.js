@@ -52,6 +52,38 @@ export async function sendMagicLinkEmail(toEmail, token, wineryName) {
 }
 
 /**
+ * Send a password email to a winery account holder.
+ * This is intended for temporary passwords or admin-issued resets.
+ */
+export async function sendPortalPasswordEmail(toEmail, wineryName, password, temporary = true) {
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to: toEmail,
+    subject: temporary
+      ? `Your temporary ${wineryName} portal password`
+      : `Your ${wineryName} portal password has been updated`,
+    html: `
+      <div style="font-family: serif; max-width: 520px; margin: 0 auto; color: rgb(8, 10, 15);">
+        <h2 style="color: rgb(8, 10, 15);">Terranthro — Winery Portal</h2>
+        <p>Hi,</p>
+        <p>Your portal password for the <strong>${escapeHtml(wineryName)}</strong> account has been ${temporary ? 'set' : 'updated'}.</p>
+        <p style="margin: 20px 0; padding: 14px 16px; background: rgb(245, 241, 232); border-radius: 6px; border: 1px solid rgb(214, 205, 191);">
+          <span style="display: block; font-size: 13px; color: rgb(64, 69, 88); margin-bottom: 8px;">Password</span>
+          <code style="font-size: 18px; letter-spacing: 0.04em; color: rgb(8, 10, 15);">${escapeHtml(password)}</code>
+        </p>
+        <p>Sign in to the portal with this password, then change it in your profile if needed.</p>
+        ${temporary ? '<p style="font-size: 13px; color: rgb(64, 69, 88);">This is a temporary password and should be changed after sign-in.</p>' : ''}
+      </div>
+    `,
+  });
+
+  if (error) {
+    console.error('Failed to send portal password email:', error);
+    throw new Error('Email delivery failed');
+  }
+}
+
+/**
  * Send an email change confirmation link to the new email address.
  */
 export async function sendEmailChangeConfirmation(newEmail, token, wineryName) {

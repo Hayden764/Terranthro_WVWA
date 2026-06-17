@@ -950,46 +950,9 @@ router.get('/intel', requireSuperadmin, async (req, res) => {
   const searchPattern = `%${search}%`;
 
   try {
-    const { rows: summaryRows } = await pool.query(`
-      SELECT
-        (SELECT COUNT(*) FROM winery_accounts) AS total_accounts,
-        (SELECT COUNT(*) FROM winery_accounts WHERE password_hash IS NOT NULL) AS password_enabled,
-        (SELECT COUNT(*) FROM winery_accounts WHERE password_must_change = TRUE) AS must_change_password,
-        (SELECT COUNT(*) FROM winery_accounts WHERE last_login >= NOW() - INTERVAL '30 days') AS active_30d,
-        (SELECT COUNT(*) FROM auth_activity_log WHERE event_type IN ('password_login', 'magic_link_verified') AND success = TRUE AND created_at >= NOW() - INTERVAL '7 days') AS successful_logins_7d,
-        (SELECT COUNT(*) FROM auth_activity_log WHERE event_type = 'password_login' AND success = FALSE AND created_at >= NOW() - INTERVAL '7 days') AS failed_logins_7d,
-        (SELECT COUNT(*) FROM auth_activity_log WHERE created_at >= NOW() - INTERVAL '24 hours') AS events_24h
-    `);
+    const summaryRows = await loadIntelSummary();
 
-    const { rows: accounts } = await pool.query(
-      `WITH recent AS (
-         SELECT
-           account_id,
-           COUNT(*) FILTER (WHERE event_type IN ('password_login', 'magic_link_verified') AND success = TRUE AND created_at >= NOW() - INTERVAL '30 days') AS login_count_30d,
-           COUNT(*) FILTER (WHERE event_type = 'password_login' AND success = FALSE AND created_at >= NOW() - INTERVAL '30 days') AS failed_logins_30d,
-           MAX(created_at) AS last_event_at,
-           (ARRAY_AGG(event_type ORDER BY created_at DESC))[1] AS last_event_type
-         FROM auth_activity_log
-         WHERE account_id IS NOT NULL
-         GROUP BY account_id
-       )
-       SELECT
-         wa.id, wa.winery_id, w.title AS winery_name,
-         wa.contact_email, wa.email_verified, wa.last_login, wa.created_at,
-         (wa.password_hash IS NOT NULL) AS has_password,
-         wa.password_must_change, wa.password_last_changed_at,
-         COALESCE(recent.login_count_30d, 0) AS login_count_30d,
-         COALESCE(recent.failed_logins_30d, 0) AS failed_logins_30d,
-         recent.last_event_at,
-         recent.last_event_type
-       FROM winery_accounts wa
-       JOIN wineries w ON w.id = wa.winery_id
-       LEFT JOIN recent ON recent.account_id = wa.id
-       WHERE LOWER(w.title) LIKE $1 OR LOWER(wa.contact_email) LIKE $1
-       ORDER BY w.title
-       LIMIT 200`,
-      [searchPattern]
-    );
+    const accounts = await loadIntelAccounts(searchPattern);
 
     res.json({ summary: summaryRows[0], accounts });
   } catch (err) {
@@ -1011,6 +974,11 @@ router.get('/intel/accounts/:id/events', requireSuperadmin, async (req, res) => 
   }
 
   try {
+    const tableExists = await hasAuthActivityLog();
+    if (!tableExists) {
+      return res.json([]);
+    }
+
     const params = [id];
     let typeSql = '';
     if (eventType) {
@@ -1040,6 +1008,143 @@ router.get('/intel/accounts/:id/events', requireSuperadmin, async (req, res) => 
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+async function hasAuthActivityLog() {
+  try {
+    const { rows } = await pool.query(`
+      SELECT to_regclass('public.auth_activity_log') IS NOT NULL AS exists
+    `);
+    return Boolean(rows[0]?.exists);
+  } catch {
+    return false;
+  }
+}
+
+async function loadIntelSummary() {
+  const hasActivity = await hasAuthActivityLog();
+  const hasPasswordFlags = await hasWineryAccountPasswordFlags();
+
+  if (!hasActivity) {
+    return [makeLegacyIntelSummaryRow()];
+  }
+
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM winery_accounts) AS total_accounts,
+        (SELECT COUNT(*) FROM winery_accounts WHERE password_hash IS NOT NULL) AS password_enabled,
+        (SELECT COUNT(*) FROM winery_accounts WHERE ${hasPasswordFlags ? 'COALESCE(password_must_change, FALSE) = TRUE' : 'FALSE'}) AS must_change_password,
+        (SELECT COUNT(*) FROM winery_accounts WHERE last_login >= NOW() - INTERVAL '30 days') AS active_30d,
+        (SELECT COUNT(*) FROM auth_activity_log WHERE event_type IN ('password_login', 'magic_link_verified') AND success = TRUE AND created_at >= NOW() - INTERVAL '7 days') AS successful_logins_7d,
+        (SELECT COUNT(*) FROM auth_activity_log WHERE event_type = 'password_login' AND success = FALSE AND created_at >= NOW() - INTERVAL '7 days') AS failed_logins_7d,
+        (SELECT COUNT(*) FROM auth_activity_log WHERE created_at >= NOW() - INTERVAL '24 hours') AS events_24h
+    `);
+    return rows;
+  } catch (err) {
+    if (err?.code === '42P01' || err?.code === '42703') {
+      return [makeLegacyIntelSummaryRow()];
+    }
+    throw err;
+  }
+}
+
+async function loadIntelAccounts(searchPattern) {
+  const hasActivity = await hasAuthActivityLog();
+  const hasPasswordFlags = await hasWineryAccountPasswordFlags();
+
+  if (!hasActivity) {
+    const { rows } = await pool.query(
+      `SELECT
+         wa.id, wa.winery_id, w.title AS winery_name,
+         wa.contact_email, wa.email_verified, wa.last_login, wa.created_at,
+         (wa.password_hash IS NOT NULL) AS has_password,
+         ${hasPasswordFlags ? 'COALESCE(wa.password_must_change, FALSE) AS password_must_change,' : 'FALSE AS password_must_change,'}
+         ${hasPasswordFlags ? 'wa.password_last_changed_at,' : 'NULL::timestamp AS password_last_changed_at,'}
+         0 AS login_count_30d,
+         0 AS failed_logins_30d,
+         NULL::timestamp AS last_event_at,
+         NULL::text AS last_event_type
+       FROM winery_accounts wa
+       JOIN wineries w ON w.id = wa.winery_id
+       WHERE LOWER(w.title) LIKE $1 OR LOWER(wa.contact_email) LIKE $1
+       ORDER BY w.title
+       LIMIT 200`,
+      [searchPattern]
+    );
+    return rows;
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `WITH recent AS (
+         SELECT
+           account_id,
+           COUNT(*) FILTER (WHERE event_type IN ('password_login', 'magic_link_verified') AND success = TRUE AND created_at >= NOW() - INTERVAL '30 days') AS login_count_30d,
+           COUNT(*) FILTER (WHERE event_type = 'password_login' AND success = FALSE AND created_at >= NOW() - INTERVAL '30 days') AS failed_logins_30d,
+           MAX(created_at) AS last_event_at,
+           (ARRAY_AGG(event_type ORDER BY created_at DESC))[1] AS last_event_type
+         FROM auth_activity_log
+         WHERE account_id IS NOT NULL
+         GROUP BY account_id
+       )
+       SELECT
+         wa.id, wa.winery_id, w.title AS winery_name,
+         wa.contact_email, wa.email_verified, wa.last_login, wa.created_at,
+         (wa.password_hash IS NOT NULL) AS has_password,
+         ${hasPasswordFlags ? 'COALESCE(wa.password_must_change, FALSE) AS password_must_change,' : 'FALSE AS password_must_change,'}
+         ${hasPasswordFlags ? 'wa.password_last_changed_at,' : 'NULL::timestamp AS password_last_changed_at,'}
+         COALESCE(recent.login_count_30d, 0) AS login_count_30d,
+         COALESCE(recent.failed_logins_30d, 0) AS failed_logins_30d,
+         recent.last_event_at,
+         recent.last_event_type
+       FROM winery_accounts wa
+       JOIN wineries w ON w.id = wa.winery_id
+       LEFT JOIN recent ON recent.account_id = wa.id
+       WHERE LOWER(w.title) LIKE $1 OR LOWER(wa.contact_email) LIKE $1
+       ORDER BY w.title
+       LIMIT 200`,
+      [searchPattern]
+    );
+    return rows;
+  } catch (err) {
+    throw err;
+  }
+}
+
+async function hasWineryAccountPasswordFlags() {
+  try {
+    const { rows } = await pool.query(
+      `SELECT
+         EXISTS (
+           SELECT 1 FROM information_schema.columns
+           WHERE table_schema = 'public'
+             AND table_name = 'winery_accounts'
+             AND column_name = 'password_must_change'
+         ) AS has_password_must_change,
+         EXISTS (
+           SELECT 1 FROM information_schema.columns
+           WHERE table_schema = 'public'
+             AND table_name = 'winery_accounts'
+             AND column_name = 'password_last_changed_at'
+         ) AS has_password_last_changed_at`
+    );
+    return Boolean(rows[0]?.has_password_must_change || rows[0]?.has_password_last_changed_at);
+  } catch {
+    return false;
+  }
+}
+
+function makeLegacyIntelSummaryRow() {
+  return {
+    total_accounts: 0,
+    password_enabled: 0,
+    must_change_password: 0,
+    active_30d: 0,
+    successful_logins_7d: 0,
+    failed_logins_7d: 0,
+    events_24h: 0,
+  };
+}
 
 // ─── Admin accounts management (superadmin only) ─────────────────
 

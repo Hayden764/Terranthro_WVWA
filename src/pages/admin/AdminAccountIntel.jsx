@@ -39,7 +39,10 @@ export default function AdminAccountIntel() {
       setError('');
     } catch (err) {
       setError(err.message || 'Failed to load account intelligence');
-      navigate('/admin', { replace: true });
+      const message = String(err?.message || '');
+      if (message.includes('401') || message.includes('403') || message.toLowerCase().includes('not authenticated')) {
+        navigate('/admin', { replace: true });
+      }
     } finally {
       setLoading(false);
     }

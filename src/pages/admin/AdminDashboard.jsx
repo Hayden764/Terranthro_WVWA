@@ -78,6 +78,27 @@ export default function AdminDashboard() {
     }
   }
 
+  async function handleSetTemporaryPassword(account) {
+    const tempPassword = prompt(`Set temporary password for ${account.contact_email}\n\nMinimum 8 characters:`);
+    if (!tempPassword) return;
+
+    if (tempPassword.length < 8) {
+      alert('Temporary password must be at least 8 characters.');
+      return;
+    }
+
+    try {
+      await apiPost(`/api/admin/accounts/${account.id}/password`, {
+        password: tempPassword,
+        temporary: true,
+      });
+      alert(`Temporary password set for ${account.contact_email}. They can sign in and change it from their profile.`);
+      load();
+    } catch (err) {
+      alert(err.message || 'Failed to set temporary password.');
+    }
+  }
+
   if (loading) {
     return <Shell><p style={{ color: TOKENS.muted }}>Loading…</p></Shell>;
   }
@@ -292,16 +313,33 @@ export default function AdminDashboard() {
                         ID {a.winery_id}
                       </span>
                     </div>
-                    <button onClick={() => handleDeleteAccount(a.id)} style={{
-                      ...outlineBtn, color: TOKENS.danger, borderColor: alpha(TOKENS.danger, 0.3),
-                      fontSize: 'var(--type-ui-label-size)', padding: '3px 10px',
-                    }}>
-                      Remove
-                    </button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {admin?.role === 'superadmin' && (
+                        <button
+                          onClick={() => handleSetTemporaryPassword(a)}
+                          style={{
+                            ...outlineBtn,
+                            color: TOKENS.warning,
+                            borderColor: alpha(TOKENS.warning, 0.35),
+                            fontSize: 'var(--type-ui-label-size)',
+                            padding: '3px 10px',
+                          }}
+                        >
+                          Set Temp Password
+                        </button>
+                      )}
+                      <button onClick={() => handleDeleteAccount(a.id)} style={{
+                        ...outlineBtn, color: TOKENS.danger, borderColor: alpha(TOKENS.danger, 0.3),
+                        fontSize: 'var(--type-ui-label-size)', padding: '3px 10px',
+                      }}>
+                        Remove
+                      </button>
+                    </div>
                   </div>
                   <div style={{ fontSize: 'var(--type-body-size)', color: alpha(TOKENS.parchment, 0.7), marginTop: 4 }}>
                     {a.contact_email}
                     {a.email_verified && ' ✓'}
+                    {a.has_password && ' · password set'}
                     {a.last_login && ` · last login ${new Date(a.last_login).toLocaleDateString()}`}
                   </div>
                 </div>

@@ -218,7 +218,7 @@ function PasswordSection({ hasPassword }) {
       </h2>
       <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 20 }}>
         {hasPassword
-          ? 'Update your portal login password.'
+          ? 'Update your portal login password. If support gave you a temporary password, change it here right after signing in.'
           : 'Set a password so you can log in without an email link.'}
       </p>
 

@@ -12,6 +12,7 @@
  *
  * GET  /api/admin/accounts                    — list winery accounts
  * POST /api/admin/accounts                    — create a winery account
+ * POST /api/admin/accounts/:id/password       — set/reset winery account password (superadmin)
  * DELETE /api/admin/accounts/:id              — remove a winery account
  *
  * POST /api/admin/admins                      — create an admin account (superadmin only)
@@ -761,6 +762,7 @@ router.get('/accounts', async (_req, res) => {
       `SELECT
          wa.id, wa.winery_id, wa.contact_email, wa.email_verified,
          wa.last_login, wa.created_at,
+         (wa.password_hash IS NOT NULL) AS has_password,
          w.title AS winery_name
        FROM winery_accounts wa
        JOIN wineries w ON w.id = wa.winery_id
@@ -807,6 +809,52 @@ router.post('/accounts', async (req, res) => {
       return res.status(409).json({ error: 'This email is already associated with another winery' });
     }
     console.error('Create account error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * POST /api/admin/accounts/:id/password
+ * Body: { password: string, temporary?: boolean }
+ *
+ * Superadmin-only endpoint for setting or resetting a winery portal account password.
+ */
+router.post('/accounts/:id/password', requireSuperadmin, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { password, temporary } = req.body ?? {};
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'Valid account id is required' });
+  }
+
+  if (!password || typeof password !== 'string' || password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+
+  try {
+    const hash = await bcrypt.hash(password, 12);
+    const { rows } = await pool.query(
+      `UPDATE winery_accounts
+       SET password_hash = $1
+       WHERE id = $2
+       RETURNING id, winery_id, contact_email`,
+      [hash, id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    res.json({
+      success: true,
+      account: rows[0],
+      temporary: Boolean(temporary),
+      message: temporary
+        ? 'Temporary password set. The user can sign in and change it from their profile.'
+        : 'Password updated successfully.',
+    });
+  } catch (err) {
+    console.error('Set winery account password error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

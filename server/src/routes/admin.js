@@ -846,15 +846,28 @@ router.post('/accounts/:id/password', requireSuperadmin, async (req, res) => {
   }
 
   try {
+    const hasPasswordFlags = await hasWineryAccountPasswordFlags();
     const hash = await bcrypt.hash(password, 12);
+
+    const updateSql = hasPasswordFlags
+      ? `UPDATE winery_accounts
+         SET password_hash = $1,
+             password_must_change = $3,
+             password_last_changed_at = NOW()
+         WHERE id = $2
+         RETURNING id, winery_id, contact_email`
+      : `UPDATE winery_accounts
+         SET password_hash = $1
+         WHERE id = $2
+         RETURNING id, winery_id, contact_email`;
+
+    const updateParams = hasPasswordFlags
+      ? [hash, id, Boolean(temporary)]
+      : [hash, id];
+
     const { rows } = await pool.query(
-      `UPDATE winery_accounts
-       SET password_hash = $1,
-           password_must_change = $3,
-           password_last_changed_at = NOW()
-       WHERE id = $2
-       RETURNING id, winery_id, contact_email`,
-      [hash, id, Boolean(temporary)]
+      updateSql,
+      updateParams
     );
 
     if (rows.length === 0) {

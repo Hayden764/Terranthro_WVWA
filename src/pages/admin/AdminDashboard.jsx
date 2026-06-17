@@ -79,7 +79,7 @@ export default function AdminDashboard() {
   }
 
   async function handleSetTemporaryPassword(account) {
-    const tempPassword = prompt(`Set and email a temporary password for ${account.contact_email}\n\nMinimum 8 characters:`);
+    const tempPassword = prompt(`Set a temporary password for ${account.contact_email}\n\nMinimum 8 characters:`);
     if (!tempPassword) return;
 
     if (tempPassword.length < 8) {
@@ -92,7 +92,7 @@ export default function AdminDashboard() {
         password: tempPassword,
         temporary: true,
       });
-      alert(`Temporary password emailed to ${account.contact_email}. They can sign in and change it from their profile.`);
+      alert(`Temporary password set for ${account.contact_email}. Send it to them directly.`);
       load();
     } catch (err) {
       alert(err.message || 'Failed to set temporary password.');
@@ -340,7 +340,7 @@ export default function AdminDashboard() {
                             padding: '3px 10px',
                           }}
                         >
-                          Email Temp Password
+                          Set Temp Password
                         </button>
                       )}
                       <button onClick={() => handleDeleteAccount(a.id)} style={{

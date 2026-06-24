@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '../../styles/tokens';
-import { apiJson } from '../../lib/api';
+import { apiJson, apiPost } from '../../lib/api';
 
 export default function AdminAccountIntel() {
   const navigate = useNavigate();
@@ -16,6 +16,9 @@ export default function AdminAccountIntel() {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventTypeFilter, setEventTypeFilter] = useState('');
   const [error, setError] = useState('');
+  const [generatedPassword, setGeneratedPassword] = useState('');
+  const [showGeneratedPassword, setShowGeneratedPassword] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   const loadAccounts = useCallback(async () => {
     try {
@@ -82,6 +85,40 @@ export default function AdminAccountIntel() {
   function selectAccount(account) {
     setSelectedAccount(account);
     setEventTypeFilter('');
+    setGeneratedPassword('');
+    setShowGeneratedPassword(false);
+  }
+
+  function handleGeneratePassword() {
+    setGeneratedPassword(generateStrongPassword(18));
+    setShowGeneratedPassword(false);
+  }
+
+  async function handleCopyPassword() {
+    if (!generatedPassword) return;
+    try {
+      await navigator.clipboard.writeText(generatedPassword);
+    } catch {
+      setError('Could not copy password to clipboard.');
+    }
+  }
+
+  async function handleApplyGeneratedPassword() {
+    if (!selectedAccount || !generatedPassword) return;
+    setResettingPassword(true);
+    try {
+      await apiPost(`/api/admin/accounts/${selectedAccount.id}/password`, {
+        password: generatedPassword,
+        temporary: true,
+      });
+      await loadAccounts();
+      setShowGeneratedPassword(false);
+      setError('');
+    } catch (err) {
+      setError(err.message || 'Failed to set temporary password');
+    } finally {
+      setResettingPassword(false);
+    }
   }
 
   if (loading && !summary) {
@@ -198,6 +235,54 @@ export default function AdminAccountIntel() {
                 <InfoBox label="Password changed" value={formatDate(selectedAccount.password_last_changed_at)} />
               </div>
 
+              <div style={{ ...infoBox, marginBottom: 16 }}>
+                <div style={{ color: TOKENS.muted, fontSize: 'var(--type-ui-label-size)', marginBottom: 8 }}>
+                  Temporary Password Helper
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+                  <button type="button" onClick={handleGeneratePassword} style={primaryBtn}>
+                    Generate Strong Temp Password
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowGeneratedPassword((v) => !v)}
+                    style={outlineBtn}
+                    disabled={!generatedPassword}
+                  >
+                    {showGeneratedPassword ? 'Hide' : 'Show'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCopyPassword}
+                    style={outlineBtn}
+                    disabled={!generatedPassword}
+                  >
+                    Copy
+                  </button>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input
+                    type={showGeneratedPassword ? 'text' : 'password'}
+                    value={generatedPassword}
+                    readOnly
+                    placeholder="Generate a password"
+                    className="ds-input"
+                    style={{ ...searchInput, minWidth: 280, flex: '1 1 320px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyGeneratedPassword}
+                    style={{ ...primaryBtn, opacity: resettingPassword ? 0.7 : 1 }}
+                    disabled={!generatedPassword || resettingPassword}
+                  >
+                    {resettingPassword ? 'Applying…' : 'Set As Temp Password'}
+                  </button>
+                </div>
+                <p style={{ color: TOKENS.muted, fontSize: 'var(--type-ui-label-size)', marginTop: 8, marginBottom: 0 }}>
+                  This sets a temporary password only. Share it manually with the user.
+                </p>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginBottom: 18 }}>
                 <InfoBox label="Logins 30d" value={selectedAccount.login_count_30d ?? 0} />
                 <InfoBox label="Failures 30d" value={selectedAccount.failed_logins_30d ?? 0} />
@@ -274,6 +359,51 @@ function formatDate(value) {
 
 function prettyEventLabel(value) {
   return String(value).replace(/_/g, ' ');
+}
+
+function generateStrongPassword(length = 18) {
+  const lower = 'abcdefghijkmnopqrstuvwxyz';
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const digits = '23456789';
+  const symbols = '!@#$%^&*_-+=';
+  const all = `${lower}${upper}${digits}${symbols}`;
+
+  const chars = [
+    pickOne(lower),
+    pickOne(upper),
+    pickOne(digits),
+    pickOne(symbols),
+  ];
+
+  while (chars.length < length) {
+    chars.push(pickOne(all));
+  }
+
+  return shuffle(chars).join('');
+}
+
+function pickOne(alphabet) {
+  const index = secureRandomInt(alphabet.length);
+  return alphabet[index];
+}
+
+function shuffle(arr) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = secureRandomInt(i + 1);
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function secureRandomInt(max) {
+  if (max <= 0) return 0;
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    const buf = new Uint32Array(1);
+    window.crypto.getRandomValues(buf);
+    return buf[0] % max;
+  }
+  return Math.floor(Math.random() * max);
 }
 
 function StatCard({ label, value }) {

@@ -216,10 +216,17 @@ router.post('/login', passwordLoginLimiter, async (req, res) => {
   const normalizedEmail = email.trim().toLowerCase();
 
   try {
+    const hasPasswordFlags = await hasWineryAccountPasswordFlags();
+    const loginSql = hasPasswordFlags
+      ? `SELECT wa.id AS account_id, wa.winery_id, wa.password_hash, wa.password_must_change
+         FROM winery_accounts wa
+         WHERE LOWER(wa.contact_email) = $1`
+      : `SELECT wa.id AS account_id, wa.winery_id, wa.password_hash, FALSE AS password_must_change
+         FROM winery_accounts wa
+         WHERE LOWER(wa.contact_email) = $1`;
+
     const { rows } = await pool.query(
-      `SELECT wa.id AS account_id, wa.winery_id, wa.password_hash, wa.password_must_change
-       FROM winery_accounts wa
-       WHERE LOWER(wa.contact_email) = $1`,
+      loginSql,
       [normalizedEmail]
     );
 
@@ -299,9 +306,15 @@ router.post('/set-password', requirePortalAuth, async (req, res) => {
   }
 
   try {
+    const hasPasswordFlags = await hasWineryAccountPasswordFlags();
+    const accountSql = hasPasswordFlags
+      ? `SELECT password_hash, password_must_change, winery_id, contact_email
+         FROM winery_accounts WHERE id = $1`
+      : `SELECT password_hash, FALSE AS password_must_change, winery_id, contact_email
+         FROM winery_accounts WHERE id = $1`;
+
     const { rows } = await pool.query(
-      `SELECT password_hash, password_must_change, winery_id, contact_email
-       FROM winery_accounts WHERE id = $1`,
+      accountSql,
       [req.portalAccount.accountId]
     );
 
@@ -321,14 +334,17 @@ router.post('/set-password', requirePortalAuth, async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password, 12);
-    await pool.query(
-      `UPDATE winery_accounts
-       SET password_hash = $1,
-           password_must_change = FALSE,
-           password_last_changed_at = NOW()
-       WHERE id = $2`,
-      [hash, req.portalAccount.accountId]
-    );
+    const updateSql = hasPasswordFlags
+      ? `UPDATE winery_accounts
+         SET password_hash = $1,
+             password_must_change = FALSE,
+             password_last_changed_at = NOW()
+         WHERE id = $2`
+      : `UPDATE winery_accounts
+         SET password_hash = $1
+         WHERE id = $2`;
+
+    await pool.query(updateSql, [hash, req.portalAccount.accountId]);
 
     await logAuthEvent({
       accountId: req.portalAccount.accountId,
@@ -530,5 +546,28 @@ router.get('/me', requirePortalAuth, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+async function hasWineryAccountPasswordFlags() {
+  try {
+    const { rows } = await pool.query(
+      `SELECT
+         EXISTS (
+           SELECT 1 FROM information_schema.columns
+           WHERE table_schema = 'public'
+             AND table_name = 'winery_accounts'
+             AND column_name = 'password_must_change'
+         ) AS has_password_must_change,
+         EXISTS (
+           SELECT 1 FROM information_schema.columns
+           WHERE table_schema = 'public'
+             AND table_name = 'winery_accounts'
+             AND column_name = 'password_last_changed_at'
+         ) AS has_password_last_changed_at`
+    );
+    return Boolean(rows[0]?.has_password_must_change || rows[0]?.has_password_last_changed_at);
+  } catch {
+    return false;
+  }
+}
 
 export default router;

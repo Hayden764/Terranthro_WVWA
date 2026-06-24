@@ -216,26 +216,18 @@ router.post('/login', passwordLoginLimiter, async (req, res) => {
   const normalizedEmail = email.trim().toLowerCase();
 
   try {
-    const hasPasswordFlags = await hasWineryAccountPasswordFlags();
-    const loginSql = hasPasswordFlags
-      ? `SELECT wa.id AS account_id, wa.winery_id, wa.password_hash, wa.password_must_change
-         FROM winery_accounts wa
-         WHERE LOWER(wa.contact_email) = $1`
-      : `SELECT wa.id AS account_id, wa.winery_id, wa.password_hash, FALSE AS password_must_change
-         FROM winery_accounts wa
-         WHERE LOWER(wa.contact_email) = $1`;
-
-    const { rows } = await pool.query(
-      loginSql,
-      [normalizedEmail]
-    );
+    const rows = await queryPortalAccountForLogin(normalizedEmail);
 
     // Use a dummy compare to prevent timing attacks even when account not found
-    const dummyHash = '$2a$12$invalidhashpaddingtomakethissafefromtiming00000000000000';
+    const dummyHash = '$2b$10$CwTycUXWue0Thq9StjUM0uJ8G6Y4s46HoPazTA/gkGEXLMaLLq5yK';
     const storedHash = rows[0]?.password_hash ?? dummyHash;
 
     if (!rows[0]?.password_hash) {
-      await bcrypt.compare(password, dummyHash);
+      try {
+        await bcrypt.compare(password, dummyHash);
+      } catch {
+        // Fail closed as invalid credentials even if the dummy hash compare fails.
+      }
       await logAuthEvent({
         identifier: normalizedEmail,
         eventType: 'password_login',
@@ -567,6 +559,34 @@ async function hasWineryAccountPasswordFlags() {
     return Boolean(rows[0]?.has_password_must_change || rows[0]?.has_password_last_changed_at);
   } catch {
     return false;
+  }
+}
+
+async function queryPortalAccountForLogin(normalizedEmail) {
+  const hasPasswordFlags = await hasWineryAccountPasswordFlags();
+  const preferredSql = hasPasswordFlags
+    ? `SELECT wa.id AS account_id, wa.winery_id, wa.password_hash, wa.password_must_change
+       FROM winery_accounts wa
+       WHERE LOWER(wa.contact_email) = $1`
+    : `SELECT wa.id AS account_id, wa.winery_id, wa.password_hash, FALSE AS password_must_change
+       FROM winery_accounts wa
+       WHERE LOWER(wa.contact_email) = $1`;
+
+  try {
+    const { rows } = await pool.query(preferredSql, [normalizedEmail]);
+    return rows;
+  } catch (err) {
+    // Column may not exist yet on older deployments; retry with a legacy-safe projection.
+    if (err?.code === '42703') {
+      const { rows } = await pool.query(
+        `SELECT wa.id AS account_id, wa.winery_id, wa.password_hash, FALSE AS password_must_change
+         FROM winery_accounts wa
+         WHERE LOWER(wa.contact_email) = $1`,
+        [normalizedEmail]
+      );
+      return rows;
+    }
+    throw err;
   }
 }
 

@@ -2384,7 +2384,17 @@ const WVWAMap = forwardRef(function WVWAMap({
         // Fetch Adelsheim parcels from API (replaces the 3.7MB public GeoJSON file)
         const vineyardRes = await fetch(`${API_BASE}/api/vineyards/parcels?dataset=adelsheim`, { headers: API_HEADERS });
         const vineyardRaw = vineyardRes.ok ? await vineyardRes.json() : { features: [] };
-        const vineyardFeatures = vineyardRaw?.features || [];
+        let vineyardFeatures = vineyardRaw?.features || [];
+
+        // Also pull the winery-linked western-AVA vineyards (wvwa-ml-2025) so they
+        // render in the green "linked" layer alongside Adelsheim. Additive only —
+        // unlinked west parcels are not included here (they belong to the white
+        // reference layer).
+        const westRes = await fetch(`${API_BASE}/api/vineyards/parcels?dataset=wvwa-ml-2025&linked=true`, { headers: API_HEADERS });
+        if (westRes.ok) {
+          const westRaw = await westRes.json();
+          vineyardFeatures = vineyardFeatures.concat(westRaw?.features || []);
+        }
 
         // Build winery → parcel lookup from the full parcel dataset so selection,
         // grouping, and relinking work consistently across all datasets.

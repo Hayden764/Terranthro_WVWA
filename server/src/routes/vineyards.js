@@ -101,6 +101,7 @@ router.get('/parcels', async (req, res) => {
         vp.varietals_list,
         w.recid AS winery_recid,
         w.title AS winery_title,
+        (vp.winery_id IS NOT NULL AND COALESCE(w.is_wvwa_member, false)) AS is_member,
         ST_AsGeoJSON(vp.geometry)::json AS geometry
       FROM vineyard_parcels vp
       LEFT JOIN wineries w ON vp.winery_id = w.id
@@ -137,6 +138,7 @@ router.get('/parcels', async (req, res) => {
           varietals_list:   row.varietals_list,
           winery_recid:     row.winery_recid,
           winery_title:     row.winery_title,
+          is_member:        row.is_member === true,
         },
         geometry: row.geometry,
       })),

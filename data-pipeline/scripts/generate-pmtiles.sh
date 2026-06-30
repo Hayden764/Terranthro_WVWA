@@ -71,6 +71,7 @@ ogr2ogr \
       vp.varietals_list,
       w.recid AS winery_recid,
       w.title AS winery_title,
+      (vp.winery_id IS NOT NULL AND COALESCE(w.is_wvwa_member, false)) AS is_member,
       vp.geometry
     FROM vineyard_parcels vp
     LEFT JOIN wineries w ON vp.winery_id = w.id

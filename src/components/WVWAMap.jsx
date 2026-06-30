@@ -2381,27 +2381,17 @@ const WVWAMap = forwardRef(function WVWAMap({
 
       // ── Load vineyard parcels ─────────────────────────────────────────
       try {
-        // Fetch Adelsheim parcels from API (replaces the 3.7MB public GeoJSON file)
-        const vineyardRes = await fetch(`${API_BASE}/api/vineyards/parcels?dataset=adelsheim`, { headers: API_HEADERS });
-        const vineyardRaw = vineyardRes.ok ? await vineyardRes.json() : { features: [] };
-        let vineyardFeatures = vineyardRaw?.features || [];
-
-        // Also pull the winery-linked western-AVA vineyards (wvwa-ml-2025) so they
-        // render in the green "linked" layer alongside Adelsheim. Additive only —
-        // unlinked west parcels are not included here (they belong to the white
-        // reference layer).
-        const westRes = await fetch(`${API_BASE}/api/vineyards/parcels?dataset=wvwa-ml-2025&linked=true`, { headers: API_HEADERS });
-        if (westRes.ok) {
-          const westRaw = await westRes.json();
-          vineyardFeatures = vineyardFeatures.concat(westRaw?.features || []);
-        }
-
-        // Build winery → parcel lookup from the full parcel dataset so selection,
-        // grouping, and relinking work consistently across all datasets.
+        // Fetch all vineyard parcels once. Color is driven by WVWA membership:
+        // member-owned parcels render green via the "linked" layer below; everyone
+        // else renders gray via the reference layers (same is_member flag).
         const parcelLookupRes = await fetch(`${API_BASE}/api/vineyards/parcels`, { headers: API_HEADERS });
         const parcelLookupGeoJSON = parcelLookupRes.ok
           ? await parcelLookupRes.json()
           : { type: 'FeatureCollection', features: [] };
+
+        // Green "linked" layer = WVWA-member-owned parcels only.
+        const vineyardFeatures = (parcelLookupGeoJSON.features || [])
+          .filter((f) => f?.properties?.is_member === true);
 
         VINEYARD_BY_RECID = {};
         VINEYARD_ALL_BY_NAME = {};
@@ -2734,8 +2724,10 @@ const WVWAMap = forwardRef(function WVWAMap({
           if (!e.features?.length) return;
           const hoveredFeature = e.features[0];
           const hoveredProps = hoveredFeature?.properties || {};
-          const vineyardName = getVineyardNameFromProperties(hoveredProps) || 'Unknown Vineyard';
-          const normalizedName = normalizeVineyardName(vineyardName);
+          const rawVineyardName = getVineyardNameFromProperties(hoveredProps);
+          const vineyardName = rawVineyardName || 'Not yet named';
+          // Only group by name when there's a real name — unnamed parcels stay individual.
+          const normalizedName = rawVineyardName ? normalizeVineyardName(rawVineyardName) : '';
           const sameNameFeatures = normalizedName
             ? map.queryRenderedFeatures({ layers: ['vineyards-reference-passive-fill'] })
               .filter((feature) => {

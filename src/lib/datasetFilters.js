@@ -1,17 +1,19 @@
-export function buildDatasetFilter(datasets) {
-  if (!datasets.length) return null;
-  return ['in', ['get', 'source_dataset'], ['literal', datasets]];
+// Vineyard map coloring is driven by WVWA membership, not by dataset.
+//   • Member-owned parcels  → green, rendered by the separate "linked" layer.
+//   • Everyone else (is_member false / missing) → gray "reference" layers.
+// `is_member` is supplied by the API and baked into the PMTiles tileset.
+
+// Non-member (and unknown) parcels render gray. `!= true` catches false, null,
+// and absent values so anything not explicitly a member falls through to gray.
+const NON_MEMBER_FILTER = ['!=', ['get', 'is_member'], true];
+
+// Interactive (formerly Adelsheim-white) reference layers are retired: members
+// are green now, so there is nothing left for this style to show.
+export function buildInteractiveReferenceVineyardFilter() {
+  return null;
 }
 
-export function buildInteractiveReferenceVineyardFilter(devLayerToggles) {
-  const enabledDatasets = [];
-  if (devLayerToggles.vineyardsAdelsheimReference) enabledDatasets.push('adelsheim');
-  return buildDatasetFilter(enabledDatasets);
-}
-
-export function buildPassiveReferenceVineyardFilter(devLayerToggles) {
-  const enabledDatasets = [];
-  if (devLayerToggles.vineyardsDundeeChehalem) enabledDatasets.push('chehalem-dundee');
-  if (devLayerToggles.vineyardsYC) enabledDatasets.push('yamhill-carlton');
-  return buildDatasetFilter(enabledDatasets);
+// All non-member parcels render in the gray passive-reference style.
+export function buildPassiveReferenceVineyardFilter() {
+  return NON_MEMBER_FILTER;
 }

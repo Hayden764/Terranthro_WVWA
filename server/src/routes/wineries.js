@@ -107,6 +107,7 @@ router.get('/', async (req, res) => {
         (SELECT COUNT(*) FROM vineyard_parcels vp WHERE vp.winery_id = w.id) AS parcel_count
       FROM wineries w
       WHERE ${bboxCondition}
+        AND w.is_wvwa_member
         ${parcelsCondition}
       ORDER BY w.title
       `,

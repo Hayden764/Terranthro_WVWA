@@ -42,7 +42,8 @@ router.get('/', async (req, res) => {
           ST_X(w.location::geometry) AS lng,
           ST_Y(w.location::geometry) AS lat
         FROM wineries w
-        WHERE w.title ILIKE $1
+        WHERE w.is_wvwa_member
+          AND w.title ILIKE $1
         ORDER BY
           CASE WHEN LOWER(w.title) = LOWER($2) THEN 0
                WHEN LOWER(w.title) LIKE LOWER($3) THEN 1

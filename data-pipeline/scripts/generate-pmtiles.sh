@@ -113,6 +113,7 @@ ogr2ogr \
       (SELECT COUNT(*) FROM vineyard_parcels vp WHERE vp.winery_id = w.id) AS parcel_count,
       w.location AS geometry
     FROM wineries w
+    WHERE w.is_wvwa_member
   "
 
 echo "  Exported: ${WINERIES_GEOJSON}"

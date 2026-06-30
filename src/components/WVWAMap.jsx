@@ -2047,18 +2047,21 @@ const WVWAMap = forwardRef(function WVWAMap({
         return parsed;
       })
       .then(fc => {
-        const loaded = fc.features.map((f, i) => ({
-          id:        f.properties.recid,
-          num:       i + 1,
-          title:     f.properties.title,
-          desc:      f.properties.description || '',
-          phone:     f.properties.phone || '',
-          url:       f.properties.url || '',
-          image_url: f.properties.image_url || '',
-          lng:       f.geometry.coordinates[0],
-          lat:       f.geometry.coordinates[1],
-          category:  f.properties.category || 'winery',
-        }));
+        const loaded = fc.features
+          // Guard: only point listings with coordinates (non-member orgs have no location).
+          .filter(f => f?.geometry?.coordinates?.length === 2)
+          .map((f, i) => ({
+            id:        f.properties.recid,
+            num:       i + 1,
+            title:     f.properties.title,
+            desc:      f.properties.description || '',
+            phone:     f.properties.phone || '',
+            url:       f.properties.url || '',
+            image_url: f.properties.image_url || '',
+            lng:       f.geometry.coordinates[0],
+            lat:       f.geometry.coordinates[1],
+            category:  f.properties.category || 'winery',
+          }));
         setListings(loaded);
       })
       .catch(err => console.error('WVWAMap: failed to load wineries from API', err));
@@ -2760,7 +2763,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             line-height: 1.4;
             font-size: 13px;
           ">
-            <div style="font-weight: 600; color: ${UI.popupLabelColor};">Winery: <span style="font-weight: 400;">Non-member winery</span></div>
+            <div style="font-weight: 600; color: ${UI.popupLabelColor};">Owner: <span style="font-weight: 400;">${hoveredProps.winery_title || hoveredProps.vineyard_org || 'Unknown'}</span></div>
             <div style="font-weight: 600; color: ${UI.popupLabelColor}; margin-top: 2px;">Vineyard: <span style="font-weight: 400;">${vineyardName}</span></div>
           </div>`;
 

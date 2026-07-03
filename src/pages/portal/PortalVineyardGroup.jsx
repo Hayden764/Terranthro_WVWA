@@ -47,6 +47,11 @@ export default function PortalVineyardGroup() {
   const [pendingAdd, setPendingAdd] = useState(null); // { geometry, vineyard_name, notes }
   const [addSubmitStatus, setAddSubmitStatus] = useState(null);
 
+  // Rename vineyard (applies to the whole group)
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameStatus, setRenameStatus] = useState(null); // null | 'submitting' | 'success' | 'error'
+
   const load = useCallback(async () => {
     try {
       const group = await apiJson(`/api/portal/vineyards/by-name?name=${encodeURIComponent(name)}`);
@@ -189,6 +194,34 @@ export default function PortalVineyardGroup() {
     }
   }
 
+  function startRename() {
+    setRenameValue(name);
+    setRenameStatus(null);
+    setRenaming(true);
+  }
+
+  async function submitRename() {
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === name) {
+      setRenaming(false);
+      return;
+    }
+    setRenameStatus('submitting');
+    try {
+      // Rename applies to the whole vineyard group; the backend expands the
+      // target parcel to all same-name siblings for this winery.
+      await apiPost('/api/portal/requests', {
+        request_type: 'vineyard_rename',
+        target_id: parcels[0]?.id,
+        payload: { vineyard_name: trimmed },
+      });
+      setRenameStatus('success');
+      setRenaming(false);
+    } catch {
+      setRenameStatus('error');
+    }
+  }
+
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'var(--font-sans)', background: parchment }}>
 
@@ -240,12 +273,42 @@ export default function PortalVineyardGroup() {
           </Link>
         </div>
 
-        <h1 style={{
-          fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink,
-          margin: '16px 0 4px',
-        }}>
-          {name}
-        </h1>
+        {renaming ? (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '16px 0 4px' }}>
+            <input
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              autoFocus
+              className="ds-input"
+              style={{ ...INPUT_STYLE, flex: '1 1 240px', minWidth: 0 }}
+              onKeyDown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') setRenaming(false); }}
+            />
+            <button onClick={submitRename} disabled={renameStatus === 'submitting'} style={smallBtnStyle}>
+              {renameStatus === 'submitting' ? 'Submitting…' : 'Submit for Review'}
+            </button>
+            <button onClick={() => setRenaming(false)} style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}>Cancel</button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', margin: '16px 0 4px' }}>
+            <h1 style={{
+              fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink, margin: 0,
+            }}>
+              {name}
+            </h1>
+            <button onClick={startRename} style={editNameBtnStyle} title="Rename this vineyard">
+              ✎ Edit name
+            </button>
+          </div>
+        )}
+        {renameStatus === 'success' && (
+          <p style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.success, fontWeight: 500, margin: '4px 0 0' }}>
+            ✓ Name change submitted for review (applies to all parcels in this vineyard once approved)
+          </p>
+        )}
+        {renameStatus === 'error' && (
+          <p style={{ fontSize: 'var(--type-mono-size)', color: crimson, margin: '4px 0 0' }}>Submission failed — try again.</p>
+        )}
         <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 24 }}>
           {parcels[0]?.nested_ava || parcels[0]?.ava_name || '—'}
           {' · '}
@@ -642,6 +705,19 @@ function Shell({ children }) {
 const smallBtnStyle = {
   ...btn('primary', { padding: '5px 12px' }),
   cursor: 'pointer',
+};
+
+const editNameBtnStyle = {
+  background: 'transparent',
+  border: `1px solid ${border}`,
+  borderRadius: 6,
+  color: ink,
+  cursor: 'pointer',
+  fontSize: 'var(--type-mono-size)',
+  fontFamily: 'var(--font-sans)',
+  padding: '4px 12px',
+  alignSelf: 'center',
+  whiteSpace: 'nowrap',
 };
 
 function RequestButton({ vineyard, type, label }) {

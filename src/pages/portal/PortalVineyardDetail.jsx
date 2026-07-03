@@ -317,7 +317,7 @@ export default function PortalVineyardDetail() {
             <button onClick={() => setRenaming(false)} style={discardBtnStyle}>Cancel</button>
           </div>
         ) : (
-          <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap', margin: '16px 0 4px' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', margin: '16px 0 4px' }}>
             <h1 style={{
               fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink, margin: 0,
             }}>
@@ -325,7 +325,7 @@ export default function PortalVineyardDetail() {
             </h1>
             <button
               onClick={startRename}
-              style={{ background: 'none', border: 'none', color: muted, cursor: 'pointer', fontSize: 'var(--type-mono-size)', padding: 0 }}
+              style={editNameBtnStyle}
               title="Rename this vineyard"
             >
               ✎ Edit name
@@ -756,6 +756,19 @@ const discardBtnStyle = {
   background: 'transparent',
   color: muted,
   border: `1px solid ${border}`,
+};
+
+const editNameBtnStyle = {
+  background: 'transparent',
+  border: `1px solid ${border}`,
+  borderRadius: 6,
+  color: ink,
+  cursor: 'pointer',
+  fontSize: 'var(--type-mono-size)',
+  fontFamily: 'var(--font-sans)',
+  padding: '4px 12px',
+  alignSelf: 'center',
+  whiteSpace: 'nowrap',
 };
 
 const pendingCardStyle = {

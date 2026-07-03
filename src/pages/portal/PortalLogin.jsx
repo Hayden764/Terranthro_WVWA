@@ -14,8 +14,8 @@ export default function PortalLogin() {
   const [mlEmail, setMlEmail] = useState('');
   const [sent, setSent] = useState(false);
 
-  // Password state
-  const [pwEmail, setPwEmail] = useState('');
+  // Password state — identifier is a username or email
+  const [pwIdentifier, setPwIdentifier] = useState('');
   const [password, setPassword] = useState('');
 
   const [error, setError] = useState('');
@@ -40,14 +40,14 @@ export default function PortalLogin() {
     setError('');
     setLoading(true);
     try {
-      const result = await apiPost('/api/auth/login', { email: pwEmail, password });
+      const result = await apiPost('/api/auth/login', { identifier: pwIdentifier, password });
       if (result.mustChangePassword) {
-        navigate('/portal/profile', { state: { mustChangePassword: true } });
+        navigate('/portal/settings', { state: { mustChangePassword: true } });
       } else {
         navigate('/portal/dashboard');
       }
     } catch (err) {
-      setError(err.message || 'Invalid email or password');
+      setError(err.message || 'Invalid username or password');
     } finally {
       setLoading(false);
     }
@@ -129,13 +129,15 @@ export default function PortalLogin() {
 
         {tab === TAB.PASSWORD && (
           <form onSubmit={handlePasswordLogin}>
-            <label style={labelStyle}>Email address</label>
+            <label style={labelStyle}>Username or email</label>
             <input
-              type="email"
+              type="text"
               required
-              value={pwEmail}
-              onChange={(e) => setPwEmail(e.target.value)}
-              placeholder="winery@example.com"
+              value={pwIdentifier}
+              onChange={(e) => setPwIdentifier(e.target.value)}
+              placeholder="username or winery@example.com"
+              autoCapitalize="none"
+              autoCorrect="off"
               className="ds-input"
               style={inputStyle}
             />

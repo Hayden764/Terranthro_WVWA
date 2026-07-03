@@ -203,20 +203,23 @@ const passwordLoginLimiter = rateLimit({
 
 /**
  * POST /api/auth/login
- * Body: { email: string, password: string }
+ * Body: { identifier: string, password: string }
+ *       (legacy: { email, password } is still accepted)
  *
  * Password-based login for winery portal accounts that have a password set.
+ * `identifier` may be either the account username or the contact email.
  */
 router.post('/login', passwordLoginLimiter, async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
-    return res.status(400).json({ error: 'Email and password are required' });
+  const { password } = req.body;
+  const rawIdentifier = req.body.identifier ?? req.body.email;
+  if (!rawIdentifier || !password || typeof rawIdentifier !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ error: 'Username or email and password are required' });
   }
 
-  const normalizedEmail = email.trim().toLowerCase();
+  const identifier = rawIdentifier.trim().toLowerCase();
 
   try {
-    const rows = await queryPortalAccountForLogin(normalizedEmail);
+    const rows = await queryPortalAccountForLogin(identifier);
 
     // Use a dummy compare to prevent timing attacks even when account not found
     const dummyHash = '$2b$10$CwTycUXWue0Thq9StjUM0uJ8G6Y4s46HoPazTA/gkGEXLMaLLq5yK';
@@ -229,7 +232,7 @@ router.post('/login', passwordLoginLimiter, async (req, res) => {
         // Fail closed as invalid credentials even if the dummy hash compare fails.
       }
       await logAuthEvent({
-        identifier: normalizedEmail,
+        identifier,
         eventType: 'password_login',
         success: false,
         details: { reason: 'no_password' },
@@ -244,7 +247,7 @@ router.post('/login', passwordLoginLimiter, async (req, res) => {
       await logAuthEvent({
         accountId: rows[0].account_id,
         wineryId: rows[0].winery_id,
-        identifier: normalizedEmail,
+        identifier,
         eventType: 'password_login',
         success: false,
         details: { reason: 'invalid_password' },
@@ -264,7 +267,7 @@ router.post('/login', passwordLoginLimiter, async (req, res) => {
     await logAuthEvent({
       accountId: account.account_id,
       wineryId: account.winery_id,
-      identifier: normalizedEmail,
+      identifier,
       eventType: 'password_login',
       success: true,
       details: { password_must_change: Boolean(rows[0].password_must_change) },
@@ -357,6 +360,65 @@ router.post('/set-password', requirePortalAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/auth/set-username
+ * Requires portal session. Body: { username: string }
+ *
+ * Sets or changes the account's login username. Usernames are 3–64 chars,
+ * lowercase letters/digits/dot/underscore/hyphen, and unique (case-insensitive).
+ */
+router.post('/set-username', requirePortalAuth, async (req, res) => {
+  const { username } = req.body;
+
+  if (!username || typeof username !== 'string') {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+
+  const normalized = username.trim().toLowerCase();
+
+  if (!/^[a-z0-9._-]{3,64}$/.test(normalized)) {
+    return res.status(400).json({
+      error: 'Username must be 3–64 characters: lowercase letters, digits, and . _ - only',
+    });
+  }
+
+  try {
+    // Reject if another account already owns this username.
+    const { rows: existing } = await pool.query(
+      `SELECT id FROM winery_accounts WHERE LOWER(username) = $1 AND id <> $2`,
+      [normalized, req.portalAccount.accountId]
+    );
+    if (existing.length > 0) {
+      return res.status(409).json({ error: 'That username is already taken' });
+    }
+
+    await pool.query(
+      `UPDATE winery_accounts SET username = $1 WHERE id = $2`,
+      [normalized, req.portalAccount.accountId]
+    );
+
+    await logAuthEvent({
+      accountId: req.portalAccount.accountId,
+      wineryId: req.portalAccount.wineryId,
+      identifier: normalized,
+      eventType: 'username_changed',
+      success: true,
+      details: { changed_via: 'portal' },
+      ip: req.ip,
+      userAgent: req.get('user-agent') || null,
+    });
+
+    res.json({ success: true, username: normalized });
+  } catch (err) {
+    // Unique-violation safety net in case of a race with the check above.
+    if (err?.code === '23505') {
+      return res.status(409).json({ error: 'That username is already taken' });
+    }
+    console.error('Set-username error:', err);
+    res.status(500).json({ error: 'Failed to update username' });
+  }
+});
+
+/**
  * POST /api/auth/change-email
  * Requires portal session. Body: { newEmail: string }
  *
@@ -387,8 +449,9 @@ router.post('/change-email', requirePortalAuth, async (req, res) => {
 
     const account = accountRows[0];
 
-    // Prevent changing to the same email
-    if (normalizedEmail === account.contact_email.toLowerCase()) {
+    // Prevent changing to the same email (current email may be null for
+    // accounts provisioned with only a username).
+    if (account.contact_email && normalizedEmail === account.contact_email.toLowerCase()) {
       return res.status(400).json({ error: 'New email is the same as current email' });
     }
 
@@ -520,7 +583,7 @@ router.post('/logout', (_req, res) => {
 router.get('/me', requirePortalAuth, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT wa.id, wa.contact_email, wa.email_verified, wa.last_login,
+      `SELECT wa.id, wa.username, wa.contact_email, wa.email_verified, wa.last_login,
               w.id AS winery_id, w.title AS winery_name, w.image_url
        FROM winery_accounts wa
        JOIN wineries w ON w.id = wa.winery_id
@@ -562,27 +625,29 @@ async function hasWineryAccountPasswordFlags() {
   }
 }
 
-async function queryPortalAccountForLogin(normalizedEmail) {
+async function queryPortalAccountForLogin(identifier) {
   const hasPasswordFlags = await hasWineryAccountPasswordFlags();
+  // Match the identifier against either the username or the contact email.
   const preferredSql = hasPasswordFlags
     ? `SELECT wa.id AS account_id, wa.winery_id, wa.password_hash, wa.password_must_change
        FROM winery_accounts wa
-       WHERE LOWER(wa.contact_email) = $1`
+       WHERE LOWER(wa.username) = $1 OR LOWER(wa.contact_email) = $1`
     : `SELECT wa.id AS account_id, wa.winery_id, wa.password_hash, FALSE AS password_must_change
        FROM winery_accounts wa
-       WHERE LOWER(wa.contact_email) = $1`;
+       WHERE LOWER(wa.username) = $1 OR LOWER(wa.contact_email) = $1`;
 
   try {
-    const { rows } = await pool.query(preferredSql, [normalizedEmail]);
+    const { rows } = await pool.query(preferredSql, [identifier]);
     return rows;
   } catch (err) {
-    // Column may not exist yet on older deployments; retry with a legacy-safe projection.
+    // Columns (username / password flags) may not exist yet on older
+    // deployments; retry with a legacy-safe email-only projection.
     if (err?.code === '42703') {
       const { rows } = await pool.query(
         `SELECT wa.id AS account_id, wa.winery_id, wa.password_hash, FALSE AS password_must_change
          FROM winery_accounts wa
          WHERE LOWER(wa.contact_email) = $1`,
-        [normalizedEmail]
+        [identifier]
       );
       return rows;
     }

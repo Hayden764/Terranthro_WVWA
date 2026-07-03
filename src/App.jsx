@@ -8,6 +8,7 @@ import PortalVerify from './pages/portal/PortalVerify';
 import PortalConfirmEmailChange from './pages/portal/PortalConfirmEmailChange';
 import PortalDashboard from './pages/portal/PortalDashboard';
 import PortalProfile from './pages/portal/PortalProfile';
+import PortalSettings from './pages/portal/PortalSettings';
 import PortalVineyardDetail from './pages/portal/PortalVineyardDetail';
 import PortalVineyardGroup from './pages/portal/PortalVineyardGroup';
 import PortalClaim from './pages/portal/PortalClaim';
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="/portal" element={<PortalLogin />} />
         <Route path="/portal/verify" element={<PortalVerify />} />          <Route path="/portal/confirm-email-change" element={<PortalConfirmEmailChange />} />        <Route path="/portal/dashboard" element={<PortalDashboard />} />
         <Route path="/portal/profile" element={<PortalProfile />} />
+        <Route path="/portal/settings" element={<PortalSettings />} />
         <Route path="/portal/vineyards/group" element={<PortalVineyardGroup />} />
         <Route path="/portal/vineyards/:id" element={<PortalVineyardDetail />} />
         <Route path="/portal/claim" element={<PortalClaim />} />

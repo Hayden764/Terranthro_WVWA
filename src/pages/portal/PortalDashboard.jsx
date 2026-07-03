@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { border, ink, muted, parchment, TOKENS } from '../../styles/tokens';
+import { border, ink, muted, parchment, electricBlue, TOKENS } from '../../styles/tokens';
 import { btn } from '../../styles/patterns';
-import { apiJson, apiPost } from '../../lib/api';
+import { apiJson } from '../../lib/api';
+import PortalHeader from '../../components/portal/PortalHeader';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import TerroirDataChips from '../../components/TerroirDataChips';
 import BulkBlockImport from '../../components/BulkBlockImport';
@@ -15,6 +16,7 @@ export default function PortalDashboard() {
   const [loading, setLoading] = useState(true);
   const [showBulk, setShowBulk] = useState(false);
   const [bulkDone, setBulkDone] = useState(null);
+  const [hoveredGroup, setHoveredGroup] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -41,11 +43,6 @@ export default function PortalDashboard() {
     return () => window.removeEventListener('session-expired', handler);
   }, [navigate]);
 
-  async function handleLogout() {
-    await apiPost('/api/auth/logout', {});
-    navigate('/portal', { replace: true });
-  }
-
   if (loading) {
     return <PageShell><p style={{ color: muted }}>Loading…</p></PageShell>;
   }
@@ -54,19 +51,8 @@ export default function PortalDashboard() {
 
   return (
     <PageShell>
-      {/* Header bar */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        marginBottom: 32,
-      }}>
-        <div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-medium-size)', color: ink, margin: 0 }}>
-            {profile?.title}
-          </h1>
-          <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginTop: 4 }}>Winery Portal</p>
-        </div>
-        <button onClick={handleLogout} style={linkBtnStyle}>Sign Out</button>
-      </div>
+      {/* Header bar with profile menu */}
+      <PortalHeader title={profile?.title} />
 
       {/* Quick stats */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 32, flexWrap: 'wrap' }}>
@@ -115,7 +101,7 @@ export default function PortalDashboard() {
           <p style={{ color: muted, fontSize: 'var(--type-body-size)', marginBottom: 12 }}>
             Set a password to log in directly without waiting for an email link. Perfect if you're having trouble with email delivery.
           </p>
-          <Link to="/portal/profile" style={actionBtnStyle}>Set a Password</Link>
+          <Link to="/portal/settings" style={actionBtnStyle}>Set a Password</Link>
         </Section>
       )}
 
@@ -148,17 +134,21 @@ export default function PortalDashboard() {
                 { label: 'Aspect', value: topo ? degToCardinal(topo.aspect_dominant_deg) : '—', tone: 'blue', glow: true },
               ];
 
+              const isHovered = hoveredGroup === group.name;
               return (
                 <Link
                   key={group.name}
                   to={href}
+                  onMouseEnter={() => setHoveredGroup(group.name)}
+                  onMouseLeave={() => setHoveredGroup(null)}
                   style={{
                     display: 'block', padding: '14px 16px', borderRadius: 8,
-                    border: `1px solid ${border}`, background: parchment,
+                    border: `1px solid ${isHovered ? electricBlue : border}`, background: parchment,
                     textDecoration: 'none', color: ink,
+                    transition: 'border-color 0.12s, color 0.12s',
                   }}
                 >
-                  <div style={{ fontWeight: 600, fontSize: 'var(--type-display-italic-size)' }}>{group.name}</div>
+                  <div style={{ fontWeight: 600, fontSize: 'var(--type-display-italic-size)', color: isHovered ? electricBlue : ink }}>{group.name}</div>
                   <div style={{ fontSize: 'var(--type-mono-size)', color: muted, marginTop: 4 }}>
                     {ava}
                     {group.parcels.length > 1 && ` · ${group.parcels.length} parcels`}
@@ -306,10 +296,6 @@ const actionBtnStyle = {
   display: 'inline-block',
   ...btn('primary', { padding: '8px 20px' }),
   textDecoration: 'none',
-};
-
-const linkBtnStyle = {
-  ...btn('ghost', { padding: '6px 16px' }),
 };
 
 /* ── Helpers ─────────────────────────────────────── */

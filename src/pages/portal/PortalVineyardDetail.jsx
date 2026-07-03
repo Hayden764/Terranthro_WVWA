@@ -38,6 +38,11 @@ export default function PortalVineyardDetail() {
   const [pendingAdd, setPendingAdd] = useState(null); // { geometry, vineyard_name, notes }
   const [addSubmitStatus, setAddSubmitStatus] = useState(null);
 
+  // Rename vineyard
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameStatus, setRenameStatus] = useState(null); // null | 'submitting' | 'success' | 'error'
+
   const load = useCallback(async () => {
     try {
       const v = await apiJson(`/api/portal/vineyards/${id}`);
@@ -137,6 +142,32 @@ export default function PortalVineyardDetail() {
       setRemovingParcel(false);
     } catch {
       setRemoveSubmitStatus('error');
+    }
+  }
+
+  function startRename() {
+    setRenameValue(vineyard.vineyard_name || '');
+    setRenameStatus(null);
+    setRenaming(true);
+  }
+
+  async function submitRename() {
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === (vineyard.vineyard_name || '')) {
+      setRenaming(false);
+      return;
+    }
+    setRenameStatus('submitting');
+    try {
+      await apiPost('/api/portal/requests', {
+        request_type: 'vineyard_rename',
+        target_id: vineyard.id,
+        payload: { vineyard_name: trimmed },
+      });
+      setRenameStatus('success');
+      setRenaming(false);
+    } catch {
+      setRenameStatus('error');
     }
   }
 
@@ -269,13 +300,47 @@ export default function PortalVineyardDetail() {
           <Link to="/portal/dashboard" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>← Dashboard</Link>
         </div>
 
-        <h1 style={{
-          fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink,
-          margin: '16px 0 4px',
-        }}>
-          {vineyard.vineyard_name || 'Unnamed Parcel'}
-        </h1>
-        <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 24 }}>
+        {renaming ? (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '16px 0 4px' }}>
+            <input
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              autoFocus
+              className="ds-input"
+              style={{ ...INPUT_STYLE, flex: '1 1 240px', minWidth: 0 }}
+              onKeyDown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') setRenaming(false); }}
+            />
+            <button onClick={submitRename} disabled={renameStatus === 'submitting'} style={smallBtnStyle}>
+              {renameStatus === 'submitting' ? 'Submitting…' : 'Submit for Review'}
+            </button>
+            <button onClick={() => setRenaming(false)} style={discardBtnStyle}>Cancel</button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap', margin: '16px 0 4px' }}>
+            <h1 style={{
+              fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink, margin: 0,
+            }}>
+              {vineyard.vineyard_name || 'Unnamed Parcel'}
+            </h1>
+            <button
+              onClick={startRename}
+              style={{ background: 'none', border: 'none', color: muted, cursor: 'pointer', fontSize: 'var(--type-mono-size)', padding: 0 }}
+              title="Rename this vineyard"
+            >
+              ✎ Edit name
+            </button>
+          </div>
+        )}
+        {renameStatus === 'success' && (
+          <p style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.success, fontWeight: 500, marginTop: 4 }}>
+            ✓ Name change submitted for review (applies to all parcels in this vineyard once approved)
+          </p>
+        )}
+        {renameStatus === 'error' && (
+          <p style={{ fontSize: 'var(--type-mono-size)', color: crimson, marginTop: 4 }}>Submission failed — try again.</p>
+        )}
+        <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 24, marginTop: 8 }}>
           {vineyard.nested_ava || vineyard.ava_name || '—'} · {Number(vineyard.acres || 0).toFixed(1)} acres
         </p>
 

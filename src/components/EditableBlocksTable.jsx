@@ -12,9 +12,11 @@
  *   onSubmit   {fn}      Called with the submitted payload (optional, for parent refresh)
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { Fragment, useState, useEffect, useCallback } from 'react';
 import { apiPost } from '../lib/api';
 import { alpha, border, crimson, electricBlue, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
+
+const NOTES_MAX = 500;
 
 const UI = {
   dirtyRowBg: alpha(TOKENS.crimson, 0.04),
@@ -40,17 +42,22 @@ const COLUMNS = [
 function rowKey(b) { return b.id; }
 
 function blockToStr(b) {
-  return COLUMNS.reduce((acc, col) => {
+  const acc = COLUMNS.reduce((acc, col) => {
     acc[col.key] = b[col.key] != null ? String(b[col.key]) : '';
     return acc;
   }, {});
+  // `notes` is edited via a dedicated per-row editor, not a table column.
+  acc.notes = b.notes != null ? String(b.notes) : '';
+  return acc;
 }
 
 function hasChanged(original, edited) {
-  return COLUMNS.some((col) => {
+  const colChanged = COLUMNS.some((col) => {
     if (col.readonly) return false;
     return (original[col.key] != null ? String(original[col.key]) : '') !== edited[col.key];
   });
+  const noteChanged = (original.notes != null ? String(original.notes) : '') !== (edited.notes ?? '');
+  return colChanged || noteChanged;
 }
 
 let _tmpSeq = 0;
@@ -157,6 +164,17 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
             });
           }
         });
+        // Notes — edited via the per-row editor, not a COLUMNS cell.
+        const origNotes = b.notes != null ? String(b.notes) : '';
+        const newNotes = edited.notes ?? '';
+        if (newNotes !== origNotes) {
+          fieldChanges.push({
+            field: 'notes',
+            label: 'Notes',
+            old: origNotes || null,
+            new: newNotes === '' ? null : newNotes,
+          });
+        }
         return { id: b.id, block_name: b.block_name || null, field_changes: fieldChanges };
       });
 
@@ -228,8 +246,8 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
               const isHovered = hoveredRow === block.id;
 
               return (
+                <Fragment key={rowKey(block)}>
                 <tr
-                  key={rowKey(block)}
                   onMouseEnter={() => setHoveredRow(block.id)}
                   onMouseLeave={() => setHoveredRow(null)}
                   style={{
@@ -319,6 +337,50 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                     ) : null}
                   </td>
                 </tr>
+
+                {/* Per-block notes — free-text (≤500 chars). Editable inline;
+                    otherwise shown read-only when the block has a note. */}
+                {isEditing ? (
+                  <tr>
+                    <td colSpan={COLUMNS.length + 1} style={{ padding: '4px 10px 12px' }}>
+                      <label style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                        fontSize: 'var(--type-ui-label-size)', color: muted, marginBottom: 4,
+                      }}>
+                        <span>Notes {block.block_name ? `for ${block.block_name}` : ''}</span>
+                        <span style={{ color: (rowData.notes || '').length >= NOTES_MAX ? crimson : muted }}>
+                          {(rowData.notes || '').length}/{NOTES_MAX}
+                        </span>
+                      </label>
+                      <textarea
+                        value={rowData.notes || ''}
+                        maxLength={NOTES_MAX}
+                        onChange={(e) => setCell(block.id, 'notes', e.target.value)}
+                        placeholder="Add context about this block that the table columns can't capture…"
+                        rows={2}
+                        className="ds-input"
+                        style={{
+                          width: '100%', boxSizing: 'border-box', padding: '8px 10px',
+                          border: `1px solid ${border}`, borderRadius: 6, resize: 'vertical',
+                          fontSize: 'var(--type-mono-size)', fontFamily: 'var(--font-sans)', color: ink,
+                          background: parchment, outline: 'none',
+                        }}
+                      />
+                    </td>
+                  </tr>
+                ) : block.notes ? (
+                  <tr>
+                    <td colSpan={COLUMNS.length + 1} style={{ padding: '0 10px 10px' }}>
+                      <div style={{
+                        fontSize: 'var(--type-mono-size)', color: muted, lineHeight: 1.5,
+                        borderLeft: `2px solid ${alpha(electricBlue, 0.4)}`, paddingLeft: 10,
+                      }}>
+                        <span style={{ fontWeight: 600, color: ink }}>Notes: </span>{block.notes}
+                      </div>
+                    </td>
+                  </tr>
+                ) : null}
+                </Fragment>
               );
             })}
 

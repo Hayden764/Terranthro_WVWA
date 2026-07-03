@@ -273,6 +273,50 @@ router.post('/requests/:id/approve', async (req, res) => {
         break;
       }
 
+      case 'vineyard_rename': {
+        const newName = typeof payload.vineyard_name === 'string'
+          ? payload.vineyard_name.trim()
+          : '';
+        if (newName && request.target_id) {
+          // Rename the whole vineyard group: the target parcel plus every
+          // sibling parcel sharing its (vineyard_name, winery_id). Keeps the
+          // denormalized vineyard_blocks.vineyard_name in sync.
+          const { rows: srcRows } = await client.query(
+            `SELECT vineyard_name FROM vineyard_parcels WHERE id = $1 AND winery_id = $2`,
+            [request.target_id, request.winery_id]
+          );
+          if (srcRows[0]) {
+            const oldName = srcRows[0].vineyard_name;
+            const { rows: siblings } = await client.query(
+              `SELECT id FROM vineyard_parcels
+               WHERE winery_id = $1 AND vineyard_name IS NOT DISTINCT FROM $2`,
+              [request.winery_id, oldName]
+            );
+            for (const sib of siblings) {
+              await client.query(
+                `UPDATE vineyard_parcels SET vineyard_name = $1 WHERE id = $2`,
+                [newName, sib.id]
+              );
+              await client.query(
+                `UPDATE vineyard_blocks SET vineyard_name = $1 WHERE vineyard_parcel_id = $2`,
+                [newName, sib.id]
+              );
+              await client.query(
+                `INSERT INTO winery_edit_log
+                   (winery_id, account_id, admin_id, request_id,
+                    table_name, record_id, field_name, old_value, new_value,
+                    entity_type, entity_id)
+                 VALUES ($1, $2, $3, $4, 'vineyard_parcels', $5, 'vineyard_name', $6, $7,
+                         'vineyard_parcel', $5)`,
+                [request.winery_id, request.account_id, adminId, requestId,
+                 sib.id, oldName, newName]
+              );
+            }
+          }
+        }
+        break;
+      }
+
       case 'vineyard_claim': {
         if (request.target_id) {
           await client.query(
@@ -297,7 +341,7 @@ router.post('/requests/:id/approve', async (req, res) => {
         const blockChanges = Array.isArray(payload.block_changes) ? payload.block_changes : [];
         const newBlocks    = Array.isArray(payload.new_blocks)    ? payload.new_blocks    : [];
         const allowedBlockCols = ['block_name', 'variety', 'clone', 'rootstock',
-                                  'rows', 'spacing', 'year_planted'];
+                                  'rows', 'spacing', 'year_planted', 'notes'];
 
         // Apply field-level changes to existing blocks
         for (const change of blockChanges) {
@@ -1361,7 +1405,7 @@ router.get('/vineyards/:parcelId/blocks', async (req, res) => {
       ),
       pool.query(
         `SELECT id, vineyard_parcel_id, vineyard_name, block_name, variety, clone,
-                rootstock, rows, spacing, vines_per_acre, vines, acres, year_planted
+                rootstock, rows, spacing, vines_per_acre, vines, acres, year_planted, notes
          FROM vineyard_blocks
          WHERE vineyard_parcel_id = $1
          ORDER BY block_name`,
@@ -1411,7 +1455,7 @@ router.post('/vineyards/:parcelId/blocks/apply', async (req, res) => {
   const { block_changes = [], new_blocks = [], deleted_block_ids = [] } = req.body;
 
   const ALLOWED_COLS = ['block_name', 'variety', 'clone', 'rootstock',
-                        'rows', 'spacing', 'year_planted'];
+                        'rows', 'spacing', 'year_planted', 'notes'];
 
   const client = await pool.connect();
   try {

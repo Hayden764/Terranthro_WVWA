@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { border, crimson, ink, muted, parchment, TOKENS } from '../../styles/tokens';
+import { useNavigate, Link } from 'react-router-dom';
+import { crimson, ink, muted, parchment, border, TOKENS } from '../../styles/tokens';
 import { INPUT_STYLE, btn } from '../../styles/patterns';
 import { apiJson, apiPost } from '../../lib/api';
 
 export default function PortalProfile() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const mustChangePassword = Boolean(location.state?.mustChangePassword);
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState({ description: '', phone: '', url: '', image_url: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -80,23 +78,10 @@ export default function PortalProfile() {
         Edit Profile
       </h1>
       <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 24 }}>
-        Changes are submitted for review and applied once approved.
+        Changes are submitted for review and applied once approved. To update your
+        login (username, password, email), go to{' '}
+        <Link to="/portal/settings" style={{ color: crimson, fontWeight: 600 }}>Account Settings</Link>.
       </p>
-
-      {mustChangePassword && (
-        <div style={{
-          background: TOKENS.warningDim,
-          border: `1px solid ${TOKENS.warning}`,
-          borderRadius: 8,
-          padding: '14px 16px',
-          color: TOKENS.warning,
-          fontSize: 'var(--type-body-size)',
-          lineHeight: 1.6,
-          marginBottom: 18,
-        }}>
-          <strong>Password update required.</strong> Use the password section below to replace the temporary password before continuing.
-        </div>
-      )}
 
       {submitted ? (
         <div style={{
@@ -139,14 +124,6 @@ export default function PortalProfile() {
           </button>
         </form>
       )}
-
-      {/* ── Password ── */}
-      <hr style={{ margin: '36px 0', border: 'none', borderTop: `1px solid ${border}` }} />
-      <PasswordSection hasPassword={profile.has_password} />
-
-      {/* ── Email ── */}
-      <hr style={{ margin: '36px 0', border: 'none', borderTop: `1px solid ${border}` }} />
-      <EmailSection currentEmail={profile.contact_email} />
     </Shell>
   );
 }
@@ -188,198 +165,4 @@ function btnStyle(disabled) {
     cursor: disabled ? 'wait' : 'pointer',
     opacity: disabled ? 0.7 : 1,
   };
-}
-
-function PasswordSection({ hasPassword }) {
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [pwError, setPwError] = useState('');
-  const [pwSuccess, setPwSuccess] = useState(false);
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setPwError('');
-    setPwSuccess(false);
-
-    if (newPassword.length < 8) {
-      setPwError('Password must be at least 8 characters');
-      return;
-    }
-    if (newPassword !== confirm) {
-      setPwError('Passwords do not match');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const body = { password: newPassword };
-      if (hasPassword) body.currentPassword = currentPassword;
-      await apiPost('/api/auth/set-password', body);
-      setPwSuccess(true);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirm('');
-    } catch (err) {
-      setPwError(err.message || 'Failed to update password');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div>
-      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink, marginBottom: 6 }}>
-        {hasPassword ? 'Change Password' : 'Set a Password'}
-      </h2>
-      <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 20 }}>
-        {hasPassword
-          ? 'Update your portal login password. If support gave you a temporary password, change it here right after signing in.'
-          : 'Set a password so you can log in without an email link.'}
-      </p>
-
-      {pwSuccess ? (
-        <div style={{
-          background: TOKENS.successDim, border: `1px solid ${TOKENS.success}`, borderRadius: 8,
-          padding: '14px 16px', color: TOKENS.success, fontSize: 'var(--type-body-size)',
-        }}>
-          Password {hasPassword ? 'updated' : 'set'} successfully.
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} style={{ maxWidth: 340 }}>
-          {hasPassword && (
-            <Field label="Current password">
-              <input
-                type="password"
-                required
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="••••••••"
-                className="ds-input"
-                style={inputStyle}
-              />
-            </Field>
-          )}
-          <Field label="New password">
-            <input
-              type="password"
-              required
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Min. 8 characters"
-              className="ds-input"
-              style={inputStyle}
-            />
-          </Field>
-          <Field label="Confirm new password">
-            <input
-              type="password"
-              required
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              placeholder="••••••••"
-              className="ds-input"
-              style={inputStyle}
-            />
-          </Field>
-
-          {pwError && <p style={{ color: crimson, fontSize: 'var(--type-mono-size)', marginBottom: 12 }}>{pwError}</p>}
-
-          <button type="submit" disabled={saving} style={btnStyle(saving)}>
-            {saving ? 'Saving…' : hasPassword ? 'Update Password' : 'Set Password'}
-          </button>
-        </form>
-      )}
-    </div>
-  );
-}
-
-function EmailSection({ currentEmail }) {
-  const [newEmail, setNewEmail] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [emailError, setEmailError] = useState('');
-  const [emailSuccess, setEmailSuccess] = useState(false);
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setEmailError('');
-    setEmailSuccess(false);
-
-    if (!newEmail.trim()) {
-      setEmailError('New email is required');
-      return;
-    }
-
-    if (newEmail.trim().toLowerCase() === currentEmail.toLowerCase()) {
-      setEmailError('New email is the same as your current email');
-      return;
-    }
-
-    // Simple email validation
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
-      setEmailError('Please enter a valid email address');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const res = await fetch('/api/auth/change-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ newEmail: newEmail.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to request email change');
-      setEmailSuccess(true);
-      setNewEmail('');
-    } catch (err) {
-      setEmailError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div>
-      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink, marginBottom: 6 }}>
-        Change Email
-      </h2>
-      <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 20 }}>
-        Current email: <strong>{currentEmail}</strong>
-        <br />
-        We'll send a verification link to your new email address.
-      </p>
-
-      {emailSuccess ? (
-        <div style={{
-          background: TOKENS.successDim, border: `1px solid ${TOKENS.success}`, borderRadius: 8,
-          padding: '14px 16px', color: TOKENS.success, fontSize: 'var(--type-body-size)',
-        }}>
-          Verification email sent! Please check your inbox and click the link to confirm your new email address.
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} style={{ maxWidth: 340 }}>
-          <Field label="New email">
-            <input
-              type="email"
-              required
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              placeholder="your.new@email.com"
-              className="ds-input"
-              style={inputStyle}
-            />
-          </Field>
-
-          {emailError && <p style={{ color: crimson, fontSize: 'var(--type-mono-size)', marginBottom: 12 }}>{emailError}</p>}
-
-          <button type="submit" disabled={saving} style={btnStyle(saving)}>
-            {saving ? 'Sending…' : 'Send Verification Link'}
-          </button>
-        </form>
-      )}
-    </div>
-  );
 }

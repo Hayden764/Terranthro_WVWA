@@ -17,6 +17,7 @@ const router = express.Router();
 // Allowed request types and the fields each one can propose changes to
 const REQUEST_SCHEMAS = {
   profile: ['description', 'phone', 'url', 'image_url'],
+  vineyard_rename: ['vineyard_name'],
   vineyard_varietals: ['varietals_list'],
   vineyard_blocks: ['block_name', 'variety', 'clone', 'rootstock', 'rows', 'spacing',
                      'vines_per_acre', 'vines', 'acres', 'year_planted',
@@ -43,7 +44,9 @@ router.get('/profile', async (req, res) => {
          w.image_url, w.category,
          ST_AsGeoJSON(w.location)::json AS location,
          (SELECT COUNT(*) FROM vineyard_parcels vp WHERE vp.winery_id = w.id) AS parcel_count,
-         (SELECT password_hash IS NOT NULL FROM winery_accounts WHERE id = $2) AS has_password
+         (SELECT password_hash IS NOT NULL FROM winery_accounts WHERE id = $2) AS has_password,
+         (SELECT contact_email FROM winery_accounts WHERE id = $2) AS contact_email,
+         (SELECT username FROM winery_accounts WHERE id = $2) AS username
        FROM wineries w
        WHERE w.id = $1`,
       [wineryId, accountId]
@@ -73,7 +76,7 @@ async function fetchParcelsWithDetails(parcelIds) {
       `SELECT
          vb.id, vb.vineyard_parcel_id, vb.vineyard_name, vb.block_name,
          vb.variety, vb.clone, vb.rootstock, vb.rows, vb.spacing,
-         vb.vines_per_acre, vb.vines, vb.acres, vb.year_planted
+         vb.vines_per_acre, vb.vines, vb.acres, vb.year_planted, vb.notes
        FROM vineyard_blocks vb
        WHERE vb.vineyard_parcel_id = ANY($1)
        ORDER BY vb.vineyard_name, vb.block_name`,
@@ -306,7 +309,7 @@ router.post('/requests', async (req, res) => {
   }
 
   // For vineyard edits, verify the parcel belongs to this winery
-  if (['vineyard_varietals', 'vineyard_blocks', 'geometry_update'].includes(request_type)) {
+  if (['vineyard_rename', 'vineyard_varietals', 'vineyard_blocks', 'geometry_update'].includes(request_type)) {
     if (!target_id) {
       return res.status(400).json({ error: 'target_id is required for vineyard edits' });
     }

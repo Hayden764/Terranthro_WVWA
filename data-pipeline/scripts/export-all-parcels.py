@@ -67,9 +67,14 @@ SELECT
     vp.acres,
     vp.varietals_list,
     w.title AS winery_title,
+    COALESCE(vc.color_index, -1) AS color_index,
     ST_AsGeoJSON(vp.geometry)::json AS geometry
 FROM vineyard_parcels vp
 LEFT JOIN wineries w ON vp.winery_id = w.id
+LEFT JOIN vineyard_colors vc
+    ON vc.vineyard_key = LOWER(TRIM(vp.vineyard_name))
+    AND vp.winery_id IS NOT NULL
+    AND COALESCE(w.is_wvwa_member, false) = true
 ORDER BY vp.id
 """
 
@@ -104,6 +109,7 @@ def main():
             "situs_zip": row["situs_zip"],
             "acres": float(row["acres"]) if row["acres"] is not None else None,
             "varietals_list": row["varietals_list"],
+            "color_index": int(row["color_index"]) if row["color_index"] is not None else -1,
         }
         features.append({
             "type": "Feature",

@@ -18,7 +18,6 @@ import { FLY_PRESETS, flyToAva, flyToCoords, flyToVineyardBounds, flyToWillamett
 import { alpha, border, crimson, ink, MAP_GLASS, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 import { getVineyardFeatureBounds } from '../lib/vineyardBounds';
 import {
-  buildInteractiveReferenceVineyardFilter,
   buildPassiveReferenceVineyardFilter,
 } from '../lib/datasetFilters';
 
@@ -145,6 +144,41 @@ const MAP_AMBER = '#C28A3A';
 const toMapLibreColor = (color, fallback) => (
   typeof color === 'string' && color.startsWith('var(') ? fallback : color
 );
+
+// ── Vineyard identity colors ────────────────────────────────────────────────
+// WVWA-member vineyards get one of these 11 palette slots (Carto "Vivid",
+// grey removed), assigned by geographic graph-coloring in the data pipeline
+// (data-pipeline/scripts/assign-vineyard-colors.py) so no two adjacent members
+// share a slot. The `color_index` property (0..10) carries the slot; -1 means
+// "not a colored member". Non-members render grey, unnamed parcels render white.
+// audit-ignore-start map-chrome-atmosphere
+const VINEYARD_MEMBER_PALETTE = [
+  '#E58606', '#5D69B1', '#52BCA3', '#99C945', '#CC61B0', '#24796C',
+  '#DAA51B', '#2F8AC4', '#764E9F', '#ED645A', '#CC3A8E',
+];
+const VINEYARD_GREY = '#ABABAB';   // named non-member
+const VINEYARD_WHITE = '#E8E1D3';  // unnamed — "help us name it" (soft parchment)
+// Selection/hover highlight: a simple white line tracing the highlighted vineyard.
+const VINEYARD_HALO_CORE = '#FFFFFF';
+// audit-ignore-end
+
+/**
+ * MapLibre fill-color expression for the vineyard reference layer:
+ *   color_index >= 0            → member palette slot
+ *   else, empty/absent name     → white (unnamed)
+ *   else                        → grey (named non-member)
+ */
+function buildVineyardFillColorExpression() {
+  const match = ['match', ['get', 'color_index']];
+  VINEYARD_MEMBER_PALETTE.forEach((hex, i) => { match.push(i, hex); });
+  match.push(VINEYARD_GREY); // default (out-of-range index falls back to grey)
+  return [
+    'case',
+    ['>=', ['coalesce', ['get', 'color_index'], -1], 0], match,
+    ['==', ['coalesce', ['get', 'vineyard_name'], ''], ''], VINEYARD_WHITE,
+    VINEYARD_GREY,
+  ];
+}
 
 // Shared listing hover/selection accent — used by the on-map dot/glow paint
 // AND the bottom-center HoverPill so both stay visually linked.
@@ -602,24 +636,29 @@ function setListingSoftFocus(map, isSoftFocused) {
 }
 
 function setVineyardReferenceSoftFocus(map, isSoftFocused) {
-  const referenceFillOpacity = isSoftFocused ? 0.003 : 0.06;
-  const referenceLineOpacity = isSoftFocused ? 0.04 : 0.5;
-  const passiveFillOpacity = isSoftFocused ? 0.04 : 0.18;
+  // Identity-color fill: keep the palette clearly visible when bright, and only
+  // hush (not hide) when a single winery is soft-focused so its parcels lead.
+  const referenceFillOpacity = isSoftFocused ? 0.18 : 0.82;
+  const referenceLineOpacity = isSoftFocused ? 0.2 : 0.55;
+  // passive-fill is now an invisible hit-target only; keep it barely-there.
+  const passiveFillOpacity = 0.01;
   const passivePatternOpacity = isSoftFocused ? 0.03 : 0.2;
   const passiveLineOpacity = isSoftFocused ? 0.05 : 0.34;
   const passiveLineWidth = isSoftFocused ? 0.5 : 0.85;
-  const linkedLineOpacity = isSoftFocused ? 0.008 : 0.86;
-  const linkedFillOpacity = isSoftFocused ? 0.001 : 0.03;
+  // Green linked line retired (membership shown by fill color now).
+  const linkedLineOpacity = 0;
+  // Linked fill is a near-invisible pointer hit-target only.
+  const linkedFillOpacity = 0.01;
   const hoverLineOpacity = isSoftFocused ? 0.35 : 1;
   const passiveHoverLineOpacity = isSoftFocused ? 0.22 : 0.7;
-  const referenceLineWidth = isSoftFocused ? 0.7 : 1.1;
+  const referenceLineWidth = isSoftFocused ? 0.6 : 0.8;
   const linkedLineWidth = isSoftFocused ? 0.6 : 1.4;
   const hoverLineWidth = isSoftFocused ? 2.0 : 3.0;
   const passiveHoverLineWidth = isSoftFocused ? 1.0 : 1.8;
-  const referenceLineColor = isSoftFocused ? '#E8EEF5' : '#C7D6E8';
+  const referenceLineColor = '#FFFFFF';
   const passiveLineColor = '#FFFFFF';
   const linkedLineColor = isSoftFocused ? '#D2DDD5' : '#3FAF79';
-  const linkedFillColor = isSoftFocused ? '#D2DDD5' : '#22C55E';
+  const linkedFillColor = '#22C55E';
 
   if (map.getLayer('vineyards-reference-fill')) {
     map.setPaintProperty('vineyards-reference-fill', 'fill-opacity', referenceFillOpacity);
@@ -680,9 +719,9 @@ function runWhenStyleReady(map, fn) {
  * first so this can layer cleanly on top of either visual state.
  */
 function applyVineyardFilterDim(map) {
-  if (map.getLayer('vineyards-reference-fill'))          map.setPaintProperty('vineyards-reference-fill', 'fill-opacity', 0.02);
+  if (map.getLayer('vineyards-reference-fill'))          map.setPaintProperty('vineyards-reference-fill', 'fill-opacity', 0.12);
   if (map.getLayer('vineyards-reference-line'))          map.setPaintProperty('vineyards-reference-line', 'line-opacity', 0.18);
-  if (map.getLayer('vineyards-reference-passive-fill'))  map.setPaintProperty('vineyards-reference-passive-fill', 'fill-opacity', 0.06);
+  if (map.getLayer('vineyards-reference-passive-fill'))  map.setPaintProperty('vineyards-reference-passive-fill', 'fill-opacity', 0.01);
   if (map.getLayer('vineyards-reference-passive-hatch')) map.setPaintProperty('vineyards-reference-passive-hatch', 'fill-opacity', 0.07);
   if (map.getLayer('vineyards-reference-passive-line'))  map.setPaintProperty('vineyards-reference-passive-line', 'line-opacity', 0.12);
   if (map.getLayer('vineyards-linked-fill'))             map.setPaintProperty('vineyards-linked-fill', 'fill-opacity', 0.012);
@@ -1728,12 +1767,12 @@ const WVWAMap = forwardRef(function WVWAMap({
         if (map.getLayer('vineyards-selected-line'))
           map.setLayoutProperty('vineyards-selected-line', 'visibility', 'visible');
         const VINE_FILL = [
-          { delay:   0, value: 0.85 },
+          { delay:   0, value: 0.95 },
           { delay: 200, value: 0.04 },
-          { delay: 380, value: 0.85 },
+          { delay: 380, value: 0.95 },
           { delay: 560, value: 0.04 },
-          { delay: 740, value: 0.85 },
-          { delay: 920, value: 0.2  },  // settle at layer default
+          { delay: 740, value: 0.95 },
+          { delay: 920, value: 0.95 },  // settle at layer default (identity color)
         ];
         const VINE_LINE = [
           { delay:   0, value: 1.0 },
@@ -1771,12 +1810,12 @@ const WVWAMap = forwardRef(function WVWAMap({
           if (map.getLayer('vineyards-selected-line'))
             map.setLayoutProperty('vineyards-selected-line', 'visibility', 'visible');
           const VINE_FILL = [
-            { delay:   0, value: 0.85 },
+            { delay:   0, value: 0.95 },
             { delay: 200, value: 0.04 },
-            { delay: 380, value: 0.85 },
+            { delay: 380, value: 0.95 },
             { delay: 560, value: 0.04 },
-            { delay: 740, value: 0.85 },
-            { delay: 920, value: 0.2  },
+            { delay: 740, value: 0.95 },
+            { delay: 920, value: 0.95 },
           ];
           const VINE_LINE = [
             { delay:   0, value: 1.0 },
@@ -2459,38 +2498,19 @@ const WVWAMap = forwardRef(function WVWAMap({
             type: 'fill',
             source: 'vineyards-reference',
             'source-layer': 'vineyard_parcels',
-            paint: { 'fill-color': '#EEF5FF', 'fill-opacity': 0.06 },
+            paint: { 'fill-color': buildVineyardFillColorExpression(), 'fill-opacity': 0.82 },
           });
-          map.addLayer({
-            id: 'vineyards-reference-line',
-            type: 'line',
-            source: 'vineyards-reference',
-            'source-layer': 'vineyard_parcels',
-            paint: { 'line-color': '#C7D6E8', 'line-width': 1.1, 'line-opacity': 0.5 },
-          });
+          // No resting borders: vineyards read as solid color shapes. Adjacent
+          // members always differ in hue (graph coloring), so hue alone separates
+          // them; grey/white classes intentionally merge where they touch.
+          // Near-transparent hit-target for non-member hover (kept from the old
+          // "passive" style; the visible grey now comes from the fill expression).
           map.addLayer({
             id: 'vineyards-reference-passive-fill',
             type: 'fill',
             source: 'vineyards-reference',
             'source-layer': 'vineyard_parcels',
-            paint: { 'fill-color': '#DCE7F3', 'fill-opacity': 0.18 },
-          });
-          map.addLayer({
-            id: 'vineyards-reference-passive-hatch',
-            type: 'fill',
-            source: 'vineyards-reference',
-            'source-layer': 'vineyard_parcels',
-            paint: {
-              'fill-pattern': VINEYARD_HATCH_PATTERN_ID,
-              'fill-opacity': 0.2,
-            },
-          });
-          map.addLayer({
-            id: 'vineyards-reference-passive-line',
-            type: 'line',
-            source: 'vineyards-reference',
-            'source-layer': 'vineyard_parcels',
-            paint: { 'line-color': '#FFFFFF', 'line-width': 0.85, 'line-opacity': 0.34 },
+            paint: { 'fill-color': '#000000', 'fill-opacity': 0.01 },
           });
         } else {
           // GeoJSON fallback: fetch all parcels from the API
@@ -2506,34 +2526,18 @@ const WVWAMap = forwardRef(function WVWAMap({
             id: 'vineyards-reference-fill',
             type: 'fill',
             source: 'vineyards-reference',
-            paint: { 'fill-color': '#EEF5FF', 'fill-opacity': 0.06 },
+            paint: { 'fill-color': buildVineyardFillColorExpression(), 'fill-opacity': 0.82 },
           });
-          map.addLayer({
-            id: 'vineyards-reference-line',
-            type: 'line',
-            source: 'vineyards-reference',
-            paint: { 'line-color': '#C7D6E8', 'line-width': 1.1, 'line-opacity': 0.5 },
-          });
+          // No resting borders: vineyards read as solid color shapes. Adjacent
+          // members always differ in hue (graph coloring), so hue alone separates
+          // them; grey/white classes intentionally merge where they touch.
+          // Near-transparent hit-target for non-member hover (kept from the old
+          // "passive" style; the visible grey now comes from the fill expression).
           map.addLayer({
             id: 'vineyards-reference-passive-fill',
             type: 'fill',
             source: 'vineyards-reference',
-            paint: { 'fill-color': '#DCE7F3', 'fill-opacity': 0.18 },
-          });
-          map.addLayer({
-            id: 'vineyards-reference-passive-hatch',
-            type: 'fill',
-            source: 'vineyards-reference',
-            paint: {
-              'fill-pattern': VINEYARD_HATCH_PATTERN_ID,
-              'fill-opacity': 0.2,
-            },
-          });
-          map.addLayer({
-            id: 'vineyards-reference-passive-line',
-            type: 'line',
-            source: 'vineyards-reference',
-            paint: { 'line-color': '#FFFFFF', 'line-width': 0.85, 'line-opacity': 0.34 },
+            paint: { 'fill-color': '#000000', 'fill-opacity': 0.01 },
           });
         }
 
@@ -2552,9 +2556,11 @@ const WVWAMap = forwardRef(function WVWAMap({
           type: 'fill',
           source: 'vineyards-linked',
           paint: {
-            // Transparent hit-target for pointer interactions on linked parcels only.
+            // Near-transparent hit-target for pointer interactions on member
+            // parcels only. Membership is now shown by the reference fill's
+            // identity color, so this layer no longer tints (was green).
             'fill-color': '#22C55E',
-            'fill-opacity': 0.03,
+            'fill-opacity': 0.01,
           },
         });
         map.addLayer({
@@ -2562,9 +2568,11 @@ const WVWAMap = forwardRef(function WVWAMap({
           type: 'line',
           source: 'vineyards-linked',
           paint: {
+            // Retired as the membership signal (color does that now); kept as a
+            // no-op layer so the many guarded writers referencing it stay valid.
             'line-color': '#3FAF79',
             'line-width': 1.4,
-            'line-opacity': 0.86,
+            'line-opacity': 0,
           },
         });
 
@@ -2614,9 +2622,10 @@ const WVWAMap = forwardRef(function WVWAMap({
           id: 'vineyards-reference-hover-line',
           type: 'line',
           source: 'vineyards-reference-hover',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
           paint: {
-            'line-color': '#38BDF8',
-            'line-width': 3.0,
+            'line-color': VINEYARD_HALO_CORE,
+            'line-width': 2.5,
             'line-opacity': 1,
           },
         });
@@ -2628,10 +2637,11 @@ const WVWAMap = forwardRef(function WVWAMap({
           id: 'vineyards-passive-hover-line',
           type: 'line',
           source: 'vineyards-passive-hover',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
           paint: {
-            'line-color': '#FFFFFF',
+            'line-color': VINEYARD_HALO_CORE,
             'line-width': 1.8,
-            'line-opacity': 0.7,
+            'line-opacity': 0.9,
           },
         });
 
@@ -2792,23 +2802,26 @@ const WVWAMap = forwardRef(function WVWAMap({
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         });
+        // Selected fill shows the vineyard's TRUE identity color at full strength
+        // so it pops when the winery-scope neighbor-dim hushes everything else.
         map.addLayer({
           id: 'vineyards-selected-fill',
           type: 'fill',
           source: 'vineyards-selected',
           paint: {
-            'fill-color': '#6DBF8A',
-            'fill-opacity': 0.2,
+            'fill-color': buildVineyardFillColorExpression(),
+            'fill-opacity': 0.95,
           },
         });
         map.addLayer({
           id: 'vineyards-selected-line',
           type: 'line',
           source: 'vineyards-selected',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
           paint: {
-            'line-color': '#8FD3B0',
-            'line-width': 1.8,
-            'line-opacity': 0.9,
+            'line-color': VINEYARD_HALO_CORE,
+            'line-width': 2.4,
+            'line-opacity': 1,
           },
         });
 
@@ -2822,17 +2835,18 @@ const WVWAMap = forwardRef(function WVWAMap({
           type: 'fill',
           source: 'vineyards-hovered',
           paint: {
-            'fill-color': '#38BDF8',
-            'fill-opacity': 0.22,
+            'fill-color': VINEYARD_HALO_CORE,
+            'fill-opacity': 0.1,
           },
         });
         map.addLayer({
           id: 'vineyards-hovered-line',
           type: 'line',
           source: 'vineyards-hovered',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
           paint: {
-            'line-color': '#38BDF8',
-            'line-width': 3.0,
+            'line-color': VINEYARD_HALO_CORE,
+            'line-width': 2.5,
             'line-opacity': 1,
           },
         });
@@ -3299,17 +3313,17 @@ const WVWAMap = forwardRef(function WVWAMap({
 
     }
 
-    const interactiveReferenceFilter = buildInteractiveReferenceVineyardFilter(devLayerToggles);
     const passiveReferenceFilter = buildPassiveReferenceVineyardFilter(devLayerToggles);
-    const showInteractiveReferenceVineyards = !!interactiveReferenceFilter;
     const showPassiveReferenceVineyards = !!passiveReferenceFilter;
+    // The reference fill/line now show EVERY parcel, colored by the identity
+    // expression (member palette / grey / white). No membership filter.
     if (map.getLayer('vineyards-reference-fill')) {
-      map.setFilter('vineyards-reference-fill', interactiveReferenceFilter);
-      setLayerVisibility(map, 'vineyards-reference-fill', showInteractiveReferenceVineyards);
+      map.setFilter('vineyards-reference-fill', null);
+      setLayerVisibility(map, 'vineyards-reference-fill', true);
     }
     if (map.getLayer('vineyards-reference-line')) {
-      map.setFilter('vineyards-reference-line', interactiveReferenceFilter);
-      setLayerVisibility(map, 'vineyards-reference-line', showInteractiveReferenceVineyards);
+      map.setFilter('vineyards-reference-line', null);
+      setLayerVisibility(map, 'vineyards-reference-line', true);
     }
     if (map.getLayer('vineyards-reference-passive-fill')) {
       map.setFilter('vineyards-reference-passive-fill', passiveReferenceFilter);

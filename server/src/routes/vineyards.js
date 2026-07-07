@@ -102,9 +102,14 @@ router.get('/parcels', async (req, res) => {
         w.recid AS winery_recid,
         w.title AS winery_title,
         (vp.winery_id IS NOT NULL AND COALESCE(w.is_wvwa_member, false)) AS is_member,
+        COALESCE(vc.color_index, -1) AS color_index,
         ST_AsGeoJSON(vp.geometry)::json AS geometry
       FROM vineyard_parcels vp
       LEFT JOIN wineries w ON vp.winery_id = w.id
+      LEFT JOIN vineyard_colors vc
+        ON vc.vineyard_key = LOWER(TRIM(vp.vineyard_name))
+        AND vp.winery_id IS NOT NULL
+        AND COALESCE(w.is_wvwa_member, false) = true
       WHERE ${bboxCondition}
         ${avaCondition}
         ${datasetCondition}
@@ -139,6 +144,7 @@ router.get('/parcels', async (req, res) => {
           winery_recid:     row.winery_recid,
           winery_title:     row.winery_title,
           is_member:        row.is_member === true,
+          color_index:      row.color_index != null ? Number(row.color_index) : -1,
         },
         geometry: row.geometry,
       })),

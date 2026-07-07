@@ -67,30 +67,18 @@ export default function AdminVineyardBlockDetail() {
 
   const ts = parcel.topo_stats;
   const blocks = parcel.blocks || [];
-  const hasMultipleParcels = siblings.length > 1;
+  // siblings = the vineyard's blocks (post-018). Render each block polygon on
+  // the map, labeled by block_name.
+  const geomBlocks = siblings.filter((s) => s.geometry);
+  const hasMultipleBlocks = geomBlocks.length > 1;
 
-  // Derive a display label from block names when no explicit parcel_label is set.
-  // Single named block → use that name. Multiple → comma-join up to 3 names.
-  const derivedBlockLabel = (() => {
-    if (parcel.parcel_label && parcel.parcel_label.trim()) return null; // explicit label wins
-    const named = blocks.map((b) => b.block_name).filter(Boolean);
-    if (named.length === 0) return null;
-    if (named.length <= 3) return named.join(', ');
-    return `${named.slice(0, 3).join(', ')} +${named.length - 3}`;
-  })();
-
-  // Build map parcel list: prefer geometry from the loaded parcel for the active one,
-  // and use sibling geometries for the rest. Inject derived label for the active parcel.
-  const mapParcels = siblings.map((s) =>
-    s.id === parcel.id
-      ? {
-          ...s,
-          geometry: parcel.geometry,
-          vineyard_name: parcel.vineyard_name,
-          parcel_label: parcel.parcel_label || derivedBlockLabel,
-        }
-      : s
-  );
+  const mapParcels = geomBlocks.length > 0
+    ? geomBlocks.map((s) => ({
+        ...s,
+        vineyard_name: parcel.vineyard_name,
+        parcel_label: s.block_name,
+      }))
+    : [{ id: parcel.id, geometry: parcel.geometry, vineyard_name: parcel.vineyard_name, acres: parcel.acres }];
 
   const terroirChips = [
     {
@@ -140,12 +128,8 @@ export default function AdminVineyardBlockDetail() {
         }}>
           <PortalVineyardMap
             parcels={mapParcels}
-            highlightId={parcel.id}
             height="100%"
             style={{ flex: 1 }}
-            onParcelClick={(p) => {
-              if (p.id !== parcel.id) navigate(`/admin/blocks/${p.id}`);
-            }}
           />
           {/* Split Parcel button — only show when a single polygon */}
           <div style={{
@@ -172,7 +156,7 @@ export default function AdminVineyardBlockDetail() {
                 gap: 6,
               }}
             >
-              ✂ Split Parcel Geometry
+              ✂ Split Block Geometry
             </button>
           </div>
         </div>
@@ -213,23 +197,12 @@ export default function AdminVineyardBlockDetail() {
           color: ink,
           margin: '16px 0 4px',
         }}>
-          {parcel.vineyard_name || 'Unnamed Parcel'}
-          {parcel.parcel_label && (
-            <span style={{
-              marginLeft: 12,
-              fontSize: 'var(--type-subhead-size)',
-              color: TOKENS.amber,
-              fontStyle: 'italic',
-              fontFamily: 'var(--font-sans)',
-            }}>
-              · {parcel.parcel_label}
-            </span>
-          )}
+          {parcel.vineyard_name || 'Unnamed Vineyard'}
         </h1>
         <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 20 }}>
           {[parcel.nested_ava || parcel.ava_name,
-            hasMultipleParcels
-              ? `${siblings.length} parcels · ${siblings.reduce((sum, s) => sum + Number(s.acres || 0), 0).toFixed(1)} ac total`
+            hasMultipleBlocks
+              ? `${geomBlocks.length} blocks · ${parcel.acres ? Number(parcel.acres).toFixed(1) : geomBlocks.reduce((sum, s) => sum + Number(s.acres || 0), 0).toFixed(1)} ac`
               : (parcel.acres ? `${Number(parcel.acres).toFixed(1)} ac` : null)
           ].filter(Boolean).join(' · ') || '—'}
           {parcel.winery_name !== 'Independent' && (
@@ -237,36 +210,37 @@ export default function AdminVineyardBlockDetail() {
           )}
         </p>
 
-        {/* Parcel picker (only if vineyard has multiple parcels) */}
-        {hasMultipleParcels && (
-          <ParcelPicker
-            siblings={siblings}
-            activeId={parcel.id}
-            onSelect={(id) => navigate(`/admin/blocks/${id}`)}
-            onSplitClick={() => setShowSplit(true)}
-          />
+        {/* Split-vineyard entry point (reassign blocks to new vineyards) */}
+        {hasMultipleBlocks && (
+          <div style={{ marginBottom: 20 }}>
+            <button
+              onClick={() => setShowSplit(true)}
+              title="Reassign a subset of this vineyard's blocks to new vineyard names"
+              style={{
+                padding: '6px 14px',
+                borderRadius: 6,
+                border: `1px solid ${alpha(TOKENS.amber, 0.4)}`,
+                background: alpha(TOKENS.amber, 0.12),
+                color: TOKENS.amber,
+                fontSize: 'var(--type-mono-size)',
+                fontWeight: 600,
+                fontFamily: 'var(--font-sans)',
+                cursor: 'pointer',
+              }}
+            >
+              ⎇ Split Vineyard
+            </button>
+          </div>
         )}
 
         {/* Vineyard Info */}
-        <Section title="Parcel Info">
+        <Section title="Vineyard Info">
           <InfoRow label="AVA" value={parcel.ava_name || '—'} />
           <InfoRow label="Sub-AVA" value={parcel.nested_ava || '—'} />
-          <InfoRow label="Address" value={[parcel.situs_address, parcel.situs_city, parcel.situs_zip].filter(Boolean).join(', ') || '—'} />
-          <InfoRow label="Owner" value={parcel.owner_name || '—'} />
           <InfoRow label="Winery" value={parcel.winery_name} />
           <InfoRow label="Varietals" value={parcel.varietals_list || '—'} />
           <InfoRow label="Acres" value={parcel.acres ? Number(parcel.acres).toFixed(2) : '—'} />
-          <InfoRow label="Parcel ID" value={`#${parcel.id}`} />
-          <ParcelLabelRow
-            parcel={parcel}
-            derivedBlockLabel={derivedBlockLabel}
-            onSaved={async (newLabel) => {
-              setParcel((p) => ({ ...p, parcel_label: newLabel }));
-              // Refresh siblings so picker + map labels update too.
-              const sibs = await apiJson(`/api/admin/vineyards/${parcelId}/siblings`);
-              setSiblings(sibs);
-            }}
-          />
+          <InfoRow label="Vineyard ID" value={`#${parcel.id}`} />
         </Section>
 
         {/* Terroir Snapshot */}
@@ -349,15 +323,15 @@ export default function AdminVineyardBlockDetail() {
         </Section>
       </div>
 
-      {/* Split-parcel-geometry modal */}
+      {/* Split-block-geometry modal */}
       {showSplitParcel && parcel && (
         <SplitParcelModal
-          parcel={{ ...parcel, geometry: parcel.geometry }}
-          blocks={parcel.blocks || []}
+          vineyard={parcel}
+          geometryBlocks={geomBlocks}
           onClose={() => setShowSplitParcel(false)}
-          onApplied={({ parcel_a_id }) => {
+          onApplied={async () => {
             setShowSplitParcel(false);
-            navigate(`/admin/blocks/${parcel_a_id}`, { replace: true });
+            await load();
           }}
         />
       )}
@@ -376,111 +350,6 @@ export default function AdminVineyardBlockDetail() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-/* ── Parcel picker ── */
-function ParcelPicker({ siblings, activeId, onSelect, onSplitClick }) {
-  return (
-    <div style={{
-      background: alpha(ink, 0.03),
-      border: `1px solid ${border}`,
-      borderRadius: 10,
-      padding: '12px 14px',
-      marginBottom: 20,
-    }}>
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        marginBottom: 8, gap: 8, flexWrap: 'wrap',
-      }}>
-        <p style={{
-          margin: 0,
-          fontSize: 'var(--type-ui-label-size)',
-          fontWeight: 600,
-          color: muted,
-          textTransform: 'uppercase',
-          letterSpacing: '0.08em',
-        }}>
-          Parcels in this vineyard ({siblings.length})
-        </p>
-        {onSplitClick && (
-          <button
-            onClick={onSplitClick}
-            title="Rename a subset of these parcels to break this vineyard into multiple vineyards"
-            style={{
-              padding: '5px 12px',
-              borderRadius: 6,
-              border: `1px solid ${alpha(TOKENS.amber, 0.4)}`,
-              background: alpha(TOKENS.amber, 0.12),
-              color: TOKENS.amber,
-              fontSize: 'var(--type-mono-size)',
-              fontWeight: 600,
-              fontFamily: 'var(--font-sans)',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            ⎇ Split Vineyard
-          </button>
-        )}
-      </div>
-      <div style={{
-        display: 'flex',
-        gap: 6,
-        flexWrap: 'wrap',
-        maxHeight: 140,
-        overflowY: 'auto',
-      }}>
-        {siblings.map((s, idx) => {
-          const isActive = s.id === activeId;
-          const customLabel = s.parcel_label && s.parcel_label.trim();
-          const fallbackLabel = `#${idx + 1}`;
-          const tooltipBase = s.situs_address || `Parcel #${s.id}`;
-          return (
-            <button
-              key={s.id}
-              onClick={() => onSelect(s.id)}
-              title={`${customLabel ? `${customLabel} \u2014 ` : ''}${tooltipBase}${s.acres ? ` · ${Number(s.acres).toFixed(1)} ac` : ''}${s.block_count > 0 ? ` · ${s.block_count} blocks` : ''}`}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 6,
-                border: isActive
-                  ? `1px solid ${TOKENS.crimson}`
-                  : `1px solid ${border}`,
-                background: isActive ? TOKENS.crimson : 'transparent',
-                color: isActive ? parchment : ink,
-                fontSize: 'var(--type-mono-size)',
-                fontFamily: 'var(--font-sans)',
-                fontWeight: isActive ? 600 : 400,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              <span>{customLabel || fallbackLabel}</span>
-              {s.block_count > 0 && (
-                <span style={{
-                  display: 'inline-block',
-                  padding: '0 6px',
-                  borderRadius: 8,
-                  background: isActive ? alpha(parchment, 0.2) : alpha(TOKENS.amber, 0.18),
-                  color: isActive ? parchment : TOKENS.amber,
-                  fontSize: 10,
-                  fontWeight: 700,
-                }}>
-                  {s.block_count}
-                </span>
-              )}
-              <span style={{ color: isActive ? alpha(parchment, 0.75) : muted, fontSize: 11 }}>
-                {s.acres ? `${Number(s.acres).toFixed(1)}ac` : ''}
-              </span>
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -510,133 +379,6 @@ function InfoRow({ label, value }) {
     <div style={{ display: 'flex', gap: 12, marginBottom: 6, fontSize: 'var(--type-mono-size)' }}>
       <span style={{ color: muted, minWidth: 80, flexShrink: 0 }}>{label}</span>
       <span style={{ color: ink }}>{value}</span>
-    </div>
-  );
-}
-
-/**
- * Per-parcel display label editor. Saves via PATCH and bubbles the new value
- * up so the heading, picker, and map can refresh.
- */
-function ParcelLabelRow({ parcel, derivedBlockLabel, onSaved }) {
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(parcel.parcel_label || '');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-
-  // Re-seed when the parcel changes (navigation between siblings).
-  useEffect(() => {
-    setValue(parcel.parcel_label || '');
-    setEditing(false);
-    setError(null);
-  }, [parcel.id, parcel.parcel_label]);
-
-  // When user opens the editor with no label, pre-fill with block-derived suggestion.
-  function openEditor() {
-    if (!parcel.parcel_label && derivedBlockLabel) {
-      setValue(derivedBlockLabel);
-    }
-    setEditing(true);
-  }
-
-  async function save() {
-    setSaving(true);
-    setError(null);
-    try {
-      const trimmed = value.trim();
-      const res = await apiFetch(`/api/admin/vineyards/${parcel.id}/label`, {
-        method: 'PATCH',
-        body: JSON.stringify({ parcel_label: trimmed || null }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || 'Server error');
-      }
-      setEditing(false);
-      onSaved?.(trimmed || null);
-    } catch (e) {
-      setError(e.message || 'Failed to save');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div style={{ display: 'flex', gap: 12, marginBottom: 6, fontSize: 'var(--type-mono-size)', alignItems: 'center' }}>
-      <span style={{ color: muted, minWidth: 80, flexShrink: 0 }}>Block Label</span>
-      {editing ? (
-        <>
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="e.g. Block 7B, West Hill A…"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') save();
-              if (e.key === 'Escape') { setEditing(false); setValue(parcel.parcel_label || ''); }
-            }}
-            style={{
-              flex: 1,
-              maxWidth: 280,
-              padding: '4px 8px',
-              border: `1px solid ${border}`,
-              borderRadius: 4,
-              background: parchment,
-              color: ink,
-              fontSize: 'var(--type-mono-size)',
-              fontFamily: 'var(--font-sans)',
-            }}
-          />
-          <button
-            onClick={save}
-            disabled={saving}
-            style={{
-              padding: '4px 10px', borderRadius: 4, border: 'none',
-              background: TOKENS.amber, color: ink, fontWeight: 600,
-              fontSize: 11, cursor: saving ? 'wait' : 'pointer',
-            }}
-          >
-            {saving ? '…' : 'Save'}
-          </button>
-          <button
-            onClick={() => { setEditing(false); setValue(parcel.parcel_label || ''); setError(null); }}
-            style={{
-              padding: '4px 10px', borderRadius: 4,
-              border: `1px solid ${border}`, background: 'transparent',
-              color: muted, fontSize: 11, cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-          {error && <span style={{ color: crimson, fontSize: 11 }}>{error}</span>}
-        </>
-      ) : (
-        <>
-          <span style={{
-            color: (parcel.parcel_label || derivedBlockLabel) ? ink : muted,
-            fontStyle: parcel.parcel_label ? 'normal' : 'italic',
-          }}>
-            {parcel.parcel_label || (derivedBlockLabel
-              ? <span title="Auto-derived from block names — click Edit to confirm">{derivedBlockLabel} <span style={{ color: TOKENS.amber, fontSize: 10 }}>(from blocks)</span></span>
-              : 'not set'
-            )}
-          </span>
-          <button
-            onClick={openEditor}
-            title="Set a custom label that will appear on the map and parcel picker"
-            style={{
-              padding: '2px 8px', borderRadius: 4,
-              border: `1px solid ${alpha(TOKENS.electricBlue, 0.35)}`,
-              background: 'transparent',
-              color: TOKENS.electricBlue, fontSize: 11,
-              fontFamily: 'var(--font-sans)', cursor: 'pointer',
-            }}
-          >
-            ✎ {parcel.parcel_label ? 'Edit' : derivedBlockLabel ? 'Confirm' : 'Set'}
-          </button>
-        </>
-      )}
     </div>
   );
 }

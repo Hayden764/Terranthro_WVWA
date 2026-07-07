@@ -348,8 +348,6 @@ export default function PortalVineyardDetail() {
         <Section title="Vineyard Info">
           <InfoRow label="AVA" value={vineyard.ava_name || '—'} />
           <InfoRow label="Sub-AVA" value={vineyard.nested_ava || '—'} />
-          <InfoRow label="Address" value={[vineyard.situs_address, vineyard.situs_city, vineyard.situs_zip].filter(Boolean).join(', ') || '—'} />
-          <InfoRow label="Owner" value={vineyard.owner_name || '—'} />
           <InfoRow label="Varietals" value={vineyard.varietals_list || '—'} />
         </Section>
 

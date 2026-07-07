@@ -791,7 +791,7 @@ function setVineyardMatchedFeatureStates(map, matchedIds, prevMatchedIds) {
   const sourceId = 'vineyards-reference';
   if (!map.getSource(sourceId)) return prevMatchedIds;
 
-  const sourceLayer = PMTILES_URL ? 'vineyard_parcels' : undefined;
+  const sourceLayer = PMTILES_URL ? 'vineyard_blocks' : undefined;
   const newSet = new Set(matchedIds || []);
 
   // Clear feature-state for ids that were matched before but aren't now
@@ -2488,16 +2488,19 @@ const WVWAMap = forwardRef(function WVWAMap({
         // Local dev: GeoJSON from the API (no file needed).
         ensureVineyardHatchPattern(map);
         if (PMTILES_URL) {
+          // Tiles carry one feature per BLOCK; promoting vineyard_id to the
+          // feature id makes every block of a vineyard share one id, so
+          // feature-state (matched/hover) applies to the whole vineyard.
           map.addSource('vineyards-reference', {
             type: 'vector',
             url: PMTILES_URL,
-            promoteId: 'id',
+            promoteId: 'vineyard_id',
           });
           map.addLayer({
             id: 'vineyards-reference-fill',
             type: 'fill',
             source: 'vineyards-reference',
-            'source-layer': 'vineyard_parcels',
+            'source-layer': 'vineyard_blocks',
             paint: { 'fill-color': buildVineyardFillColorExpression(), 'fill-opacity': 0.82 },
           });
           // No resting borders: vineyards read as solid color shapes. Adjacent
@@ -2509,7 +2512,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             id: 'vineyards-reference-passive-fill',
             type: 'fill',
             source: 'vineyards-reference',
-            'source-layer': 'vineyard_parcels',
+            'source-layer': 'vineyard_blocks',
             paint: { 'fill-color': '#000000', 'fill-opacity': 0.01 },
           });
         } else {
@@ -2581,7 +2584,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         // (set by setVineyardMatchedFeatureStates when the user applies filters).
         // Sourced from the same vineyards-reference source so it works for
         // both PMTiles vector and GeoJSON fallback.
-        const matchedSourceLayer = PMTILES_URL ? { 'source-layer': 'vineyard_parcels' } : {};
+        const matchedSourceLayer = PMTILES_URL ? { 'source-layer': 'vineyard_blocks' } : {};
         map.addLayer({
           id: 'vineyards-matched-fill',
           type: 'fill',

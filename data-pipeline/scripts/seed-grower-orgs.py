@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# ═══════════════════════════════════════════════════════════════════
+# FROZEN — PRE-018 MODEL. Do NOT run against the migrated database.
+# Migration 018 unified the model (vineyard_parcels → vineyards,
+# blocks carry all polygons). This script assumes the old per-polygon
+# parcel model and is kept for historical reference only.
+# ═══════════════════════════════════════════════════════════════════
 """
 seed-grower-orgs.py — Phase 2b: create owner orgs for unmatched west vineyards
 ==============================================================================

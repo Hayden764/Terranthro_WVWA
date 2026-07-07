@@ -492,9 +492,9 @@ export default function EditorPage() {
     // Capture before values for the fields that changed
     const before = {};
     const META_KEYS = [
-      'vineyard_name', 'vineyard_org', 'owner_name', 'ava_name',
-      'nested_ava', 'nested_nested_ava', 'situs_address', 'situs_city',
-      'situs_zip', 'acres', 'varietals_list', 'source_dataset', 'winery_id',
+      'vineyard_name', 'vineyard_org', 'ava_name',
+      'nested_ava', 'nested_nested_ava',
+      'acres', 'varietals_list', 'source_dataset', 'winery_id',
     ];
     for (const k of META_KEYS) {
       before[k] = selectedParcel.properties[k] ?? null;
@@ -913,7 +913,6 @@ export default function EditorPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                 <MetaField label="Vineyard Name"       field="vineyard_name"     form={metaForm} setForm={setMetaForm} />
                 <MetaField label="Organization"        field="vineyard_org"      form={metaForm} setForm={setMetaForm} />
-                <MetaField label="Owner Name"          field="owner_name"        form={metaForm} setForm={setMetaForm} />
                 <MetaField label="Source Dataset"      field="source_dataset"    form={metaForm} setForm={setMetaForm} />
                 <div style={{ height: 1, background: TOKENS.border }} />
                 <MetaField label="AVA Name"            field="ava_name"          form={metaForm} setForm={setMetaForm} />
@@ -925,9 +924,6 @@ export default function EditorPage() {
                 <div style={{ height: 1, background: TOKENS.border }} />
                 <MetaField label="Winery ID"           field="winery_id"         form={metaForm} setForm={setMetaForm} type="number" />
                 <div style={{ height: 1, background: TOKENS.border }} />
-                <MetaField label="Situs Address"       field="situs_address"     form={metaForm} setForm={setMetaForm} />
-                <MetaField label="Situs City"          field="situs_city"        form={metaForm} setForm={setMetaForm} />
-                <MetaField label="Situs ZIP"           field="situs_zip"         form={metaForm} setForm={setMetaForm} />
                 <button onClick={handleSaveMeta} disabled={metaSaveStatus === 'saving'} style={{ ...btnStyle(metaSaveStatus === 'saving' ? TOKENS.vividGreen : TOKENS.success, TOKENS.vividGreen), marginTop: 4, fontSize: 'var(--type-body-size)' }}>
                   {metaSaveStatus === 'saving' ? 'Staging…' : 'Stage Metadata'}
                 </button>

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # generate-pmtiles.sh
 #
-# Exports vineyard parcels and winery points from PostGIS and builds PMTiles
-# files for use with MapLibre GL JS (native pmtiles:// support in v4+).
+# Exports vineyard blocks (one feature per polygon, with vineyard-level
+# attributes baked onto every block) and winery points from PostGIS and builds
+# PMTiles files for use with MapLibre GL JS (native pmtiles:// support in v4+).
 #
 # Prerequisites:
 #   brew install tippecanoe gdal
@@ -11,7 +12,7 @@
 #   ./generate-pmtiles.sh
 #
 # Output:
-#   client-wvwa/public/tiles/vineyard_parcels.pmtiles
+#   client-wvwa/public/tiles/vineyard_blocks.pmtiles
 #   client-wvwa/public/tiles/wineries.pmtiles
 #
 # For production, upload the .pmtiles files to Cloudflare R2 and update the
@@ -48,56 +49,63 @@ TILES_DIR="${SCRIPT_DIR}/../../client-wvwa/public/tiles"
 echo "Creating tiles directory: ${TILES_DIR}"
 mkdir -p "${TILES_DIR}"
 
-# ── Vineyard Parcels ──────────────────────────────────────────────────────────
+# ── Vineyard Blocks ───────────────────────────────────────────────────────────
+# One feature per block polygon; vineyard-level attributes (name, membership,
+# color) are replicated onto every block so map paint expressions can treat
+# adjacent blocks of one vineyard as a single colored mass.
 echo ""
-echo "Step 1: Exporting vineyard parcels from PostGIS..."
+echo "Step 1: Exporting vineyard blocks from PostGIS..."
 
-PARCELS_GEOJSON="${TMP_DIR}/vineyard_parcels.geojson"
+BLOCKS_GEOJSON="${TMP_DIR}/vineyard_blocks.geojson"
 
-# Exclude PII columns: owner_name, situs_address, situs_city, situs_zip
 ogr2ogr \
-  -f GeoJSON "${PARCELS_GEOJSON}" \
+  -f GeoJSON "${BLOCKS_GEOJSON}" \
   "${PG_DSN}" \
   -sql "
     SELECT
-      vp.id,
-      vp.winery_id,
-      vp.source_dataset,
-      vp.vineyard_name,
-      vp.vineyard_org,
-      vp.acres,
-      vp.nested_ava,
-      vp.nested_nested_ava,
-      vp.varietals_list,
+      b.id,
+      b.vineyard_id,
+      b.block_name,
+      b.acres,
+      b.source_dataset,
+      v.winery_id,
+      v.vineyard_name,
+      v.vineyard_org,
+      v.nested_ava,
+      v.nested_nested_ava,
+      v.varietals_list,
+      v.acres AS vineyard_acres,
       w.recid AS winery_recid,
       w.title AS winery_title,
-      (vp.winery_id IS NOT NULL AND COALESCE(w.is_wvwa_member, false)) AS is_member,
+      (v.winery_id IS NOT NULL AND COALESCE(w.is_wvwa_member, false)) AS is_member,
       COALESCE(vc.color_index, -1) AS color_index,
-      vp.geometry
-    FROM vineyard_parcels vp
-    LEFT JOIN wineries w ON vp.winery_id = w.id
+      b.geometry
+    FROM vineyard_blocks b
+    JOIN vineyards v ON v.id = b.vineyard_id
+    LEFT JOIN wineries w ON v.winery_id = w.id
     LEFT JOIN vineyard_colors vc
-      ON vc.vineyard_key = LOWER(TRIM(vp.vineyard_name))
-      AND vp.winery_id IS NOT NULL
+      ON vc.vineyard_key = LOWER(TRIM(v.vineyard_name))
+      AND v.winery_id IS NOT NULL
       AND COALESCE(w.is_wvwa_member, false) = true
+    WHERE b.geometry IS NOT NULL
   "
 
-echo "  Exported: ${PARCELS_GEOJSON}"
+echo "  Exported: ${BLOCKS_GEOJSON}"
 
 echo ""
-echo "Step 2: Building vineyard_parcels.pmtiles..."
+echo "Step 2: Building vineyard_blocks.pmtiles..."
 
 tippecanoe \
-  --output="${TILES_DIR}/vineyard_parcels.pmtiles" \
-  --layer=vineyard_parcels \
+  --output="${TILES_DIR}/vineyard_blocks.pmtiles" \
+  --layer=vineyard_blocks \
   --minimum-zoom=8 \
   --maximum-zoom=14 \
   --simplification=2 \
   --drop-densest-as-needed \
   --force \
-  "${PARCELS_GEOJSON}"
+  "${BLOCKS_GEOJSON}"
 
-echo "  Built: ${TILES_DIR}/vineyard_parcels.pmtiles"
+echo "  Built: ${TILES_DIR}/vineyard_blocks.pmtiles"
 
 # ── Winery Points ─────────────────────────────────────────────────────────────
 echo ""
@@ -115,7 +123,7 @@ ogr2ogr \
       w.recid,
       w.title,
       w.category,
-      (SELECT COUNT(*) FROM vineyard_parcels vp WHERE vp.winery_id = w.id) AS parcel_count,
+      (SELECT COUNT(*) FROM vineyards v WHERE v.winery_id = w.id) AS parcel_count,
       w.location AS geometry
     FROM wineries w
     WHERE w.is_wvwa_member
@@ -146,5 +154,5 @@ ls -lh "${TILES_DIR}/"*.pmtiles
 
 echo ""
 echo "To upload to Cloudflare R2:"
-echo "  aws s3 cp ${TILES_DIR}/vineyard_parcels.pmtiles s3://YOUR_BUCKET/tiles/vineyard_parcels.pmtiles \\"
+echo "  aws s3 cp ${TILES_DIR}/vineyard_blocks.pmtiles s3://YOUR_BUCKET/tiles/vineyard_blocks.pmtiles \\"
 echo "    --endpoint-url https://YOUR_ACCOUNT.r2.cloudflarestorage.com"

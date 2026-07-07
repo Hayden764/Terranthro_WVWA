@@ -19,15 +19,16 @@ function parseBbox(bboxStr) {
 /**
  * GET /api/vineyards/parcels
  *
- * Returns vineyard parcel polygons as a GeoJSON FeatureCollection.
+ * Returns vineyard footprint polygons (one feature per vineyard entity) as a
+ * GeoJSON FeatureCollection. Path kept as /parcels for client compatibility.
  *
  * Query params:
  *   ?bbox=west,south,east,north    — spatial filter (strongly recommended)
  *   ?ava=Chehalem+Mountains        — filter by nested_ava name (case-insensitive)
- *   ?dataset=adelsheim|chehalem-dundee|yamhill-carlton
+ *   ?dataset=adelsheim|chehalem-dundee|yamhill-carlton|wvwa-ml-2025
  *   ?variety=Pinot+Noir            — ILIKE match on varietals_list
- *   ?winery_id=42                  — only parcels for a specific winery db id
- *   ?linked=true                   — only parcels with a winery_id (linked to a winery record)
+ *   ?winery_id=42                  — only vineyards for a specific winery db id
+ *   ?linked=true                   — only vineyards with a winery_id (linked to a winery record)
  */
 router.get('/parcels', async (req, res) => {
   const bbox = parseBbox(req.query.bbox);
@@ -90,13 +91,9 @@ router.get('/parcels', async (req, res) => {
         vp.source_dataset,
         vp.vineyard_name,
         vp.vineyard_org,
-        vp.owner_name,
         vp.ava_name,
         vp.nested_ava,
         vp.nested_nested_ava,
-        vp.situs_address,
-        vp.situs_city,
-        vp.situs_zip,
         vp.acres,
         vp.varietals_list,
         w.recid AS winery_recid,
@@ -104,7 +101,7 @@ router.get('/parcels', async (req, res) => {
         (vp.winery_id IS NOT NULL AND COALESCE(w.is_wvwa_member, false)) AS is_member,
         COALESCE(vc.color_index, -1) AS color_index,
         ST_AsGeoJSON(vp.geometry)::json AS geometry
-      FROM vineyard_parcels vp
+      FROM vineyards vp
       LEFT JOIN wineries w ON vp.winery_id = w.id
       LEFT JOIN vineyard_colors vc
         ON vc.vineyard_key = LOWER(TRIM(vp.vineyard_name))
@@ -132,13 +129,9 @@ router.get('/parcels', async (req, res) => {
           source_dataset:   row.source_dataset,
           vineyard_name:    row.vineyard_name,
           vineyard_org:     row.vineyard_org,
-          owner_name:       row.owner_name,
           ava_name:         row.ava_name,
           nested_ava:       row.nested_ava,
           nested_nested_ava: row.nested_nested_ava,
-          situs_address:    row.situs_address,
-          situs_city:       row.situs_city,
-          situs_zip:        row.situs_zip,
           acres:            row.acres != null ? Number(row.acres) : null,
           varietals_list:   row.varietals_list,
           winery_recid:     row.winery_recid,
@@ -184,7 +177,7 @@ router.get('/parcels/by-winery/:recid', async (req, res) => {
         w.recid AS winery_recid,
         w.title AS winery_title,
         ST_AsGeoJSON(vp.geometry)::json AS geometry
-      FROM vineyard_parcels vp
+      FROM vineyards vp
       JOIN wineries w ON vp.winery_id = w.id
       WHERE w.recid = $1
       ORDER BY vp.vineyard_name
@@ -221,19 +214,19 @@ router.get('/parcels/by-winery/:recid', async (req, res) => {
 /**
  * PATCH /api/vineyards/parcels/:id/metadata
  *
- * Updates editable text/numeric fields for a vineyard parcel.
- * Body: any subset of { vineyard_name, vineyard_org, owner_name, ava_name,
- *   nested_ava, nested_nested_ava, situs_address, situs_city, situs_zip,
- *   acres, varietals_list, source_dataset, winery_id }
+ * Updates editable text/numeric fields for a vineyard.
+ * Body: any subset of { vineyard_name, vineyard_org, ava_name,
+ *   nested_ava, nested_nested_ava, acres, varietals_list,
+ *   source_dataset, winery_id }
  */
 router.patch('/parcels/:id/metadata', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) return res.status(400).json({ error: 'Invalid parcel id' });
+  if (isNaN(id)) return res.status(400).json({ error: 'Invalid vineyard id' });
 
   const ALLOWED = [
-    'vineyard_name', 'vineyard_org', 'owner_name', 'ava_name',
-    'nested_ava', 'nested_nested_ava', 'situs_address', 'situs_city',
-    'situs_zip', 'acres', 'varietals_list', 'source_dataset', 'winery_id',
+    'vineyard_name', 'vineyard_org', 'ava_name',
+    'nested_ava', 'nested_nested_ava',
+    'acres', 'varietals_list', 'source_dataset', 'winery_id',
   ];
 
   const updates = {};
@@ -266,10 +259,10 @@ router.patch('/parcels/:id/metadata', async (req, res) => {
 
   try {
     const { rowCount } = await pool.query(
-      `UPDATE vineyard_parcels SET ${setClauses.join(', ')} WHERE id = $${values.length}`,
+      `UPDATE vineyards SET ${setClauses.join(', ')} WHERE id = $${values.length}`,
       values
     );
-    if (rowCount === 0) return res.status(404).json({ error: 'Parcel not found' });
+    if (rowCount === 0) return res.status(404).json({ error: 'Vineyard not found' });
     res.json({ success: true, id, updated: Object.keys(updates) });
   } catch (err) {
     console.error('PATCH /api/vineyards/parcels/:id/metadata error:', err);
@@ -280,13 +273,16 @@ router.patch('/parcels/:id/metadata', async (req, res) => {
 /**
  * PATCH /api/vineyards/parcels/:id/geometry
  *
- * Replaces the PostGIS geometry for a specific vineyard parcel.
+ * Replaces the PostGIS geometry for a specific vineyard footprint.
+ * NOTE: footprints are derived from block unions post-018 — a direct write
+ * here is an override and will be recomputed the next time any of the
+ * vineyard's blocks change (trg_vineyard_footprint). Prefer editing blocks.
  * Body: { "geometry": <GeoJSON Geometry — Polygon or MultiPolygon> }
  * Protected by requireApiKey via the router-level middleware in app.js.
  */
 router.patch('/parcels/:id/geometry', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) return res.status(400).json({ error: 'Invalid parcel id' });
+  if (isNaN(id)) return res.status(400).json({ error: 'Invalid vineyard id' });
 
   const { geometry } = req.body;
   if (!geometry || typeof geometry !== 'object') {
@@ -301,14 +297,14 @@ router.patch('/parcels/:id/geometry', async (req, res) => {
 
   try {
     const { rowCount, rows } = await pool.query(
-      `UPDATE vineyard_parcels
+      `UPDATE vineyards
        SET geometry = ST_SetSRID(ST_GeomFromGeoJSON($1::text), 4326),
            acres = ROUND((ST_Area(ST_SetSRID(ST_GeomFromGeoJSON($1::text), 4326)::geography) / 4046.856422)::numeric, 3)
        WHERE id = $2
        RETURNING acres`,
       [JSON.stringify(geometry), id]
     );
-    if (rowCount === 0) return res.status(404).json({ error: 'Parcel not found' });
+    if (rowCount === 0) return res.status(404).json({ error: 'Vineyard not found' });
     res.json({ success: true, id, acres: rows[0].acres != null ? Number(rows[0].acres) : null });
   } catch (err) {
     console.error('PATCH /api/vineyards/parcels/:id/geometry error:', err);
@@ -329,7 +325,7 @@ router.get('/parcels/:id/topo-stats', async (req, res) => {
     const { rows } = await pool.query(
       `
       SELECT
-        parcel_id,
+        vineyard_id AS parcel_id,
         elevation_min_ft,
         elevation_max_ft,
         elevation_mean_ft,
@@ -342,8 +338,8 @@ router.get('/parcels/:id/topo-stats', async (req, res) => {
         aspect_mean_deg,
         pixel_count,
         data_source
-      FROM vineyard_parcel_topo_stats
-      WHERE parcel_id = $1
+      FROM vineyard_topo_stats
+      WHERE vineyard_id = $1
       `,
       [id]
     );
@@ -434,7 +430,7 @@ router.get('/parcels/:id/blocks', async (req, res) => {
           '[]'::json
         ) AS buyers
       FROM vineyard_blocks
-      WHERE vineyard_parcel_id = $1
+      WHERE vineyard_id = $1
       ORDER BY block_name
       `,
       [id]
@@ -454,7 +450,7 @@ router.get('/parcels/:id/blocks', async (req, res) => {
  * blocks, with usage counts. Used to populate the filter modal's variety
  * chip picker.
  *
- * vineyard_parcels.varietals_list is a free-form delimited string (commas,
+ * vineyards.varietals_list is a free-form delimited string (commas,
  * pipes, semicolons or " and "), so it is split server-side here. Block-level
  * vineyard_blocks.variety is a single value per row.
  */
@@ -470,7 +466,7 @@ router.get('/varieties', async (_req, res) => {
 
     // Parcel-level varieties (delimited string, split client-side here)
     const { rows: parcelRows } = await pool.query(
-      `SELECT varietals_list FROM vineyard_parcels
+      `SELECT varietals_list FROM vineyards
         WHERE varietals_list IS NOT NULL AND TRIM(varietals_list) <> ''`
     );
 
@@ -526,14 +522,14 @@ router.get('/filter-ranges', async (_req, res) => {
         ROUND(percentile_cont(0.99) WITHIN GROUP (ORDER BY ts.elevation_mean_ft)::numeric, 0) AS elev_p99,
         ROUND(percentile_cont(0.01) WITHIN GROUP (ORDER BY ts.slope_mean_deg)::numeric, 1)    AS slope_p01,
         ROUND(percentile_cont(0.99) WITHIN GROUP (ORDER BY ts.slope_mean_deg)::numeric, 1)    AS slope_p99
-      FROM vineyard_parcel_topo_stats ts
+      FROM vineyard_topo_stats ts
     `);
 
     const { rows: acreRows } = await pool.query(`
       SELECT
         ROUND(MIN(acres)::numeric, 2) AS acres_min,
         ROUND(percentile_cont(0.99) WITHIN GROUP (ORDER BY acres)::numeric, 1) AS acres_p99
-      FROM vineyard_parcels
+      FROM vineyards
       WHERE acres IS NOT NULL AND acres > 0
     `);
 

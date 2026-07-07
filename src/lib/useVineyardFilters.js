@@ -94,8 +94,8 @@ export function filtersToQueryString(f) {
  *   isActive               — boolean
  *   activeCount            — number of active facets
  *   loading                — query in flight
- *   queryResult            — { wineries, matching_parcel_ids,
- *                              matching_parcel_total_count, winery_total_count }
+ *   queryResult            — { wineries, matching_vineyard_ids,
+ *                              matching_vineyard_total_count, winery_total_count }
  *                            or null when no filters are active
  *   error                  — string | null
  */

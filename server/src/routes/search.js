@@ -55,20 +55,20 @@ router.get('/', async (req, res) => {
         [term, q, `${q.toLowerCase()}%`, limit]
       ),
 
-      // Vineyard parcel names (distinct — one result per unique name)
+      // Vineyard names (distinct — one result per unique name)
       pool.query(
         `
-        SELECT DISTINCT ON (LOWER(vp.vineyard_name))
-          vp.vineyard_name              AS label,
-          vp.nested_ava                 AS sublabel,
-          ST_X(ST_Centroid(vp.geometry)) AS lng,
-          ST_Y(ST_Centroid(vp.geometry)) AS lat,
-          vp.source_dataset             AS dataset
-        FROM vineyard_parcels vp
-        WHERE vp.vineyard_name IS NOT NULL
-          AND vp.vineyard_name != ''
-          AND vp.vineyard_name ILIKE $1
-        ORDER BY LOWER(vp.vineyard_name), vp.vineyard_name
+        SELECT DISTINCT ON (LOWER(v.vineyard_name))
+          v.vineyard_name              AS label,
+          v.nested_ava                 AS sublabel,
+          ST_X(ST_Centroid(v.geometry)) AS lng,
+          ST_Y(ST_Centroid(v.geometry)) AS lat,
+          v.source_dataset             AS dataset
+        FROM vineyards v
+        WHERE v.vineyard_name IS NOT NULL
+          AND v.vineyard_name != ''
+          AND v.vineyard_name ILIKE $1
+        ORDER BY LOWER(v.vineyard_name), v.vineyard_name
         LIMIT $2
         `,
         [term, limit]

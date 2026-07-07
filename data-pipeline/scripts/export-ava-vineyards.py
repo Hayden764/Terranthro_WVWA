@@ -87,19 +87,15 @@ SELECT
     vp.source_dataset,
     vp.vineyard_name,
     vp.vineyard_org,
-    vp.owner_name,
     vp.ava_name,
     vp.nested_ava,
     vp.nested_nested_ava,
-    vp.situs_address,
-    vp.situs_city,
-    vp.situs_zip,
     vp.acres,
     vp.varietals_list,
     ST_AsGeoJSON(vp.geometry)::json            AS geometry,
     ST_X(ST_PointOnSurface(vp.geometry))       AS pt_x,
     ST_Y(ST_PointOnSurface(vp.geometry))       AS pt_y
-FROM vineyard_parcels vp
+FROM vineyards vp
 WHERE vp.source_dataset = ANY(%s)
 ORDER BY vp.id
 """
@@ -147,13 +143,9 @@ def main():
             "assigned_ava": assigned,
             "vineyard_name": row["vineyard_name"],
             "vineyard_org": row["vineyard_org"],
-            "owner_name": row["owner_name"],
             "ava_name": row["ava_name"],
             "nested_ava": row["nested_ava"],
             "nested_nested_ava": row["nested_nested_ava"],
-            "situs_address": row["situs_address"],
-            "situs_city": row["situs_city"],
-            "situs_zip": row["situs_zip"],
             "acres": float(row["acres"]) if row["acres"] is not None else None,
             "varietals_list": row["varietals_list"],
         }

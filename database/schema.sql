@@ -165,24 +165,24 @@ CREATE INDEX idx_wineries_recid    ON wineries(recid);
 CREATE INDEX idx_wineries_category ON wineries(category);
 
 -- ─────────────────────────────────────────────
--- Vineyard parcels
--- source_dataset: 'adelsheim' | 'chehalem-dundee' | 'yamhill-carlton'
--- winery_id is NULL for parcels not linked to a winery record
--- geometry uses GEOMETRY(Geometry) not MultiPolygon — source data mixes Polygon and MultiPolygon
+-- Vineyards (unified model — migration 018)
+-- One row per vineyard ENTITY. geometry is the footprint = ST_Union of the
+-- vineyard's blocks, maintained automatically by trg_vineyard_footprint
+-- (see migration 018) whenever a block's geometry or vineyard_id changes.
+-- Edit polygons at the BLOCK level (QGIS or the app); footprints follow.
+-- source_dataset: 'adelsheim' | 'chehalem-dundee' | 'yamhill-carlton' |
+--                 'wvwa-ml-2025' | 'admin'
+-- winery_id is NULL for vineyards not linked to a winery record.
 -- ─────────────────────────────────────────────
-CREATE TABLE vineyard_parcels (
+CREATE TABLE vineyards (
     id                 SERIAL PRIMARY KEY,
     winery_id          INTEGER REFERENCES wineries(id) ON DELETE SET NULL,
     source_dataset     VARCHAR(60) NOT NULL,
     vineyard_name      TEXT,
     vineyard_org       TEXT,
-    owner_name         TEXT,
     ava_name           TEXT,
     nested_ava         TEXT,
     nested_nested_ava  TEXT,
-    situs_address      TEXT,
-    situs_city         VARCHAR(100),
-    situs_zip          VARCHAR(20),
     acres              NUMERIC(10, 3),
     varietals_list     TEXT,
     z1_vineyard_id     INTEGER,
@@ -191,22 +191,27 @@ CREATE TABLE vineyard_parcels (
     created_at         TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_vp_geometry    ON vineyard_parcels USING GIST(geometry);
-CREATE INDEX idx_vp_winery_id   ON vineyard_parcels(winery_id);
-CREATE INDEX idx_vp_ava_id      ON vineyard_parcels(ava_id);
-CREATE INDEX idx_vp_source      ON vineyard_parcels(source_dataset);
-CREATE INDEX idx_vp_ava_name    ON vineyard_parcels(ava_name);
-CREATE INDEX idx_vp_nested_ava  ON vineyard_parcels(nested_ava);
+CREATE INDEX idx_v_geometry    ON vineyards USING GIST(geometry);
+CREATE INDEX idx_v_winery_id   ON vineyards(winery_id);
+CREATE INDEX idx_v_ava_id      ON vineyards(ava_id);
+CREATE INDEX idx_v_source      ON vineyards(source_dataset);
+CREATE INDEX idx_v_ava_name    ON vineyards(ava_name);
+CREATE INDEX idx_v_nested_ava  ON vineyards(nested_ava);
 
 -- ─────────────────────────────────────────────
--- Vineyard blocks (block-level viticulture data)
--- Currently sourced from Adelsheim vineyard_blocks CSV only
--- vineyard_parcel_id is NULL when no matching parcel was found by name
+-- Vineyard blocks — ALL polygon geometry lives here (one row per polygon).
+-- vineyard_name is denormalized from the parent (kept in sync on rename).
+-- acres auto-computed from geometry by trg_block_acres (migration 011).
+-- source_dataset (provenance):
+--   'wvwa-ml-2025'  — U-Net-detected polygons (west AVAs)
+--   'tax-lot'       — county tax-lot polygons (east AVAs, from migration 018)
+--   'adelsheim-csv' — attribute-only viticulture blocks (no geometry)
+--   'admin'         — drawn in the admin editor
 -- ─────────────────────────────────────────────
 CREATE TABLE vineyard_blocks (
     id                  SERIAL PRIMARY KEY,
-    vineyard_parcel_id  INTEGER REFERENCES vineyard_parcels(id) ON DELETE CASCADE,
-    vineyard_name       TEXT NOT NULL,
+    vineyard_id         INTEGER REFERENCES vineyards(id) ON DELETE CASCADE,
+    vineyard_name       TEXT,
     block_name          TEXT,
     variety             VARCHAR(100),
     clone               VARCHAR(100),
@@ -217,12 +222,26 @@ CREATE TABLE vineyard_blocks (
     vines               INTEGER,
     acres               NUMERIC(10, 3),
     year_planted        INTEGER,
+    source_dataset      VARCHAR(30),
+    -- geometry + notes + fruit_sold_to added by migrations 010/011/017
     created_at          TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_vb_parcel_id ON vineyard_blocks(vineyard_parcel_id);
-CREATE INDEX idx_vb_variety   ON vineyard_blocks(variety);
-CREATE INDEX idx_vb_vineyard  ON vineyard_blocks(vineyard_name);
+CREATE INDEX idx_vb_vineyard_id ON vineyard_blocks(vineyard_id);
+CREATE INDEX idx_vb_variety     ON vineyard_blocks(variety);
+CREATE INDEX idx_vb_vineyard    ON vineyard_blocks(vineyard_name);
+
+-- ─────────────────────────────────────────────
+-- Legacy id map (migration 018) — old per-polygon vineyard_parcels ids →
+-- new (vineyard, block) ids. Historical edit_requests.target_id and
+-- winery_edit_log.record_id resolve through this. NEVER drop.
+-- ─────────────────────────────────────────────
+CREATE TABLE legacy_parcel_map (
+    old_parcel_id   INTEGER PRIMARY KEY,
+    new_vineyard_id INTEGER NOT NULL,
+    new_block_id    INTEGER NOT NULL,
+    migrated_at     TIMESTAMP DEFAULT NOW()
+);
 
 -- ─────────────────────────────────────────────
 -- Pre-computed per-AVA statistics

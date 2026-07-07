@@ -3,11 +3,11 @@ Per-Parcel Topography Statistics Compute Script
 ================================================
 Clips the Willamette Valley 1m elevation and slope COGs to each vineyard parcel
 and computes min/max/mean/std/percentile statistics, then upserts into the
-vineyard_parcel_topo_stats table.
+vineyard_topo_stats table.
 
 Prerequisite:
     - download-1m-dem.py has been run and the 3 COGs exist
-    - Migration 002_vineyard_parcel_topo_stats.sql has been applied
+    - Migration 002_vineyard_topo_stats.sql has been applied
     - DATABASE_URL (or DB_* vars) are set in environment
 
 Usage:
@@ -137,7 +137,7 @@ def fetch_parcels(conn, parcel_ids: Optional[List[int]] = None) -> List[dict]:
                 """
                 SELECT id, vineyard_name,
                        ST_AsGeoJSON(ST_Transform(geometry, 4326))::json AS geom
-                FROM vineyard_parcels
+                FROM vineyards
                 WHERE id = ANY(%s)
                 ORDER BY id
                 """,
@@ -148,7 +148,7 @@ def fetch_parcels(conn, parcel_ids: Optional[List[int]] = None) -> List[dict]:
                 """
                 SELECT id, vineyard_name,
                        ST_AsGeoJSON(ST_Transform(geometry, 4326))::json AS geom
-                FROM vineyard_parcels
+                FROM vineyards
                 ORDER BY id
                 """
             )
@@ -156,26 +156,26 @@ def fetch_parcels(conn, parcel_ids: Optional[List[int]] = None) -> List[dict]:
 
 
 def upsert_stats(conn, stats_row: dict, dry_run: bool = False) -> None:
-    """Upsert a stats row into vineyard_parcel_topo_stats."""
+    """Upsert a stats row into vineyard_topo_stats."""
     if dry_run:
         return
 
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO vineyard_parcel_topo_stats (
-                parcel_id, elevation_min_ft, elevation_max_ft, elevation_mean_ft,
+            INSERT INTO vineyard_topo_stats (
+                vineyard_id, elevation_min_ft, elevation_max_ft, elevation_mean_ft,
                 elevation_std_ft, slope_mean_deg, slope_max_deg, slope_p10_deg,
                 slope_p90_deg, aspect_dominant_deg, aspect_mean_deg,
                 pixel_count, data_source, computed_at
             ) VALUES (
-                %(parcel_id)s, %(elevation_min_ft)s, %(elevation_max_ft)s,
+                %(vineyard_id)s, %(elevation_min_ft)s, %(elevation_max_ft)s,
                 %(elevation_mean_ft)s, %(elevation_std_ft)s, %(slope_mean_deg)s,
                 %(slope_max_deg)s, %(slope_p10_deg)s, %(slope_p90_deg)s,
                 %(aspect_dominant_deg)s, %(aspect_mean_deg)s,
                 %(pixel_count)s, %(data_source)s, NOW()
             )
-            ON CONFLICT (parcel_id) DO UPDATE SET
+            ON CONFLICT (vineyard_id) DO UPDATE SET
                 elevation_min_ft    = EXCLUDED.elevation_min_ft,
                 elevation_max_ft    = EXCLUDED.elevation_max_ft,
                 elevation_mean_ft   = EXCLUDED.elevation_mean_ft,
@@ -211,7 +211,7 @@ def compute_parcel_stats(
     Clip the three COGs to one parcel and compute statistics.
     Returns a dict ready for upsert, or None if no valid pixels found.
     """
-    parcel_id = parcel["id"]
+    vineyard_id = parcel["id"]
     geom_wgs84 = parcel["geom"]
 
     # Reproject geometry from WGS84 to the COG CRS (UTM 10N)
@@ -223,7 +223,7 @@ def compute_parcel_stats(
             geom=geom_wgs84,
         )
     except Exception as e:
-        logger.warning(f"Parcel {parcel_id}: CRS transform failed: {e}")
+        logger.warning(f"Parcel {vineyard_id}: CRS transform failed: {e}")
         return None
 
     shapes = [geom_utm]
@@ -246,11 +246,11 @@ def compute_parcel_stats(
         elev_ft = elev_vals * METERS_TO_FEET
         elev_ft = elev_ft[(elev_ft > -500) & (elev_ft < 15_000)]
     except Exception as e:
-        logger.warning(f"Parcel {parcel_id}: elevation mask failed: {e}")
+        logger.warning(f"Parcel {vineyard_id}: elevation mask failed: {e}")
         return None
 
     if len(elev_ft) == 0:
-        logger.debug(f"Parcel {parcel_id}: no valid elevation pixels (outside COG extent or all nodata)")
+        logger.debug(f"Parcel {vineyard_id}: no valid elevation pixels (outside COG extent or all nodata)")
         return None
 
     # --- Slope ---
@@ -264,7 +264,7 @@ def compute_parcel_stats(
             slope_vals = slope_vals[slope_vals != src_slope_nodata]
         slope_vals = slope_vals[(slope_vals >= 0) & (slope_vals <= 90)]  # physical range
     except Exception as e:
-        logger.warning(f"Parcel {parcel_id}: slope mask failed: {e}")
+        logger.warning(f"Parcel {vineyard_id}: slope mask failed: {e}")
         slope_vals = np.array([])
 
     # --- Aspect ---
@@ -278,12 +278,12 @@ def compute_parcel_stats(
             aspect_vals = aspect_vals[aspect_vals != src_aspect_nodata]
         aspect_vals = aspect_vals[(aspect_vals >= -1) & (aspect_vals <= 360)]  # GDAL: -1=flat, 0–360=direction
     except Exception as e:
-        logger.warning(f"Parcel {parcel_id}: aspect mask failed: {e}")
+        logger.warning(f"Parcel {vineyard_id}: aspect mask failed: {e}")
         aspect_vals = np.array([])
 
     # --- Build stats row ---
     row = {
-        "parcel_id":           parcel_id,
+        "vineyard_id":           vineyard_id,
         "elevation_min_ft":    round(float(np.min(elev_ft)), 2),
         "elevation_max_ft":    round(float(np.max(elev_ft)), 2),
         "elevation_mean_ft":   round(float(np.mean(elev_ft)), 2),
@@ -314,10 +314,10 @@ def process_parcel_worker(args) -> Tuple[int, Optional[dict], Optional[str]]:
     Worker function for thread pool. Tries the primary COG source first (USGS
     TNM 1m); if that returns no valid pixels, falls back to DOGAMI 3ft. Each
     call opens its own DatasetReader (rasterio is not thread-safe).
-    Returns (parcel_id, stats_row_or_None, error_msg_or_None).
+    Returns (vineyard_id, stats_row_or_None, error_msg_or_None).
     """
     parcel, sources = args
-    parcel_id = parcel["id"]
+    vineyard_id = parcel["id"]
 
     last_err = None
     for label, elev_path, slope_path, aspect_path in sources:
@@ -330,11 +330,11 @@ def process_parcel_worker(args) -> Tuple[int, Optional[dict], Optional[str]]:
                     data_source_label=label,
                 )
                 if row is not None:
-                    return parcel_id, row, None
+                    return vineyard_id, row, None
         except Exception as e:
             last_err = str(e)
 
-    return parcel_id, None, last_err
+    return vineyard_id, None, last_err
 
 
 # ---------------------------------------------------------------------------
@@ -378,7 +378,7 @@ def process_parcel_worker(args) -> Tuple[int, Optional[dict], Optional[str]]:
 def main(cog_dir, parcel_ids, workers, dry_run, verbose):
     """
     Compute per-vineyard-parcel topography statistics from 1m LiDAR COGs
-    and upsert into the vineyard_parcel_topo_stats table.
+    and upsert into the vineyard_topo_stats table.
     """
     script_dir = Path(__file__).resolve().parent
 
@@ -456,17 +456,17 @@ def main(cog_dir, parcel_ids, workers, dry_run, verbose):
                        for args in work_args}
 
             for future in as_completed(futures):
-                parcel_id, row, err = future.result()
+                vineyard_id, row, err = future.result()
 
                 if err:
-                    logger.warning(f"Parcel {parcel_id}: {err}")
+                    logger.warning(f"Parcel {vineyard_id}: {err}")
                     failed += 1
                 elif row is None:
                     skipped += 1
                 else:
                     if verbose or dry_run:
                         click.echo(
-                            f"  Parcel {parcel_id}: "
+                            f"  Parcel {vineyard_id}: "
                             f"elev {row['elevation_mean_ft']:.0f}ft "
                             f"(range {row['elevation_min_ft']:.0f}–{row['elevation_max_ft']:.0f}ft), "
                             f"slope {row['slope_mean_deg']:.1f}°, "
@@ -478,7 +478,7 @@ def main(cog_dir, parcel_ids, workers, dry_run, verbose):
                         upsert_stats(conn, row, dry_run=dry_run)
                         completed += 1
                     except Exception as e:
-                        logger.error(f"Parcel {parcel_id}: DB upsert failed: {e}")
+                        logger.error(f"Parcel {vineyard_id}: DB upsert failed: {e}")
                         conn.rollback()
                         failed += 1
 

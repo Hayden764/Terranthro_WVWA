@@ -1,14 +1,15 @@
 /**
  * SplitVineyardModal
  *
- * Admin tool: rename a subset of sibling parcels (those sharing the same
- * vineyard_name + winery_id) so that one big vineyard becomes 2+ smaller
- * vineyards. E.g. "Shea Vineyard" with 40 parcels → "Shea Vineyard - West Hill",
- * "Shea Vineyard - East Hill", "Shea Vineyard - Third Hill".
+ * Admin tool: reassign a subset of a vineyard's BLOCKS to new vineyard names
+ * so that one big vineyard becomes 2+ smaller vineyards. E.g. "Shea Vineyard"
+ * with 40 blocks → "Shea Vineyard - West Hill", "Shea Vineyard - East Hill".
+ * Blocks given the same new name land in ONE new vineyard; footprints refresh
+ * automatically (trg_vineyard_footprint).
  *
  * UX:
- *   - Lists every sibling parcel as a row with a "New name" text input.
- *   - Quick-assign bar above: type a name + check the parcels you want it
+ *   - Lists every block as a row with a "New name" text input.
+ *   - Quick-assign bar above: type a name + check the blocks you want it
  *     applied to + click Apply.
  *   - Submit posts to /api/admin/vineyards/:parcelId/split.
  */
@@ -18,11 +19,11 @@ import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '../../sty
 import { apiFetch } from '../../lib/api';
 
 export default function SplitVineyardModal({
-  parcelId,           // any sibling id — used as the route parameter
-  siblings,           // [{ id, vineyard_name, acres, situs_address, block_count }]
-  currentName,        // current shared vineyard name (for header copy)
+  parcelId,           // the vineyard id — used as the route parameter
+  siblings,           // the vineyard's blocks: [{ id, vineyard_name, block_name, acres, source_dataset }]
+  currentName,        // current vineyard name (for header copy)
   onClose,
-  onApplied,          // called after successful split with { renamed, group_count }
+  onApplied,          // called after successful split with { moved, new_vineyard_ids, source_deleted }
 }) {
   // names keyed by parcel id
   const [names, setNames] = useState(() => {
@@ -89,8 +90,11 @@ export default function SplitVineyardModal({
     setError(null);
     try {
       const assignments = siblings
-        .filter((s) => (names[s.id] || '').trim() !== (s.vineyard_name || '').trim())
-        .map((s) => ({ parcel_id: s.id, new_vineyard_name: (names[s.id] || '').trim() }));
+        .filter((s) => {
+          const after = (names[s.id] || '').trim();
+          return after && after !== (s.vineyard_name || '').trim();
+        })
+        .map((s) => ({ block_id: s.id, new_vineyard_name: (names[s.id] || '').trim() }));
 
       const res = await apiFetch(`/api/admin/vineyards/${parcelId}/split`, {
         method: 'POST',
@@ -143,7 +147,7 @@ export default function SplitVineyardModal({
             Split Vineyard
           </h2>
           <p style={{ color: muted, fontSize: 'var(--type-mono-size)', margin: 0 }}>
-            {currentName ? `“${currentName}” currently spans ${siblings.length} parcels.` : `${siblings.length} parcels in this vineyard.`}
+            {currentName ? `“${currentName}” currently spans ${siblings.length} blocks.` : `${siblings.length} blocks in this vineyard.`}
             {' '}Rename any subset to break the vineyard into multiple vineyards.
           </p>
         </div>
@@ -193,9 +197,9 @@ export default function SplitVineyardModal({
               <tr>
                 <th style={thStyle}>{/* checkbox */}</th>
                 <th style={thStyle}>#</th>
-                <th style={thStyle}>Address</th>
+                <th style={thStyle}>Block</th>
                 <th style={{ ...thStyle, textAlign: 'right' }}>Acres</th>
-                <th style={{ ...thStyle, textAlign: 'right' }}>Blocks</th>
+                <th style={thStyle}>Source</th>
                 <th style={thStyle}>New Vineyard Name</th>
               </tr>
             </thead>
@@ -218,13 +222,13 @@ export default function SplitVineyardModal({
                     </td>
                     <td style={{ ...tdStyle, color: muted }}>{i + 1}</td>
                     <td style={tdStyle}>
-                      {s.situs_address || <span style={{ color: muted, fontStyle: 'italic' }}>—</span>}
+                      {s.block_name || <span style={{ color: muted, fontStyle: 'italic' }}>Block {s.id}</span>}
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: muted }}>
                       {s.acres ? Number(s.acres).toFixed(1) : '—'}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right', color: muted }}>
-                      {s.block_count || 0}
+                    <td style={{ ...tdStyle, color: muted }}>
+                      {s.source_dataset || '—'}
                     </td>
                     <td style={tdStyle}>
                       <input
@@ -281,7 +285,7 @@ export default function SplitVineyardModal({
             <p style={{ margin: 0, color: muted, fontSize: 'var(--type-mono-size)' }}>
               {changedCount === 0
                 ? 'No changes pending'
-                : `${changedCount} parcel${changedCount !== 1 ? 's' : ''} will be renamed`}
+                : `${changedCount} block${changedCount !== 1 ? 's' : ''} will be reassigned`}
               {error && <span style={{ color: crimson, marginLeft: 12 }}>{error}</span>}
             </p>
             <div style={{ display: 'flex', gap: 8 }}>

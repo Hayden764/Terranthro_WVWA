@@ -96,7 +96,7 @@ def fetch_vineyards(conn):
         SELECT
             LOWER(TRIM(vp.vineyard_name)) AS vineyard_key,
             ST_AsText(vp.geometry)        AS wkt
-        FROM vineyard_parcels vp
+        FROM vineyards vp
         JOIN wineries w ON vp.winery_id = w.id
         WHERE vp.vineyard_name IS NOT NULL
           AND TRIM(vp.vineyard_name) <> ''

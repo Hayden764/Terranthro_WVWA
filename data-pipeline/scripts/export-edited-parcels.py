@@ -61,16 +61,14 @@ SELECT DISTINCT ON (vp.id)
     vp.id,
     vp.vineyard_name,
     vp.vineyard_org,
-    vp.owner_name,
     vp.ava_name,
     vp.nested_ava,
     vp.nested_nested_ava,
     vp.acres,
-    vp.parcel_label,
     vp.source_dataset,
     vp.winery_id,
     ST_AsGeoJSON(vp.geometry)::json AS geometry
-FROM vineyard_parcels vp
+FROM vineyards vp
 INNER JOIN winery_edit_log wel
     ON wel.entity_id = vp.id
     AND wel.entity_type = 'vineyard_parcel'
@@ -95,15 +93,13 @@ def main():
     for row in rows:
         geometry = row["geometry"]
         properties = {
-            "parcel_id": row["id"],
+            "vineyard_id": row["id"],
             "vineyard_name": row["vineyard_name"],
             "vineyard_org": row["vineyard_org"],
-            "owner_name": row["owner_name"],
             "ava_name": row["ava_name"],
             "nested_ava": row["nested_ava"],
             "nested_nested_ava": row["nested_nested_ava"],
             "acres": float(row["acres"]) if row["acres"] is not None else None,
-            "parcel_label": row["parcel_label"],
             "source_dataset": row["source_dataset"],
             "winery_id": row["winery_id"],
         }

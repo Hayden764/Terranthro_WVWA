@@ -7,7 +7,7 @@ Source: data/Vineyards_W_Names/  (U-Net-detected vineyard polygons, attributed
 with vineyard_name / vineyard_org). Each file is one AVA.
 
 Model (matches the live schema, no migration required):
-  • A named vineyard  -> one vineyard_parcels row.
+  • A named vineyard  -> one vineyards row.
         geometry  = ST_Union of that vineyard's detected polygons (the footprint)
         acres     = geography area of the union
         source_dataset = 'wvwa-ml-2025'
@@ -166,23 +166,23 @@ def get_database_url():
 
 def insert(conn, all_parcels, all_blocks):
     cur = conn.cursor()
-    cur.execute("DELETE FROM vineyard_parcels WHERE source_dataset = %s", (SOURCE_DATASET,))
+    cur.execute("DELETE FROM vineyards WHERE source_dataset = %s", (SOURCE_DATASET,))
     print(f"  deleted {cur.rowcount} existing '{SOURCE_DATASET}' parcels (blocks cascade)")
 
     n_parcels = n_blocks = 0
     for p in all_parcels:
         cur.execute(
             """
-            INSERT INTO vineyard_parcels
-              (source_dataset, vineyard_name, vineyard_org, owner_name, ava_name,
+            INSERT INTO vineyards
+              (source_dataset, vineyard_name, vineyard_org, ava_name,
                acres, geometry)
-            VALUES (%s, %s, %s, %s, %s,
+            VALUES (%s, %s, %s, %s,
               ROUND((ST_Area(ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326))::geography)
                      / 4046.856422)::numeric, 3),
               ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326)))
             RETURNING id
             """,
-            (SOURCE_DATASET, p["vineyard_name"], p["vineyard_org"], p["owner_name"],
+            (SOURCE_DATASET, p["vineyard_name"], p["vineyard_org"],
              p["ava_name"], p["geom"], p["geom"]),
         )
         parcel_id = cur.fetchone()[0]
@@ -192,10 +192,10 @@ def insert(conn, all_parcels, all_blocks):
             cur.execute(
                 """
                 INSERT INTO vineyard_blocks
-                  (vineyard_parcel_id, vineyard_name, block_name, geometry)
-                VALUES (%s, %s, %s, ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326)))
+                  (vineyard_id, vineyard_name, block_name, geometry, source_dataset)
+                VALUES (%s, %s, %s, ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326)), %s)
                 """,
-                (parcel_id, p["vineyard_name"] or '', b["block_name"], b["geom"]),
+                (parcel_id, p["vineyard_name"], b["block_name"], b["geom"], SOURCE_DATASET),
             )
             n_blocks += 1
     cur.close()

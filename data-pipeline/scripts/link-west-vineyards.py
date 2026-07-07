@@ -3,7 +3,7 @@
 link-west-vineyards.py — Link wvwa-ml-2025 vineyards to winery/org records
 ==========================================================================
 
-Sets vineyard_parcels.winery_id for west-AVA vineyards by matching their
+Sets vineyards.winery_id for west-AVA vineyards by matching their
 `vineyard_org` (the operating entity) to a wineries.title / aliases entry.
 
 Two passes, both high-precision:
@@ -85,7 +85,7 @@ def main():
                 by_norm.setdefault(k, wid)
 
     cur.execute(
-        """SELECT id, vineyard_name, vineyard_org FROM vineyard_parcels
+        """SELECT id, vineyard_name, vineyard_org FROM vineyards
            WHERE source_dataset = %s AND vineyard_org IS NOT NULL
              AND lower(vineyard_org) <> 'independent'""",
         (SOURCE_DATASET,),
@@ -109,10 +109,10 @@ def main():
         conn.rollback(); conn.close(); return
 
     from psycopg2.extras import execute_batch
-    execute_batch(cur, "UPDATE vineyard_parcels SET winery_id=%s WHERE id=%s", updates)
+    execute_batch(cur, "UPDATE vineyards SET winery_id=%s WHERE id=%s", updates)
     conn.commit()
     cur.execute(
-        "SELECT COUNT(*) FROM vineyard_parcels WHERE source_dataset=%s AND winery_id IS NOT NULL",
+        "SELECT COUNT(*) FROM vineyards WHERE source_dataset=%s AND winery_id IS NOT NULL",
         (SOURCE_DATASET,),
     )
     print(f"  committed. west vineyards now linked: {cur.fetchone()[0]}")

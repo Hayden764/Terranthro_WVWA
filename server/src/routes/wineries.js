@@ -89,7 +89,7 @@ router.get('/', async (req, res) => {
     }
 
     const parcelsCondition = hasParcels
-      ? `AND EXISTS (SELECT 1 FROM vineyard_parcels vp WHERE vp.winery_id = w.id)`
+      ? `AND EXISTS (SELECT 1 FROM vineyards v WHERE v.winery_id = w.id)`
       : '';
 
     const { rows } = await pool.query(
@@ -104,7 +104,8 @@ router.get('/', async (req, res) => {
         w.image_url,
         w.category,
         ST_AsGeoJSON(w.location)::json AS geometry,
-        (SELECT COUNT(*) FROM vineyard_parcels vp WHERE vp.winery_id = w.id) AS parcel_count
+        -- kept as parcel_count for API/fallback-file compatibility; counts vineyards post-018
+        (SELECT COUNT(*) FROM vineyards v WHERE v.winery_id = w.id) AS parcel_count
       FROM wineries w
       WHERE ${bboxCondition}
         AND w.is_wvwa_member
@@ -159,13 +160,13 @@ router.get('/', async (req, res) => {
 /**
  * GET /api/wineries/query
  *
- * Roll-up query: returns wineries that have at least one vineyard parcel
+ * Roll-up query: returns wineries that have at least one vineyard
  * matching the given topo / viticulture / location filters. Used by the
  * Wineries dock filter modal and to drive map dimming.
  *
  * All filters are AND-combined. Aspect uses the indexed aspect_bucket
  * generated column from migration 012. Filters that touch topo stats
- * inner-join vineyard_parcel_topo_stats, so parcels without computed
+ * inner-join vineyard_topo_stats, so vineyards without computed
  * stats are excluded from those filtered queries.
  *
  * Query params (all optional):
@@ -174,16 +175,16 @@ router.get('/', async (req, res) => {
  *   aspect=N,NE,SW                 — comma-separated 8-pt buckets
  *   variety=Pinot+Noir             — ILIKE on varietals_list
  *   ava=Dundee+Hills               — ILIKE on nested_ava OR ava_name
- *   acres_min, acres_max           — on parcel acres
- *   linked=true                    — only parcels with a winery_id
+ *   acres_min, acres_max           — on vineyard acres
+ *   linked=true                    — only vineyards with a winery_id
  *   limit, offset                  — pagination on wineries (default 200/0)
  *
  * Response:
  *   {
  *     wineries: [{ id, recid, title, category, lng, lat, ava_names,
- *                  matching_parcel_count, matching_acres, elevation_mean_ft }],
- *     matching_parcel_ids: [...],
- *     matching_parcel_total_count,
+ *                  matching_vineyard_count, matching_acres, elevation_mean_ft }],
+ *     matching_vineyard_ids: [...],
+ *     matching_vineyard_total_count,
  *     winery_total_count
  *   }
  */
@@ -225,7 +226,7 @@ router.get('/query', async (req, res) => {
     aspects.length > 0;
 
   const params = [];
-  const where = ['vp.winery_id IS NOT NULL']; // roll-up only meaningful for linked parcels
+  const where = ['v.winery_id IS NOT NULL']; // roll-up only meaningful for linked vineyards
   // (linkedOnly is implied; the explicit param is kept for symmetry but is a no-op here.)
 
   if (elevMin != null) {
@@ -250,51 +251,51 @@ router.get('/query', async (req, res) => {
   }
   if (variety) {
     params.push(`%${variety}%`);
-    where.push(`vp.varietals_list ILIKE $${params.length}`);
+    where.push(`v.varietals_list ILIKE $${params.length}`);
   }
   if (ava) {
     params.push(`%${ava}%`);
-    where.push(`(vp.nested_ava ILIKE $${params.length} OR vp.ava_name ILIKE $${params.length})`);
+    where.push(`(v.nested_ava ILIKE $${params.length} OR v.ava_name ILIKE $${params.length})`);
   }
   if (acresMin != null) {
     params.push(acresMin);
-    where.push(`vp.acres >= $${params.length}`);
+    where.push(`v.acres >= $${params.length}`);
   }
   if (acresMax != null) {
     params.push(acresMax);
-    where.push(`vp.acres <= $${params.length}`);
+    where.push(`v.acres <= $${params.length}`);
   }
 
   const join = needsTopoJoin
-    ? 'JOIN vineyard_parcel_topo_stats ts ON ts.parcel_id = vp.id'
-    : 'LEFT JOIN vineyard_parcel_topo_stats ts ON ts.parcel_id = vp.id';
+    ? 'JOIN vineyard_topo_stats ts ON ts.vineyard_id = v.id'
+    : 'LEFT JOIN vineyard_topo_stats ts ON ts.vineyard_id = v.id';
 
   const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
 
-  // Outer query: roll up matching parcels per winery
+  // Outer query: roll up matching vineyards per winery
   const sql = `
     WITH matched AS (
       SELECT
-        vp.id          AS parcel_id,
-        vp.winery_id,
-        vp.acres,
-        vp.nested_ava,
-        vp.ava_name,
+        v.id           AS vineyard_id,
+        v.winery_id,
+        v.acres,
+        v.nested_ava,
+        v.ava_name,
         ts.elevation_mean_ft
-      FROM vineyard_parcels vp
+      FROM vineyards v
       ${join}
       ${whereSql}
     ),
     rollup AS (
       SELECT
         m.winery_id,
-        COUNT(*)::int                                   AS matching_parcel_count,
+        COUNT(*)::int                                   AS matching_vineyard_count,
         ROUND(SUM(COALESCE(m.acres, 0))::numeric, 2)    AS matching_acres,
         ROUND(AVG(m.elevation_mean_ft)::numeric, 0)     AS elevation_mean_ft,
         ARRAY_AGG(DISTINCT COALESCE(m.nested_ava, m.ava_name))
           FILTER (WHERE COALESCE(m.nested_ava, m.ava_name) IS NOT NULL)
                                                          AS ava_names,
-        ARRAY_AGG(m.parcel_id)                          AS parcel_ids
+        ARRAY_AGG(m.vineyard_id)                        AS vineyard_ids
       FROM matched m
       GROUP BY m.winery_id
     )
@@ -305,11 +306,11 @@ router.get('/query', async (req, res) => {
       w.category,
       ST_X(w.location::geometry) AS lng,
       ST_Y(w.location::geometry) AS lat,
-      r.matching_parcel_count,
+      r.matching_vineyard_count,
       r.matching_acres,
       r.elevation_mean_ft,
       r.ava_names,
-      r.parcel_ids
+      r.vineyard_ids
     FROM rollup r
     JOIN wineries w ON w.id = r.winery_id
     ORDER BY w.title
@@ -319,23 +320,23 @@ router.get('/query', async (req, res) => {
   try {
     const { rows } = await pool.query(sql, params);
 
-    // Flatten parcel ids and compute totals across the (paginated) result set.
-    // For an accurate total of matching parcels regardless of pagination,
+    // Flatten vineyard ids and compute totals across the (paginated) result set.
+    // For an accurate total of matching vineyards regardless of pagination,
     // we run a small COUNT query.
     const countSql = `
       SELECT
-        COUNT(DISTINCT vp.id)        AS matching_parcel_total_count,
-        COUNT(DISTINCT vp.winery_id) AS winery_total_count
-      FROM vineyard_parcels vp
+        COUNT(DISTINCT v.id)        AS matching_vineyard_total_count,
+        COUNT(DISTINCT v.winery_id) AS winery_total_count
+      FROM vineyards v
       ${join}
       ${whereSql}
     `;
     const { rows: countRows } = await pool.query(countSql, params);
-    const totals = countRows[0] || { matching_parcel_total_count: 0, winery_total_count: 0 };
+    const totals = countRows[0] || { matching_vineyard_total_count: 0, winery_total_count: 0 };
 
-    const matchingParcelIds = [];
+    const matchingVineyardIds = [];
     for (const r of rows) {
-      if (Array.isArray(r.parcel_ids)) matchingParcelIds.push(...r.parcel_ids);
+      if (Array.isArray(r.vineyard_ids)) matchingVineyardIds.push(...r.vineyard_ids);
     }
 
     res.json({
@@ -346,13 +347,13 @@ router.get('/query', async (req, res) => {
         category: r.category,
         lng: r.lng,
         lat: r.lat,
-        matching_parcel_count: r.matching_parcel_count,
+        matching_vineyard_count: r.matching_vineyard_count,
         matching_acres: r.matching_acres != null ? Number(r.matching_acres) : 0,
         elevation_mean_ft: r.elevation_mean_ft != null ? Number(r.elevation_mean_ft) : null,
         ava_names: Array.isArray(r.ava_names) ? r.ava_names : [],
       })),
-      matching_parcel_ids: matchingParcelIds,
-      matching_parcel_total_count: Number(totals.matching_parcel_total_count) || 0,
+      matching_vineyard_ids: matchingVineyardIds,
+      matching_vineyard_total_count: Number(totals.matching_vineyard_total_count) || 0,
       winery_total_count: Number(totals.winery_total_count) || 0,
     });
   } catch (err) {
@@ -364,7 +365,7 @@ router.get('/query', async (req, res) => {
 /**
  * GET /api/wineries/:recid
  *
- * Returns a single winery feature with all linked vineyard parcels embedded.
+ * Returns a single winery feature with all linked vineyards embedded.
  */
 router.get('/:recid', async (req, res) => {
   const recid = parseInt(req.params.recid, 10);
@@ -385,18 +386,18 @@ router.get('/:recid', async (req, res) => {
         ST_AsGeoJSON(w.location)::json AS geometry,
         json_agg(
           json_build_object(
-            'id',            vp.id,
-            'vineyard_name', vp.vineyard_name,
-            'vineyard_org',  vp.vineyard_org,
-            'acres',         vp.acres,
-            'nested_ava',    vp.nested_ava,
-            'varietals',     vp.varietals_list,
-            'source',        vp.source_dataset,
-            'geometry',      ST_AsGeoJSON(vp.geometry)::json
-          ) ORDER BY vp.vineyard_name
-        ) FILTER (WHERE vp.id IS NOT NULL) AS parcels
+            'id',            v.id,
+            'vineyard_name', v.vineyard_name,
+            'vineyard_org',  v.vineyard_org,
+            'acres',         v.acres,
+            'nested_ava',    v.nested_ava,
+            'varietals',     v.varietals_list,
+            'source',        v.source_dataset,
+            'geometry',      ST_AsGeoJSON(v.geometry)::json
+          ) ORDER BY v.vineyard_name
+        ) FILTER (WHERE v.id IS NOT NULL) AS parcels
       FROM wineries w
-      LEFT JOIN vineyard_parcels vp ON vp.winery_id = w.id
+      LEFT JOIN vineyards v ON v.winery_id = w.id
       WHERE w.recid = $1
       GROUP BY w.id
       `,
@@ -445,18 +446,17 @@ async function loadSourcedFrom(wineryId) {
          vb.clone,
          vb.acres         AS block_acres,
          vb.year_planted,
-         vp.id            AS parcel_id,
-         vp.vineyard_name,
-         vp.parcel_label,
+         v.id             AS vineyard_id,
+         v.vineyard_name,
          w.id             AS source_winery_id,
          w.recid          AS source_winery_recid,
          COALESCE(w.title, 'Independent vineyard') AS source_winery_name
        FROM vineyard_block_buyers bb
        JOIN vineyard_blocks vb   ON vb.id = bb.block_id
-       JOIN vineyard_parcels vp  ON vp.id = vb.vineyard_parcel_id
-       LEFT JOIN wineries w      ON w.id  = vp.winery_id
+       JOIN vineyards v          ON v.id = vb.vineyard_id
+       LEFT JOIN wineries w      ON w.id  = v.winery_id
        WHERE bb.buyer_winery_id = $1
-       ORDER BY source_winery_name, vp.parcel_label, vb.block_name`,
+       ORDER BY source_winery_name, v.vineyard_name, vb.block_name`,
       [wineryId]
     );
     return rows;

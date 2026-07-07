@@ -7,19 +7,20 @@
  *
  * Behaviour: upsert-only.
  *   Rows are matched to existing blocks by block_name (winery-wide,
- *   case-insensitive). For inserts (new blocks) a parcel_label is required
- *   so we know where to place them. Updates re-use the block's existing
- *   parcel — the CSV does not need to specify it.
+ *   case-insensitive). For inserts (new blocks) a vineyard name is required
+ *   so we know where to place them (the legacy CSV column "parcel_label" is
+ *   accepted as an alias for vineyard). Updates re-use the block's existing
+ *   vineyard — the CSV does not need to specify it.
  *   fruit_sold_to is split on '|' and reconciled against
  *   vineyard_block_buyers (buyer_winery_id resolved via wineries.title or
  *   wineries.aliases). Buyers absent from this row are deleted for that block.
  *
- * Acreage flagging: per parcel touched, if Σ block.acres delta ≥ 5 % of the
- * parcel's prior block-acre total, the parcel id is reported in
+ * Acreage flagging: per vineyard touched, if Σ block.acres delta ≥ 5 % of the
+ * vineyard's prior block-acre total, the vineyard id is reported in
  * `flagged_parcels` so callers can attach an `acreage_change` flag.
  *
  * Input row keys (after column_map normalization):
- *   block_name (required), parcel_label (required for inserts),
+ *   block_name (required), vineyard or parcel_label (required for inserts),
  *   variety, clone, rootstock, rows, spacing, year_planted, acres, vines,
  *   vines_per_acre, fruit_sold_to
  *
@@ -29,8 +30,9 @@
  *     errors: [{ row, message }],
  *     unlinked_buyers: [{ name, count }],
  *     flagged_parcels: [{ parcel_id, before_acres, after_acres, pct_change }],
- *     per_parcel: [{ parcel_id, parcel_label, updated, inserted }]
+ *     per_parcel: [{ parcel_id, vineyard_name, updated, inserted }]
  *   }
+ *   (keys keep the legacy "parcel" naming; ids are vineyard ids post-018)
  */
 
 const ROW_FIELDS = [
@@ -96,20 +98,19 @@ export async function bulkApplyBlocks(ctx) {
   const { client, wineryId, rows = [], columnMap = {}, adminId = null,
           accountId = null, requestId = null, origin = 'admin' } = ctx;
 
-  // ── Load parcels for this winery ──────────────────────────────────
-  const { rows: parcels } = await client.query(
-    `SELECT id, vineyard_name, parcel_label,
-            COALESCE((SELECT SUM(acres) FROM vineyard_blocks WHERE vineyard_parcel_id = vp.id), 0) AS prior_block_acres
-     FROM vineyard_parcels vp
-     WHERE vp.winery_id = $1`,
+  // ── Load vineyards for this winery ────────────────────────────────
+  const { rows: vineyards } = await client.query(
+    `SELECT id, vineyard_name,
+            COALESCE((SELECT SUM(acres) FROM vineyard_blocks WHERE vineyard_id = v.id), 0) AS prior_block_acres
+     FROM vineyards v
+     WHERE v.winery_id = $1`,
     [wineryId]
   );
 
-  const parcelByLabel = new Map();
-  // Hill-aware index: parcels grouped by normalized hill (extracted from
-  // vineyard_name suffix). Two indexes per hill: by parcel_label, and a
-  // sorted list for prefix matching of new sub-blocks.
-  const parcelsByHill = new Map(); // normHill → { byLabel: Map, list: [] }
+  const vineyardByName = new Map();
+  // Hill-aware index: vineyards grouped by normalized hill (extracted from
+  // vineyard_name suffix), e.g. "Shea Vineyard - East Hill" → "easthill".
+  const vineyardsByHill = new Map(); // normHill → { byName: Map, list: [] }
   function extractHill(vineyardName) {
     if (!vineyardName) return '';
     // "Shea Vineyard - East Hill" → "East Hill"
@@ -117,22 +118,22 @@ export async function bulkApplyBlocks(ctx) {
     const tail = m ? m[1] : vineyardName;
     return normHill(tail);
   }
-  for (const p of parcels) {
-    if (p.parcel_label) parcelByLabel.set(norm(p.parcel_label), p);
+  for (const p of vineyards) {
+    if (p.vineyard_name) vineyardByName.set(norm(p.vineyard_name), p);
     const h = extractHill(p.vineyard_name);
-    if (!parcelsByHill.has(h)) parcelsByHill.set(h, { byLabel: new Map(), list: [] });
-    const bucket = parcelsByHill.get(h);
-    if (p.parcel_label) bucket.byLabel.set(norm(p.parcel_label), p);
+    if (!vineyardsByHill.has(h)) vineyardsByHill.set(h, { byName: new Map(), list: [] });
+    const bucket = vineyardsByHill.get(h);
+    if (p.vineyard_name) bucket.byName.set(norm(p.vineyard_name), p);
     bucket.list.push(p);
   }
 
   // ── Load all existing blocks for the winery ───────────────────────
   const { rows: allBlocks } = await client.query(
-    `SELECT vb.id, vb.block_name, vb.acres, vb.vineyard_parcel_id,
-            vp.parcel_label, vp.vineyard_name
+    `SELECT vb.id, vb.block_name, vb.acres, vb.vineyard_id,
+            v.vineyard_name
      FROM vineyard_blocks vb
-     JOIN vineyard_parcels vp ON vp.id = vb.vineyard_parcel_id
-     WHERE vp.winery_id = $1`,
+     JOIN vineyards v ON v.id = vb.vineyard_id
+     WHERE v.winery_id = $1`,
     [wineryId]
   );
   // Hill-aware block index: norm(hill) + '|' + norm(block_name) → block row
@@ -160,8 +161,8 @@ export async function bulkApplyBlocks(ctx) {
 
   const errors = [];
   const unlinkedCounts = new Map();
-  const perParcel = new Map(); // parcel_id → { updated, inserted, parcel_label }
-  const touchedParcels = new Set();
+  const perVineyard = new Map(); // vineyard_id → { updated, inserted, vineyard_name }
+  const touchedVineyards = new Set();
   let buyerLinksAdded = 0;
   let buyerLinksRemoved = 0;
   let updated = 0;
@@ -174,16 +175,17 @@ export async function bulkApplyBlocks(ctx) {
     const rowNum = i + 1; // 1-based for human messages
 
     // Allow client to mark a row to be silently skipped (used by the
-    // manual row-level parcel linker UI).
+    // manual row-level vineyard linker UI).
     if (raw.__skip__ === true || raw.__skip__ === 'true') {
       skipped++;
       continue;
     }
 
-    const blockName   = (raw.block_name || '').trim();
-    const parcelLabel = (raw.parcel_label || '').trim();
-    const hillRaw     = (raw.hill || '').trim();
-    const hillKey     = normHill(hillRaw);
+    const blockName    = (raw.block_name || '').trim();
+    // "parcel_label" kept as a legacy CSV alias for the vineyard name
+    const vineyardName = (raw.vineyard || raw.vineyard_name || raw.parcel_label || '').trim();
+    const hillRaw      = (raw.hill || '').trim();
+    const hillKey      = normHill(hillRaw);
     if (!blockName) {
       errors.push({ row: rowNum, message: 'Missing block_name' });
       skipped++;
@@ -192,26 +194,26 @@ export async function bulkApplyBlocks(ctx) {
 
     // Try to match an existing block.
     //   1. (hill, block_name) — most specific
-    //   2. (parcel_label, block_name) — manual-link disambiguator
+    //   2. (vineyard, block_name) — manual-link disambiguator
     //   3. (block_name) alone — but error if ambiguous
     let existing = null;
     if (hillKey) {
       existing = blockByHillName.get(`${hillKey}|${norm(blockName)}`) || null;
     }
-    if (!existing && parcelLabel) {
-      // Find a block whose parcel_label matches and block_name matches
-      const targetParcel = parcelByLabel.get(norm(parcelLabel));
-      if (targetParcel) {
+    if (!existing && vineyardName) {
+      // Find a block in the named vineyard whose block_name matches
+      const targetVineyard = vineyardByName.get(norm(vineyardName));
+      if (targetVineyard) {
         const match = allBlocks.find(b =>
-          b.vineyard_parcel_id === targetParcel.id && norm(b.block_name) === norm(blockName)
+          b.vineyard_id === targetVineyard.id && norm(b.block_name) === norm(blockName)
         );
         if (match) existing = match;
       }
     }
     if (!existing) {
       const blockKey = norm(blockName);
-      if (blockNameDuplicates.has(blockKey) && !hillKey && !parcelLabel) {
-        errors.push({ row: rowNum, message: `Block name "${blockName}" exists in multiple parcels — add a "hill" column or pick a parcel manually` });
+      if (blockNameDuplicates.has(blockKey) && !hillKey && !vineyardName) {
+        errors.push({ row: rowNum, message: `Block name "${blockName}" exists in multiple vineyards — add a "hill" or "vineyard" column or pick a vineyard manually` });
         skipped++;
         continue;
       }
@@ -220,46 +222,45 @@ export async function bulkApplyBlocks(ctx) {
       }
     }
 
-    // Resolve parcel for INSERTs (updates re-use the block's existing parcel).
-    let parcel;
+    // Resolve vineyard for INSERTs (updates re-use the block's existing vineyard).
+    let vineyard;
     if (existing) {
-      parcel = {
-        id: existing.vineyard_parcel_id,
-        parcel_label: existing.parcel_label,
+      vineyard = {
+        id: existing.vineyard_id,
         vineyard_name: existing.vineyard_name,
       };
     } else {
-      // INSERT path. Need to figure out which parcel this new block belongs to.
+      // INSERT path. Need to figure out which vineyard this new block belongs to.
       // Priority:
-      //   a) explicit parcel_label match
-      //   b) within the hill, parcel whose label is a prefix of block_name
-      //      (e.g. "Block 19 East" → parcel "Block 19")
-      //   c) within the hill, exact block_name == parcel_label
-      if (parcelLabel) {
-        parcel = parcelByLabel.get(norm(parcelLabel));
+      //   a) explicit vineyard-name match
+      //   b) within the hill, vineyard whose name is a prefix of block_name
+      //      (e.g. "Block 19 East" → vineyard "Block 19")
+      //   c) within the hill, exact block_name == vineyard_name
+      if (vineyardName) {
+        vineyard = vineyardByName.get(norm(vineyardName));
       }
-      if (!parcel && hillKey && parcelsByHill.has(hillKey)) {
-        const bucket = parcelsByHill.get(hillKey);
+      if (!vineyard && hillKey && vineyardsByHill.has(hillKey)) {
+        const bucket = vineyardsByHill.get(hillKey);
         const blockNameNorm = norm(blockName);
         // exact match within hill
-        if (bucket.byLabel.has(blockNameNorm)) {
-          parcel = bucket.byLabel.get(blockNameNorm);
+        if (bucket.byName.has(blockNameNorm)) {
+          vineyard = bucket.byName.get(blockNameNorm);
         } else {
-          // prefix match: longest parcel_label that is a prefix of block_name
+          // prefix match: longest vineyard_name that is a prefix of block_name
           let best = null;
           for (const p of bucket.list) {
-            if (!p.parcel_label) continue;
-            const lbl = norm(p.parcel_label);
+            if (!p.vineyard_name) continue;
+            const lbl = norm(p.vineyard_name);
             if (blockNameNorm === lbl || blockNameNorm.startsWith(lbl + ' ')) {
-              if (!best || lbl.length > norm(best.parcel_label).length) best = p;
+              if (!best || lbl.length > norm(best.vineyard_name).length) best = p;
             }
           }
-          parcel = best || null;
+          vineyard = best || null;
         }
       }
-      if (!parcel) {
+      if (!vineyard) {
         const hillHint = hillRaw ? ` on hill "${hillRaw}"` : '';
-        errors.push({ row: rowNum, message: `No parcel found for new block "${blockName}"${hillHint} — specify parcel_label or ensure a parent parcel exists on this hill` });
+        errors.push({ row: rowNum, message: `No vineyard found for new block "${blockName}"${hillHint} — specify a vineyard column or ensure a parent vineyard exists on this hill` });
         skipped++;
         continue;
       }
@@ -292,9 +293,9 @@ export async function bulkApplyBlocks(ctx) {
       updated++;
     } else {
       // INSERT
-      const cols = ['vineyard_parcel_id', 'vineyard_name', ...ROW_FIELDS];
+      const cols = ['vineyard_id', 'vineyard_name', ...ROW_FIELDS];
       const placeholders = cols.map((_, i2) => `$${i2 + 1}`).join(', ');
-      const vals = [parcel.id, parcel.vineyard_name, ...ROW_FIELDS.map(f => values[f])];
+      const vals = [vineyard.id, vineyard.vineyard_name, ...ROW_FIELDS.map(f => values[f])];
       const { rows: ins } = await client.query(
         `INSERT INTO vineyard_blocks (${cols.join(', ')}) VALUES (${placeholders}) RETURNING id`,
         vals
@@ -303,10 +304,10 @@ export async function bulkApplyBlocks(ctx) {
       // Track new block in both indexes so a later duplicate row errors out
       const newRow = {
         id: blockId, block_name: blockName, acres: values.acres,
-        vineyard_parcel_id: parcel.id, parcel_label: parcel.parcel_label,
-        vineyard_name: parcel.vineyard_name,
+        vineyard_id: vineyard.id,
+        vineyard_name: vineyard.vineyard_name,
       };
-      const insertedHillKey = normHill((parcel.vineyard_name || '').match(/[-–—]\s*([^-–—]+)$/)?.[1] || parcel.vineyard_name || '');
+      const insertedHillKey = normHill((vineyard.vineyard_name || '').match(/[-–—]\s*([^-–—]+)$/)?.[1] || vineyard.vineyard_name || '');
       blockByHillName.set(`${insertedHillKey}|${norm(blockName)}`, newRow);
       const nameKey = norm(blockName);
       if (blockByName.has(nameKey)) blockNameDuplicates.add(nameKey);
@@ -314,18 +315,18 @@ export async function bulkApplyBlocks(ctx) {
       inserted++;
     }
 
-    // Per-parcel tally
-    if (!perParcel.has(parcel.id)) {
-      perParcel.set(parcel.id, {
-        parcel_id: parcel.id,
-        parcel_label: parcel.parcel_label,
+    // Per-vineyard tally
+    if (!perVineyard.has(vineyard.id)) {
+      perVineyard.set(vineyard.id, {
+        parcel_id: vineyard.id,
+        vineyard_name: vineyard.vineyard_name,
         updated: 0,
         inserted: 0,
       });
     }
-    const tally = perParcel.get(parcel.id);
+    const tally = perVineyard.get(vineyard.id);
     if (existing) tally.updated++; else tally.inserted++;
-    touchedParcels.add(parcel.id);
+    touchedVineyards.add(vineyard.id);
 
     // ── Reconcile buyers for this block ─────────────────────────────
     const buyerNames = splitBuyers(values.fruit_sold_to);
@@ -388,7 +389,7 @@ export async function bulkApplyBlocks(ctx) {
         blockId,
         JSON.stringify({
           source: origin,
-          parcel_label: parcelLabel,
+          vineyard: vineyardName,
           block_name: blockName,
           buyers: Array.from(desired.values()).map(d => d.name),
         }),
@@ -399,20 +400,20 @@ export async function bulkApplyBlocks(ctx) {
 
   // ── Acreage-change flag check ─────────────────────────────────────
   const flaggedParcels = [];
-  for (const parcelId of touchedParcels) {
-    const parcel = parcels.find(p => p.id === parcelId);
-    if (!parcel) continue;
-    const before = Number(parcel.prior_block_acres) || 0;
+  for (const vineyardId of touchedVineyards) {
+    const vineyard = vineyards.find(p => p.id === vineyardId);
+    if (!vineyard) continue;
+    const before = Number(vineyard.prior_block_acres) || 0;
     const { rows: aRows } = await client.query(
-      `SELECT COALESCE(SUM(acres), 0) AS total FROM vineyard_blocks WHERE vineyard_parcel_id = $1`,
-      [parcelId]
+      `SELECT COALESCE(SUM(acres), 0) AS total FROM vineyard_blocks WHERE vineyard_id = $1`,
+      [vineyardId]
     );
     const after = Number(aRows[0].total) || 0;
     if (before > 0) {
       const pct = Math.abs((after - before) / before) * 100;
       if (pct >= 5) {
         flaggedParcels.push({
-          parcel_id: parcelId,
+          parcel_id: vineyardId,
           before_acres: before,
           after_acres: after,
           pct_change: Math.round(pct * 10) / 10,
@@ -420,7 +421,7 @@ export async function bulkApplyBlocks(ctx) {
       }
     } else if (after > 0) {
       flaggedParcels.push({
-        parcel_id: parcelId,
+        parcel_id: vineyardId,
         before_acres: 0,
         after_acres: after,
         pct_change: 100,
@@ -433,13 +434,13 @@ export async function bulkApplyBlocks(ctx) {
       updated, inserted, skipped,
       buyer_links_added:   buyerLinksAdded,
       buyer_links_removed: buyerLinksRemoved,
-      parcels_touched:     touchedParcels.size,
+      parcels_touched:     touchedVineyards.size,
     },
     errors,
     unlinked_buyers: Array.from(unlinkedCounts.entries())
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count),
     flagged_parcels: flaggedParcels,
-    per_parcel: Array.from(perParcel.values()),
+    per_parcel: Array.from(perVineyard.values()),
   };
 }

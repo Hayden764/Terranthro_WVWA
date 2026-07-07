@@ -57,19 +57,15 @@ SELECT
     vp.source_dataset,
     vp.vineyard_name,
     vp.vineyard_org,
-    vp.owner_name,
     vp.ava_name,
     vp.nested_ava,
     vp.nested_nested_ava,
-    vp.situs_address,
-    vp.situs_city,
-    vp.situs_zip,
     vp.acres,
     vp.varietals_list,
     w.title AS winery_title,
     COALESCE(vc.color_index, -1) AS color_index,
     ST_AsGeoJSON(vp.geometry)::json AS geometry
-FROM vineyard_parcels vp
+FROM vineyards vp
 LEFT JOIN wineries w ON vp.winery_id = w.id
 LEFT JOIN vineyard_colors vc
     ON vc.vineyard_key = LOWER(TRIM(vp.vineyard_name))
@@ -100,13 +96,9 @@ def main():
             "source_dataset": row["source_dataset"],
             "vineyard_name": row["vineyard_name"],
             "vineyard_org": row["vineyard_org"],
-            "owner_name": row["owner_name"],
             "ava_name": row["ava_name"],
             "nested_ava": row["nested_ava"],
             "nested_nested_ava": row["nested_nested_ava"],
-            "situs_address": row["situs_address"],
-            "situs_city": row["situs_city"],
-            "situs_zip": row["situs_zip"],
             "acres": float(row["acres"]) if row["acres"] is not None else None,
             "varietals_list": row["varietals_list"],
             "color_index": int(row["color_index"]) if row["color_index"] is not None else -1,

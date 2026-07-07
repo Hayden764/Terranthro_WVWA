@@ -389,7 +389,7 @@ export default function WVWAMapPage() {
             onVineyardRecidSetChange={setVineyardRecidSet}
             onMapReady={() => setMapReady(true)}
             // Vineyard filter overlay (dimming + matched parcels)
-            matchedParcelIds={vineyardFilters.queryResult?.matching_parcel_ids ?? null}
+            matchedParcelIds={vineyardFilters.queryResult?.matching_vineyard_ids ?? null}
             filtersActive={vineyardFilters.isActive}
             vineyardScope={vineyardScope}
           />
@@ -405,7 +405,7 @@ export default function WVWAMapPage() {
         onReset={vineyardFilters.resetFilters}
         liveResultSummary={vineyardFilters.queryResult ? {
           wineries: vineyardFilters.queryResult.winery_total_count,
-          parcels:  vineyardFilters.queryResult.matching_parcel_total_count,
+          parcels:  vineyardFilters.queryResult.matching_vineyard_total_count,
         } : null}
       />
     </div>

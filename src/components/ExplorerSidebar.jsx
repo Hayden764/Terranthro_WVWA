@@ -1040,7 +1040,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
       const r = filterActive ? rollupByRecid.get(l.id) : null;
       return {
         ...l,
-        _matching_parcel_count: r ? r.matching_parcel_count : (vineyardRecidSet.get?.(l.id) ?? 0),
+        _matching_vineyard_count: r ? r.matching_vineyard_count : (vineyardRecidSet.get?.(l.id) ?? 0),
         _matching_acres:        r ? r.matching_acres        : null,
         _elevation_mean_ft:     r ? r.elevation_mean_ft     : null,
         _ava_names:             r ? (Array.isArray(r.ava_names) ? r.ava_names : []) : [],
@@ -1057,7 +1057,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
       return dir * (bv - av); // higher first by default
     };
     switch (sortKey) {
-      case 'parcels':   arr.sort((a, b) => cmpNum(a._matching_parcel_count, b._matching_parcel_count) || cmpStr(a.title, b.title)); break;
+      case 'parcels':   arr.sort((a, b) => cmpNum(a._matching_vineyard_count, b._matching_vineyard_count) || cmpStr(a.title, b.title)); break;
       case 'acres':     arr.sort((a, b) => cmpNum(a._matching_acres,        b._matching_acres)        || cmpStr(a.title, b.title)); break;
       case 'elevation': arr.sort((a, b) => cmpNum(a._elevation_mean_ft,     b._elevation_mean_ft)     || cmpStr(a.title, b.title)); break;
       case 'ava':       arr.sort((a, b) => cmpStr(a._ava_names?.[0],        b._ava_names?.[0])        || cmpStr(a.title, b.title)); break;
@@ -1108,7 +1108,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
       {filterActive && (
         <div style={{ padding: '6px 16px', background: TOKENS.dangerDim, borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <span style={{ fontSize: 'var(--type-ui-label-size)', color: crimson, fontWeight: 600 }}>
-            {vineyardFilterResult.winery_total_count} winer{vineyardFilterResult.winery_total_count === 1 ? 'y' : 'ies'} match · {vineyardFilterResult.matching_parcel_total_count} parcel{vineyardFilterResult.matching_parcel_total_count === 1 ? '' : 's'}
+            {vineyardFilterResult.winery_total_count} winer{vineyardFilterResult.winery_total_count === 1 ? 'y' : 'ies'} match · {vineyardFilterResult.matching_vineyard_total_count} vineyard{vineyardFilterResult.matching_vineyard_total_count === 1 ? '' : 's'}
           </span>
         </div>
       )}
@@ -1157,7 +1157,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
           // When a stat-filter is active, show match metrics inline
           const meta = filterActive
             ? [
-                `${l._matching_parcel_count} parcel${l._matching_parcel_count === 1 ? '' : 's'}`,
+                `${l._matching_vineyard_count} vineyard${l._matching_vineyard_count === 1 ? '' : 's'}`,
                 l._matching_acres != null ? `${l._matching_acres} ac` : null,
                 l._elevation_mean_ft != null ? `${l._elevation_mean_ft} ft avg` : null,
               ].filter(Boolean).join(' · ')

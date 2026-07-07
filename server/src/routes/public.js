@@ -26,18 +26,17 @@ router.get('/wineries/:recid/sourced-from', async (req, res) => {
          vb.clone,
          vb.acres         AS block_acres,
          vb.year_planted,
-         vp.id            AS parcel_id,
-         vp.vineyard_name,
-         vp.parcel_label,
+         v.id             AS vineyard_id,
+         v.vineyard_name,
          w.id             AS source_winery_id,
          w.recid          AS source_winery_recid,
          COALESCE(w.title, 'Independent vineyard') AS source_winery_name
        FROM vineyard_block_buyers bb
        JOIN vineyard_blocks vb   ON vb.id = bb.block_id
-       JOIN vineyard_parcels vp  ON vp.id = vb.vineyard_parcel_id
-       LEFT JOIN wineries w      ON w.id  = vp.winery_id
+       JOIN vineyards v          ON v.id = vb.vineyard_id
+       LEFT JOIN wineries w      ON w.id  = v.winery_id
        WHERE bb.buyer_winery_id = (SELECT id FROM self)
-       ORDER BY source_winery_name, vp.parcel_label, vb.block_name`,
+       ORDER BY source_winery_name, v.vineyard_name, vb.block_name`,
       [recid]
     );
     res.json(rows);

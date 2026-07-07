@@ -94,7 +94,7 @@ export default function AdminVineyardBlocks() {
             }}>
               <thead>
                 <tr style={{ background: alpha(ink, 0.04) }}>
-                  {['Vineyard', 'Winery', 'AVA', 'Parcels', 'Acres', 'Blocks'].map((h) => (
+                  {['Vineyard', 'Winery', 'AVA', 'ID', 'Acres', 'Blocks'].map((h) => (
                     <th key={h} style={thStyle}>{h}</th>
                   ))}
                   <th style={{ ...thStyle, width: 60 }} />
@@ -123,8 +123,8 @@ export default function AdminVineyardBlocks() {
                       <td style={tdStyle}>{v.vineyard_name || <em style={{ color: muted }}>Unnamed</em>}</td>
                       <td style={{ ...tdStyle, color: muted }}>{v.winery_name}</td>
                       <td style={{ ...tdStyle, color: muted }}>{v.ava_name || '—'}</td>
-                      <td style={{ ...tdStyle, color: v.parcel_count > 1 ? TOKENS.electricBlue : ink }}>
-                        {v.parcel_count}
+                      <td style={{ ...tdStyle, color: muted }}>
+                        #{v.parcel_id}
                       </td>
                       <td style={{ ...tdStyle, color: muted }}>{v.total_acres ? Number(v.total_acres).toFixed(1) : '—'}</td>
                       <td style={{ ...tdStyle }}>

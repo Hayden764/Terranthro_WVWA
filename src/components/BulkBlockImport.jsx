@@ -144,8 +144,8 @@ export default function BulkBlockImport({ wineryId, wineryTitle, parcelLabels = 
       const next = { ...prev };
       for (const v of distinctCsvParcelValues) {
         if (next[v]) continue;
-        const match = parcels.find(p => (p.parcel_label || '').toLowerCase() === v.toLowerCase());
-        if (match) next[v] = match.parcel_label;
+        const match = parcels.find(p => (p.vineyard_name || '').toLowerCase() === v.toLowerCase());
+        if (match) next[v] = match.vineyard_name;
       }
       return next;
     });
@@ -398,7 +398,7 @@ function Step1({ onFile, parcelLabels }) {
           <ul style={{ margin: '8px 0 0 16px', padding: 0 }}>
             {parcelLabels.map(p => (
               <li key={p.id}>
-                <strong>{p.parcel_label || '(unlabeled)'}</strong> — {p.vineyard_name}
+                <strong>{p.vineyard_name || '(unnamed)'}</strong>
                 {p.block_count > 0 ? ` (${p.block_count} blocks)` : ''}
               </li>
             ))}
@@ -482,8 +482,8 @@ function Step2({
                         <option value="">— Unmapped (will error) —</option>
                         <option value="__skip__">⊘ Skip rows with this value</option>
                         {parcels.map(p => (
-                          <option key={p.id} value={p.parcel_label || ''}>
-                            {p.parcel_label || '(unlabeled)'} — {p.vineyard_name}
+                          <option key={p.id} value={p.vineyard_name || ''}>
+                            {p.vineyard_name || '(unnamed)'}
                             {p.block_count > 0 ? ` · ${p.block_count} blocks` : ''}
                           </option>
                         ))}
@@ -562,7 +562,7 @@ function Step3({
             <tbody>
               {per_parcel.map(p => (
                 <tr key={p.parcel_id}>
-                  <td style={tableTd}>{p.parcel_label || `#${p.parcel_id}`}</td>
+                  <td style={tableTd}>{p.vineyard_name || `#${p.parcel_id}`}</td>
                   <td style={tableTd}>{p.updated}</td>
                   <td style={tableTd}>{p.inserted}</td>
                 </tr>
@@ -627,11 +627,11 @@ function Step3({
                           onChange={(ev) => onRowOverrideChange(e.row, ev.target.value)}
                           style={{ padding: '4px 6px', fontSize: 'var(--type-mono-size)', minWidth: 280 }}
                         >
-                          <option value="">— Pick a parcel —</option>
+                          <option value="">— Pick a vineyard —</option>
                           <option value="__skip__">⊘ Skip this row</option>
                           {parcels.map(p => (
-                            <option key={p.id} value={p.parcel_label || ''}>
-                              {p.parcel_label || '(unlabeled)'} — {p.vineyard_name}
+                            <option key={p.id} value={p.vineyard_name || ''}>
+                              {p.vineyard_name || '(unnamed)'}
                             </option>
                           ))}
                         </select>

@@ -475,14 +475,14 @@ router.post('/requests/:id/approve', async (req, res) => {
             if (geomBlocks.length === 1) {
               await client.query(
                 `UPDATE vineyard_blocks
-                 SET geometry = ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)
+                 SET geometry = ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326))
                  WHERE id = $2`,
                 [JSON.stringify(opItem.geometry), geomBlocks[0].id]
               );
             } else {
               await client.query(
                 `UPDATE vineyards
-                 SET geometry = ST_SetSRID(ST_GeomFromGeoJSON($1), 4326),
+                 SET geometry = ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)),
                      acres = ROUND((ST_Area(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)::geography) / 4046.856422)::numeric, 3)
                  WHERE id = $2`,
                 [JSON.stringify(opItem.geometry), pid]
@@ -561,7 +561,7 @@ router.post('/requests/:id/approve', async (req, res) => {
                   ava_name, nested_ava, nested_nested_ava,
                   varietals_list, source_dataset)
                VALUES ($1,
-                 ST_SetSRID(ST_GeomFromGeoJSON($2), 4326),
+                 ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($2), 4326)),
                  ROUND((ST_Area(ST_SetSRID(ST_GeomFromGeoJSON($2), 4326)::geography) / 4046.856422)::numeric, 3),
                  $3,$4,$5,$6,$7,$8,$9)
                RETURNING id`,
@@ -574,7 +574,7 @@ router.post('/requests/:id/approve', async (req, res) => {
             // footprint invariant (footprint = union of blocks) holds.
             await client.query(
               `INSERT INTO vineyard_blocks (vineyard_id, vineyard_name, geometry, source_dataset)
-               VALUES ($1, $2, ST_SetSRID(ST_GeomFromGeoJSON($3), 4326), 'admin')`,
+               VALUES ($1, $2, ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($3), 4326)), 'admin')`,
               [newParcel[0].id, sanitized.vineyard_name, JSON.stringify(opItem.geometry)]
             );
             await client.query(
@@ -1879,17 +1879,21 @@ router.post('/blocks/:blockId/split-geometry', async (req, res) => {
     }
     const parent = parentRows[0];
 
-    // Validate block is a single Polygon (not MultiPolygon / NULL)
+    // Validate block is a single polygon. geometry is strictly typed
+    // MultiPolygon (migration 019), so ST_GeometryType is always
+    // 'ST_MultiPolygon' here regardless of ring count — check
+    // ST_NumGeometries instead to detect a true multi-polygon block.
     const { rows: typeRows } = await client.query(
-      `SELECT ST_GeometryType(geometry) AS gtype FROM vineyard_blocks WHERE id = $1`,
+      `SELECT geometry IS NULL AS is_null, ST_NumGeometries(geometry) AS n
+       FROM vineyard_blocks WHERE id = $1`,
       [blockId]
     );
-    if (typeRows[0]?.gtype !== 'ST_Polygon') {
+    if (typeRows[0]?.is_null || Number(typeRows[0]?.n) !== 1) {
       await client.query('ROLLBACK');
       return res.status(422).json({
-        error: typeRows[0]?.gtype === 'ST_MultiPolygon'
-          ? 'This block contains multiple polygons (MultiPolygon). Split it into separate blocks first.'
-          : 'This block has no editable polygon geometry.',
+        error: typeRows[0]?.is_null
+          ? 'This block has no editable polygon geometry.'
+          : 'This block contains multiple polygons (MultiPolygon). Split it into separate blocks first.',
       });
     }
 
@@ -1929,7 +1933,7 @@ router.post('/blocks/:blockId/split-geometry', async (req, res) => {
     // trg_block_acres recomputes acres; footprint union is unchanged.
     await client.query(
       `UPDATE vineyard_blocks
-       SET geometry = ST_SetSRID(ST_GeomFromGeoJSON($1), 4326),
+       SET geometry = ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)),
            block_name = COALESCE($2, block_name)
        WHERE id = $3`,
       [JSON.stringify(pieceA.geometry), labelA, blockId]
@@ -1939,7 +1943,7 @@ router.post('/blocks/:blockId/split-geometry', async (req, res) => {
       `INSERT INTO vineyard_blocks
          (vineyard_id, vineyard_name, block_name, variety, clone, rootstock,
           spacing, year_planted, source_dataset, geometry)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, ST_SetSRID(ST_GeomFromGeoJSON($10), 4326))
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($10), 4326)))
        RETURNING id`,
       [parent.vineyard_id, parent.vineyard_name, labelB,
        parent.variety, parent.clone, parent.rootstock,

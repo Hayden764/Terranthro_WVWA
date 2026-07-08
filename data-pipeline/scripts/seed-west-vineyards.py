@@ -179,7 +179,7 @@ def insert(conn, all_parcels, all_blocks):
             VALUES (%s, %s, %s, %s,
               ROUND((ST_Area(ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326))::geography)
                      / 4046.856422)::numeric, 3),
-              ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326)))
+              ST_Multi(ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326))))
             RETURNING id
             """,
             (SOURCE_DATASET, p["vineyard_name"], p["vineyard_org"],
@@ -193,7 +193,7 @@ def insert(conn, all_parcels, all_blocks):
                 """
                 INSERT INTO vineyard_blocks
                   (vineyard_id, vineyard_name, block_name, geometry, source_dataset)
-                VALUES (%s, %s, %s, ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326)), %s)
+                VALUES (%s, %s, %s, ST_Multi(ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326))), %s)
                 """,
                 (parcel_id, p["vineyard_name"], b["block_name"], b["geom"], SOURCE_DATASET),
             )

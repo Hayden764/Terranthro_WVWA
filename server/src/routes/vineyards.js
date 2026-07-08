@@ -298,7 +298,7 @@ router.patch('/parcels/:id/geometry', async (req, res) => {
   try {
     const { rowCount, rows } = await pool.query(
       `UPDATE vineyards
-       SET geometry = ST_SetSRID(ST_GeomFromGeoJSON($1::text), 4326),
+       SET geometry = ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($1::text), 4326)),
            acres = ROUND((ST_Area(ST_SetSRID(ST_GeomFromGeoJSON($1::text), 4326)::geography) / 4046.856422)::numeric, 3)
        WHERE id = $2
        RETURNING acres`,

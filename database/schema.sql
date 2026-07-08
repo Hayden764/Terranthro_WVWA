@@ -170,6 +170,9 @@ CREATE INDEX idx_wineries_category ON wineries(category);
 -- vineyard's blocks, maintained automatically by trg_vineyard_footprint
 -- (see migration 018) whenever a block's geometry or vineyard_id changes.
 -- Edit polygons at the BLOCK level (QGIS or the app); footprints follow.
+-- geometry is strictly typed MultiPolygon (migration 019) — QGIS reports a
+-- mixed Polygon/MultiPolygon untyped column as "MultiSurface" and writes
+-- edits back as such, which the geography-cast acres trigger rejects.
 -- source_dataset: 'adelsheim' | 'chehalem-dundee' | 'yamhill-carlton' |
 --                 'wvwa-ml-2025' | 'admin'
 -- winery_id is NULL for vineyards not linked to a winery record.
@@ -187,7 +190,7 @@ CREATE TABLE vineyards (
     varietals_list     TEXT,
     z1_vineyard_id     INTEGER,
     ava_id             INTEGER REFERENCES avas(id) ON DELETE SET NULL,
-    geometry           GEOMETRY(Geometry, 4326) NOT NULL,
+    geometry           GEOMETRY(MultiPolygon, 4326) NOT NULL,
     created_at         TIMESTAMP DEFAULT NOW()
 );
 
@@ -223,7 +226,8 @@ CREATE TABLE vineyard_blocks (
     acres               NUMERIC(10, 3),
     year_planted        INTEGER,
     source_dataset      VARCHAR(30),
-    -- geometry + notes + fruit_sold_to added by migrations 010/011/017
+    -- geometry (MultiPolygon, migrations 011/019) + notes + fruit_sold_to
+    -- added by migrations 010/011/017
     created_at          TIMESTAMP DEFAULT NOW()
 );
 

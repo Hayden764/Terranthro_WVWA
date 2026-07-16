@@ -60,7 +60,7 @@ export const WV_SUB_AVAS = [
   { slug: 'dundee-hills',             name: 'Dundee Hills',             file: '/data/dundee_hills.geojson',             color: TOKENS.amber },
   { slug: 'eola-amity-hills',         name: 'Eola-Amity Hills',         file: '/data/eola_amity_hills.geojson',         color: TOKENS.amber },
   { slug: 'lower-long-tom',           name: 'Lower Long Tom',           file: '/data/lower_long_tom.geojson',           color: TOKENS.amber },
-  { slug: 'mcminnville',              name: 'McMinneville',              file: '/data/mcminnville.geojson',              color: TOKENS.amber },
+  { slug: 'mcminnville',              name: 'McMinnville',               file: '/data/mcminnville.geojson',              color: TOKENS.amber },
   { slug: 'mount-pisgah-polk-county', name: 'Mount Pisgah/Polk County', file: '/data/mount_pisgah_polk_county.geojson', color: TOKENS.amber },
   { slug: 'tualatin-hills',           name: 'Tualatin Hills',           file: '/data/tualatin_hills.geojson',           color: TOKENS.amber },
   { slug: 'van-duzer-corridor',       name: 'Van Duzer Corridor',       file: '/data/van_duzer_corridor.geojson',       color: TOKENS.amber },

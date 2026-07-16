@@ -17,6 +17,94 @@ function parseBbox(bboxStr) {
 }
 
 /**
+ * GET /api/vineyards/tiles/:z/:x/:y
+ *
+ * Dynamic Mapbox Vector Tiles for the vineyard reference layer, generated live
+ * from PostGIS via ST_AsMVT. One feature per vineyard *block*, with the
+ * vineyard-level attributes (name, owner, membership, color) baked onto every
+ * block — mirroring the attribute set the old static pmtiles carried, so the
+ * map's paint/filter expressions work unchanged.
+ *
+ * The MVT feature id is set to `vineyard_id` so MapLibre feature-state
+ * (matched / hover) applies to every block of a vineyard at once.
+ *
+ * Because tiles come straight from the DB, edits (QGIS, portal, admin) appear
+ * on the live map on the next tile fetch — no regeneration/upload step.
+ */
+router.get('/tiles/:z/:x/:y', async (req, res) => {
+  const z = Number.parseInt(req.params.z, 10);
+  const x = Number.parseInt(req.params.x, 10);
+  const y = Number.parseInt(req.params.y, 10);
+
+  if (![z, x, y].every(Number.isInteger) || z < 0 || z > 22) {
+    return res.status(400).json({ error: 'Invalid tile coordinates' });
+  }
+  const dim = 2 ** z;
+  if (x < 0 || y < 0 || x >= dim || y >= dim) {
+    return res.status(400).json({ error: 'Tile coordinates out of range' });
+  }
+
+  try {
+    // vineyard_blocks.geometry is stored in EPSG:4326; ST_TileEnvelope returns
+    // EPSG:3857, so we transform geometry into 3857 for ST_AsMVTGeom and filter
+    // with the index-friendly && against the tile envelope reprojected to 4326.
+    const { rows } = await pool.query(
+      `WITH bounds AS (
+         SELECT ST_TileEnvelope($1, $2, $3) AS env3857,
+                ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS env4326
+       ),
+       features AS (
+         SELECT
+           ST_AsMVTGeom(ST_Transform(b.geometry, 3857), bounds.env3857, 4096, 64, true) AS geom,
+           b.vineyard_id,
+           b.id AS block_id,
+           b.block_name,
+           b.acres,
+           v.winery_id,
+           v.vineyard_name,
+           v.vineyard_org,
+           v.nested_ava,
+           v.nested_nested_ava,
+           v.varietals_list,
+           v.acres AS vineyard_acres,
+           w.recid AS winery_recid,
+           w.title AS winery_title,
+           (v.winery_id IS NOT NULL AND COALESCE(w.is_wvwa_member, false)) AS is_member,
+           COALESCE(vc.color_index, -1) AS color_index
+         FROM vineyard_blocks b
+         JOIN vineyards v ON v.id = b.vineyard_id
+         LEFT JOIN wineries w ON v.winery_id = w.id
+         LEFT JOIN vineyard_colors vc
+           ON vc.vineyard_key = LOWER(TRIM(v.vineyard_name))
+           AND v.winery_id IS NOT NULL
+           AND COALESCE(w.is_wvwa_member, false) = true
+         CROSS JOIN bounds
+         WHERE b.geometry IS NOT NULL
+           AND b.geometry && bounds.env4326
+       )
+       SELECT ST_AsMVT(features, 'vineyard_blocks', 4096, 'geom', 'vineyard_id') AS tile
+       FROM features
+       WHERE geom IS NOT NULL`,
+      [z, x, y]
+    );
+
+    const tile = rows[0]?.tile;
+    res.setHeader('Content-Type', 'application/vnd.mapbox-vector-tile');
+    // Short TTL keeps the map effectively live while still letting the CDN/edge
+    // absorb repeated pans. Edits show up within a minute.
+    res.setHeader('Cache-Control', 'public, max-age=60');
+
+    if (!tile || tile.length === 0) {
+      return res.status(204).end();
+    }
+    return res.send(tile);
+  } catch (err) {
+    console.error('GET /api/vineyards/tiles error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
  * GET /api/vineyards/parcels
  *
  * Returns vineyard footprint polygons (one feature per vineyard entity) as a

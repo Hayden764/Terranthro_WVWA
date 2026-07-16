@@ -1,7 +1,31 @@
 import express from 'express';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { pool } from '../db/pool.js';
 
 const router = express.Router();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// AVA boundary polygons the map renders live as static files at the repo root.
+const AVA_DATA_DIR = path.resolve(__dirname, '../../../public/data');
+
+/**
+ * Pulls every geometry out of a GeoJSON boundary file (Feature,
+ * FeatureCollection, or bare geometry) as an array of geometry JSON strings.
+ */
+function extractGeometryStrings(geojson) {
+  const out = [];
+  const push = (geom) => { if (geom && geom.type) out.push(JSON.stringify(geom)); };
+  if (geojson?.type === 'FeatureCollection') {
+    for (const f of geojson.features || []) push(f?.geometry);
+  } else if (geojson?.type === 'Feature') {
+    push(geojson.geometry);
+  } else {
+    push(geojson);
+  }
+  return out;
+}
 
 /**
  * GET /api/avas/state/:stateAbbrev
@@ -251,6 +275,78 @@ router.get('/:slug/parents', async (req, res) => {
     res.json({ slug, parents: rows });
   } catch (err) {
     console.error('GET /api/avas/:slug/parents error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/avas/:slug/members
+ *
+ * Returns the recids of WVWA member wineries that own at least one vineyard
+ * whose representative interior point falls inside this AVA boundary.
+ *
+ * This is the vineyard-ownership complement to the frontend's client-side
+ * tasting-room point-in-polygon filter: a member who farms a vineyard inside
+ * the AVA but whose tasting room sits elsewhere still belongs in the AVA's
+ * directory. The frontend unions these recids with the point-inside set.
+ *
+ * The AVA boundary is read from the same static GeoJSON the map renders
+ * (public/data/<slug>.geojson, slug hyphens → underscores) rather than the DB
+ * `avas` table, keeping the membership boundary identical to what's on screen.
+ *
+ * Interior-point rule (ST_PointOnSurface + ST_Contains) mirrors the
+ * export-ava-vineyards.py classification convention, so a vineyard lists in
+ * exactly one AVA per hierarchy level. Because a child AVA's polygon nests
+ * inside its parent's, sub-AVA vineyard owners roll up into parent AVAs
+ * automatically.
+ */
+router.get('/:slug/members', async (req, res) => {
+  const { slug } = req.params;
+
+  // Guard against path traversal — slugs are lowercase kebab-case only.
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    return res.status(400).json({ error: 'Invalid AVA slug' });
+  }
+
+  const filePath = path.join(AVA_DATA_DIR, `${slug.replace(/-/g, '_')}.geojson`);
+
+  try {
+    let geojson;
+    try {
+      geojson = JSON.parse(await readFile(filePath, 'utf8'));
+    } catch (fileErr) {
+      if (fileErr.code === 'ENOENT') {
+        return res.status(404).json({ error: `No boundary file for AVA: ${slug}` });
+      }
+      throw fileErr;
+    }
+
+    const geometries = extractGeometryStrings(geojson);
+    if (geometries.length === 0) {
+      return res.json({ slug, recids: [] });
+    }
+
+    const { rows } = await pool.query(
+      `
+      WITH ava AS (
+        SELECT ST_Union(ST_SetSRID(ST_GeomFromGeoJSON(g), 4326)) AS g
+        FROM unnest($1::text[]) AS t(g)
+      )
+      SELECT DISTINCT w.recid
+      FROM vineyards v
+      JOIN wineries w ON w.id = v.winery_id
+      CROSS JOIN ava
+      WHERE w.is_wvwa_member
+        AND v.geometry && ava.g
+        AND ST_Contains(ava.g, ST_PointOnSurface(v.geometry))
+      ORDER BY w.recid
+      `,
+      [geometries]
+    );
+
+    res.json({ slug, recids: rows.map((r) => r.recid) });
+  } catch (err) {
+    console.error('GET /api/avas/:slug/members error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

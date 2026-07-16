@@ -30,10 +30,11 @@ const API_HEADERS = import.meta.env.VITE_INTERNAL_API_KEY
   ? { 'x-api-key': import.meta.env.VITE_INTERNAL_API_KEY }
   : {};
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
-// PMTiles URL for the vineyard reference layer.
-// In production: set VITE_PMTILES_URL to your R2/CDN URL.
-// In local dev: leave unset to fall back to GeoJSON from the API.
-const PMTILES_URL = import.meta.env.VITE_PMTILES_URL || null;
+// Vineyard reference layer is served as live Mapbox Vector Tiles straight from
+// PostGIS (ST_AsMVT) — so DB edits appear on the map with no tile regeneration.
+// Same endpoint in dev and prod; the API key (if any) is injected via the map's
+// transformRequest below.
+const VINEYARD_TILES_URL = `${API_BASE}/api/vineyards/tiles/{z}/{x}/{y}`;
 const FALLBACK_STYLE = {
   version: 8,
   sources: {
@@ -791,7 +792,7 @@ function setVineyardMatchedFeatureStates(map, matchedIds, prevMatchedIds) {
   const sourceId = 'vineyards-reference';
   if (!map.getSource(sourceId)) return prevMatchedIds;
 
-  const sourceLayer = PMTILES_URL ? 'vineyard_blocks' : undefined;
+  const sourceLayer = 'vineyard_blocks';
   const newSet = new Set(matchedIds || []);
 
   // Clear feature-state for ids that were matched before but aren't now
@@ -2231,6 +2232,14 @@ const WVWAMap = forwardRef(function WVWAMap({
       minPitch: 0,
       maxPitch: 85,
       projection: { type: 'globe' },
+      // Attach the internal API key to our own vector-tile requests (the tile
+      // endpoint sits behind requireApiKey; MapLibre can't set headers per
+      // source, so we do it here). External tiles (basemap, terrain) untouched.
+      transformRequest: (url) => (
+        API_HEADERS['x-api-key'] && url.includes('/api/vineyards/tiles/')
+          ? { url, headers: { ...API_HEADERS } }
+          : { url }
+      ),
     });
 
     // Compass is rendered by the custom MapControls component
@@ -2484,65 +2493,42 @@ const WVWAMap = forwardRef(function WVWAMap({
         }
 
         // White reference polygons — all three datasets.
-        // Production: PMTiles vector tiles via VITE_PMTILES_URL (set in Vercel).
-        // Local dev: GeoJSON from the API (no file needed).
+        // Served as live vector tiles from PostGIS (ST_AsMVT), so DB edits show
+        // up on the map with no regeneration/upload. Same source in dev + prod.
+        // Tiles carry one feature per BLOCK; the vineyard_id feature id makes
+        // every block of a vineyard share one id, so feature-state
+        // (matched/hover) applies to the whole vineyard.
         ensureVineyardHatchPattern(map);
-        if (PMTILES_URL) {
-          // Tiles carry one feature per BLOCK; promoting vineyard_id to the
-          // feature id makes every block of a vineyard share one id, so
-          // feature-state (matched/hover) applies to the whole vineyard.
-          map.addSource('vineyards-reference', {
-            type: 'vector',
-            url: PMTILES_URL,
-            promoteId: 'vineyard_id',
-          });
-          map.addLayer({
-            id: 'vineyards-reference-fill',
-            type: 'fill',
-            source: 'vineyards-reference',
-            'source-layer': 'vineyard_blocks',
-            paint: { 'fill-color': buildVineyardFillColorExpression(), 'fill-opacity': 0.82 },
-          });
-          // No resting borders: vineyards read as solid color shapes. Adjacent
-          // members always differ in hue (graph coloring), so hue alone separates
-          // them; grey/white classes intentionally merge where they touch.
-          // Near-transparent hit-target for non-member hover (kept from the old
-          // "passive" style; the visible grey now comes from the fill expression).
-          map.addLayer({
-            id: 'vineyards-reference-passive-fill',
-            type: 'fill',
-            source: 'vineyards-reference',
-            'source-layer': 'vineyard_blocks',
-            paint: { 'fill-color': '#000000', 'fill-opacity': 0.01 },
-          });
-        } else {
-          // GeoJSON fallback: fetch all parcels from the API
-          const refRes = await fetch(`${API_BASE}/api/vineyards/parcels`, { headers: API_HEADERS });
-          const refGeoJSON = refRes.ok ? await refRes.json() : { type: 'FeatureCollection', features: [] };
-
-          map.addSource('vineyards-reference', {
-            type: 'geojson',
-            data: refGeoJSON,
-            promoteId: 'id',
-          });
-          map.addLayer({
-            id: 'vineyards-reference-fill',
-            type: 'fill',
-            source: 'vineyards-reference',
-            paint: { 'fill-color': buildVineyardFillColorExpression(), 'fill-opacity': 0.82 },
-          });
-          // No resting borders: vineyards read as solid color shapes. Adjacent
-          // members always differ in hue (graph coloring), so hue alone separates
-          // them; grey/white classes intentionally merge where they touch.
-          // Near-transparent hit-target for non-member hover (kept from the old
-          // "passive" style; the visible grey now comes from the fill expression).
-          map.addLayer({
-            id: 'vineyards-reference-passive-fill',
-            type: 'fill',
-            source: 'vineyards-reference',
-            paint: { 'fill-color': '#000000', 'fill-opacity': 0.01 },
-          });
-        }
+        map.addSource('vineyards-reference', {
+          type: 'vector',
+          tiles: [VINEYARD_TILES_URL],
+          minzoom: 8,
+          maxzoom: 14,
+          // No promoteId: ST_AsMVT already stamps each feature's id with
+          // vineyard_id (its feature_id_name), so every block of a vineyard
+          // shares one id and feature-state (matched/hover) covers the whole
+          // vineyard. Adding promoteId here would look for a now-consumed
+          // `vineyard_id` property and blank out the id instead.
+        });
+        map.addLayer({
+          id: 'vineyards-reference-fill',
+          type: 'fill',
+          source: 'vineyards-reference',
+          'source-layer': 'vineyard_blocks',
+          paint: { 'fill-color': buildVineyardFillColorExpression(), 'fill-opacity': 0.82 },
+        });
+        // No resting borders: vineyards read as solid color shapes. Adjacent
+        // members always differ in hue (graph coloring), so hue alone separates
+        // them; grey/white classes intentionally merge where they touch.
+        // Near-transparent hit-target for non-member hover (kept from the old
+        // "passive" style; the visible grey now comes from the fill expression).
+        map.addLayer({
+          id: 'vineyards-reference-passive-fill',
+          type: 'fill',
+          source: 'vineyards-reference',
+          'source-layer': 'vineyard_blocks',
+          paint: { 'fill-color': '#000000', 'fill-opacity': 0.01 },
+        });
 
         // Linked Adelsheim polygons rendered in green above the white base.
         // Loaded from API (replaces the nested vineyard_polygons in the public GeoJSON).
@@ -2582,9 +2568,8 @@ const WVWAMap = forwardRef(function WVWAMap({
         // ── Filter-match overlay ────────────────────────────────────────────
         // Highlights vineyard parcels whose feature-state `matched` is true
         // (set by setVineyardMatchedFeatureStates when the user applies filters).
-        // Sourced from the same vineyards-reference source so it works for
-        // both PMTiles vector and GeoJSON fallback.
-        const matchedSourceLayer = PMTILES_URL ? { 'source-layer': 'vineyard_blocks' } : {};
+        // Sourced from the same vineyards-reference vector-tile source.
+        const matchedSourceLayer = { 'source-layer': 'vineyard_blocks' };
         map.addLayer({
           id: 'vineyards-matched-fill',
           type: 'fill',
@@ -3117,15 +3102,36 @@ const WVWAMap = forwardRef(function WVWAMap({
         };
         const pointInPolygon = (lng, lat) => rings.some(ring => pointInRing(lng, lat, ring));
 
-        // Build list of IDs inside the AVA
-        const insideIds = listingsRef.current
+        // Members whose TASTING ROOM point falls inside the AVA (client-side).
+        const pointIds = listingsRef.current
           .filter(l => pointInPolygon(l.lng, l.lat))
           .map(l => l.id);
-        insideIdsRef.current = insideIds;
-        setInsideIds(insideIds);
-        // Update source data so clusters re-compute with only the AVA's points
-        const src = map.getSource('listings');
-        if (src) src.setData(buildListingsGeoJSON(listingsRef.current, listingFilterModeRef.current, vineyardRecidSetRef.current, insideIds));
+
+        // Apply an insideIds set to both the map source and the panel state.
+        const applyInsideIds = (ids) => {
+          insideIdsRef.current = ids;
+          setInsideIds(ids);
+          const src = map.getSource('listings');
+          if (src) src.setData(buildListingsGeoJSON(listingsRef.current, listingFilterModeRef.current, vineyardRecidSetRef.current, ids));
+        };
+
+        // Show the point-inside set immediately, then union in the server's
+        // vineyard-owner set (members who farm a vineyard inside the AVA but
+        // whose tasting room sits elsewhere) once it arrives.
+        const memberSlug = selectedAva;
+        applyInsideIds(pointIds);
+        fetch(`${API_BASE}/api/avas/${memberSlug}/members`, { headers: API_HEADERS })
+          .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+          .then(data => {
+            // Ignore a stale response if the selection changed while fetching.
+            if (selectedAvaRef.current !== memberSlug) return;
+            const recids = Array.isArray(data?.recids) ? data.recids : [];
+            applyInsideIds(Array.from(new Set([...pointIds, ...recids])));
+          })
+          .catch(err => {
+            // Fall back to the point-inside set (current behavior) on error.
+            console.warn(`AVA members fetch failed for ${memberSlug}:`, err);
+          });
       }
 
       // ── Fly to selected AVA — use curated camera from avaCameraConfig ──

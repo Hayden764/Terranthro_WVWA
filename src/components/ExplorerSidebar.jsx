@@ -118,6 +118,9 @@ function SectionHeader({ label, open, onToggle, count }) {
 }
 
 // ── AVA detail view ───────────────────────────────────────────────────────
+// `acres` = official TTB AVA size (total land area). "Mapped Vineyard Acres" —
+// the sum of digitized block polygons inside each AVA — is NOT stored here; it's
+// fetched live from GET /api/avas/acres so it stays current as blocks are edited.
 const AVA_META = {
   'chehalem-mountains':  { acres: '~68,000', established: 1983, highlights: 'Diverse soils including Jory, Laurelwood forest, and Willakenzie. Three nested AVAs.' },
   'dundee-hills':        { acres: '~6,490',  established: 1983, highlights: 'Famous red Jory soil, premier Pinot Noir. Notable south/southwest exposures, 200–1,000 ft elevation.' },
@@ -132,7 +135,12 @@ const AVA_META = {
   'yamhill-carlton':     { acres: '~60,000', established: 2005, highlights: 'Ancient marine sediment soils. Warm days, cool nights. Exceptional Pinot Noir structure.' },
 };
 
-function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, onListingClick, onListingHover }) {
+// Formatters for the live mapped-acres figures from GET /api/avas/acres.
+const fmtAcres = (n) => (Number.isFinite(n) ? Math.round(n).toLocaleString() : null);          // 2887.07 → "2,887"
+const fmtAcresApprox = (n) => (Number.isFinite(n) ? `${(Math.floor(n / 100) * 100).toLocaleString()}+` : null); // 16622 → "16,600+"
+const fmtAcresCompact = (n) => (Number.isFinite(n) ? `${(n / 1000).toFixed(1)}k+` : null);      // 16622 → "16.6k+"
+
+function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, mappedAcres, onListingClick, onListingHover }) {
   const meta = AVA_META[ava.slug] || {};
   const inside = insideIds
     ? listings.filter(l => l.category === 'winery' && insideIds.includes(l.id))
@@ -168,6 +176,7 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, onL
           <TerroirDataChips chips={[
             { label: 'Established', value: meta.established ? String(meta.established) : '—', tone: 'amber', glow: false },
             { label: 'Acres', value: meta.acres || '—', tone: 'parchment', glow: false },
+            { label: 'Mapped Vineyard Acres', value: fmtAcres(mappedAcres) || '—', tone: 'parchment', glow: false },
             { label: 'Members', value: String(inside.length), tone: 'green', glow: true },
             { label: 'Mapped', value: String(withPolygons.length), tone: 'blue', glow: true },
           ]} />
@@ -1199,11 +1208,12 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
 }
 
 // ── About section ─────────────────────────────────────────────────────────
-function AboutSection() {
+function AboutSection({ totalAcres }) {
+  const acresPhrase = fmtAcresApprox(totalAcres) || '16,000+';
   return (
     <div style={{ padding: '14px 16px', fontSize: 'var(--type-mono-size)', color: muted, lineHeight: 1.75 }}>
       <p style={{ margin: '0 0 12px' }}>
-        <strong style={{ color: ink }}>Willamette Valley Wine Country</strong> encompasses over 500 wineries and 26,000+ acres of vineyard across eleven American Viticultural Areas in Oregon's Northern Willamette Valley.
+        <strong style={{ color: ink }}>Willamette Valley Wine Country</strong> encompasses over 500 wineries and {acresPhrase} acres of mapped vineyard across eleven American Viticultural Areas in Oregon's Northern Willamette Valley.
       </p>
       <p style={{ margin: '0 0 12px' }}>
         This explorer provides detailed vineyard mapping, topographic analysis, and climate data for each nested AVA.
@@ -1256,6 +1266,18 @@ export default function ExplorerSidebar({
   vineyardFilterResult = null,
 }) {
   const [sections, setSections] = useState({ layers: false, about: false });
+
+  // Live mapped-vineyard-acres per AVA + valley total (GET /api/avas/acres).
+  // Fetched once; feeds the overview tile, the About blurb, and each AVA's
+  // snapshot chip so the numbers track block edits without code changes.
+  const [acresData, setAcresData] = useState(null); // { avas: { slug: acres }, total }
+  useEffect(() => {
+    let cancelled = false;
+    apiJson('/api/avas/acres')
+      .then((d) => { if (!cancelled) setAcresData(d); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // Navigation stack: 'home' | 'ava-list' | 'winery-list' | 'ava-detail' | 'winery-detail' | 'parcel-blocks'
   const [viewStack, setViewStack] = useState(['home']);
@@ -1488,8 +1510,8 @@ export default function ExplorerSidebar({
                   <div style={{ ...T.sectionLabel, marginTop: 3, fontWeight: 600 }}>Mapped</div>
                 </div>
                 <div style={{ background: parchment, borderRadius: 8, padding: '9px 12px', border: `1px solid ${border}` }}>
-                  <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: ink, fontFamily: 'var(--font-display)', lineHeight: 1 }}>26k+</div>
-                  <div style={{ ...T.sectionLabel, marginTop: 3, fontWeight: 600 }}>Vineyard Acres</div>
+                  <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: ink, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{fmtAcresCompact(acresData?.total) || '—'}</div>
+                  <div style={{ ...T.sectionLabel, marginTop: 3, fontWeight: 600 }}>Mapped Vineyard Acres</div>
                 </div>
               </div>
             </div>
@@ -1612,7 +1634,7 @@ export default function ExplorerSidebar({
                 </div>
                 <Chevron open={sections.about} size={13} />
               </button>
-              {sections.about && <AboutSection />}
+              {sections.about && <AboutSection totalAcres={acresData?.total} />}
             </div>
           </div>
 
@@ -1697,6 +1719,7 @@ export default function ExplorerSidebar({
                 listings={listings}
                 insideIds={insideIds}
                 vineyardRecidSet={vineyardRecidSet}
+                mappedAcres={acresData?.avas?.[detailAva.slug]}
                 onListingClick={handleListingClick}
                 onListingHover={(l) => mapRef.current?.hoverListing(l)}
               />

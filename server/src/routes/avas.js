@@ -112,6 +112,98 @@ router.get('/state/:stateAbbrev', async (req, res) => {
   }
 });
 
+// Willamette Valley sub-AVAs (matches the frontend WV_SUB_AVAS list + AVA_META).
+// 'willamette-valley' is included to get the de-duplicated valley-wide total
+// (its polygon nests every sub-AVA, so summing per sub-AVA would double count).
+const WV_AVA_SLUGS = [
+  'chehalem-mountains', 'dundee-hills', 'eola-amity-hills', 'laurelwood-district',
+  'lower-long-tom', 'mcminnville', 'mount-pisgah-polk-county', 'ribbon-ridge',
+  'tualatin-hills', 'van-duzer-corridor', 'yamhill-carlton', 'willamette-valley',
+];
+
+// Recomputing the spatial sums reads 12 boundary files and unions them against
+// every block on each hit, so cache the result briefly. Block geometry changes
+// rarely (admin edits); a short TTL keeps the number effectively live.
+const ACRES_CACHE_TTL_MS = 5 * 60 * 1000;
+let acresCache = null; // { at: number, payload: { avas: {...}, total: number } }
+
+/**
+ * GET /api/avas/acres
+ *
+ * Live "mapped vineyard acres" per Willamette Valley sub-AVA plus the
+ * de-duplicated valley-wide total, computed from vineyard_blocks.acres.
+ *
+ * A block counts toward an AVA when its representative interior point falls
+ * inside that AVA's boundary — the same rule /members and the export scripts
+ * use — so nested sub-AVAs (Ribbon Ridge, Laurelwood) roll up into their
+ * parents. Boundaries come from the static public/data/*.geojson the map
+ * renders, keeping the acreage consistent with what's on screen.
+ *
+ * Response: { avas: { '<slug>': <acres>, ... }, total: <acres> }
+ * where `total` is the 'willamette-valley' figure (every mapped block, once).
+ */
+router.get('/acres', async (_req, res) => {
+  if (acresCache && Date.now() - acresCache.at < ACRES_CACHE_TTL_MS) {
+    return res.json(acresCache.payload);
+  }
+
+  try {
+    // Flatten every AVA's boundary geometries into parallel (slug, geojson)
+    // arrays; a FeatureCollection contributes multiple rows sharing one slug,
+    // re-unioned per slug in SQL below.
+    const slugs = [];
+    const geoms = [];
+    await Promise.all(
+      WV_AVA_SLUGS.map(async (slug) => {
+        const filePath = path.join(AVA_DATA_DIR, `${slug.replace(/-/g, '_')}.geojson`);
+        try {
+          const geojson = JSON.parse(await readFile(filePath, 'utf8'));
+          for (const g of extractGeometryStrings(geojson)) {
+            slugs.push(slug);
+            geoms.push(g);
+          }
+        } catch (fileErr) {
+          if (fileErr.code !== 'ENOENT') throw fileErr;
+          // Missing boundary file → that AVA simply reports no acreage.
+        }
+      })
+    );
+
+    const { rows } = await pool.query(
+      `
+      WITH parts AS (
+        SELECT slug, ST_SetSRID(ST_GeomFromGeoJSON(g), 4326) AS geom
+        FROM unnest($1::text[], $2::text[]) AS t(slug, g)
+      ),
+      ava AS (
+        SELECT slug, ST_Union(geom) AS g FROM parts GROUP BY slug
+      )
+      SELECT a.slug,
+             COALESCE(SUM(b.acres), 0)::float AS acres
+      FROM ava a
+      LEFT JOIN vineyard_blocks b
+        ON b.geometry IS NOT NULL
+       AND b.geometry && a.g
+       AND ST_Contains(a.g, ST_PointOnSurface(b.geometry))
+      GROUP BY a.slug
+      `,
+      [slugs, geoms]
+    );
+
+    const avas = {};
+    for (const r of rows) avas[r.slug] = r.acres;
+    const total = avas['willamette-valley'] ?? 0;
+    delete avas['willamette-valley'];
+
+    const payload = { avas, total };
+    acresCache = { at: Date.now(), payload };
+    res.json(payload);
+  } catch (err) {
+    console.error('GET /api/avas/acres error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 /**
  * GET /api/avas/:slug
  *

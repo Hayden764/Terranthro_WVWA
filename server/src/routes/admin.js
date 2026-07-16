@@ -570,11 +570,15 @@ router.post('/requests/:id/approve', async (req, res) => {
                sanitized.ava_name, sanitized.nested_ava, sanitized.nested_nested_ava,
                sanitized.varietals_list, sanitized.source_dataset || 'admin']
             );
-            // The new vineyard's polygon also becomes its first block so the
-            // footprint invariant (footprint = union of blocks) holds.
+            // The new vineyard's polygon(s) also become its blocks so the
+            // footprint invariant (footprint = union of blocks) holds. A
+            // multi-part MultiPolygon is exploded into one block per part via
+            // ST_Dump so the block count reflects the true polygon count —
+            // otherwise the whole shape would collapse into a single block.
             await client.query(
               `INSERT INTO vineyard_blocks (vineyard_id, vineyard_name, geometry, source_dataset)
-               VALUES ($1, $2, ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($3), 4326)), 'admin')`,
+               SELECT $1, $2, ST_Multi((d).geom), 'admin'
+               FROM ST_Dump(ST_SetSRID(ST_GeomFromGeoJSON($3), 4326)) d`,
               [newParcel[0].id, sanitized.vineyard_name, JSON.stringify(opItem.geometry)]
             );
             await client.query(

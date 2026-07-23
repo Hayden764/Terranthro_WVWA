@@ -15,7 +15,7 @@
  */
 import express from 'express';
 import { pool } from '../db/pool.js';
-import { bulkApplyBlocks } from '../services/blockBulkApply.js';
+import { applyDataRequest, IMMEDIATE_APPLY_TYPES } from '../services/applyDataRequest.js';
 
 const router = express.Router();
 
@@ -24,10 +24,9 @@ const REQUEST_SCHEMAS = {
   profile: ['description', 'phone', 'url', 'image_url'],
   vineyard_rename: ['vineyard_name'],
   vineyard_varietals: ['varietals_list'],
-  vineyard_blocks: ['block_name', 'variety', 'clone', 'rootstock', 'rows', 'spacing',
+  vineyard_blocks: ['block_name', 'variety', 'clone', 'rootstock', 'trellis', 'rows', 'spacing',
                      'vines_per_acre', 'vines', 'acres', 'year_planted',
                      'block_changes', 'new_blocks'],
-  vineyard_blocks_bulk: ['rows', 'column_map', 'filename'],
   vineyard_claim: ['vineyard_name', 'notes'],
   vineyard_new: ['vineyard_name', 'notes', 'ava_name', 'geometry'],
   geometry_update: ['notes', 'geometry_description', 'old_geometry', 'new_geometry'],
@@ -80,13 +79,22 @@ async function fetchParcelsWithDetails(vineyardIds) {
     pool.query(
       `SELECT
          vb.id, vb.vineyard_id, vb.vineyard_name, vb.block_name,
-         vb.variety, vb.clone, vb.rootstock, vb.rows, vb.spacing,
+         vb.variety, vb.clone, vb.rootstock, vb.trellis, vb.rows, vb.spacing,
          vb.vines_per_acre, vb.vines, vb.acres, vb.year_planted, vb.notes,
          vb.source_dataset,
-         (vb.geometry IS NOT NULL) AS has_geometry
+         (vb.geometry IS NOT NULL) AS has_geometry,
+         ST_AsGeoJSON(vb.geometry)::json AS geometry,
+         bt.elevation_min_ft  AS t_elev_min,
+         bt.elevation_max_ft  AS t_elev_max,
+         bt.elevation_mean_ft AS t_elev_mean,
+         bt.slope_mean_deg    AS t_slope_mean,
+         bt.slope_max_deg     AS t_slope_max,
+         bt.aspect_dominant_deg AS t_aspect_deg,
+         bt.aspect_bucket     AS t_aspect_bucket
        FROM vineyard_blocks vb
+       LEFT JOIN vineyard_block_topo_stats bt ON bt.block_id = vb.id
        WHERE vb.vineyard_id = ANY($1)
-       ORDER BY vb.vineyard_name, vb.block_name`,
+       ORDER BY vb.vineyard_name, vb.id`,
       [vineyardIds]
     ),
     pool.query(
@@ -100,6 +108,21 @@ async function fetchParcelsWithDetails(vineyardIds) {
 
   const blocksByParcel = {};
   for (const b of blocksResult.rows) {
+    // Nest per-block topo stats (from vineyard_block_topo_stats) into `topo`,
+    // then strip the flat t_* columns off the block row.
+    const hasTopo = b.t_elev_mean != null || b.t_slope_mean != null || b.t_aspect_deg != null;
+    b.topo = hasTopo ? {
+      elevation_min_ft: b.t_elev_min,
+      elevation_max_ft: b.t_elev_max,
+      elevation_mean_ft: b.t_elev_mean,
+      slope_mean_deg: b.t_slope_mean,
+      slope_max_deg: b.t_slope_max,
+      aspect_dominant_deg: b.t_aspect_deg,
+      aspect_bucket: b.t_aspect_bucket,
+    } : null;
+    for (const k of ['t_elev_min', 't_elev_max', 't_elev_mean', 't_slope_mean', 't_slope_max', 't_aspect_deg', 't_aspect_bucket']) {
+      delete b[k];
+    }
     if (!blocksByParcel[b.vineyard_id]) blocksByParcel[b.vineyard_id] = [];
     blocksByParcel[b.vineyard_id].push(b);
   }
@@ -397,6 +420,43 @@ router.post('/requests', async (req, res) => {
       }
     }
 
+    // ── Immediate-apply path ──────────────────────────────────────────────
+    // Data-only edits (rename, varietals, block table info, profile) apply
+    // straight to the DB and are logged as an 'auto_applied' record for the
+    // admin notification feed. Geometry / claim / ownership edits still queue
+    // as 'pending' for admin approval.
+    if (IMMEDIATE_APPLY_TYPES.includes(request_type)) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const { rows: reqRows } = await client.query(
+          `INSERT INTO edit_requests
+             (winery_id, account_id, request_type, target_id, payload, origin, status, reviewed_at)
+           VALUES ($1, $2, $3, $4, $5, 'winery', 'auto_applied', NOW())
+           RETURNING id, request_type, status, created_at`,
+          [wineryId, accountId, request_type, target_id || null, JSON.stringify(sanitizedPayload)]
+        );
+        const record = reqRows[0];
+        await applyDataRequest(client, {
+          id: record.id,
+          request_type,
+          target_id: target_id || null,
+          winery_id: wineryId,
+          account_id: accountId,
+          payload: sanitizedPayload,
+        }, { adminId: null });
+        await client.query('COMMIT');
+        return res.status(201).json(record);
+      } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Auto-apply request error:', err);
+        return res.status(500).json({ error: 'Server error' });
+      } finally {
+        client.release();
+      }
+    }
+
+    // ── Approval path (geometry, claim, new parcel, remove) ────────────────
     const { rows } = await pool.query(
       `INSERT INTO edit_requests (winery_id, account_id, request_type, target_id, payload, origin, flag, flag_detail)
        VALUES ($1, $2, $3, $4, $5, 'winery', $6, $7)
@@ -503,39 +563,6 @@ router.get('/vineyards/:id/history', async (req, res) => {
   } catch (err) {
     console.error('Portal history error:', err);
     res.status(500).json({ error: 'Server error' });
-  }
-});
-
-/**
- * POST /api/portal/blocks/bulk-preview
- * Body: { rows, column_map }
- * Runs the importer in dry-run mode (rolled back) so the winery can review
- * the diff before submitting an edit request.
- */
-router.post('/blocks/bulk-preview', async (req, res) => {
-  const { wineryId } = req.portalAccount;
-  const { rows = [], column_map = {} } = req.body || {};
-  if (!Array.isArray(rows) || rows.length === 0) {
-    return res.status(400).json({ error: 'rows must be a non-empty array' });
-  }
-  if (rows.length > 5000) {
-    return res.status(413).json({ error: 'Too many rows (max 5000)' });
-  }
-
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const result = await bulkApplyBlocks({
-      client, wineryId, rows, columnMap: column_map, origin: 'portal',
-    });
-    await client.query('ROLLBACK');
-    res.json({ dry_run: true, ...result });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    console.error('Portal bulk-preview error:', err);
-    res.status(500).json({ error: err.message || 'Server error' });
-  } finally {
-    client.release();
   }
 });
 

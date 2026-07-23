@@ -219,6 +219,7 @@ CREATE TABLE vineyard_blocks (
     variety             VARCHAR(100),
     clone               VARCHAR(100),
     rootstock           VARCHAR(100),
+    trellis             VARCHAR(100),   -- migration 020
     rows                INTEGER,
     spacing             VARCHAR(30),
     vines_per_acre      NUMERIC(10, 2),

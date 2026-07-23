@@ -23,6 +23,7 @@ import bcrypt from 'bcryptjs';
 import { pool } from '../db/pool.js';
 import { signAdminToken, requireAdminAuth, requireSuperadmin } from '../middleware/adminAuth.js';
 import { bulkApplyBlocks } from '../services/blockBulkApply.js';
+import { applyDataRequest } from '../services/applyDataRequest.js';
 import { logAuthEvent } from '../services/authActivity.js';
 
 const router = express.Router();
@@ -208,106 +209,13 @@ router.post('/requests/:id/approve', async (req, res) => {
 
     // Apply the change based on type
     switch (request.request_type) {
-      case 'profile': {
-        const allowedCols = ['description', 'phone', 'url', 'image_url'];
-        const sets = [];
-        const vals = [];
-        for (const col of allowedCols) {
-          if (col in payload) {
-            vals.push(payload[col]);
-            sets.push(`${col} = $${vals.length}`);
-          }
-        }
-        if (sets.length > 0) {
-          vals.push(request.winery_id);
-          // Log old values
-          const { rows: old } = await client.query(
-            `SELECT description, phone, url, image_url FROM wineries WHERE id = $1`,
-            [request.winery_id]
-          );
-          await client.query(
-            `UPDATE wineries SET ${sets.join(', ')} WHERE id = $${vals.length}`,
-            vals
-          );
-          // Audit log
-          for (const col of allowedCols) {
-            if (col in payload && old[0]) {
-              await client.query(
-                `INSERT INTO winery_edit_log
-                   (winery_id, account_id, admin_id, request_id,
-                    table_name, record_id, field_name, old_value, new_value,
-                    entity_type, entity_id)
-                 VALUES ($1, $2, $3, $4, 'wineries', $5, $6, $7, $8, 'winery', $5)`,
-                [request.winery_id, request.account_id, adminId, requestId,
-                 request.winery_id, col, old[0][col], payload[col]]
-              );
-            }
-          }
-        }
+      // Data-only edits share one apply path with the portal's immediate-apply
+      // route (server/src/services/applyDataRequest.js) so the two can't drift.
+      case 'profile':
+      case 'vineyard_varietals':
+      case 'vineyard_rename':
+        await applyDataRequest(client, request, { adminId });
         break;
-      }
-
-      case 'vineyard_varietals': {
-        if (payload.varietals_list != null && request.target_id) {
-          const { rows: old } = await client.query(
-            `SELECT varietals_list FROM vineyards WHERE id = $1`,
-            [request.target_id]
-          );
-          await client.query(
-            `UPDATE vineyards SET varietals_list = $1 WHERE id = $2 AND winery_id = $3`,
-            [payload.varietals_list, request.target_id, request.winery_id]
-          );
-          if (old[0]) {
-            await client.query(
-              `INSERT INTO winery_edit_log
-                 (winery_id, account_id, admin_id, request_id,
-                  table_name, record_id, field_name, old_value, new_value,
-                  entity_type, entity_id)
-               VALUES ($1, $2, $3, $4, 'vineyard_parcels', $5, 'varietals_list', $6, $7,
-                       'vineyard_parcel', $5)`,
-              [request.winery_id, request.account_id, adminId, requestId,
-               request.target_id, old[0].varietals_list, payload.varietals_list]
-            );
-          }
-        }
-        break;
-      }
-
-      case 'vineyard_rename': {
-        const newName = typeof payload.vineyard_name === 'string'
-          ? payload.vineyard_name.trim()
-          : '';
-        if (newName && request.target_id) {
-          // One vineyards row per entity post-018: rename it and keep the
-          // denormalized vineyard_blocks.vineyard_name in sync.
-          const { rows: srcRows } = await client.query(
-            `SELECT vineyard_name FROM vineyards WHERE id = $1 AND winery_id = $2`,
-            [request.target_id, request.winery_id]
-          );
-          if (srcRows[0]) {
-            const oldName = srcRows[0].vineyard_name;
-            await client.query(
-              `UPDATE vineyards SET vineyard_name = $1 WHERE id = $2`,
-              [newName, request.target_id]
-            );
-            await client.query(
-              `UPDATE vineyard_blocks SET vineyard_name = $1 WHERE vineyard_id = $2`,
-              [newName, request.target_id]
-            );
-            await client.query(
-              `INSERT INTO winery_edit_log
-                 (winery_id, account_id, admin_id, request_id,
-                  table_name, record_id, field_name, old_value, new_value,
-                  entity_type, entity_id)
-               VALUES ($1, $2, $3, $4, 'vineyard_parcels', $5, 'vineyard_name', $6, $7,
-                       'vineyard_parcel', $5)`,
-              [request.winery_id, request.account_id, adminId, requestId,
-               request.target_id, oldName, newName]
-            );
-          }
-        }
-        break;
-      }
 
       case 'vineyard_claim': {
         if (request.target_id) {
@@ -329,80 +237,9 @@ router.post('/requests/:id/approve', async (req, res) => {
         break;
       }
 
-      case 'vineyard_blocks': {
-        const blockChanges = Array.isArray(payload.block_changes) ? payload.block_changes : [];
-        const newBlocks    = Array.isArray(payload.new_blocks)    ? payload.new_blocks    : [];
-        const allowedBlockCols = ['block_name', 'variety', 'clone', 'rootstock',
-                                  'rows', 'spacing', 'year_planted', 'notes'];
-
-        // Apply field-level changes to existing blocks
-        for (const change of blockChanges) {
-          if (!change.id || !Array.isArray(change.field_changes)) continue;
-          for (const fc of change.field_changes) {
-            if (!allowedBlockCols.includes(fc.field)) continue;
-            await client.query(
-              `UPDATE vineyard_blocks SET ${fc.field} = $1 WHERE id = $2`,
-              [fc.new ?? null, change.id]
-            );
-            await client.query(
-              `INSERT INTO winery_edit_log
-                 (winery_id, account_id, admin_id, request_id,
-                  table_name, record_id, field_name, old_value, new_value,
-                  entity_type, entity_id)
-               VALUES ($1, $2, $3, $4, 'vineyard_blocks', $5, $6, $7, $8,
-                       'vineyard_block', $5)`,
-              [request.winery_id, request.account_id, adminId, requestId,
-               change.id, fc.field,
-               fc.old != null ? String(fc.old) : null,
-               fc.new != null ? String(fc.new) : null]
-            );
-            // Also log against the parent parcel for easy parcel-level history
-            if (request.target_id) {
-              await client.query(
-                `INSERT INTO winery_edit_log
-                   (winery_id, account_id, admin_id, request_id,
-                    table_name, record_id, field_name, old_value, new_value,
-                    entity_type, entity_id)
-                 VALUES ($1, $2, $3, $4, 'vineyard_blocks', $5, $6, $7, $8,
-                         'vineyard_parcel', $9)`,
-                [request.winery_id, request.account_id, adminId, requestId,
-                 change.id, `block.${fc.field}`,
-                 fc.old != null ? String(fc.old) : null,
-                 fc.new != null ? String(fc.new) : null,
-                 request.target_id]
-              );
-            }
-          }
-        }
-
-        // Insert new blocks
-        for (const nb of newBlocks) {
-          const cols = allowedBlockCols.filter((c) => nb[c] != null);
-          if (cols.length === 0 || !request.target_id) continue;
-          const vals = cols.map((c) => nb[c]);
-          const placeholders = cols.map((_, i) => `$${i + 2}`).join(', ');
-          const { rows: inserted } = await client.query(
-            `INSERT INTO vineyard_blocks (vineyard_id, vineyard_name, ${cols.join(', ')})
-             VALUES ($1, (SELECT vineyard_name FROM vineyards WHERE id = $1), ${placeholders})
-             RETURNING id`,
-            [request.target_id, ...vals]
-          );
-          const newId = inserted[0]?.id;
-          if (newId) {
-            await client.query(
-              `INSERT INTO winery_edit_log
-                 (winery_id, account_id, admin_id, request_id,
-                  table_name, record_id, action,
-                  entity_type, entity_id)
-               VALUES ($1, $2, $3, $4, 'vineyard_blocks', $5, 'insert',
-                       'vineyard_parcel', $6)`,
-              [request.winery_id, request.account_id, adminId, requestId,
-               newId, request.target_id]
-            );
-          }
-        }
+      case 'vineyard_blocks':
+        await applyDataRequest(client, request, { adminId });
         break;
-      }
 
       // vineyard_new: no auto-apply, admin creates the parcel manually.
       case 'vineyard_new':
@@ -662,6 +499,89 @@ router.post('/requests/:id/reject', async (req, res) => {
   } catch (err) {
     console.error('Reject request error:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * POST /api/admin/requests/:id/revert
+ * Body: { admin_notes?: string }
+ *
+ * Undoes an AUTO-APPLIED data change by restoring the old values recorded in
+ * winery_edit_log, then marks the request 'reverted'. Best-effort: if a value
+ * was changed again by a later request, this restores the value logged at the
+ * time of THIS request.
+ */
+router.post('/requests/:id/revert', async (req, res) => {
+  const requestId = parseInt(req.params.id, 10);
+  const { admin_notes } = req.body;
+  const { adminId } = req.adminAccount;
+
+  // Guard rails for the dynamic table/column names below — only our own writers
+  // produce these, but validate before interpolating into SQL regardless.
+  const TABLE_MAP = { vineyard_parcels: 'vineyards', vineyards: 'vineyards', vineyard_blocks: 'vineyard_blocks', wineries: 'wineries' };
+  const ALLOWED_FIELDS = new Set([
+    'description', 'phone', 'url', 'image_url', 'varietals_list', 'vineyard_name',
+    'block_name', 'variety', 'clone', 'rootstock', 'trellis', 'rows', 'spacing', 'vines', 'year_planted', 'notes',
+  ]);
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query(`SELECT * FROM edit_requests WHERE id = $1 FOR UPDATE`, [requestId]);
+    if (rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Request not found' });
+    }
+    const request = rows[0];
+    if (request.status !== 'auto_applied') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: `Only auto-applied changes can be reverted (this one is ${request.status})` });
+    }
+
+    const { rows: logs } = await client.query(
+      `SELECT id, table_name, record_id, field_name, old_value, action
+       FROM winery_edit_log WHERE request_id = $1 ORDER BY id ASC`,
+      [requestId]
+    );
+
+    for (const l of logs) {
+      // Skip the parcel-level duplicate rows of block field changes (field like 'block.variety').
+      if (l.field_name && l.field_name.startsWith('block.')) continue;
+
+      // Undo an inserted row (new block) by deleting it.
+      if (l.action === 'insert') {
+        if (l.table_name === 'vineyard_blocks' && l.record_id) {
+          await client.query(`DELETE FROM vineyard_blocks WHERE id = $1`, [l.record_id]);
+        }
+        continue;
+      }
+
+      // Restore a field's old value.
+      const table = TABLE_MAP[l.table_name];
+      if (!table || !l.field_name || !ALLOWED_FIELDS.has(l.field_name) || !l.record_id) continue;
+      await client.query(`UPDATE ${table} SET ${l.field_name} = $1 WHERE id = $2`, [l.old_value, l.record_id]);
+      // Renames also touch the denormalized block name.
+      if (l.field_name === 'vineyard_name' && table === 'vineyards') {
+        await client.query(`UPDATE vineyard_blocks SET vineyard_name = $1 WHERE vineyard_id = $2`, [l.old_value, l.record_id]);
+      }
+    }
+
+    await client.query(
+      `UPDATE edit_requests
+       SET status = 'reverted', admin_notes = $1, reviewed_by = $2, reviewed_at = NOW()
+       WHERE id = $3`,
+      [admin_notes || 'Reverted by admin', adminId, requestId]
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true, status: 'reverted' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Revert request error:', err);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 });
 
@@ -1512,8 +1432,8 @@ router.post('/vineyards/:parcelId/blocks/apply', async (req, res) => {
   const { adminId } = req.adminAccount;
   const { block_changes = [], new_blocks = [], deleted_block_ids = [] } = req.body;
 
-  const ALLOWED_COLS = ['block_name', 'variety', 'clone', 'rootstock',
-                        'rows', 'spacing', 'year_planted', 'notes'];
+  const ALLOWED_COLS = ['block_name', 'variety', 'clone', 'rootstock', 'trellis',
+                        'rows', 'spacing', 'vines', 'year_planted', 'notes'];
 
   const client = await pool.connect();
   try {

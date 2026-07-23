@@ -185,7 +185,7 @@ export default function AdminDashboard() {
       {tab === 'requests' && (
         <>
           <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-            {['pending', 'approved', 'rejected', 'flagged'].map((s) => (
+            {['pending', 'auto_applied', 'approved', 'rejected', 'flagged'].map((s) => (
               <button
                 key={s}
                 onClick={() => setFilter(s)}
@@ -196,7 +196,7 @@ export default function AdminDashboard() {
                   fontSize: 'var(--type-body-size)', cursor: 'pointer', textTransform: 'capitalize',
                 }}
               >
-                {s === 'flagged' ? '⚑ flagged' : s}
+                {FILTER_LABELS[s] || s}
               </button>
             ))}
           </div>
@@ -377,19 +377,30 @@ function Shell({ children }) {
   );
 }
 
+const FILTER_LABELS = {
+  pending: 'pending',
+  auto_applied: '⚡ auto-applied',
+  approved: 'approved',
+  rejected: 'rejected',
+  flagged: '⚑ flagged',
+};
+
 function StatusBadge({ status }) {
   const colors = {
     pending: { bg: alpha(TOKENS.warning, 0.15), color: TOKENS.warning },
     approved: { bg: alpha(TOKENS.success, 0.15), color: TOKENS.success },
     rejected: { bg: alpha(TOKENS.danger, 0.15), color: TOKENS.danger },
+    auto_applied: { bg: alpha(TOKENS.electricBlue, 0.15), color: TOKENS.electricBlue },
+    reverted: { bg: alpha(TOKENS.muted, 0.18), color: TOKENS.muted },
   };
   const c = colors[status] || colors.pending;
+  const label = status === 'auto_applied' ? 'auto-applied' : status;
   return (
     <span style={{
       padding: '2px 10px', borderRadius: 10, fontSize: 'var(--type-ui-label-size)', fontWeight: 600,
       background: c.bg, color: c.color, textTransform: 'capitalize',
     }}>
-      {status}
+      {label}
     </span>
   );
 }

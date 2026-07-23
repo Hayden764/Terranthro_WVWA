@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import lineSplit from '@turf/line-split';
-import { lineString, polygon as turfPolygon, feature as turfFeature } from '@turf/helpers';
+import { feature as turfFeature } from '@turf/helpers';
 import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '../../styles/tokens';
 import { INPUT_STYLE, btn } from '../../styles/patterns';
 import { apiJson, apiPost } from '../../lib/api';
@@ -16,9 +16,14 @@ export default function PortalVineyardDetail() {
   const [vineyard, setVineyard] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Map ↔ table block selection
+  const [selectedBlockId, setSelectedBlockId] = useState(null);
+
+  // Block table edit toggle (parent-owned; button lives in the Blocks header)
+  const [editingBlocks, setEditingBlocks] = useState(false);
+
   // Edit boundary
   const [editingGeometry, setEditingGeometry] = useState(false);
-  const [editingBlocks, setEditingBlocks] = useState(false);
   const [pendingGeometry, setPendingGeometry] = useState(null); // { geometry, notes }
   const [geoSubmitStatus, setGeoSubmitStatus] = useState(null); // null | 'submitting' | 'success' | 'error'
 
@@ -56,6 +61,23 @@ export default function PortalVineyardDetail() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Stable references for the map (avoids re-mounting on every parent render).
+  const parcelsArg = useMemo(() => (vineyard?.geometry ? [vineyard] : []), [vineyard]);
+  // Give every block a stable display name — its own name, or "Block N" by its
+  // position in the id-ordered list. Computed once here so the map and table
+  // always agree on what a block is called.
+  const blocksWithNames = useMemo(
+    () => (vineyard?.blocks || []).map((b, i) => ({
+      ...b,
+      display_name: (b.block_name && b.block_name.trim()) ? b.block_name.trim() : `Block ${i + 1}`,
+    })),
+    [vineyard]
+  );
+  const blockFeatures = useMemo(() => blocksWithNames.filter((b) => b.geometry), [blocksWithNames]);
+
+  // A geometry confirmation is awaiting review — hide the map toolbar while so.
+  const geometryBusy = Boolean(pendingGeometry || pendingSplit || pendingAdd || removingParcel);
+
   async function submitGeometry() {
     if (!pendingGeometry) return;
     setGeoSubmitStatus('submitting');
@@ -92,13 +114,7 @@ export default function PortalVineyardDetail() {
           notes: '',
         });
       } else {
-        // Line didn't fully cross the parcel — keep raw for admin to handle
-        setPendingSplit({
-          polygon_a: null,
-          polygon_b: null,
-          split_line: lineGeometry,
-          notes: '',
-        });
+        setPendingSplit({ polygon_a: null, polygon_b: null, split_line: lineGeometry, notes: '' });
       }
     } catch {
       setPendingSplit({ polygon_a: null, polygon_b: null, split_line: lineGeometry, notes: '' });
@@ -166,6 +182,7 @@ export default function PortalVineyardDetail() {
       });
       setRenameStatus('success');
       setRenaming(false);
+      load(); // rename applies immediately — refresh to show the new name
     } catch {
       setRenameStatus('error');
     }
@@ -197,58 +214,34 @@ export default function PortalVineyardDetail() {
     return <Shell><p style={{ color: muted }}>Loading…</p></Shell>;
   }
 
-  const elevationMean = vineyard.topo_stats?.elevation_mean_ft != null
-    ? `${Math.round(Number(vineyard.topo_stats.elevation_mean_ft))} ft`
-    : null;
-
-  const gst = vineyard.gst_f ?? vineyard.growing_season_temp_f ?? null;
-  const gstValue = gst != null ? `${Number(gst).toFixed(1)}°F` : null;
-
-  const winkler = vineyard.winkler_index ?? vineyard.gdd ?? null;
-  const winklerValue = winkler != null ? Number(winkler).toLocaleString('en-US') : null;
-
-  const soil = vineyard.soil_series || vineyard.soil_type || vineyard.soil || null;
-
   const ts = vineyard.topo_stats;
   const blockCount = vineyard.blocks?.length ?? 0;
 
   const terroirChips = [
-    // Top-left: Blocks
-    {
-      label: 'Blocks',
-      value: blockCount > 0 ? String(blockCount) : '—',
-      tone: 'amber',
-      glow: false,
-    },
-    // Top-right: Elevation
+    { label: 'Blocks', value: blockCount > 0 ? String(blockCount) : '—', tone: 'amber', glow: false },
     {
       label: 'Elevation',
       value: ts?.elevation_mean_ft != null ? `${Math.round(Number(ts.elevation_mean_ft))} ft` : '—',
       subValue: ts?.elevation_min_ft != null
         ? `${Math.round(Number(ts.elevation_min_ft))}–${Math.round(Number(ts.elevation_max_ft))} ft range`
         : null,
-      tone: 'parchment',
-      glow: false,
+      tone: 'parchment', glow: false,
     },
-    // Bottom-left: Aspect
     {
       label: 'Aspect',
       value: ts?.aspect_dominant_deg != null ? degToCardinal(ts.aspect_dominant_deg) : '—',
       subValue: ts?.aspect_dominant_deg != null
         ? `${Math.round(Number(ts.aspect_dominant_deg))}° dom · ${Math.round(Number(ts.aspect_mean_deg))}° avg`
         : null,
-      tone: 'blue',
-      glow: true,
+      tone: 'blue', glow: true,
     },
-    // Bottom-right: Slope
     {
       label: 'Slope',
       value: ts?.slope_mean_deg != null ? `${Number(ts.slope_mean_deg).toFixed(1)}°` : '—',
       subValue: ts?.slope_p10_deg != null
         ? `${Number(ts.slope_p10_deg).toFixed(1)}–${Number(ts.slope_p90_deg).toFixed(1)}° range`
         : null,
-      tone: 'green',
-      glow: true,
+      tone: 'green', glow: true,
     },
   ];
 
@@ -263,8 +256,11 @@ export default function PortalVineyardDetail() {
           borderRight: `1px solid ${border}`,
         }}>
           <PortalVineyardMap
-            parcels={vineyard.geometry ? [vineyard] : []}
+            parcels={parcelsArg}
+            blocks={blockFeatures}
             highlightId={vineyard.id}
+            selectedBlockId={selectedBlockId}
+            onBlockSelect={setSelectedBlockId}
             height="100%"
             style={{ flex: 1 }}
             editParcelId={editingGeometry ? vineyard.id : null}
@@ -282,7 +278,96 @@ export default function PortalVineyardDetail() {
               setPendingAdd({ geometry, vineyard_name: '', notes: '' });
             }}
             onAddCancel={() => setAddingParcel(false)}
+            onStartEditBoundary={geometryBusy || !vineyard.geometry ? undefined : () => { setEditingGeometry(true); setGeoSubmitStatus(null); }}
+            onStartSplit={geometryBusy || !vineyard.geometry ? undefined : () => { setSplittingParcel(true); setSplitSubmitStatus(null); }}
+            onStartAdd={geometryBusy ? undefined : () => { setAddingParcel(true); setAddSubmitStatus(null); }}
+            onRemove={geometryBusy ? undefined : () => { setRemovingParcel(true); setRemoveSubmitStatus(null); setRemoveNotes(''); }}
           />
+
+          {/* Pending geometry-action confirmations — overlaid on the map */}
+          {(pendingGeometry || pendingSplit || removingParcel || pendingAdd) && (
+            <div style={pendingOverlayStyle}>
+              {pendingGeometry && (
+                <PendingCard
+                  title="⚠ Review boundary change"
+                  body="Your boundary change will be sent to admin for approval. Add an optional note explaining the correction."
+                  notePlaceholder="Optional: describe what changed and why"
+                  noteValue={pendingGeometry.notes}
+                  onNote={(v) => setPendingGeometry((p) => ({ ...p, notes: v }))}
+                  submitLabel="Submit for Review"
+                  submitting={geoSubmitStatus === 'submitting'}
+                  error={geoSubmitStatus === 'error'}
+                  onSubmit={submitGeometry}
+                  onDiscard={() => { setPendingGeometry(null); setGeoSubmitStatus(null); }}
+                />
+              )}
+              {pendingSplit && (
+                <PendingCard
+                  title="✂ Confirm parcel split"
+                  body={pendingSplit.polygon_a
+                    ? 'Two sub-parcels were computed from your split line. Add an optional note for the admin.'
+                    : 'The split line was recorded. Admin will apply the split manually. Add an optional note below.'}
+                  notePlaceholder="Optional: e.g. 'Left half is Pinot Noir, right half is Chardonnay'"
+                  noteValue={pendingSplit.notes}
+                  onNote={(v) => setPendingSplit((p) => ({ ...p, notes: v }))}
+                  submitLabel="Submit Split Request"
+                  submitting={splitSubmitStatus === 'submitting'}
+                  error={splitSubmitStatus === 'error'}
+                  onSubmit={submitSplit}
+                  onDiscard={() => { setPendingSplit(null); setSplitSubmitStatus(null); }}
+                />
+              )}
+              {pendingAdd && (
+                <PendingCard
+                  title="+ Review new parcel"
+                  body="Give your new parcel a name and any notes for the admin."
+                  extraField={(
+                    <input
+                      type="text"
+                      placeholder="Parcel / vineyard name"
+                      value={pendingAdd.vineyard_name}
+                      onChange={(e) => setPendingAdd((p) => ({ ...p, vineyard_name: e.target.value }))}
+                      className="ds-input"
+                      style={{ ...textareaStyle, resize: 'none', marginBottom: 8 }}
+                    />
+                  )}
+                  notePlaceholder="Optional: variety, location notes, etc."
+                  noteValue={pendingAdd.notes}
+                  onNote={(v) => setPendingAdd((p) => ({ ...p, notes: v }))}
+                  submitLabel="Submit for Review"
+                  submitDisabled={!pendingAdd.vineyard_name.trim()}
+                  submitting={addSubmitStatus === 'submitting'}
+                  error={addSubmitStatus === 'error'}
+                  onSubmit={submitAdd}
+                  onDiscard={() => { setPendingAdd(null); setAddSubmitStatus(null); }}
+                />
+              )}
+              {removingParcel && (
+                <div style={{ ...pendingCardStyle, border: `1px solid ${alpha(TOKENS.danger, 0.55)}` }}>
+                  <p style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: crimson, marginBottom: 8 }}>Remove this parcel</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                    {[
+                      { value: 'delete', label: 'Delete — vines have been pulled up or parcel no longer exists' },
+                      { value: 'unlink', label: 'Unlink — parcel was sold or is no longer associated with my winery' },
+                    ].map(({ value, label }) => (
+                      <label key={value} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 'var(--type-mono-size)', cursor: 'pointer' }}>
+                        <input type="radio" name="removeAction" value={value} checked={removeAction === value} onChange={() => setRemoveAction(value)} style={{ marginTop: 2, accentColor: crimson }} />
+                        <span style={{ color: ink }}>{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <textarea placeholder="Optional: additional notes for the admin" value={removeNotes} onChange={(e) => setRemoveNotes(e.target.value)} rows={2} className="ds-input" style={textareaStyle} />
+                  {removeSubmitStatus === 'error' && <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={submitRemove} disabled={removeSubmitStatus === 'submitting'} style={{ ...smallBtnStyle, background: crimson }}>
+                      {removeSubmitStatus === 'submitting' ? 'Submitting…' : 'Submit Request'}
+                    </button>
+                    <button onClick={() => { setRemovingParcel(false); setRemoveSubmitStatus(null); setRemoveNotes(''); }} style={discardBtnStyle}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -300,15 +385,20 @@ export default function PortalVineyardDetail() {
           <Link to="/portal/dashboard" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>← Dashboard</Link>
         </div>
 
+        {/* Success feedback for geometry actions */}
+        <StatusBanner statuses={{
+          'Boundary update submitted for review': geoSubmitStatus === 'success',
+          'Split request submitted for review': splitSubmitStatus === 'success',
+          'New parcel submitted for review': addSubmitStatus === 'success',
+          'Removal request submitted for review': removeSubmitStatus === 'success',
+        }} />
+
+        {/* Title + rename */}
         {renaming ? (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '16px 0 4px' }}>
             <input
-              type="text"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              autoFocus
-              className="ds-input"
-              style={{ ...INPUT_STYLE, flex: '1 1 240px', minWidth: 0 }}
+              type="text" value={renameValue} onChange={(e) => setRenameValue(e.target.value)} autoFocus
+              className="ds-input" style={{ ...INPUT_STYLE, flex: '1 1 240px', minWidth: 0 }}
               onKeyDown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') setRenaming(false); }}
             />
             <button onClick={submitRename} disabled={renameStatus === 'submitting'} style={smallBtnStyle}>
@@ -318,23 +408,15 @@ export default function PortalVineyardDetail() {
           </div>
         ) : (
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', margin: '16px 0 4px' }}>
-            <h1 style={{
-              fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink, margin: 0,
-            }}>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink, margin: 0 }}>
               {vineyard.vineyard_name || 'Unnamed Parcel'}
             </h1>
-            <button
-              onClick={startRename}
-              style={editNameBtnStyle}
-              title="Rename this vineyard"
-            >
-              ✎ Edit name
-            </button>
+            <button onClick={startRename} style={editNameBtnStyle} title="Rename this vineyard">✎ Edit name</button>
           </div>
         )}
         {renameStatus === 'success' && (
           <p style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.success, fontWeight: 500, marginTop: 4 }}>
-            ✓ Name change submitted for review (applies to all parcels in this vineyard once approved)
+            ✓ Name updated
           </p>
         )}
         {renameStatus === 'error' && (
@@ -355,278 +437,38 @@ export default function PortalVineyardDetail() {
           <TerroirDataChips chips={terroirChips} columns={2} />
         </Section>
 
-        {/* Topo stats (read-only) */}
-        {vineyard.topo_stats && (
-          <Section title="Topography (read-only)">
-            <InfoRow label="Elevation" value={`${Number(vineyard.topo_stats.elevation_min_ft).toFixed(0)}–${Number(vineyard.topo_stats.elevation_max_ft).toFixed(0)} ft (avg ${Number(vineyard.topo_stats.elevation_mean_ft).toFixed(0)} ft)`} />
-            <InfoRow label="Slope" value={`${Number(vineyard.topo_stats.slope_mean_deg).toFixed(1)}° avg, ${Number(vineyard.topo_stats.slope_max_deg).toFixed(1)}° max`} />
-            <InfoRow label="Aspect" value={`${Number(vineyard.topo_stats.aspect_dominant_deg).toFixed(0)}° dominant`} />
-          </Section>
-        )}
-
-        {/* Blocks */}
-        <Section title="Blocks">
+        {/* Blocks — the editable table, with a prominent Edit control in the header */}
+        <Section
+          title="Blocks"
+          action={vineyard.blocks.length > 0 && !editingBlocks ? (
+            <button onClick={() => setEditingBlocks(true)} style={smallBtnStyle}>✎ Edit table</button>
+          ) : editingBlocks ? (
+            <span style={{ fontSize: 'var(--type-mono-size)', color: muted }}>Editing…</span>
+          ) : null}
+        >
           {vineyard.blocks.length === 0 ? (
             <p style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>No blocks recorded.</p>
           ) : (
             <EditableBlocksTable
               parcelId={vineyard.id}
-              blocks={vineyard.blocks}
+              blocks={blocksWithNames}
               editMode={editingBlocks}
+              selectedBlockId={selectedBlockId}
+              onRowSelect={setSelectedBlockId}
+              autoApply
               onEditCancel={() => setEditingBlocks(false)}
-              onEditComplete={() => setEditingBlocks(false)}
+              onEditComplete={() => { setEditingBlocks(false); load(); }}
             />
+          )}
+          {!editingBlocks && (
+            <p style={{ fontSize: 'var(--type-mono-size)', color: muted, marginTop: 12 }}>
+              Table edits (names, varieties, planting details) save immediately. Boundary changes on the map are reviewed by an admin.
+            </p>
           )}
         </Section>
 
-        {/* Request Changes */}
-        <Section title="Request Changes">
-          <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 16 }}>
-            All changes are submitted for admin review before being applied.
-          </p>
-
-          {/* Geometry edit flow */}
-          {vineyard.geometry && !pendingGeometry && (
-            <div style={{ marginBottom: 16 }}>
-              {geoSubmitStatus === 'success' ? (
-                <p style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.success, fontWeight: 500 }}>✓ Geometry update submitted for review</p>
-              ) : (
-                <>
-                  <p style={{ fontSize: 'var(--type-mono-size)', color: muted, marginBottom: 8 }}>
-                    To correct the parcel boundary, click below — the map will enter edit mode so you can drag vertices.
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Pending geometry confirmation */}
-          {pendingGeometry && (
-            <div style={pendingCardStyle}>
-              <p style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, marginBottom: 6 }}>
-                ⚠ Review before submitting
-              </p>
-              <p style={{ fontSize: 'var(--type-body-size)', color: muted, marginBottom: 10 }}>
-                Your boundary change will be sent to admin for approval. Add an optional note explaining the correction.
-              </p>
-              <textarea
-                placeholder="Optional: describe what changed and why"
-                value={pendingGeometry.notes}
-                onChange={(e) => setPendingGeometry((p) => ({ ...p, notes: e.target.value }))}
-                rows={2}
-                className="ds-input"
-                style={textareaStyle}
-              />
-              {geoSubmitStatus === 'error' && (
-                <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>
-              )}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={submitGeometry} disabled={geoSubmitStatus === 'submitting'} style={smallBtnStyle}>
-                  {geoSubmitStatus === 'submitting' ? 'Submitting…' : 'Submit for Review'}
-                </button>
-                <button
-                  onClick={() => { setPendingGeometry(null); setGeoSubmitStatus(null); }}
-                  style={discardBtnStyle}
-                >
-                  Discard
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Pending split confirmation */}
-          {pendingSplit && (
-            <div style={pendingCardStyle}>
-              <p style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, marginBottom: 6 }}>
-                ✂ Confirm parcel split
-              </p>
-              <p style={{ fontSize: 'var(--type-body-size)', color: muted, marginBottom: 10 }}>
-                {pendingSplit.polygon_a
-                  ? 'Two sub-parcels were computed from your split line. Add an optional note for the admin.'
-                  : 'The split line was recorded. Admin will apply the split manually. Add an optional note below.'}
-              </p>
-              <textarea
-                placeholder="Optional: e.g. 'Left half is Pinot Noir, right half is Chardonnay'"
-                value={pendingSplit.notes}
-                onChange={(e) => setPendingSplit((p) => ({ ...p, notes: e.target.value }))}
-                rows={2}
-                className="ds-input"
-                style={textareaStyle}
-              />
-              {splitSubmitStatus === 'error' && (
-                <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>
-              )}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={submitSplit} disabled={splitSubmitStatus === 'submitting'} style={smallBtnStyle}>
-                  {splitSubmitStatus === 'submitting' ? 'Submitting…' : 'Submit Split Request'}
-                </button>
-                <button
-                  onClick={() => { setPendingSplit(null); setSplitSubmitStatus(null); }}
-                  style={discardBtnStyle}
-                >
-                  Discard
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Remove / unlink confirmation */}
-          {removingParcel && (
-            <div style={{ ...pendingCardStyle, borderColor: alpha(TOKENS.danger, 0.35), background: TOKENS.dangerDim, marginBottom: 16 }}>
-              <p style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: crimson, marginBottom: 8 }}>
-                Remove this parcel
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-                {[
-                  { value: 'delete', label: 'Delete — vines have been pulled up or parcel no longer exists' },
-                  { value: 'unlink', label: 'Unlink — parcel was sold or is no longer associated with my winery' },
-                ].map(({ value, label }) => (
-                  <label key={value} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 'var(--type-mono-size)', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="removeAction"
-                      value={value}
-                      checked={removeAction === value}
-                      onChange={() => setRemoveAction(value)}
-                      style={{ marginTop: 2, accentColor: crimson }}
-                    />
-                    <span style={{ color: ink }}>{label}</span>
-                  </label>
-                ))}
-              </div>
-              <textarea
-                placeholder="Optional: additional notes for the admin"
-                value={removeNotes}
-                onChange={(e) => setRemoveNotes(e.target.value)}
-                rows={2}
-                className="ds-input"
-                style={textareaStyle}
-              />
-              {removeSubmitStatus === 'error' && (
-                <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>
-              )}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={submitRemove} disabled={removeSubmitStatus === 'submitting'} style={{ ...smallBtnStyle, background: crimson }}>
-                  {removeSubmitStatus === 'submitting' ? 'Submitting…' : 'Submit Request'}
-                </button>
-                <button
-                  onClick={() => { setRemovingParcel(false); setRemoveSubmitStatus(null); setRemoveNotes(''); }}
-                  style={discardBtnStyle}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Add parcel confirmation */}
-          {pendingAdd && (
-            <div style={pendingCardStyle}>
-              <p style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, marginBottom: 6 }}>
-                + Review new parcel
-              </p>
-              <p style={{ fontSize: 'var(--type-body-size)', color: muted, marginBottom: 10 }}>
-                Give your new parcel a name and any notes for the admin.
-              </p>
-              <input
-                type="text"
-                placeholder="Parcel / vineyard name"
-                value={pendingAdd.vineyard_name}
-                onChange={(e) => setPendingAdd((p) => ({ ...p, vineyard_name: e.target.value }))}
-                className="ds-input"
-                style={{ ...textareaStyle, resize: 'none', marginBottom: 8 }}
-              />
-              <textarea
-                placeholder="Optional: variety, location notes, etc."
-                value={pendingAdd.notes}
-                onChange={(e) => setPendingAdd((p) => ({ ...p, notes: e.target.value }))}
-                rows={2}
-                className="ds-input"
-                style={textareaStyle}
-              />
-              {addSubmitStatus === 'error' && (
-                <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>
-              )}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={submitAdd} disabled={addSubmitStatus === 'submitting' || !pendingAdd.vineyard_name.trim()} style={smallBtnStyle}>
-                  {addSubmitStatus === 'submitting' ? 'Submitting…' : 'Submit for Review'}
-                </button>
-                <button
-                  onClick={() => { setPendingAdd(null); setAddSubmitStatus(null); }}
-                  style={discardBtnStyle}
-                >
-                  Discard
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Action button row ── */}
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
-            {/* Edit Boundary */}
-            {vineyard.geometry && !pendingGeometry && geoSubmitStatus !== 'success' && (
-              editingGeometry ? (
-                <span style={{ fontSize: 'var(--type-mono-size)', color: muted, alignSelf: 'center' }}>Editing on map…</span>
-              ) : (
-                <button onClick={() => { setEditingGeometry(true); setGeoSubmitStatus(null); }} style={smallBtnStyle}>
-                  Edit Boundary
-                </button>
-              )
-            )}
-
-            {/* Edit Block Info */}
-            {editingBlocks ? (
-              <span style={{ fontSize: 'var(--type-mono-size)', color: muted, alignSelf: 'center' }}>
-                Editing block info above…
-              </span>
-            ) : (
-              <button onClick={() => setEditingBlocks(true)} style={smallBtnStyle}>
-                Edit Block Info
-              </button>
-            )}
-
-            {/* Split Parcel */}
-            {vineyard.geometry && !pendingSplit && splitSubmitStatus !== 'success' && (
-              splittingParcel ? (
-                <span style={{ fontSize: 'var(--type-mono-size)', color: muted, alignSelf: 'center' }}>Drawing split line…</span>
-              ) : (
-                <button onClick={() => { setSplittingParcel(true); setSplitSubmitStatus(null); }} style={smallBtnStyle}>
-                  Split Parcel
-                </button>
-              )
-            )}
-            {splitSubmitStatus === 'success' && (
-              <span style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.success, fontWeight: 500 }}>✓ Split request submitted</span>
-            )}
-
-            {/* Add Parcel */}
-            {!pendingAdd && addSubmitStatus !== 'success' && (
-              addingParcel ? (
-                <span style={{ fontSize: 'var(--type-mono-size)', color: muted, alignSelf: 'center' }}>Drawing on map…</span>
-              ) : (
-                <button onClick={() => { setAddingParcel(true); setAddSubmitStatus(null); }} style={smallBtnStyle}>
-                  Add Parcel
-                </button>
-              )
-            )}
-            {addSubmitStatus === 'success' && (
-              <span style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.success, fontWeight: 500 }}>✓ New parcel submitted for review</span>
-            )}
-
-            {/* Remove / Unlink */}
-            {!removingParcel && removeSubmitStatus !== 'success' && (
-              <button
-                onClick={() => { setRemovingParcel(true); setRemoveSubmitStatus(null); setRemoveNotes(''); }}
-                style={{ ...smallBtnStyle, background: 'transparent', color: crimson, border: `1px solid ${crimson}` }}
-              >
-                Remove / Unlink
-              </button>
-            )}
-            {removeSubmitStatus === 'success' && (
-              <span style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.success, fontWeight: 500 }}>✓ Removal request submitted</span>
-            )}
-          </div>
-
+        {/* History (collapsed) */}
+        <Section title="History &amp; requests" collapsible defaultOpen={false}>
           <ParcelHistorySection parcelId={vineyard.id} />
         </Section>
       </div>
@@ -634,71 +476,33 @@ export default function PortalVineyardDetail() {
   );
 }
 
-function RequestButton({ vineyard, type, label }) {
-  const [open, setOpen] = useState(false);
-  const [value, setValue] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
-
-  async function handleSubmit() {
-    setSubmitting(true);
-    try {
-      const payload = type === 'vineyard_varietals'
-        ? { varietals_list: value }
-        : type === 'vineyard_blocks'
-          ? { notes: value }
-          : { notes: value, geometry_description: value };
-
-      await apiPost('/api/portal/requests', {
-        request_type: type,
-        target_id: vineyard.id,
-        payload,
-      });
-      setDone(true);
-    } catch {
-      // ignore
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  if (done) {
-    return <span style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.success, fontWeight: 500 }}>✓ Submitted</span>;
-  }
-
-  if (!open) {
-    return (
-      <button onClick={() => setOpen(true)} style={smallBtnStyle}>
-        {label}
-      </button>
-    );
-  }
-
+/* ── Reusable pending-action card (map overlay) ── */
+function PendingCard({ title, body, extraField, notePlaceholder, noteValue, onNote, submitLabel, submitDisabled, submitting, error, onSubmit, onDiscard }) {
   return (
-    <div style={{ width: '100%', marginBottom: 8 }}>
-      <label style={{ fontSize: 'var(--type-body-size)', color: muted, marginBottom: 4, display: 'block' }}>
-        {type === 'vineyard_varietals' ? 'New varietals list' : 'Describe the requested changes'}
-      </label>
-      <textarea
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        rows={3}
-        className="ds-input"
-        style={{
-          ...INPUT_STYLE,
-          width: '100%',
-          padding: '8px 12px',
-          resize: 'vertical',
-        }}
-      />
-      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <button onClick={handleSubmit} disabled={submitting || !value.trim()} style={smallBtnStyle}>
-          {submitting ? '…' : 'Submit'}
+    <div style={pendingCardStyle}>
+      <p style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, marginBottom: 6 }}>{title}</p>
+      <p style={{ fontSize: 'var(--type-body-size)', color: muted, marginBottom: 10 }}>{body}</p>
+      {extraField}
+      <textarea placeholder={notePlaceholder} value={noteValue} onChange={(e) => onNote(e.target.value)} rows={2} className="ds-input" style={textareaStyle} />
+      {error && <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={onSubmit} disabled={submitting || submitDisabled} style={smallBtnStyle}>
+          {submitting ? 'Submitting…' : submitLabel}
         </button>
-        <button onClick={() => setOpen(false)} style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}>
-          Cancel
-        </button>
+        <button onClick={onDiscard} style={discardBtnStyle}>Discard</button>
       </div>
+    </div>
+  );
+}
+
+function StatusBanner({ statuses }) {
+  const active = Object.entries(statuses).filter(([, v]) => v).map(([k]) => k);
+  if (active.length === 0) return null;
+  return (
+    <div style={{ marginTop: 12 }}>
+      {active.map((msg) => (
+        <p key={msg} style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.success, fontWeight: 500, margin: '2px 0' }}>✓ {msg}</p>
+      ))}
     </div>
   );
 }
@@ -722,14 +526,25 @@ function Shell({ children }) {
   );
 }
 
-function Section({ title, children }) {
+function Section({ title, children, action, collapsible = false, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const isOpen = collapsible ? open : true;
   return (
     <div style={{
       background: parchment, borderRadius: 10, padding: '20px 16px',
       border: `1px solid ${border}`, marginBottom: 20,
     }}>
-      <h2 style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 600, color: ink, marginBottom: 12 }}>{title}</h2>
-      {children}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isOpen ? 12 : 0, gap: 8 }}>
+        <h2
+          style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 600, color: ink, margin: 0, cursor: collapsible ? 'pointer' : 'default', userSelect: 'none' }}
+          onClick={collapsible ? () => setOpen((o) => !o) : undefined}
+        >
+          {collapsible && <span style={{ color: muted, marginRight: 6, fontSize: 14 }}>{isOpen ? '▾' : '▸'}</span>}
+          {title}
+        </h2>
+        {action}
+      </div>
+      {isOpen && children}
     </div>
   );
 }
@@ -742,7 +557,6 @@ function InfoRow({ label, value }) {
     </div>
   );
 }
-
 
 const smallBtnStyle = {
   ...btn('primary', { padding: '6px 16px' }),
@@ -769,12 +583,18 @@ const editNameBtnStyle = {
   whiteSpace: 'nowrap',
 };
 
+const pendingOverlayStyle = {
+  position: 'absolute', left: 12, right: 12, bottom: 12, zIndex: 20,
+  maxHeight: 'calc(100% - 24px)', overflowY: 'auto',
+};
+
 const pendingCardStyle = {
-  background: TOKENS.warningDim,
-  border: `1px solid ${alpha(TOKENS.warning, 0.45)}`,
+  background: parchment,
+  border: `1px solid ${alpha(TOKENS.warning, 0.55)}`,
   borderRadius: 8,
   padding: '14px 16px',
-  marginBottom: 16,
+  marginBottom: 12,
+  boxShadow: `0 8px 24px ${alpha(ink, 0.28)}`,
 };
 
 const textareaStyle = {

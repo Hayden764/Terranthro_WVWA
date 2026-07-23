@@ -29,6 +29,13 @@ const REQUEST_TYPE_LABELS = {
   admin_batch_edit:   'Admin Batch Edit',
 };
 
+const REVIEW_VERBS = {
+  approved: 'Approved',
+  rejected: 'Rejected',
+  auto_applied: 'Auto-applied',
+  reverted: 'Reverted',
+};
+
 const BLOCK_FIELDS = ['block_name', 'variety', 'clone', 'rootstock', 'row_orientation', 'vine_spacing', 'row_spacing', 'year_planted', 'trellis'];
 
 export default function AdminRequestDetail() {
@@ -39,6 +46,8 @@ export default function AdminRequestDetail() {
   const [actionStatus, setActionStatus] = useState(null); // 'working' | 'done' | 'error'
   const [rejectNotes, setRejectNotes] = useState('');
   const [showRejectBox, setShowRejectBox] = useState(false);
+  const [revertNotes, setRevertNotes] = useState('');
+  const [showRevertBox, setShowRevertBox] = useState(false);
   // For admin_batch_edit: tracks admin-edited ops (null = use server payload as-is)
   const [editedOps, setEditedOps] = useState(null);
 
@@ -60,12 +69,15 @@ export default function AdminRequestDetail() {
     try {
       const body = {};
       if (action === 'reject') body.admin_notes = rejectNotes || undefined;
+      if (action === 'revert') body.admin_notes = revertNotes || undefined;
       if (action === 'approve' && editedOps !== null) body.ops_override = editedOps;
       await apiPost(`/api/admin/requests/${id}/${action}`, body);
       setActionStatus('done');
       await load();
       setShowRejectBox(false);
       setRejectNotes('');
+      setShowRevertBox(false);
+      setRevertNotes('');
     } catch {
       setActionStatus('error');
     }
@@ -83,6 +95,7 @@ export default function AdminRequestDetail() {
 
   const payload = request.payload || {};
   const isPending = request.status === 'pending';
+  const isAutoApplied = request.status === 'auto_applied';
   const parcel = request.parcel || null;
   const isGeometryUpdate = request.request_type === 'geometry_update';
 
@@ -136,12 +149,21 @@ export default function AdminRequestDetail() {
         <span>Submitted {new Date(request.created_at).toLocaleString()}</span>
         {request.reviewed_at && (
           <span>
-            {request.status === 'approved' ? 'Approved' : 'Rejected'}{' '}
+            {REVIEW_VERBS[request.status] || 'Reviewed'}{' '}
             {new Date(request.reviewed_at).toLocaleString()}
             {request.reviewed_by_name && ` by ${request.reviewed_by_name}`}
           </span>
         )}
       </div>
+
+      {/* Auto-applied notice */}
+      {isAutoApplied && (
+        <div style={{ ...infoBox, borderColor: alpha(TOKENS.electricBlue, 0.3), background: alpha(TOKENS.electricBlue, 0.06), marginBottom: 20 }}>
+          <p style={{ margin: 0, fontSize: 'var(--type-mono-size)', color: alpha(TOKENS.parchment, 0.82), lineHeight: 1.5 }}>
+            ⚡ <strong>Applied immediately</strong> by the winery — no approval was required. Review the change below; if it looks wrong, reach out to the winery or use <strong>Revert</strong> to restore the previous values.
+          </p>
+        </div>
+      )}
 
       {/* Admin notes (if already reviewed) */}
       {request.admin_notes && (
@@ -247,6 +269,41 @@ export default function AdminRequestDetail() {
                   {actionStatus === 'working' ? 'Working…' : 'Confirm Reject'}
                 </button>
                 <button onClick={() => setShowRejectBox(false)} style={outlineBtn}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Revert action (auto-applied changes) ── */}
+      {isAutoApplied && (
+        <div style={{ marginTop: 28, borderTop: `1px solid ${alpha(TOKENS.parchment, 0.07)}`, paddingTop: 20 }}>
+          {actionStatus === 'error' && (
+            <p style={{ fontSize: 'var(--type-body-size)', color: TOKENS.danger, marginBottom: 12 }}>Action failed — please try again.</p>
+          )}
+          {!showRevertBox ? (
+            <button onClick={() => setShowRevertBox(true)} disabled={actionStatus === 'working'} style={rejectBtnStyle}>
+              ↩ Revert this change
+            </button>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 480 }}>
+              <label style={{ ...TYPE.uiLabel, color: TOKENS.muted }}>Revert reason (optional — restores the previous values)</label>
+              <textarea
+                value={revertNotes}
+                onChange={(e) => setRevertNotes(e.target.value)}
+                rows={3}
+                placeholder="Why is this being reverted? (e.g. incorrect data)"
+                style={{
+                  padding: '8px 10px', borderRadius: 6, fontSize: 'var(--type-mono-size)', color: TOKENS.parchment,
+                  background: alpha(TOKENS.parchment, 0.05), border: `1px solid ${alpha(TOKENS.parchment, 0.10)}`,
+                  resize: 'vertical', outline: 'none', fontFamily: 'inherit',
+                }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => handleAction('revert')} disabled={actionStatus === 'working'} style={rejectBtnStyle}>
+                  {actionStatus === 'working' ? 'Working…' : 'Confirm Revert'}
+                </button>
+                <button onClick={() => setShowRevertBox(false)} style={outlineBtn}>Cancel</button>
               </div>
             </div>
           )}
@@ -1025,6 +1082,8 @@ function StatusBadge({ status }) {
     pending: { bg: alpha(TOKENS.warning, 0.15), color: TOKENS.warning },
     approved: { bg: alpha(TOKENS.success, 0.15), color: TOKENS.success },
     rejected: { bg: alpha(TOKENS.danger, 0.15), color: TOKENS.danger },
+    auto_applied: { bg: alpha(TOKENS.electricBlue, 0.15), color: TOKENS.electricBlue },
+    reverted: { bg: alpha(TOKENS.muted, 0.18), color: TOKENS.muted },
   };
   const c = colors[status] || colors.pending;
   return (
@@ -1032,7 +1091,7 @@ function StatusBadge({ status }) {
       padding: '4px 14px', borderRadius: 12, fontSize: 'var(--type-body-size)', fontWeight: 600,
       background: c.bg, color: c.color, textTransform: 'capitalize', whiteSpace: 'nowrap',
     }}>
-      {status}
+      {status === 'auto_applied' ? 'auto-applied' : status}
     </span>
   );
 }

@@ -4,6 +4,16 @@
  * Props:
  *   parcels        {Array}    Array of parcel objects with a `.geometry` GeoJSON field
  *                             and `.id`, `.vineyard_name` properties.
+ *   blocks         {Array}    Optional per-block objects ({ id, block_name, geometry,
+ *                             color_index }). When non-empty the map renders each block
+ *                             as its own colour-coded, clickable polygon instead of the
+ *                             parcel outline. (`parcels` is still used for boundary edits.)
+ *   selectedBlockId {number}  Block id to emphasise; kept in sync with the table.
+ *   onBlockSelect  {fn}       Called with a block id when a block polygon is clicked.
+ *   onStartEditBoundary/onStartSplit/onStartAdd/onRemove {fn}
+ *                             When provided, a compact boundary toolbar renders on the
+ *                             map (hidden while a draw mode is active) that triggers the
+ *                             existing edit/split/add geometry flows via the parent.
  *   highlightId    {number}   Optional parcel id to emphasise (fill is brighter).
  *   height         {number}   CSS height in px (default 340).
  *   onParcelClick  {fn}       Called with the parcel object when a user clicks a polygon.
@@ -25,7 +35,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
-import { alpha, border, crimson, ink, mix, muted, parchment, TOKENS } from '../styles/tokens';
+import { alpha, border, crimson, ink, MAP_GLASS, mix, muted, parchment, TOKENS } from '../styles/tokens';
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 
@@ -39,6 +49,28 @@ const HEX = {
   danger:     '#E03040',
   successDark:'#062a1a', // mix(success 60%, ink) — used for stroke
 };
+
+// Categorical palette for colour-coding individual blocks on the map. Mirrors the
+// accent tones in tokens.css, extended with a few tints so adjacent blocks stay
+// distinguishable. Indexed by `colorIndex` (block position), wrapping via modulo.
+const BLOCK_PALETTE = [
+  '#2E9BFF', // electric blue
+  '#00C44F', // vivid green
+  '#C87D4A', // amber
+  '#8A7AE8', // violet
+  '#E03040', // crimson
+  '#22B8C4', // teal
+  '#E0A100', // gold
+  '#E066B3', // pink
+];
+
+// Build a MapLibre "match" expression mapping colorIndex → palette hex.
+function blockColorExpr() {
+  const expr = ['match', ['%', ['get', 'colorIndex'], BLOCK_PALETTE.length]];
+  BLOCK_PALETTE.forEach((hex, i) => expr.push(i, hex));
+  expr.push(BLOCK_PALETTE[0]); // fallback
+  return expr;
+}
 
 // UI constants for map layer styling
 const UI = {
@@ -206,6 +238,11 @@ export default function PortalVineyardMap({
   highlightId = null,
   height = 340,
   onParcelClick,
+  // Per-block display + selection. When `blocks` is non-empty, the map renders
+  // each block as its own colour-coded polygon instead of the parcel outline.
+  blocks = [],
+  selectedBlockId = null,
+  onBlockSelect,
   editParcelId = null,
   onGeometrySave,
   onEditCancel,
@@ -216,12 +253,27 @@ export default function PortalVineyardMap({
   addMode = false,
   onAddSave,
   onAddCancel,
+  // Boundary toolbar — when any handler is provided, a compact toolbar of
+  // geometry actions renders on the map (hidden while a draw mode is active).
+  onStartEditBoundary,
+  onStartSplit,
+  onStartAdd,
+  onRemove,
   style: wrapperStyle,
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const popupRef = useRef(null);
   const drawRef = useRef(null);
+
+  // Latest blocks / selection held in refs so the map-init closure reads current
+  // values without forcing a full re-mount when they change.
+  const blocksRef = useRef(blocks);
+  const selectedBlockRef = useRef(selectedBlockId);
+  const onBlockSelectRef = useRef(onBlockSelect);
+  blocksRef.current = blocks;
+  selectedBlockRef.current = selectedBlockId;
+  onBlockSelectRef.current = onBlockSelect;
 
   // Edit-mode simplify control state
   const [simplifyStrength, setSimplifyStrength] = useState(30);
@@ -277,6 +329,27 @@ export default function PortalVineyardMap({
     return { type: 'FeatureCollection', features };
   }, [parcels, highlightId]);
 
+  // Build the per-block FeatureCollection. Blocks without geometry are omitted
+  // from the map (they still appear in the table). `selected` drives highlight.
+  const buildBlocksGeoJSON = useCallback(() => {
+    const features = (blocks || [])
+      .filter((b) => b.geometry)
+      .map((b, i) => {
+        const bid = b.id ?? b.block_id;
+        return {
+          type: 'Feature',
+          geometry: b.geometry,
+          properties: {
+            id: bid,
+            name: b.display_name || b.block_name || `Block ${i + 1}`,
+            colorIndex: b.color_index != null ? b.color_index : i,
+            selected: String(bid) === String(selectedBlockId) ? 1 : 0,
+          },
+        };
+      });
+    return { type: 'FeatureCollection', features };
+  }, [blocks, selectedBlockId]);
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -299,9 +372,73 @@ export default function PortalVineyardMap({
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
 
     map.on('load', () => {
-      // ── Source ────────────────────────────────────────────────────────
+      // ── Parcel source ─────────────────────────────────────────────────
+      // Always present: used by the highlight effect and to fit bounds when no
+      // blocks are supplied. Its display layers are only added in parcel mode.
       map.addSource('parcels', { type: 'geojson', data: geojson });
 
+      const blockData = buildBlocksGeoJSON();
+      const hasBlocks = blockData.features.length > 0;
+
+      if (hasBlocks) {
+        // ── Per-block rendering ─────────────────────────────────────────
+        map.addSource('blocks', { type: 'geojson', data: blockData });
+
+        map.addLayer({
+          id: 'blocks-fill',
+          type: 'fill',
+          source: 'blocks',
+          paint: {
+            'fill-color': blockColorExpr(),
+            'fill-opacity': ['case', ['==', ['get', 'selected'], 1], 0.6, 0.32],
+          },
+        });
+
+        map.addLayer({
+          id: 'blocks-line',
+          type: 'line',
+          source: 'blocks',
+          paint: {
+            'line-color': ['case', ['==', ['get', 'selected'], 1], HEX.parchment, blockColorExpr()],
+            'line-width': ['case', ['==', ['get', 'selected'], 1], 3, 1.5],
+            'line-opacity': 0.95,
+          },
+        });
+
+        map.addLayer({
+          id: 'blocks-label',
+          type: 'symbol',
+          source: 'blocks',
+          layout: {
+            'text-field': ['get', 'name'],
+            'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+            'text-size': 11,
+            'text-anchor': 'center',
+          },
+          paint: {
+            'text-color': UI.parcelLabelText,
+            'text-halo-color': UI.parcelLabelHalo,
+            'text-halo-width': 1.5,
+          },
+        });
+
+        const bbox = bboxFromGeometries(blockData.features.map((f) => f.geometry));
+        if (isFinite(bbox[0][0])) map.fitBounds(bbox, { padding: 60, maxZoom: 17 });
+
+        map.on('mouseenter', 'blocks-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', 'blocks-fill', () => { map.getCanvas().style.cursor = ''; });
+
+        map.on('click', 'blocks-fill', (e) => {
+          const feature = e.features && e.features[0];
+          if (!feature) return;
+          const cb = onBlockSelectRef.current;
+          if (cb) cb(feature.properties.id);
+        });
+
+        return; // skip parcel display layers
+      }
+
+      // ── Parcel rendering (fallback: no per-block geometry) ────────────
       // ── Fill (base) ───────────────────────────────────────────────────
       map.addLayer({
         id: 'parcels-fill',
@@ -493,6 +630,14 @@ export default function PortalVineyardMap({
     const src = map.getSource('parcels');
     if (src) src.setData(geojson);
   }, [highlightId, buildGeoJSON]);
+
+  // Update block colours / selection without re-mounting the map.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const src = map.getSource('blocks');
+    if (src) src.setData(buildBlocksGeoJSON());
+  }, [selectedBlockId, buildBlocksGeoJSON]);
 
   // Helper: purge any stale MapboxDraw layers/sources that survived a prior
   // mount. Needed because in React StrictMode + maplibre's deferred style.load,
@@ -745,6 +890,41 @@ export default function PortalVineyardMap({
         }}
       />
 
+      {/* Boundary toolbar — idle-mode geometry actions */}
+      {!editParcelId && !splitParcelId && !addMode &&
+       (onStartEditBoundary || onStartSplit || onStartAdd || onRemove) && (
+        <div style={{
+          position: 'absolute', top: 10, left: 10, zIndex: 10,
+          display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: 'calc(100% - 20px)',
+          background: MAP_GLASS.bg,
+          border: `1px solid ${MAP_GLASS.border}`,
+          borderRadius: MAP_GLASS.radius,
+          boxShadow: MAP_GLASS.shadow,
+          padding: 6,
+        }}>
+          {onStartEditBoundary && (
+            <button onClick={onStartEditBoundary} style={toolbarBtnStyle} title="Correct the vineyard boundary">
+              ✎ Boundary
+            </button>
+          )}
+          {onStartSplit && (
+            <button onClick={onStartSplit} style={toolbarBtnStyle} title="Split this parcel with a line">
+              ✂ Split
+            </button>
+          )}
+          {onStartAdd && (
+            <button onClick={onStartAdd} style={toolbarBtnStyle} title="Draw a new parcel">
+              ＋ Add
+            </button>
+          )}
+          {onRemove && (
+            <button onClick={onRemove} style={{ ...toolbarBtnStyle, color: crimson }} title="Remove or unlink this parcel">
+              Remove
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Edit mode overlay bar */}
       {editParcelId && (
         <div style={{
@@ -897,4 +1077,12 @@ const editSimplifyBtnStyle = {
   background: alpha(parchment, 0.12), color: UI.overlayTitle,
   fontSize: 'var(--type-body-size)', fontWeight: 500,
   cursor: 'pointer', fontFamily: 'var(--font-sans)',
+};
+
+const toolbarBtnStyle = {
+  padding: '6px 12px', borderRadius: MAP_GLASS.radius - 2,
+  border: `1px solid ${MAP_GLASS.border}`,
+  background: 'transparent', color: MAP_GLASS.text,
+  fontSize: 'var(--type-mono-size)', fontWeight: 600,
+  cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap',
 };

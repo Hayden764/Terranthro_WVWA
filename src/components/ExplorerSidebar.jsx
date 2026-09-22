@@ -62,6 +62,50 @@ const SIDEBAR_W = '25vw';
 const SIDEBAR_MIN_W = 260;
 const SIDEBAR_MAX_W = 420;
 
+// ── Mobile bottom sheet ──────────────────────────────────────────────────
+// On a phone the panel is a bottom sheet, not a side drawer: a side drawer
+// wide enough to read covers the map, so every selection hid the thing the
+// user had just tapped. The sheet rests at `peek` (search bar + grab handle),
+// rises to `half` when something is selected, and `full` is the old
+// full-screen panel. The map is inset above the peek height, so it is never
+// completely covered and its attribution stays visible.
+export const SHEET_PEEK_PX = 88;
+const SHEET_FULL_FRACTION = 0.92;
+const SHEET_HALF_FRACTION = 0.55;
+export const SHEET_DETENTS = ['peek', 'half', 'full'];
+
+/** Pixel height of each detent for a given viewport height. */
+function sheetHeights(viewportH) {
+  return {
+    peek: SHEET_PEEK_PX,
+    half: Math.round(viewportH * SHEET_HALF_FRACTION),
+    full: Math.round(viewportH * SHEET_FULL_FRACTION),
+  };
+}
+
+/**
+ * Visible viewport height in px, tracking the mobile URL bar.
+ *
+ * `100vh` is the *largest* the viewport ever gets, so a sheet sized in vh
+ * hangs below the browser chrome and its bottom controls become unreachable.
+ * visualViewport reports what is actually on screen.
+ */
+function useViewportHeight() {
+  const [h, setH] = useState(() => (
+    typeof window === 'undefined' ? 800 : (window.visualViewport?.height ?? window.innerHeight)
+  ));
+  useEffect(() => {
+    const read = () => setH(window.visualViewport?.height ?? window.innerHeight);
+    window.addEventListener('resize', read);
+    window.visualViewport?.addEventListener('resize', read);
+    return () => {
+      window.removeEventListener('resize', read);
+      window.visualViewport?.removeEventListener('resize', read);
+    };
+  }, []);
+  return h;
+}
+
 // ── Colormap gradients (matching WVWAMap / ScalePanel) ───────────────────
 // audit-ignore-start centralized-colormap-gradients
 const COLORMAP_CSS = {
@@ -335,7 +379,11 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
     const name = (focusedVineyard?.name || '').trim().toLowerCase();
     const key = name ? `name:${name}` : null;
     setExpandedGroupKey(key && vineyardGroups.some(g => g.key === key) ? key : null);
-  }, [listing?.id, focusedVineyard?.name, focusedVineyard?.at]); // eslint-disable-line react-hooks/exhaustive-deps
+    // vineyardGroups.length is a dep because selectedVineyards reaches this
+    // panel a render AFTER the listing does (map → page → sidebar). Without it
+    // the effect ran once against an empty group list, found no match, and the
+    // tapped vineyard silently stayed collapsed.
+  }, [listing?.id, focusedVineyard?.name, focusedVineyard?.at, vineyardGroups.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalAcres = vineyardGroups.reduce((sum, g) => sum + g.acresTotal, 0);
   const headerAvas = new Set();
@@ -1431,6 +1479,8 @@ export default function ExplorerSidebar({
   onViewAllVineyards,
   onVineyardScopeChange,
   isMobile = false,
+  sheetDetent = 'peek',       // mobile only: 'peek' | 'half' | 'full'
+  onSheetDetentChange,
   isOpen = false,
   onClose,
   // Vineyard filter modal hooks (optional)
@@ -1473,6 +1523,47 @@ export default function ExplorerSidebar({
     const onWineryPage = viewStack.includes('winery-detail');
     onVineyardScopeChange?.(onWineryPage ? 'winery' : 'all');
   }, [viewStack, onVineyardScopeChange]);
+
+  // ── Mobile sheet drag ──────────────────────────────────────────────────
+  // Dragging sets an explicit pixel height so the sheet tracks the finger;
+  // releasing snaps to the nearest detent and hands control back to the
+  // transition. draggedRef stops the handle's click from also toggling.
+  const viewportH = useViewportHeight();
+  const [dragHeight, setDragHeight] = useState(null);
+  const draggedRef = useRef(false);
+
+  const onHandlePointerDown = useCallback((e) => {
+    if (!isMobile) return;
+    const heights = sheetHeights(viewportH);
+    const startY = e.clientY;
+    const startH = heights[sheetDetent] ?? heights.peek;
+    draggedRef.current = false;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+
+    const move = (ev) => {
+      const dy = startY - ev.clientY;             // up is positive
+      if (Math.abs(dy) > 4) draggedRef.current = true;
+      setDragHeight(Math.max(48, Math.min(heights.full, startH + dy)));
+    };
+    const up = (ev) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      const dy = startY - ev.clientY;
+      const finalH = Math.max(48, Math.min(heights.full, startH + dy));
+      setDragHeight(null);
+      if (!draggedRef.current) return;            // a tap; let onClick decide
+      const nearest = SHEET_DETENTS.reduce((best, d) => (
+        Math.abs(heights[d] - finalH) < Math.abs(heights[best] - finalH) ? d : best
+      ), 'peek');
+      onSheetDetentChange?.(nearest);
+      // Let the click that follows pointerup see the drag, then clear it.
+      setTimeout(() => { draggedRef.current = false; }, 0);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  }, [isMobile, sheetDetent, viewportH, onSheetDetentChange]);
 
   // Column index for the 3-panel (+ parcel-blocks) sliding track
   const VIEW_COL = { home: 0, 'ava-list': 1, 'winery-list': 1, 'ava-detail': 2, 'winery-detail': 2, 'parcel-blocks': 3 };
@@ -1588,25 +1679,59 @@ export default function ExplorerSidebar({
     : currentView === 'parcel-blocks' ? (detailParcel?.parcel_label ?? 'Blocks')
     : '';
 
+  // Sheet geometry: the sheet is always full height and slid down to expose
+  // only the active detent, so the content below never reflows while dragging.
+  const heights = sheetHeights(viewportH);
+  const visibleH = dragHeight ?? heights[sheetDetent] ?? heights.peek;
+  const sheetStyle = isMobile ? {
+    width: '100%', minWidth: 'unset', maxWidth: 'unset',
+    height: heights.full,
+    position: 'fixed', left: 0, right: 0, bottom: 0,
+    borderRight: 'none',
+    borderTop: `1px solid ${border}`,
+    borderRadius: '16px 16px 0 0',
+    zIndex: 200,
+    transform: `translateY(${heights.full - visibleH}px)`,
+    transition: dragHeight == null ? 'transform 260ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+    boxShadow: `0 -8px 32px ${UI.mobileShadow}`,
+  } : {
+    width: SIDEBAR_W,
+    minWidth: SIDEBAR_MIN_W,
+    maxWidth: SIDEBAR_MAX_W,
+    height: '100%',
+    borderRight: `1px solid ${border}`,
+    position: 'relative',
+    zIndex: 10,
+  };
+
   return (
     <div style={{
-      width: isMobile ? '85vw' : SIDEBAR_W,
-      minWidth: isMobile ? 'unset' : SIDEBAR_MIN_W,
-      maxWidth: isMobile ? 360 : SIDEBAR_MAX_W,
-      height: '100%',
       background: T.sidebarBg,
-      borderRight: `1px solid ${border}`,
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      position: isMobile ? 'fixed' : 'relative',
-      top: isMobile ? 0 : undefined,
-      left: isMobile ? 0 : undefined,
-      zIndex: isMobile ? 200 : 10,
-      transform: isMobile ? (isOpen ? 'translateX(0)' : 'translateX(-100%)') : undefined,
-      transition: isMobile ? 'transform 220ms cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
-      boxShadow: isMobile && isOpen ? `4px 0 24px ${UI.mobileShadow}` : undefined,
+      ...sheetStyle,
     }}>
+
+      {/* Grab handle — drag to any detent, tap to toggle peek ↔ half */}
+      {isMobile && (
+        <div
+          onPointerDown={onHandlePointerDown}
+          onClick={() => {
+            if (draggedRef.current) return;   // the drag already chose a detent
+            onSheetDetentChange?.(sheetDetent === 'peek' ? 'half' : 'peek');
+          }}
+          style={{
+            flexShrink: 0, background: T.headerBg,
+            padding: '8px 0 2px', cursor: 'grab', touchAction: 'none',
+            display: 'flex', justifyContent: 'center',
+          }}
+          aria-label={sheetDetent === 'peek' ? 'Expand panel' : 'Collapse panel'}
+          role="button"
+        >
+          <div style={{ width: 38, height: 4, borderRadius: 2, background: alpha(parchment, 0.45) }} />
+        </div>
+      )}
 
       {/* Sidebar header — search bar + optional back button on same line */}
       <div style={{ background: T.headerBg, padding: '10px 12px', flexShrink: 0 }}>
@@ -1617,7 +1742,8 @@ export default function ExplorerSidebar({
               style={{
                 background: UI.backBtnBg, border: `1px solid ${UI.backBtnBorder}`,
                 borderRadius: 7, color: T.headerText, cursor: 'pointer',
-                width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: isMobile ? 40 : 30, height: isMobile ? 40 : 30,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 'var(--type-display-italic-size)', flexShrink: 0,
               }}
             >
@@ -1631,18 +1757,18 @@ export default function ExplorerSidebar({
               else onSelectAva(slug);
             }} />
           </div>
-          {isMobile && (
+          {isMobile && sheetDetent !== 'peek' && (
             <button
-              onClick={onClose}
-              aria-label="Close menu"
+              onClick={() => onSheetDetentChange?.('peek')}
+              aria-label="Collapse panel"
               style={{
                 background: UI.backBtnBg, border: `1px solid ${UI.backBtnBorder}`,
                 borderRadius: 7, color: T.headerText, cursor: 'pointer',
-                width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 'var(--type-display-italic-size)', flexShrink: 0, lineHeight: 1,
               }}
             >
-              ×
+              ⌄
             </button>
           )}
         </div>
@@ -1662,12 +1788,15 @@ export default function ExplorerSidebar({
           {/* ── Panel 0: Home menu ── */}
           <div style={{ width: '25%', height: '100%', overflowY: 'auto', overflowX: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column', scrollbarWidth: 'thin', scrollbarColor: `${alpha(ink, 0.18)} transparent` }}>
 
-            {/* Hero welcome card — light, stretches to fill remaining space */}
+            {/* Hero welcome card — stretches to fill the desktop sidebar, but on
+                the mobile sheet it sits below the navigation instead of pushing
+                it off the bottom of a half-height sheet. */}
             <div style={{
               background: parchment,
               padding: '16px 16px 14px',
               borderBottom: `1px solid ${border}`,
-              flex: 1,
+              order: isMobile ? 2 : 0,
+              flex: isMobile ? '0 0 auto' : 1,
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',

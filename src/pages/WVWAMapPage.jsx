@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import WVWAMap, { LISTING_FILTER_MODES } from '../components/WVWAMap';
-import ExplorerSidebar from '../components/ExplorerSidebar';
+import ExplorerSidebar, { SHEET_PEEK_PX } from '../components/ExplorerSidebar';
 import FilterModal from '../components/FilterModal';
 import { useVineyardFilters } from '../lib/useVineyardFilters';
-import { alpha, border, crimson, ink, MAP_GLASS, parchment, TOKENS, TYPE } from '../styles/tokens';
+import { alpha, border, crimson, ink, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 const UI = {
   taglineText:      alpha(TOKENS.parchment, 0.5),
@@ -11,7 +11,6 @@ const UI = {
   btnTextIdle:      alpha(TOKENS.parchment, 0.35),
   btnHoverBg:       alpha(TOKENS.parchment, 0.1),
   subtleLabel:      alpha(TOKENS.parchment, 0.45),
-  scrimBg:          alpha('black', 0.45),
 };
 import { useIsMobile } from '../lib/useIsMobile';
 
@@ -174,7 +173,9 @@ export default function WVWAMapPage() {
   const mapRef = useRef(null);
 
   const isMobile = useIsMobile();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Mobile panel is a bottom sheet with three resting heights; it is never
+  // fully dismissed, so there is no open/closed state to get stuck in.
+  const [sheetDetent, setSheetDetent] = useState('peek');
 
   // ── Entrance state ───────────────────────────────────────────────────
   // Skip intro on reload if the user has already seen it this tab session,
@@ -239,12 +240,14 @@ export default function WVWAMapPage() {
   const vineyardFilters = useVineyardFilters();
   const [filterModalOpen, setFilterModalOpen] = useState(false);
 
-  // Auto-open sidebar on mobile when a map interaction selects content
-  useEffect(() => { if (isMobile && selectedListing) setSidebarOpen(true); }, [isMobile, selectedListing]);
-  useEffect(() => { if (isMobile && selectedAva) setSidebarOpen(true); }, [isMobile, selectedAva]);
+  // Raise the sheet to half height when a map interaction selects something —
+  // enough to read the winery and its vineyards while the map stays on screen.
+  // Deliberately not 'full': burying the map was the old drawer's whole problem.
+  useEffect(() => { if (isMobile && selectedListing) setSheetDetent(d => (d === 'peek' ? 'half' : d)); }, [isMobile, selectedListing]);
+  useEffect(() => { if (isMobile && selectedAva) setSheetDetent(d => (d === 'peek' ? 'half' : d)); }, [isMobile, selectedAva]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', overflow: 'hidden', background: parchment, fontFamily: 'var(--font-sans)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100dvh', overflow: 'hidden', background: parchment, fontFamily: 'var(--font-sans)' }}>
 
       {/* ── Slim header ─────────────────────────────────────────────── */}
       <header style={{
@@ -285,10 +288,14 @@ export default function WVWAMapPage() {
             />
           </a>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ fontSize: 'var(--type-body-size)', color: UI.subtleLabel, fontFamily: 'var(--font-sans)', letterSpacing: '0.02em' }}>
-            Wineries &amp; AVA Explorer
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>
+          {/* Phone widths can't fit the tagline: it wrapped to three lines and
+              spilled out of the 48px bar, over both logos. */}
+          {!isMobile && (
+            <div style={{ fontSize: 'var(--type-body-size)', color: UI.subtleLabel, fontFamily: 'var(--font-sans)', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
+              Wineries &amp; AVA Explorer
+            </div>
+          )}
           <PortalHeaderButton />
         </div>
       </header>
@@ -305,8 +312,8 @@ export default function WVWAMapPage() {
         {!isIntro && (
           <ExplorerSidebar
             isMobile={isMobile}
-            isOpen={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
+            sheetDetent={sheetDetent}
+            onSheetDetentChange={setSheetDetent}
             mapRef={mapRef}
             selectedAva={selectedAva}
             onSelectAva={setSelectedAva}
@@ -337,42 +344,13 @@ export default function WVWAMapPage() {
           />
         )}
 
-        {/* Mobile scrim — tap outside drawer to close */}
-        {isMobile && sidebarOpen && (
-          <div
-            onClick={() => setSidebarOpen(false)}
-            style={{
-              position: 'fixed', inset: 0,
-              background: UI.scrimBg,
-              zIndex: 199,
-            }}
-          />
-        )}
-
-        {/* Map */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          {/* Mobile hamburger FAB — MAP_GLASS card to match the rail / badge / pills / popup */}
-          {isMobile && !isIntro && (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open menu"
-              style={{
-                position: 'absolute', top: 12, left: 12, zIndex: 100,
-                width: 42, height: 42,
-                background: MAP_GLASS.bg,
-                border: `1px solid ${MAP_GLASS.border}`,
-                borderRadius: MAP_GLASS.radiusCard,
-                color: MAP_GLASS.text,
-                fontSize: 'var(--type-display-italic-size)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer',
-                boxShadow: MAP_GLASS.shadow,
-                fontFamily: 'var(--font-sans)', lineHeight: 1,
-              }}
-            >
-              ☰
-            </button>
-          )}
+        {/* Map — on mobile it ends above the sheet's resting height, so the
+            sheet never covers the whole map and the attribution stays legible.
+            The hamburger is gone: the sheet's own handle is always on screen. */}
+        <div style={{
+          flex: 1, position: 'relative', overflow: 'hidden',
+          marginBottom: isMobile && !isIntro ? SHEET_PEEK_PX : 0,
+        }}>
           <WVWAMap
             ref={mapRef}
             selectedAva={selectedAva}

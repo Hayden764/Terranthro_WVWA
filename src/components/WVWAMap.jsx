@@ -87,6 +87,9 @@ function normalizeVineyardName(name) {
   return (typeof name === 'string' ? name : '').trim().toLowerCase();
 }
 
+// Layers a tap can land on and still count as "on a vineyard".
+const VINEYARD_CLICK_HIT_LAYERS = ['vineyards-linked-fill', 'vineyards-reference-passive-fill'];
+
 /** How many distinct vineyards a set of parcels covers (parcels ≠ vineyards). */
 function countVineyardGroups(features = []) {
   const names = new Set();
@@ -1711,6 +1714,15 @@ const WVWAMap = forwardRef(function WVWAMap({
   const [activeLayer, setActiveLayer]   = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [devPanelOpen, setDevPanelOpen] = useState(true);
+  // Touch devices have no hover, so a single tap on a vineyard would open the
+  // panel for something the user never saw the name of. There, a tap previews
+  // (outline + pill) and the pill's Details button opens it.
+  const [isTouch] = useState(() => (
+    typeof window !== 'undefined'
+      && !!window.matchMedia?.('(hover: none) and (pointer: coarse)').matches
+  ));
+  const isTouchRef = useRef(isTouch);
+  const [previewVineyard, setPreviewVineyard] = useState(null); // { name, winery, listing }
   const [devLayerToggles, setDevLayerToggles] = useState(DEV_LAYER_DEFAULTS);
 
   // When controlled props are provided, sync internal state to them
@@ -1981,6 +1993,19 @@ const WVWAMap = forwardRef(function WVWAMap({
     setSelectedListing(listing);
     onListingSelect?.(listing);
   }, [onListingSelect]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Commit the tapped vineyard: this is the second, explicit step of the touch
+  // flow, doing exactly what a desktop click does — open the winery with this
+  // vineyard expanded, without moving the camera.
+  const openPreviewedVineyard = useCallback(() => {
+    const p = previewVineyard;
+    if (!p) return;
+    if (p.listing) setSelectedListingRef.current?.(p.listing);
+    onVineyardFocusRef.current?.(p.name || null);
+    const src = mapRef.current?.getSource?.('vineyards-hovered');
+    if (src) src.setData({ type: 'FeatureCollection', features: [] });
+    setPreviewVineyard(null);
+  }, [previewVineyard]);
 
   // Frame every parcel passed in. Shared by the sidebar's "View all vineyards"
   // button, the on-map winery badge and the imperative viewAllVineyards handle.
@@ -2785,6 +2810,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           map.getCanvas().style.cursor = 'pointer';
         });
         map.on('mousemove', 'vineyards-linked-fill', (e) => {
+          if (isTouchRef.current) return;   // no hover on touch; the pill does this job
           if (!e.features?.length) return;
           const passiveHoverSrc = map.getSource('vineyards-passive-hover');
           if (passiveHoverSrc) {
@@ -2836,7 +2862,32 @@ const WVWAMap = forwardRef(function WVWAMap({
             ? Number(clickedProps.winery_recid)
             : null;
           if (wineryRecid == null) return;
-          const linkedListing = listingsRef.current.find((l) => l.id === wineryRecid);
+          const linkedListing = listingsRef.current.find((l) => l.id === wineryRecid) || null;
+          const vineyardName = getVineyardNameFromProperties(clickedProps) || null;
+
+          // Touch: first tap only previews. Outline the vineyard and name it in
+          // a pill, so the user can see what they hit before committing screen
+          // space to the panel; the pill's Details button does the opening.
+          if (isTouchRef.current) {
+            const key = normalizeVineyardName(vineyardName);
+            const groupFeatures = (key && VINEYARD_ALL_BY_NAME[key]) || [];
+            const src = map.getSource('vineyards-hovered');
+            if (src) {
+              src.setData({
+                type: 'FeatureCollection',
+                features: groupFeatures.length
+                  ? groupFeatures
+                  : [{ type: 'Feature', geometry: clickedFeature.geometry, properties: clickedProps }],
+              });
+            }
+            setPreviewVineyard({
+              name: vineyardName,
+              winery: clickedProps.winery_title || clickedProps.vineyard_org || '',
+              listing: linkedListing,
+            });
+            return;
+          }
+
           if (linkedListing) {
             setSelectedListingRef.current?.(linkedListing);
           }
@@ -2844,7 +2895,17 @@ const WVWAMap = forwardRef(function WVWAMap({
           // view they framed is the answer. The sidebar opens the winery and
           // expands the clicked vineyard; "View all vineyards" there (or the
           // map's own button) is what zooms out to the rest of the estate.
-          onVineyardFocusRef.current?.(getVineyardNameFromProperties(clickedProps) || null);
+          onVineyardFocusRef.current?.(vineyardName);
+        });
+
+        // Tapping the map away from any vineyard dismisses the preview.
+        map.on('click', (e) => {
+          if (!isTouchRef.current) return;
+          const hitLayers = VINEYARD_CLICK_HIT_LAYERS.filter((id) => map.getLayer(id));
+          if (hitLayers.length && map.queryRenderedFeatures(e.point, { layers: hitLayers }).length) return;
+          setPreviewVineyard(null);
+          const src = map.getSource('vineyards-hovered');
+          if (src) src.setData({ type: 'FeatureCollection', features: [] });
         });
         map.on('mouseleave', 'vineyards-linked-fill', () => {
           map.getCanvas().style.cursor = '';
@@ -2869,6 +2930,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           map.getCanvas().style.cursor = 'pointer';
         });
         map.on('mousemove', 'vineyards-reference-passive-fill', (e) => {
+          if (isTouchRef.current) return;   // no hover on touch
           if (!e.features?.length) return;
           const hoveredFeature = e.features[0];
           const hoveredProps = hoveredFeature?.properties || {};
@@ -3583,10 +3645,55 @@ const WVWAMap = forwardRef(function WVWAMap({
         <HoverPill dotColor={TOKENS.vividGreen}>{hoveredVineyardOrganization}</HoverPill>
       )}
 
+      {/* Tap preview (touch only) — names the vineyard before anything opens,
+          standing in for the hover popup a finger can never trigger. */}
+      {introComplete && isTouch && previewVineyard && (
+        <div style={{
+          position: 'absolute', bottom: 16, left: 12, right: 12,
+          background: MAP_GLASS.bgStrong,
+          border: `1px solid ${MAP_GLASS.border}`,
+          borderRadius: MAP_GLASS.radiusCard,
+          boxShadow: MAP_GLASS.shadow,
+          fontFamily: 'var(--font-sans)',
+          zIndex: 12,
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '10px 10px 10px 16px',
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontSize: 'var(--type-body-size)', fontWeight: 700, color: MAP_GLASS.text,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {previewVineyard.name || 'Vineyard'}
+            </div>
+            {previewVineyard.winery && (
+              <div style={{
+                fontSize: 'var(--type-ui-label-size)', color: alpha(MAP_GLASS.text, 0.7), marginTop: 2,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {previewVineyard.winery}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={openPreviewedVineyard}
+            style={{
+              flexShrink: 0, minHeight: 44, padding: '0 16px',
+              background: crimson, border: 'none', borderRadius: 8,
+              color: parchment, fontFamily: 'var(--font-sans)',
+              fontSize: 'var(--type-mono-size)', fontWeight: 700, cursor: 'pointer',
+            }}
+          >
+            Details ›
+          </button>
+        </div>
+      )}
+
       {/* Selected winery badge — takes the top-center slot from the AVA badge,
           and carries the "zoom out to the whole estate" action that the map
-          click deliberately no longer performs on its own. */}
-      {introComplete && selectedListing && (
+          click deliberately no longer performs on its own. On touch the sheet's
+          own header carries the name, and this would overflow a phone anyway. */}
+      {introComplete && selectedListing && !isTouch && (
         <div style={{
           position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
           background: MAP_GLASS.bgStrong,

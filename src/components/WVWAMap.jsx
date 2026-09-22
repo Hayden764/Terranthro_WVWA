@@ -1659,7 +1659,7 @@ const WVWAMap = forwardRef(function WVWAMap({
   const [vineyardFocusMode, setVineyardFocusMode] = useState(false);
   const [listingFilterMode, setListingFilterMode] = useState(LISTING_FILTER_MODES.allWineries);
   const [listingSymbologyPreset, setListingSymbologyPreset] = useState(DEFAULT_LISTING_SYMBOLOGY);
-  const [vineyardRecidSet, setVineyardRecidSet] = useState(() => new Set());
+  const [vineyardRecidSet, setVineyardRecidSet] = useState(() => new Map());
   const [insideIds, setInsideIds] = useState(null);
   const [activeLayer, setActiveLayer]   = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
@@ -2075,7 +2075,7 @@ const WVWAMap = forwardRef(function WVWAMap({
     });
   }, [vineyardScope, filtersActive, mapLoaded]);
   const listingFilterModeRef = useRef(LISTING_FILTER_MODES.allWineries);
-  const vineyardRecidSetRef = useRef(new Set());
+  const vineyardRecidSetRef = useRef(new Map());
 
   // Keep filter refs in sync with state
   useEffect(() => {

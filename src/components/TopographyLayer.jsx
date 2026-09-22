@@ -1,21 +1,18 @@
 import { useEffect, useRef } from 'react';
 import {
-  getTopoTileUrl,
-  getTopoStatsUrl,
+  getTopoPmtilesUrl,
+  getTopoStats,
   getTopoSourceId,
   getTopoLayerId,
   TOPO_LAYER_OPACITY,
 } from '../config/topographyConfig';
 
 /**
- * Loads the full Willamette Valley 1m LiDAR topography raster for the active
- * layer type (elevation / slope / aspect).
+ * Shows the Willamette Valley 3m topography for the active layer type
+ * (elevation / slope / aspect) from pre-rendered raster PMTiles on R2 — colours
+ * are baked in at build time, so there is no tile server or stats request.
  *
- * The single WV-wide COG is used regardless of which sub-AVA (if any) is
- * selected. TiTiler statistics are fetched first to rescale the colormap to
- * the actual data range.
- *
- * Reports stats back via onStats({ min, max, mean, std }).
+ * Reports the layer's fixed range via onStats({ min, max, mean, std }).
  */
 const TopographyLayer = ({ map, activeLayer, onStats }) => {
   const prevLayerRef = useRef(null);
@@ -46,73 +43,39 @@ const TopographyLayer = ({ map, activeLayer, onStats }) => {
       return;
     }
 
-    let cancelled = false;
-    const statsUrl = getTopoStatsUrl(activeLayer);
+    const sourceId = getTopoSourceId(activeLayer);
+    const layerId  = getTopoLayerId(activeLayer);
 
-    const addTileLayer = (rescale) => {
-      if (cancelled || !map) return;
-
-      const tileUrl  = getTopoTileUrl(activeLayer, rescale);
-      const sourceId = getTopoSourceId(activeLayer);
-      const layerId  = getTopoLayerId(activeLayer);
-
-      try {
-        if (map.getLayer(layerId)) map.removeLayer(layerId);
-        if (map.getSource(sourceId)) map.removeSource(sourceId);
-      } catch (e) { /* ignore */ }
-
-      try {
-        map.addSource(sourceId, {
-          type: 'raster',
-          tiles: [tileUrl],
-          tileSize: 256,
-          minzoom: 0,
-          maxzoom: 18,
-        });
-
-        let beforeLayerId;
-        if (map.getLayer('wv-boundary-line')) beforeLayerId = 'wv-boundary-line';
-
-        map.addLayer({
-          id: layerId,
-          type: 'raster',
-          source: sourceId,
-          paint: {
-            'raster-opacity': TOPO_LAYER_OPACITY,
-            'raster-fade-duration': 300,
-          },
-        }, beforeLayerId);
-
-        prevLayerRef.current = activeLayer;
-      } catch (e) {
-        console.warn(`TopographyLayer: failed to add ${activeLayer}`, e);
-      }
-    };
-
-    // Fetch WV-level COG stats → rescale colormap to actual data range
-    fetch(statsUrl)
-      .then(r => r.json())
-      .then(json => {
-        if (cancelled) return;
-        // TiTiler returns { "b1": { min, max, mean, std, ... } }
-        const band = json?.b1 ?? Object.values(json ?? {})[0];
-        if (band?.min != null && band?.max != null) {
-          const { min, max, mean, std } = band;
-          onStats?.({ min, max, mean, std });
-          addTileLayer(`${min},${max}`);
-        } else {
-          onStats?.(null);
-          removeLayer(activeLayer);
-        }
-      })
-      .catch(() => {
-        if (cancelled) return;
-        onStats?.(null);
-        removeLayer(activeLayer);
+    removeLayer(activeLayer);
+    try {
+      map.addSource(sourceId, {
+        type: 'raster',
+        url: getTopoPmtilesUrl(activeLayer),
+        tileSize: 256,
+        attribution: 'DOGAMI lidar',
       });
 
+      let beforeLayerId;
+      if (map.getLayer('wv-boundary-line')) beforeLayerId = 'wv-boundary-line';
+
+      map.addLayer({
+        id: layerId,
+        type: 'raster',
+        source: sourceId,
+        paint: {
+          'raster-opacity': TOPO_LAYER_OPACITY,
+          'raster-fade-duration': 300,
+        },
+      }, beforeLayerId);
+
+      prevLayerRef.current = activeLayer;
+      onStats?.(getTopoStats(activeLayer));
+    } catch (e) {
+      console.warn(`TopographyLayer: failed to add ${activeLayer}`, e);
+      onStats?.(null);
+    }
+
     return () => {
-      cancelled = true;
       if (!map) return;
       removeLayer(activeLayer);
     };

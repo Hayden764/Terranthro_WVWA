@@ -224,7 +224,7 @@ export default function WVWAMapPage() {
   const [parcelTopoStats, setParcelTopoStats]       = useState({});
   const [selectedVineyards, setSelectedVineyards]   = useState([]);
   const [insideIds, setInsideIds]                   = useState(null);
-  const [vineyardRecidSet, setVineyardRecidSet]     = useState(() => new Set());
+  const [vineyardRecidSet, setVineyardRecidSet]     = useState(() => new Map());
   // Which vineyards the map emphasizes, driven by the sidebar's page level
   // ('all' everywhere except a winery page, where it's 'winery').
   const [vineyardScope, setVineyardScope]           = useState('all');

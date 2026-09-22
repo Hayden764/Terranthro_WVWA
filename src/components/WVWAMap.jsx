@@ -3649,7 +3649,8 @@ const WVWAMap = forwardRef(function WVWAMap({
           standing in for the hover popup a finger can never trigger. */}
       {introComplete && isTouch && previewVineyard && (
         <div style={{
-          position: 'absolute', bottom: 16, left: 12, right: 12,
+          // Clears the compass/reset stack now parked in the bottom-left corner.
+          position: 'absolute', bottom: 16, left: 68, right: 12,
           background: MAP_GLASS.bgStrong,
           border: `1px solid ${MAP_GLASS.border}`,
           borderRadius: MAP_GLASS.radiusCard,

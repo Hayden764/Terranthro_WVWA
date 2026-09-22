@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { alpha, border, crimson, electricBlue, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { EARTH_LAYER_TYPES, TERROIR_CLASS_COLORS } from '../config/earthLayersConfig';
@@ -69,7 +69,7 @@ const SIDEBAR_MAX_W = 420;
 // rises to `half` when something is selected, and `full` is the old
 // full-screen panel. The map is inset above the peek height, so it is never
 // completely covered and its attribution stays visible.
-export const SHEET_PEEK_PX = 88;
+export const SHEET_PEEK_PX = 100;   // handle strip + search row, measured
 const SHEET_FULL_FRACTION = 0.92;
 const SHEET_HALF_FRACTION = 0.55;
 export const SHEET_DETENTS = ['peek', 'half', 'full'];
@@ -197,7 +197,7 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, map
   const withPolygons = inside.filter(l => vineyardRecidSet.has(l.id));
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', paddingBottom: 16 }}>
       {onBack && <BackBtn onClick={onBack} />}
 
       <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -397,7 +397,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
   ].filter(Boolean).join(' · ');
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', paddingBottom: 16 }}>
       {onBack && <BackBtn onClick={onBack} />}
 
       {/* Winery identity — pinned to the top of the panel so the name is always
@@ -840,7 +840,7 @@ function ParcelBlockView({ parcel, onBack }) {
   });
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', paddingBottom: 16 }}>
       <BackBtn onClick={onBack} />
 
       {/* Header */}
@@ -1531,6 +1531,17 @@ export default function ExplorerSidebar({
   const viewportH = useViewportHeight();
   const [dragHeight, setDragHeight] = useState(null);
   const draggedRef = useRef(false);
+  // Measured, not assumed: the header grows a row when a back button appears.
+  const chromeRef = useRef(null);
+  const [chromeH, setChromeH] = useState(0);
+  useLayoutEffect(() => {
+    const el = chromeRef.current;
+    if (!isMobile || !el) return undefined;
+    setChromeH(el.offsetHeight);
+    const ro = new ResizeObserver(([entry]) => setChromeH(entry.contentRect.height));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isMobile]);
 
   const onHandlePointerDown = useCallback((e) => {
     if (!isMobile) return;
@@ -1705,6 +1716,26 @@ export default function ExplorerSidebar({
   };
 
   return (
+    <>
+    {/* Invisible grab strip sitting ON the map, directly above the sheet's top
+        edge. Reaching for a 5px handle means starting the gesture on the map,
+        and MapLibre claimed the drag as a pan. This widens the target upward
+        without widening the visible handle. */}
+    {isMobile && (
+      <div
+        onPointerDown={onHandlePointerDown}
+        onClick={() => {
+          if (draggedRef.current) return;
+          onSheetDetentChange?.(sheetDetent === 'peek' ? 'half' : 'peek');
+        }}
+        style={{
+          position: 'fixed', left: 0, right: 0,
+          bottom: visibleH, height: 26,
+          zIndex: 201, touchAction: 'none', background: 'transparent',
+        }}
+        aria-hidden="true"
+      />
+    )}
     <div style={{
       background: T.sidebarBg,
       display: 'flex',
@@ -1712,6 +1743,10 @@ export default function ExplorerSidebar({
       overflow: 'hidden',
       ...sheetStyle,
     }}>
+
+      {/* Handle + header measured together: the scrolling area below is sized
+          to the visible part of the sheet, so its last row is always reachable. */}
+      <div ref={chromeRef} style={{ flexShrink: 0 }}>
 
       {/* Grab handle — drag to any detent, tap to toggle peek ↔ half */}
       {isMobile && (
@@ -1722,14 +1757,14 @@ export default function ExplorerSidebar({
             onSheetDetentChange?.(sheetDetent === 'peek' ? 'half' : 'peek');
           }}
           style={{
-            flexShrink: 0, background: T.headerBg,
-            padding: '8px 0 2px', cursor: 'grab', touchAction: 'none',
+            background: T.headerBg,
+            padding: '14px 0 10px', cursor: 'grab', touchAction: 'none',
             display: 'flex', justifyContent: 'center',
           }}
           aria-label={sheetDetent === 'peek' ? 'Expand panel' : 'Collapse panel'}
           role="button"
         >
-          <div style={{ width: 38, height: 4, borderRadius: 2, background: alpha(parchment, 0.45) }} />
+          <div style={{ width: 44, height: 5, borderRadius: 3, background: alpha(parchment, 0.5) }} />
         </div>
       )}
 
@@ -1774,8 +1809,19 @@ export default function ExplorerSidebar({
         </div>
       </div>
 
-      {/* 4-panel sliding content area */}
-      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+      </div>{/* /chrome */}
+
+      {/* 4-panel sliding content area.
+          On the sheet this is sized to the *visible* height rather than left to
+          flex inside a full-height sheet — otherwise the bottom of the scroll
+          container sat below the fold and the last rows of a long vineyard list
+          could never be scrolled into view. */}
+      <div style={{
+        overflow: 'hidden', position: 'relative',
+        ...(isMobile
+          ? { height: Math.max(0, (heights[sheetDetent] ?? heights.peek) - chromeH), flex: '0 0 auto' }
+          : { flex: 1 }),
+      }}>
         <div style={{
           display: 'flex',
           width: '400%',
@@ -2063,5 +2109,6 @@ export default function ExplorerSidebar({
         </div>
       </div>
     </div>
+    </>
   );
 }

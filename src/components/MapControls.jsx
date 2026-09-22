@@ -1,14 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { alpha, MAP_GLASS, TOKENS } from '../styles/tokens';
 
-const MAX_PITCH_FLAT = 85;
-const MAX_PITCH_WITH_TERRAIN = 71;
-
 // UI constants for map control styling — all surfaces consume the shared
 // MAP_GLASS token family so every floating map element stays consistent.
 const UI = {
-  separator:        alpha(TOKENS.ink, 0.08),
-  pitchLabel:       MAP_GLASS.textMuted,
   compassNeedle:    alpha(TOKENS.crimson, 0.92),
   compassBack:      alpha(TOKENS.ink, 0.35),
   compassCircle:    alpha(TOKENS.ink, 0.12),
@@ -18,7 +13,7 @@ const UI = {
 
 const BTN_BASE = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  width: 36, height: 36, borderRadius: MAP_GLASS.radius, cursor: 'pointer',
+  width: 40, height: 40, borderRadius: MAP_GLASS.radius, cursor: 'pointer',
   border: `1px solid ${MAP_GLASS.border}`,
   background: MAP_GLASS.bg,
   color: MAP_GLASS.text,
@@ -26,46 +21,18 @@ const BTN_BASE = {
   transition: 'background 0.15s, color 0.15s, border-color 0.15s, transform 0.15s',
 };
 
-const BTN_ACTIVE = {
-  ...BTN_BASE,
-  background: MAP_GLASS.bgActive,
-  border: `1px solid ${MAP_GLASS.borderActive}`,
-  color: MAP_GLASS.textActive,
-};
-
+/**
+ * Floating map controls: a compass dial and a reset-view button, bottom-left.
+ *
+ * Zoom and pitch buttons used to live here too, in a tall rail down the middle
+ * of the left edge. Both are gestures every map user already has — scroll or
+ * pinch to zoom, two-finger drag to pitch — so on a phone the rail was chrome
+ * over the map for no gain. The 3D terrain toggle went with them.
+ */
 export default function MapControls({ map, mapLoaded, selectedAva, onSelectAva, onResetView }) {
-  const [terrainActive, setTerrainActive] = useState(false);
   const [bearing, setBearing] = useState(0);
-  const [pitch, setPitch] = useState(0);
-
-  const handleZoomIn = useCallback(() => { map?.zoomIn({ duration: 300 }); }, [map]);
-  const handleZoomOut = useCallback(() => { map?.zoomOut({ duration: 300 }); }, [map]);
 
   const handleResetView = useCallback(() => { onResetView?.(); }, [onResetView]);
-
-  const handleToggleTerrain = useCallback(() => {
-    if (!map) return;
-    const terrain = map.getTerrain?.();
-    if (terrain) {
-      map.setTerrain(null);
-      map.setMaxPitch(MAX_PITCH_FLAT);
-      setTerrainActive(false);
-    } else {
-      if (!map.getSource('terrainSource')) {
-        map.addSource('terrainSource', {
-          type: 'raster-dem',
-          tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
-          encoding: 'terrarium',
-          tileSize: 256,
-          maxzoom: 15,
-        });
-      }
-      map.setTerrain({ source: 'terrainSource', exaggeration: 1.5 });
-      map.setMaxPitch(MAX_PITCH_WITH_TERRAIN);
-      if ((map.getPitch?.() || 0) > MAX_PITCH_WITH_TERRAIN) map.setPitch(MAX_PITCH_WITH_TERRAIN);
-      setTerrainActive(true);
-    }
-  }, [map]);
 
   // Track bearing for compass needle
   useEffect(() => {
@@ -75,94 +42,26 @@ export default function MapControls({ map, mapLoaded, selectedAva, onSelectAva, 
     return () => map.off('rotate', onRotate);
   }, [map]);
 
-  // Track pitch for step buttons
-  useEffect(() => {
-    if (!map) return;
-    setPitch(Math.round(map.getPitch?.() || 0));
-    const onPitch = () => setPitch(Math.round(map.getPitch()));
-    map.on('pitch', onPitch);
-    return () => map.off('pitch', onPitch);
-  }, [map]);
-
-  const handlePitchUp = useCallback(() => {
-    if (!map) return;
-    const next = Math.min((map.getPitch?.() || 0) + 10, 70);
-    map.easeTo({ pitch: next, duration: 300 });
-  }, [map]);
-
-  const handlePitchDown = useCallback(() => {
-    if (!map) return;
-    const next = Math.max((map.getPitch?.() || 0) - 10, 0);
-    map.easeTo({ pitch: next, duration: 300 });
-  }, [map]);
-
   const handleResetNorth = useCallback(() => {
     map?.resetNorth({ duration: 400 });
   }, [map]);
-
-  const maxPitch = terrainActive ? MAX_PITCH_WITH_TERRAIN : MAX_PITCH_FLAT;
 
   if (!map || !mapLoaded) return null;
 
   return (
     <div style={{
-      position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', zIndex: 30,
-      display: 'flex', flexDirection: 'column', gap: 5,
+      // bottom clears the basemap attribution line.
+      position: 'absolute', left: 16, bottom: 26, zIndex: 30,
+      display: 'flex', flexDirection: 'column', gap: 8,
     }}>
-
-      {/* Zoom cluster */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <ControlBtn style={BTN_BASE} onClick={handleZoomIn} title="Zoom in">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </ControlBtn>
-        <ControlBtn style={BTN_BASE} onClick={handleZoomOut} title="Zoom out">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </ControlBtn>
-      </div>
-
-      {/* Separator */}
-      <div style={{ height: 1, background: UI.separator, margin: '2px 4px' }} />
-
-      {/* Pitch step buttons */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <ControlBtn style={pitch >= 70 ? { ...BTN_BASE, opacity: 0.35, cursor: 'default' } : BTN_BASE} onClick={handlePitchUp} title="Increase pitch (+10°)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="18 15 12 9 6 15" />
-          </svg>
-        </ControlBtn>
-        <div style={{ fontSize: 'var(--type-ui-label-size)', color: UI.pitchLabel, fontFamily: 'var(--font-mono)', fontWeight: 600, textAlign: 'center', userSelect: 'none', lineHeight: 1 }}>{pitch}°</div>
-        <ControlBtn style={pitch <= 0 ? { ...BTN_BASE, opacity: 0.35, cursor: 'default' } : BTN_BASE} onClick={handlePitchDown} title="Decrease pitch (-10°)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </ControlBtn>
-      </div>
-
-      {/* Separator */}
-      <div style={{ height: 1, background: UI.separator, margin: '2px 4px' }} />
-
       {/* Compass dial — drag to rotate, click to reset north */}
       <CompassDial map={map} bearing={bearing} onResetNorth={handleResetNorth} />
-
-      {/* Separator */}
-      <div style={{ height: 1, background: UI.separator, margin: '2px 4px' }} />
 
       {/* Reset view */}
       <ControlBtn style={BTN_BASE} onClick={handleResetView} title="Reset to Willamette Valley">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="1 4 1 10 7 10" />
           <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-        </svg>
-      </ControlBtn>
-
-      {/* 3D terrain */}
-      <ControlBtn style={terrainActive ? BTN_ACTIVE : BTN_BASE} onClick={handleToggleTerrain} title={terrainActive ? 'Disable 3D terrain' : 'Enable 3D terrain'}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M8 3l4 8 5-5 5 15H2L8 3z" />
         </svg>
       </ControlBtn>
     </div>
@@ -217,7 +116,7 @@ function CompassDial({ map, bearing, onResetNorth }) {
       onPointerUp={onPointerUp}
       title="Drag to rotate · click to reset north"
       style={{
-        width: 36, height: 36, borderRadius: '50%',
+        width: 40, height: 40, borderRadius: '50%',
         cursor: isDragging ? 'grabbing' : 'grab',
         background: MAP_GLASS.bg,
         border: `1px solid ${MAP_GLASS.border}`,

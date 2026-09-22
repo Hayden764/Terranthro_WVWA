@@ -12,6 +12,7 @@ import EarthLayer from './EarthLayer';
 import MapControls from './MapControls';
 import CameraDebug from './CameraDebug';
 import TerroirDataChips from './TerroirDataChips';
+import TerroirSummary from './TerroirSummary';
 import HoverPill from './map/HoverPill';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { EARTH_LAYER_TYPES, TERROIR_CLASS_COLORS, isEarthLayer } from '../config/earthLayersConfig';
@@ -1164,7 +1165,12 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                   const vals = rows.map(r => r[key]).filter(v => v != null);
                   return vals.length ? Math.max(...vals) : null;
                 };
+                // Soil + AVA rank come from the largest parcel (most LiDAR pixels)
+                const largest = rows.reduce((a, b) => ((b.pixel_count ?? 0) > (a.pixel_count ?? 0) ? b : a));
                 return {
+                  terroir: largest.terroir ?? null,
+                  rank: largest.rank ?? null,
+                  parcelCount: rows.length,
                   elev_min: min('elevation_min_ft'),
                   elev_max: max('elevation_max_ft'),
                   slope_mean: avg('slope_mean_deg'),
@@ -1246,6 +1252,15 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                             </span>
                           )}
                         </div>
+                      )}
+
+                      {groupTopoStats && (
+                        <TerroirSummary
+                          variant="glass"
+                          terroir={groupTopoStats.terroir}
+                          rank={groupTopoStats.rank}
+                          note={groupTopoStats.parcelCount > 1 ? `Soil and ranking for the largest of ${groupTopoStats.parcelCount} parcels` : null}
+                        />
                       )}
 
                       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -3503,7 +3518,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         />
       )}
 
-      // ...Show Wineries button removed...
+      {/* ...Show Wineries button removed... */}
 
       {/* Map controls — floating left-center */}
       {introComplete && mapLoaded && (

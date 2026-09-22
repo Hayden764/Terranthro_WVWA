@@ -453,7 +453,70 @@ router.get('/parcels/:id/topo-stats', async (req, res) => {
       data_source:         r.data_source,
     };
 
-    res.json({ parcel_id: id, topo });
+    // Soil-over-bedrock pairing (migrations 022/023) and where this vineyard
+    // ranks against others in its most specific AVA. Both are optional extras:
+    // a missing row leaves the field null rather than failing the topo response.
+    const [terroirRes, rankRes] = await Promise.all([
+      pool.query(
+        `SELECT terroir_label, terroir_origin, soil_series, soil_texture, soil_class,
+                soil_pct, soil_parent_material, soil_drainage,
+                bedrock_name, bedrock_formation, bedrock_age, bedrock_class, bedrock_pct
+         FROM vineyard_terroir WHERE vineyard_id = $1`,
+        [id]
+      ),
+      pool.query(
+        `WITH v AS (
+           SELECT v.id,
+                  COALESCE(NULLIF(v.nested_nested_ava, ''),
+                           NULLIF(NULLIF(v.nested_ava, ''), 'Willamette Valley'),
+                           NULLIF(NULLIF(v.ava_name, ''), 'Willamette Valley')) AS ava,
+                  t.elevation_mean_ft, t.slope_mean_deg
+           FROM vineyards v
+           JOIN vineyard_topo_stats t ON t.vineyard_id = v.id
+         ), ranked AS (
+           SELECT id, ava,
+                  COUNT(*) OVER (PARTITION BY ava) AS ava_count,
+                  PERCENT_RANK() OVER (PARTITION BY ava ORDER BY elevation_mean_ft) AS elev_pr,
+                  PERCENT_RANK() OVER (PARTITION BY ava ORDER BY slope_mean_deg)    AS slope_pr,
+                  PERCENT_RANK() OVER (ORDER BY elevation_mean_ft) AS elev_pr_wv,
+                  PERCENT_RANK() OVER (ORDER BY slope_mean_deg)    AS slope_pr_wv
+           FROM v
+         )
+         SELECT * FROM ranked WHERE id = $1`,
+        [id]
+      ),
+    ]);
+
+    const t = terroirRes.rows[0];
+    const terroir = t ? {
+      label:          t.terroir_label,
+      origin:         t.terroir_origin,
+      soil_series:    t.soil_series,
+      soil_texture:   t.soil_texture,
+      soil_class:     t.soil_class,
+      soil_pct:       t.soil_pct != null ? Number(t.soil_pct) : null,
+      soil_parent_material: t.soil_parent_material,
+      soil_drainage:  t.soil_drainage,
+      bedrock_name:   t.bedrock_name,
+      bedrock_formation: t.bedrock_formation,
+      bedrock_age:    t.bedrock_age,
+      bedrock_class:  t.bedrock_class,
+      bedrock_pct:    t.bedrock_pct != null ? Number(t.bedrock_pct) : null,
+    } : null;
+
+    const k = rankRes.rows[0];
+    const pct = (v) => (v != null ? Math.round(Number(v) * 100) : null);
+    // A rank among a handful of vineyards says little — need at least 10 peers
+    const rank = k ? {
+      ava:            k.ava,
+      ava_count:      Number(k.ava_count),
+      elevation_pct:  k.ava && Number(k.ava_count) >= 10 ? pct(k.elev_pr) : null,
+      slope_pct:      k.ava && Number(k.ava_count) >= 10 ? pct(k.slope_pr) : null,
+      elevation_pct_wv: pct(k.elev_pr_wv),
+      slope_pct_wv:     pct(k.slope_pr_wv),
+    } : null;
+
+    res.json({ parcel_id: id, topo: { ...topo, terroir, rank } });
   } catch (err) {
     console.error('GET /api/vineyards/parcels/:id/topo-stats error:', err);
     res.status(500).json({ error: 'Internal server error' });

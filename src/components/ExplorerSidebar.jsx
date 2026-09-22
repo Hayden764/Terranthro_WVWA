@@ -6,6 +6,7 @@ import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
 import { MONTH_ABBR } from '../config/climateConfig';
 import TerroirDataChips from './TerroirDataChips';
+import TerroirSummary from './TerroirSummary';
 import { apiJson } from '../lib/api';
 
 // ── Design tokens (light‑mode, eggshell base) ────────────────────────────
@@ -125,7 +126,7 @@ function SectionHeader({ label, open, onToggle, count }) {
 const AVA_META = {
   'chehalem-mountains':  { acres: '~68,000', established: 1983, highlights: 'Diverse soils including Jory, Laurelwood forest, and Willakenzie. Three nested AVAs.' },
   'dundee-hills':        { acres: '~6,490',  established: 1983, highlights: 'Famous red Jory soil, premier Pinot Noir. Notable south/southwest exposures, 200–1,000 ft elevation.' },
-  'eola-amity-hills':    { acres: '~42,000', established: 2006, highlights: 'Van Duzer wind corridor creates natural cooling. Intense Pinot Noir and Chardonnay.' },
+  'eola-amity-hills':    { acres: '~39,000', established: 2006, highlights: 'Volcanic basalt soils mixed with marine sediments and alluvium. Afternoon winds through the Van Duzer Corridor cool the vines and keep acids firm.' },
   'laurelwood-district': { acres: '~8,400',  established: 2015, highlights: 'Nested in Chehalem Mountains. Unique Laurelwood soils — windblown Missoula Flood deposits over Columbia River Basalt.' },
   'lower-long-tom':      { acres: '~30,000', established: 2020, highlights: 'Southern Willamette Valley. Warmer climate, broader variety potential.' },
   'mcminnville':         { acres: '~40,000', established: 2005, highlights: 'Marine sediment soils. Pacific influence. Cool, fog-prone mornings.' },
@@ -432,7 +433,12 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                     const mx  = k => { const v = vals(k); return v.length ? Math.max(...v) : null; };
                     const aspectMeanDeg = avg('aspect_mean_deg');
                     const aspectDomDeg  = avg('aspect_dominant_deg');
+                    // Soil + AVA rank come from the largest parcel (most LiDAR pixels)
+                    const largest = rows.reduce((a, b) => ((b.pixel_count ?? 0) > (a.pixel_count ?? 0) ? b : a));
                     return {
+                      terroir:        largest.terroir ?? null,
+                      rank:           largest.rank ?? null,
+                      parcelCount:    rows.length,
                       elev_min:       mn('elevation_min_ft'),
                       elev_max:       mx('elevation_max_ft'),
                       slope_mean:     avg('slope_mean_deg'),
@@ -540,6 +546,11 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                           <div style={{ paddingTop: 10 }}>
                             <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Terroir Snapshot</div>
                             <TerroirDataChips chips={terroirChips} columns={2} />
+                            <TerroirSummary
+                              terroir={groupTopoStats?.terroir}
+                              rank={groupTopoStats?.rank}
+                              note={groupTopoStats?.parcelCount > 1 ? `Soil and ranking for the largest of ${groupTopoStats.parcelCount} parcels` : null}
+                            />
                           </div>
 
                           {/* Block list */}

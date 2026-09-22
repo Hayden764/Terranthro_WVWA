@@ -8,11 +8,13 @@ const pmtilesProtocol = new Protocol();
 maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile.bind(pmtilesProtocol));
 import ClimateLayer from './ClimateLayer';
 import TopographyLayer from './TopographyLayer';
+import EarthLayer from './EarthLayer';
 import MapControls from './MapControls';
 import CameraDebug from './CameraDebug';
 import TerroirDataChips from './TerroirDataChips';
 import HoverPill from './map/HoverPill';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
+import { EARTH_LAYER_TYPES, TERROIR_CLASS_COLORS, isEarthLayer } from '../config/earthLayersConfig';
 import { AVA_CAMERA, WV_CAMERA } from '../config/avaCameraConfig';
 import { FLY_PRESETS, flyToAva, flyToCoords, flyToVineyardBounds, flyToWillamette, flyToIntro, WV_BOUNDS } from '../config/flyTo';
 import { alpha, border, crimson, ink, MAP_GLASS, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
@@ -972,6 +974,7 @@ const LAYER_META = {
   elevation: { icon: '⛰️',  label: 'Elevation' },
   slope:     { icon: '📐', label: 'Slope' },
   aspect:    { icon: '🧭', label: 'Aspect' },
+  ...Object.fromEntries(Object.values(EARTH_LAYER_TYPES).map(t => [t.id, { icon: t.icon, label: t.label }])),
 };
 function getLayerIcon(id)  { return LAYER_META[id]?.icon  ?? '🗺️'; }
 function getLayerLabel(id) { return LAYER_META[id]?.label ?? id; }
@@ -1320,6 +1323,7 @@ const LAYER_INFO_FULL = {
   elevation: { why: 'Height above sea level. Higher-elevation vineyards experience cooler temperatures, more wind exposure, and often better drainage — all factors that influence grape quality.', source: 'USGS Digital Elevation Model', period: 'Static terrain data' },
   slope:     { why: 'Steepness of terrain in degrees. Slopes between 5–15° are generally ideal for viticulture, providing good drainage and sun exposure.', source: 'Derived from USGS DEM', period: 'Static terrain data' },
   aspect:    { why: 'The compass direction a slope faces. South- and southwest-facing slopes receive more sunlight in the Northern Hemisphere, producing warmer and more sun-exposed microclimates.', source: 'Derived from USGS DEM', period: 'Static terrain data' },
+  ...Object.fromEntries(Object.values(EARTH_LAYER_TYPES).map(t => [t.id, { why: t.why, source: t.source, period: t.period }])),
 };
 
 // audit-ignore-start centralized-colormap-gradients
@@ -1336,6 +1340,7 @@ function LayerTabContent({ activeLayer, topoStats }) {
   if (!info) return null;
 
   const topoConfig = TOPO_LAYER_TYPES[activeLayer];
+  const earthConfig = EARTH_LAYER_TYPES[activeLayer];
 
   const CARD = { background: UI.cardBg, border: `1px solid ${UI.cardBorder}`, borderRadius: 10, padding: '12px 14px', marginBottom: 8 };
   const LBL  = { ...TYPE.uiLabel, color: UI.labelText, marginBottom: 4 };
@@ -1375,6 +1380,21 @@ function LayerTabContent({ activeLayer, topoStats }) {
           </div>
         );
       })()}
+
+      {earthConfig && (
+        <div style={CARD}>
+          <div style={{ ...LBL, marginBottom: 8 }}>Legend — {earthConfig.description}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 10px' }}>
+            {earthConfig.classes.map(cls => (
+              <div key={cls} style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                <span style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0, background: TERROIR_CLASS_COLORS[cls], border: `1px solid ${alpha(TOKENS.parchment, 0.15)}` }} />
+                <span style={{ ...TYPE.uiLabel, color: UI.cardTextStrong, textTransform: 'none', letterSpacing: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cls}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ ...TYPE.uiLabel, color: UI.labelText, textTransform: 'none', letterSpacing: 0, marginTop: 10 }}>Click anywhere on the map for unit details.</div>
+        </div>
+      )}
 
       {!topoStats && topoConfig && (
         <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2217,6 +2237,7 @@ const WVWAMap = forwardRef(function WVWAMap({
 
   const isClimateActive = activeLayer === 'tdmean';
   const isTopoActive    = ['elevation', 'slope', 'aspect'].includes(activeLayer);
+  const isEarthActive   = isEarthLayer(activeLayer);
 
   // ── Map initialization ────────────────────────────────────────────────
   useEffect(() => {
@@ -3471,6 +3492,14 @@ const WVWAMap = forwardRef(function WVWAMap({
           map={mapRef.current}
           activeLayer={isTopoActive ? activeLayer : null}
           onStats={setTopoStats}
+        />
+      )}
+
+      {/* Soils / bedrock geology vector layers */}
+      {introComplete && mapLoaded && mapRef.current && (
+        <EarthLayer
+          map={mapRef.current}
+          activeLayer={isEarthActive ? activeLayer : null}
         />
       )}
 

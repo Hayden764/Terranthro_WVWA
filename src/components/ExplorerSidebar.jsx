@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { alpha, border, crimson, electricBlue, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
+import { EARTH_LAYER_TYPES, TERROIR_CLASS_COLORS } from '../config/earthLayersConfig';
 import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
 import { MONTH_ABBR } from '../config/climateConfig';
@@ -862,6 +863,8 @@ const TOPO_LAYERS = [
 function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange, topoStats }) {
   const [climateOpen, setClimateOpen] = useState(true);
   const [topoOpen, setTopoOpen] = useState(true);
+  const [earthOpen, setEarthOpen] = useState(true);
+  const earthConfig = activeLayer ? EARTH_LAYER_TYPES[activeLayer] : null;
 
   const fmt = v => typeof v === 'number' ? v.toFixed(1) : '—';
   const topoConfig = activeLayer ? TOPO_LAYER_TYPES[activeLayer] : null;
@@ -1006,6 +1009,64 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: muted }}>
                   <span>−22°C</span><span>26°C</span>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Soils & Geology */}
+      <div style={{ borderBottom: `1px solid ${border}` }}>
+        <button
+          onClick={() => setEarthOpen(p => !p)}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
+        >
+          <span style={T.sectionLabel}>Soils &amp; Geology</span>
+          <Chevron open={earthOpen} />
+        </button>
+
+        {earthOpen && (
+          <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {Object.values(EARTH_LAYER_TYPES).map(layer => {
+              const active = activeLayer === layer.id;
+              return (
+                <button
+                  key={layer.id}
+                  onClick={() => onLayerChange(active ? null : layer.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
+                    border: `1.5px solid ${active ? crimson + '80' : border}`,
+                    background: active ? TOKENS.dangerDim : parchment,
+                    cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
+                    <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.description} · {layer.attribution}</div>
+                  </div>
+                  <div style={{
+                    width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
+                  </div>
+                </button>
+              );
+            })}
+
+            {earthConfig && (
+              <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
+                <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Legend — {earthConfig.label}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 10px' }}>
+                  {earthConfig.classes.map(cls => (
+                    <div key={cls} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <span style={{ width: 11, height: 11, borderRadius: 3, flexShrink: 0, background: TERROIR_CLASS_COLORS[cls] }} />
+                      <span style={{ fontSize: 'var(--type-ui-label-size)', color: ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cls}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 8 }}>Click the map for series, texture and formation details.</div>
               </div>
             )}
           </div>
@@ -1591,7 +1652,7 @@ export default function ExplorerSidebar({
                 </div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Data Layers</div>
-                  <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>Climate &amp; topography overlays</div>
+                  <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>Climate, terrain, soils &amp; bedrock</div>
                 </div>
               </div>
               <Chevron open={sections.layers} size={13} />

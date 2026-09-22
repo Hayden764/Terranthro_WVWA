@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { alpha, border, crimson, electricBlue, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { EARTH_LAYER_TYPES, TERROIR_CLASS_COLORS } from '../config/earthLayersConfig';
+import { VINEYARD_THEMES, NO_DATA_COLOR } from '../config/vineyardThemes';
 import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
 import { MONTH_ABBR } from '../config/climateConfig';
 import TerroirDataChips from './TerroirDataChips';
-import TerroirSummary from './TerroirSummary';
+import TerroirFactRows from './TerroirFactRows';
+import { terroirFactRows } from '../lib/terroirFacts';
 import ClimateVintages from './climate/ClimateVintages';
 import { apiJson } from '../lib/api';
 
@@ -526,15 +528,18 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                       {/* Expanded content */}
                       {isExpanded && (
                         <div style={{ padding: '0 12px 12px', borderTop: `1px solid ${border}` }}>
-                          {/* Terroir snapshot */}
+                          {/* Terroir: tiles for the numbers, rows for the facts */}
                           <div style={{ paddingTop: 10 }}>
                             <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Terroir Snapshot</div>
                             <TerroirDataChips chips={terroirChips} columns={2} />
-                            <TerroirSummary
-                              terroir={groupTopoStats?.terroir}
-                              rank={groupTopoStats?.rank}
-                              note={groupTopoStats?.parcelCount > 1 ? `Soil and ranking for the largest of ${groupTopoStats.parcelCount} parcels` : null}
-                            />
+                            <div style={{ marginTop: 8 }}>
+                              <TerroirFactRows rows={terroirFactRows(groupTopoStats)} />
+                            </div>
+                            {groupTopoStats?.parcelCount > 1 && (
+                              <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 6 }}>
+                                Soil, ranking and climate for the largest of {groupTopoStats.parcelCount} parcels
+                              </div>
+                            )}
                           </div>
 
                           {groupTopoStats?.largestId != null && (
@@ -862,7 +867,7 @@ const TOPO_LAYERS = [
   { id: 'aspect',    label: 'Aspect',      sub: 'Direction slope faces' },
 ];
 
-function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange, topoStats }) {
+function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange, topoStats, vineyardTheme = 'ownership', onVineyardThemeChange, vineyardThemeValues }) {
   const [climateOpen, setClimateOpen] = useState(true);
   const [topoOpen, setTopoOpen] = useState(true);
   const [earthOpen, setEarthOpen] = useState(true);
@@ -873,6 +878,63 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
 
   return (
     <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: 0 }}>
+
+      {/* Colour vineyards by */}
+      <div style={{ borderBottom: `1px solid ${border}` }}>
+        <div style={{ padding: '8px 16px 0' }}>
+          <span style={T.sectionLabel}>Colour vineyards by</span>
+        </div>
+        <div style={{ padding: '6px 12px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <select
+            aria-label="Colour vineyards by"
+            value={vineyardTheme}
+            onChange={(e) => onVineyardThemeChange?.(e.target.value)}
+            style={{
+              width: '100%', padding: '7px 9px', borderRadius: 8, cursor: 'pointer',
+              border: `1.5px solid ${vineyardTheme === 'ownership' ? border : crimson + '80'}`,
+              background: parchment, color: ink, fontFamily: 'var(--font-sans)',
+              fontSize: 'var(--type-mono-size)', fontWeight: 600,
+            }}
+          >
+            {Object.values(VINEYARD_THEMES).map((t) => (
+              <option key={t.id} value={t.id}>{t.label}</option>
+            ))}
+          </select>
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>
+            {VINEYARD_THEMES[vineyardTheme]?.description}
+          </div>
+
+          {VINEYARD_THEMES[vineyardTheme]?.legend && (() => {
+            // Categorical legends list only the classes present in view; range
+            // legends (elevation, slope) always show every band.
+            const theme = VINEYARD_THEMES[vineyardTheme];
+            const present = vineyardThemeValues?.values;
+            const isCategorical = theme.legendKey && !theme.legendKey.startsWith('elev') && !theme.legendKey.startsWith('slope');
+            const items = isCategorical && present?.size
+              ? theme.legend.filter((it) => present.has(it.label))
+              : theme.legend;
+            const showNoData = !isCategorical || vineyardThemeValues?.missing !== false;
+            return (
+            <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 10px' }}>
+                {items.map((item) => (
+                  <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <span style={{ width: 11, height: 11, borderRadius: 3, flexShrink: 0, background: item.color }} />
+                    <span style={{ fontSize: 'var(--type-ui-label-size)', color: ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                  </div>
+                ))}
+                {showNoData && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <span style={{ width: 11, height: 11, borderRadius: 3, flexShrink: 0, background: NO_DATA_COLOR }} />
+                    <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>No data</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            );
+          })()}
+        </div>
+      </div>
 
       {/* Climate */}
       <div style={{ borderBottom: `1px solid ${border}` }}>
@@ -1314,6 +1376,9 @@ export default function ExplorerSidebar({
   currentMonth,
   onMonthChange,
   topoStats,
+  vineyardTheme,
+  onVineyardThemeChange,
+  vineyardThemeValues,
   listingFilterMode,
   onListingFilterModeChange,
   selectedVineyards,
@@ -1667,6 +1732,9 @@ export default function ExplorerSidebar({
                   currentMonth={currentMonth}
                   onMonthChange={onMonthChange}
                   topoStats={topoStats}
+                  vineyardTheme={vineyardTheme}
+                  onVineyardThemeChange={onVineyardThemeChange}
+                  vineyardThemeValues={vineyardThemeValues}
                 />
               </div>
             )}

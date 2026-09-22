@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { overlayBeforeId, placeBelowVineyards } from '../lib/mapLayerOrder';
 import {
   getTopoPmtilesUrl,
   getTopoStats,
@@ -55,8 +56,7 @@ const TopographyLayer = ({ map, activeLayer, onStats }) => {
         attribution: 'DOGAMI lidar',
       });
 
-      let beforeLayerId;
-      if (map.getLayer('wv-boundary-line')) beforeLayerId = 'wv-boundary-line';
+      const beforeLayerId = overlayBeforeId(map);
 
       map.addLayer({
         id: layerId,
@@ -68,6 +68,8 @@ const TopographyLayer = ({ map, activeLayer, onStats }) => {
         },
       }, beforeLayerId);
 
+      // Vineyard layers may load after this one; keep the raster underneath.
+      placeBelowVineyards(map, [layerId]);
       prevLayerRef.current = activeLayer;
       onStats?.(getTopoStats(activeLayer));
     } catch (e) {

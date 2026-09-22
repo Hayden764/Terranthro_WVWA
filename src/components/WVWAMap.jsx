@@ -12,11 +12,14 @@ import EarthLayer from './EarthLayer';
 import MapControls from './MapControls';
 import CameraDebug from './CameraDebug';
 import TerroirDataChips from './TerroirDataChips';
-import TerroirSummary from './TerroirSummary';
+import TerroirFactRows from './TerroirFactRows';
+import { terroirFactRows } from '../lib/terroirFacts';
 import ClimateVintages from './climate/ClimateVintages';
 import HoverPill from './map/HoverPill';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { EARTH_LAYER_TYPES, TERROIR_CLASS_COLORS, isEarthLayer } from '../config/earthLayersConfig';
+import { VINEYARD_THEMES } from '../config/vineyardThemes';
+import { placeBelowVineyards } from '../lib/mapLayerOrder';
 import { AVA_CAMERA, WV_CAMERA } from '../config/avaCameraConfig';
 import { FLY_PRESETS, flyToAva, flyToCoords, flyToVineyardBounds, flyToWillamette, flyToIntro, WV_BOUNDS } from '../config/flyTo';
 import { alpha, border, crimson, ink, MAP_GLASS, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
@@ -38,7 +41,11 @@ const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 // PostGIS (ST_AsMVT) — so DB edits appear on the map with no tile regeneration.
 // Same endpoint in dev and prod; the API key (if any) is injected via the map's
 // transformRequest below.
-const VINEYARD_TILES_URL = `${API_BASE}/api/vineyards/tiles/{z}/{x}/{y}`;
+// MapLibre fetches tiles from a worker, which cannot resolve a root-relative
+// URL, so the origin is always spelled out. In dev API_BASE is '' (Vite proxies
+// /api), which previously left this relative and broke vineyard tiles locally.
+const VINEYARD_TILES_URL =
+  `${API_BASE || (typeof window !== 'undefined' ? window.location.origin : '')}/api/vineyards/tiles/{z}/{x}/{y}`;
 const FALLBACK_STYLE = {
   version: 8,
   sources: {
@@ -1259,12 +1266,14 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                       )}
 
                       {groupTopoStats && (
-                        <TerroirSummary
-                          variant="glass"
-                          terroir={groupTopoStats.terroir}
-                          rank={groupTopoStats.rank}
-                          note={groupTopoStats.parcelCount > 1 ? `Soil and ranking for the largest of ${groupTopoStats.parcelCount} parcels` : null}
-                        />
+                        <div style={{ marginTop: 8 }}>
+                          <TerroirFactRows rows={terroirFactRows(groupTopoStats)} variant="glass" />
+                          {groupTopoStats.parcelCount > 1 && (
+                            <div style={{ fontSize: 'var(--type-ui-label-size)', color: UI.faintText, marginTop: 6 }}>
+                              Soil, ranking and climate for the largest of {groupTopoStats.parcelCount} parcels
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {groupTopoStats?.largestId != null && (
@@ -1628,6 +1637,8 @@ const WVWAMap = forwardRef(function WVWAMap({
   onMonthChange,
   listingFilterMode: listingFilterModeProp,
   onListingFilterModeChange,
+  vineyardTheme = 'ownership',
+  onVineyardThemeValuesChange,
   listingSymbologyPreset: listingSymbologyPresetProp,
   onListingSymbologyPresetChange,
   // Push-only callbacks (WVWAMap notifies parent of derived state)
@@ -2264,6 +2275,61 @@ const WVWAMap = forwardRef(function WVWAMap({
   const isTopoActive    = ['elevation', 'slope', 'aspect'].includes(activeLayer);
   const isEarthActive   = isEarthLayer(activeLayer);
 
+  // "Colour vineyards by": swaps the fill-colour expression on the existing
+  // vineyard fills. 'ownership' restores the member-graph identity colours;
+  // hover, selection, filters and click behaviour are untouched either way.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    const cfg = VINEYARD_THEMES[vineyardTheme] ?? VINEYARD_THEMES.ownership;
+    const expression = cfg.paint ?? buildVineyardFillColorExpression();
+    for (const id of ['vineyards-reference-fill', 'vineyards-selected-fill']) {
+      if (map.getLayer(id)) {
+        try { map.setPaintProperty(id, 'fill-color', expression); } catch { /* style reloading */ }
+      }
+    }
+
+    // In a data theme the fills can match the raster underneath (elevation uses
+    // the same ramp as the Elevation layer), so outline the blocks to keep their
+    // shapes readable. Ownership needs no outline — its hues already separate.
+    const OUTLINE_ID = 'vineyards-theme-line';
+    try {
+      if (map.getLayer(OUTLINE_ID)) map.removeLayer(OUTLINE_ID);
+      if (cfg.paint && map.getLayer('vineyards-reference-fill')) {
+        map.addLayer({
+          id: OUTLINE_ID,
+          type: 'line',
+          source: 'vineyards-reference',
+          'source-layer': 'vineyard_blocks',
+          paint: {
+            'line-color': 'rgba(255, 255, 255, 0.75)',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.4, 15, 1.2],
+          },
+        }, 'vineyards-reference-passive-fill');
+      }
+    } catch { /* style reloading */ }
+
+    // Report which classes are actually on screen so the legend can drop the
+    // ones this region never has (e.g. Ultramafic soils in the Willamette).
+    if (!cfg.legendKey || !onVineyardThemeValuesChange) return undefined;
+    const report = () => {
+      try {
+        const feats = map.querySourceFeatures('vineyards-reference', { sourceLayer: 'vineyard_blocks' });
+        const values = new Set();
+        let missing = false;
+        for (const f of feats) {
+          const v = f.properties?.[cfg.legendKey];
+          if (v === undefined || v === null || v === '') missing = true;
+          else values.add(String(v));
+        }
+        onVineyardThemeValuesChange({ values, missing });
+      } catch { /* source not ready */ }
+    };
+    report();
+    map.on('idle', report);
+    return () => { map.off('idle', report); };
+  }, [vineyardTheme, mapLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Map initialization ────────────────────────────────────────────────
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -2847,6 +2913,10 @@ const WVWAMap = forwardRef(function WVWAMap({
             'fill-opacity': 0.95,
           },
         });
+        // Any overlay (soils, bedrock, topography, climate) switched on before
+        // these layers existed would sit above them and hide the vineyards.
+        placeBelowVineyards(map);
+
         map.addLayer({
           id: 'vineyards-selected-line',
           type: 'line',

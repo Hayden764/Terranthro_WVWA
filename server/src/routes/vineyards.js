@@ -70,10 +70,21 @@ router.get('/tiles/:z/:x/:y', async (req, res) => {
            w.recid AS winery_recid,
            w.title AS winery_title,
            (v.winery_id IS NOT NULL AND COALESCE(w.is_wvwa_member, false)) AS is_member,
-           COALESCE(vc.color_index, -1) AS color_index
+           COALESCE(vc.color_index, -1) AS color_index,
+           -- Attributes the map's "colour vineyards by" themes paint from
+           -- (migrations 012 / 022 / 023). Per block, so a vineyard whose
+           -- blocks differ in soil or aspect shows that variation.
+           bs.soil_class,
+           bg.terroir_class AS bedrock_class,
+           ROUND(bt.elevation_mean_ft)::int AS elev_ft,
+           ROUND(bt.slope_mean_deg, 1)::float AS slope_deg,
+           bt.aspect_bucket AS aspect
          FROM vineyard_blocks b
          JOIN vineyards v ON v.id = b.vineyard_id
          LEFT JOIN wineries w ON v.winery_id = w.id
+         LEFT JOIN vineyard_block_soils bs ON bs.block_id = b.id
+         LEFT JOIN vineyard_block_geology bg ON bg.block_id = b.id
+         LEFT JOIN vineyard_block_topo_stats bt ON bt.block_id = b.id
          LEFT JOIN vineyard_colors vc
            ON vc.vineyard_key = LOWER(TRIM(v.vineyard_name))
            AND v.winery_id IS NOT NULL

@@ -225,6 +225,8 @@ export default function WVWAMapPage() {
   const [selectedVineyards, setSelectedVineyards]   = useState([]);
   const [insideIds, setInsideIds]                   = useState(null);
   const [vineyardRecidSet, setVineyardRecidSet]     = useState(() => new Map());
+  const [vineyardTheme, setVineyardTheme]           = useState('ownership');
+  const [vineyardThemeValues, setVineyardThemeValues] = useState(null);
   // Which vineyards the map emphasizes, driven by the sidebar's page level
   // ('all' everywhere except a winery page, where it's 'winery').
   const [vineyardScope, setVineyardScope]           = useState('all');
@@ -316,6 +318,9 @@ export default function WVWAMapPage() {
             topoStats={topoStats}
             listingFilterMode={listingFilterMode}
             onListingFilterModeChange={setListingFilterMode}
+            vineyardTheme={vineyardTheme}
+            onVineyardThemeChange={setVineyardTheme}
+            vineyardThemeValues={vineyardThemeValues}
             selectedVineyards={selectedVineyards}
             parcelTopoStats={parcelTopoStats}
             onVineyardHover={(features) => mapRef.current?.hoverVineyards?.(features)}
@@ -378,6 +383,8 @@ export default function WVWAMapPage() {
             onMonthChange={setCurrentMonth}
             listingFilterMode={listingFilterMode}
             onListingFilterModeChange={setListingFilterMode}
+            vineyardTheme={vineyardTheme}
+            onVineyardThemeValuesChange={setVineyardThemeValues}
             listingSymbologyPreset={listingSymbologyPreset}
             onListingSymbologyPresetChange={setListingSymbologyPreset}
             // Push-only callbacks

@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { alpha, TOKENS, TYPE } from '../../styles/tokens';
 import { apiJson } from '../../lib/api';
+import TerroirDataChips from '../TerroirDataChips';
 
 /**
  * Vintage climate for an AVA or a vineyard, from GET /api/climate/:type/:key/vintages
@@ -127,36 +128,21 @@ function Headline({ v, data, baseline, colors, compact }) {
   );
 }
 
-function SeasonTiles({ v, baseline, colors }) {
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-      {SEASON_ORDER.map((s) => {
-        const sv = v.seasons[s];
-        const an = v.anomaly[baseline].seasons[s];
-        return (
-          <div key={s} style={{ background: colors.tileBg, border: `1px solid ${colors.line}`, borderRadius: 8, padding: '7px 9px' }}>
-            <div style={{ ...TYPE.uiLabel, color: colors.sub, marginBottom: 3 }}>{SEASON_SHORT[s]}</div>
-            {sv ? (
-              <>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                  <span style={{ fontSize: 'var(--type-mono-size)', fontWeight: 700, color: colors.text }}>{sv.tmean.toFixed(1)}°F</span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 'var(--type-ui-label-size)', color: colors.sub }}>
-                    <span style={{ width: 7, height: 7, borderRadius: 2, background: an?.tmean > 0.3 ? STRIPE_COLORS[7] : an?.tmean < -0.3 ? STRIPE_COLORS[1] : STRIPE_COLORS[4] }} />
-                    {signed(an?.tmean, 1, '°')}
-                  </span>
-                </div>
-                <div style={{ fontSize: 'var(--type-ui-label-size)', color: colors.sub, marginTop: 2 }}>
-                  {sv.ppt.toFixed(1)} in rain · {an?.ppt_pct == null ? '—' : `${an.ppt_pct > 0 ? '+' : ''}${an.ppt_pct}%`}
-                </div>
-              </>
-            ) : (
-              <div style={{ fontSize: 'var(--type-ui-label-size)', color: colors.sub }}>No data</div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
+function SeasonTiles({ v, baseline, variant }) {
+  const chips = SEASON_ORDER.map((s) => {
+    const sv = v.seasons[s];
+    const an = v.anomaly[baseline].seasons[s];
+    return {
+      label: SEASON_SHORT[s],
+      value: sv ? `${sv.tmean.toFixed(1)}°F` : '—',
+      subValue: sv
+        ? `${signed(an?.tmean, 1, '°')} · ${sv.ppt.toFixed(1)} in rain${an?.ppt_pct == null ? '' : ` (${an.ppt_pct > 0 ? '+' : ''}${an.ppt_pct}%)`}`
+        : null,
+      tone: an?.tmean > 0.3 ? 'amber' : an?.tmean < -0.3 ? 'blue' : 'parchment',
+      glow: false,
+    };
+  });
+  return <TerroirDataChips chips={chips} columns={2} variant={variant === 'glass' ? 'glass' : 'light'} />;
 }
 
 function ChartTooltip({ active, payload, label, unit, digits, colors }) {
@@ -245,9 +231,27 @@ export default function ClimateVintages({ type = 'ava', entityKey, variant = 'li
   }
 
   if (compact) {
+    const bl = data.baselines[baseline];
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <Headline v={v} data={data} baseline={baseline} colors={colors} compact />
+        <TerroirDataChips
+          variant={variant === 'glass' ? 'glass' : 'light'}
+          columns={2}
+          chips={[
+            {
+              label: `GDD ${v.year}`,
+              value: fmtInt(v.gdd),
+              subValue: `${v.winkler_region}${v.provisional ? ' · provisional' : ''}`,
+              tone: 'amber', glow: true,
+            },
+            {
+              label: `vs ${bl.from}–${bl.to}`,
+              value: signed(v.anomaly[baseline].gdd, 0),
+              subValue: v.gdd_rank != null ? `${ordinal(v.gdd_rank)} warmest of ${data.ranked_count}` : null,
+              tone: 'parchment', glow: false,
+            },
+          ]}
+        />
         <VintageStripes data={data} baseline={baseline} year={activeYear} onSelect={setYear} colors={colors} />
       </div>
     );
@@ -287,7 +291,7 @@ export default function ClimateVintages({ type = 'ava', entityKey, variant = 'li
       </div>
 
       <Headline v={v} data={data} baseline={baseline} colors={colors} />
-      <SeasonTiles v={v} baseline={baseline} colors={colors} />
+      <SeasonTiles v={v} baseline={baseline} variant={variant} />
       <MonthlyCharts v={v} data={data} baseline={baseline} colors={colors} />
 
       <div>

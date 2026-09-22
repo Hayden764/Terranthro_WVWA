@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
+import { overlayBeforeId, placeBelowVineyards } from '../lib/mapLayerOrder';
 import {
   EARTH_LAYER_TYPES,
   EARTH_LAYER_OPACITY,
@@ -15,9 +16,6 @@ import {
  */
 
 const VINEYARD_CLICK_LAYERS = ['vineyards-linked-fill', 'vineyards-reference-fill', 'vineyards-reference-passive-fill'];
-// Draw under vineyard polygons so parcels stay readable on top of the soil colours
-const BEFORE_LAYER_CANDIDATES = ['vineyards-reference-fill', 'wv-boundary-line'];
-
 const sourceId = (id) => `earth-${id}`;
 const fillId   = (id) => `earth-${id}-fill`;
 const lineId   = (id) => `earth-${id}-line`;
@@ -102,7 +100,7 @@ const EarthLayer = ({ map, activeLayer }) => {
         url: `pmtiles://${new URL(cfg.url, window.location.origin).href}`,
         attribution: cfg.attribution,
       });
-      const beforeId = BEFORE_LAYER_CANDIDATES.find((id) => map.getLayer(id));
+      const beforeId = overlayBeforeId(map);
       map.addLayer({
         id: fid,
         type: 'fill',
@@ -124,6 +122,9 @@ const EarthLayer = ({ map, activeLayer }) => {
           'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.3, 15, 1],
         },
       }, beforeId);
+      // The vineyard layers may not exist yet when this runs; re-assert once
+      // they do so the fill never ends up covering them.
+      placeBelowVineyards(map, [fid, lid]);
     } catch (e) {
       console.warn(`EarthLayer: failed to add ${activeLayer}`, e);
       return remove;

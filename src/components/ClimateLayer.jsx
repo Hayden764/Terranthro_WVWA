@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { overlayBeforeId, placeBelowVineyards } from '../lib/mapLayerOrder';
 import {
   CLIMATE_SOURCE_ID,
   CLIMATE_LAYER_ID,
@@ -60,9 +61,7 @@ const ClimateLayer = ({
           attribution: 'PRISM Climate Data'
         });
 
-        // Insert below AVA boundary layers if they exist
-        let beforeLayerId;
-        if (map.getLayer('wv-boundary-line')) beforeLayerId = 'wv-boundary-line';
+        const beforeLayerId = overlayBeforeId(map);
 
         map.addLayer({
           id: CLIMATE_LAYER_ID,
@@ -73,6 +72,7 @@ const ClimateLayer = ({
             'raster-fade-duration': 300
           }
         }, beforeLayerId);
+        placeBelowVineyards(map, [CLIMATE_LAYER_ID]);
 
         setIsSourceAdded(true);
       } catch (error) {

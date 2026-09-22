@@ -7,6 +7,7 @@ import { LISTING_FILTER_MODES } from './WVWAMap';
 import { MONTH_ABBR } from '../config/climateConfig';
 import TerroirDataChips from './TerroirDataChips';
 import TerroirSummary from './TerroirSummary';
+import ClimateVintages from './climate/ClimateVintages';
 import { apiJson } from '../lib/api';
 
 // ── Design tokens (light‑mode, eggshell base) ────────────────────────────
@@ -149,24 +150,6 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, map
     : listings.filter(l => l.category === 'winery');
   const withPolygons = inside.filter(l => vineyardRecidSet.has(l.id));
 
-  const [climateStats, setClimateStats] = useState(null);
-  useEffect(() => {
-    let cancelled = false;
-    setClimateStats(null);
-    apiJson(`/api/climate/${ava.slug}/stats`)
-      .then(data => { if (!cancelled) setClimateStats(data.stats || null); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [ava.slug]);
-
-  const tdmean = climateStats?.tdmean;
-  const climateChips = tdmean ? [
-    { label: 'GS Temp Mean', value: `${tdmean.mean.toFixed(1)}${tdmean.unit}`, tone: 'amber', glow: true },
-    { label: 'GS Temp Max',  value: `${tdmean.max.toFixed(1)}${tdmean.unit}`,  tone: 'green', glow: true },
-    { label: 'GS Temp Min',  value: `${tdmean.min.toFixed(1)}${tdmean.unit}`,  tone: 'blue',  glow: true },
-    { label: 'Std Dev',      value: `±${tdmean.std_dev.toFixed(1)}${tdmean.unit}`, tone: 'parchment', glow: false },
-  ] : null;
-
   return (
     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
       {onBack && <BackBtn onClick={onBack} />}
@@ -192,13 +175,11 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, map
           </div>
         )}
 
-        {/* Live climate data */}
-        {climateChips && (
-          <div>
-            <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Growing Season Climate</div>
-            <TerroirDataChips chips={climateChips} />
-          </div>
-        )}
+        {/* Vintage climate (PRISM monthly, 1991 onward) */}
+        <div>
+          <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Vintage Climate</div>
+          <ClimateVintages type="ava" entityKey={ava.slug} />
+        </div>
 
         {/* Winery list inside AVA */}
         {inside.length > 0 && (
@@ -433,9 +414,12 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                     const mx  = k => { const v = vals(k); return v.length ? Math.max(...v) : null; };
                     const aspectMeanDeg = avg('aspect_mean_deg');
                     const aspectDomDeg  = avg('aspect_dominant_deg');
-                    // Soil + AVA rank come from the largest parcel (most LiDAR pixels)
-                    const largest = rows.reduce((a, b) => ((b.pixel_count ?? 0) > (a.pixel_count ?? 0) ? b : a));
+                    // Soil, AVA rank and vintage climate come from the largest parcel (most LiDAR pixels)
+                    const largestId = group.features.map(f => f.properties?.id).filter(id => parcelTopoStats?.[id])
+                      .reduce((a, b) => ((parcelTopoStats[b].pixel_count ?? 0) > (parcelTopoStats[a].pixel_count ?? 0) ? b : a));
+                    const largest = parcelTopoStats[largestId];
                     return {
+                      largestId,
                       terroir:        largest.terroir ?? null,
                       rank:           largest.rank ?? null,
                       parcelCount:    rows.length,
@@ -552,6 +536,13 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                               note={groupTopoStats?.parcelCount > 1 ? `Soil and ranking for the largest of ${groupTopoStats.parcelCount} parcels` : null}
                             />
                           </div>
+
+                          {groupTopoStats?.largestId != null && (
+                            <div style={{ paddingTop: 10 }}>
+                              <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Vintage Climate</div>
+                              <ClimateVintages type="vineyard" entityKey={groupTopoStats.largestId} compact />
+                            </div>
+                          )}
 
                           {/* Block list */}
                           {blockRows.length > 0 && (

@@ -13,6 +13,7 @@ import MapControls from './MapControls';
 import CameraDebug from './CameraDebug';
 import TerroirDataChips from './TerroirDataChips';
 import TerroirSummary from './TerroirSummary';
+import ClimateVintages from './climate/ClimateVintages';
 import HoverPill from './map/HoverPill';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { EARTH_LAYER_TYPES, TERROIR_CLASS_COLORS, isEarthLayer } from '../config/earthLayersConfig';
@@ -1165,9 +1166,12 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                   const vals = rows.map(r => r[key]).filter(v => v != null);
                   return vals.length ? Math.max(...vals) : null;
                 };
-                // Soil + AVA rank come from the largest parcel (most LiDAR pixels)
-                const largest = rows.reduce((a, b) => ((b.pixel_count ?? 0) > (a.pixel_count ?? 0) ? b : a));
+                // Soil, AVA rank and vintage climate come from the largest parcel (most LiDAR pixels)
+                const largestId = group.features.map(f => f.properties?.id).filter(id => parcelTopoStats?.[id])
+                  .reduce((a, b) => ((parcelTopoStats[b].pixel_count ?? 0) > (parcelTopoStats[a].pixel_count ?? 0) ? b : a));
+                const largest = parcelTopoStats[largestId];
                 return {
+                  largestId,
                   terroir: largest.terroir ?? null,
                   rank: largest.rank ?? null,
                   parcelCount: rows.length,
@@ -1261,6 +1265,12 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                           rank={groupTopoStats.rank}
                           note={groupTopoStats.parcelCount > 1 ? `Soil and ranking for the largest of ${groupTopoStats.parcelCount} parcels` : null}
                         />
+                      )}
+
+                      {groupTopoStats?.largestId != null && (
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${UI.subtleDivider}` }}>
+                          <ClimateVintages type="vineyard" entityKey={groupTopoStats.largestId} variant="glass" compact />
+                        </div>
                       )}
 
                       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>

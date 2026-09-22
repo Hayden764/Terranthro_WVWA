@@ -277,7 +277,7 @@ function degToCardinal(deg) {
   return dirs[Math.round(deg / 45) % 8];
 }
 
-function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack, onVineyardHover, onViewAllVineyards, onParcelClick }) {
+function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focusedVineyard, onBack, onVineyardHover, onViewAllVineyards, onParcelClick }) {
   const [expandedGroupKey, setExpandedGroupKey] = useState(null);
   const [hoveredGroup, setHoveredGroup] = useState(null);
   const [sourcedFrom, setSourcedFrom] = useState([]);
@@ -322,9 +322,52 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
     return avaOrder !== 0 ? avaOrder : a.name.localeCompare(b.name);
   });
 
+  // A map click names the vineyard it landed on: open that one straight away
+  // instead of making the user find it in the list.
+  //
+  // One effect, not two: the panel receives the new listing one render after
+  // the click (the sidebar sets detailWinery from an effect), so a separate
+  // "collapse on winery change" effect would fire second and close the very
+  // vineyard the click just opened. Re-deriving on either change, and only
+  // keeping a name this winery actually has, collapses stale selections too.
+  // `at` is the click timestamp, so re-clicking the same vineyard re-opens it.
+  useEffect(() => {
+    const name = (focusedVineyard?.name || '').trim().toLowerCase();
+    const key = name ? `name:${name}` : null;
+    setExpandedGroupKey(key && vineyardGroups.some(g => g.key === key) ? key : null);
+  }, [listing?.id, focusedVineyard?.name, focusedVineyard?.at]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const totalAcres = vineyardGroups.reduce((sum, g) => sum + g.acresTotal, 0);
+  const headerAvas = new Set();
+  vineyardGroups.forEach(g => { const a = primaryAva(g.avas); if (a) headerAvas.add(avaDisplayLabel(a)); });
+  const headerSub = [
+    vineyardGroups.length
+      ? `${vineyardGroups.length} vineyard${vineyardGroups.length !== 1 ? 's' : ''}`
+      : null,
+    totalAcres > 0 ? `${Math.round(totalAcres).toLocaleString()} ac` : null,
+    headerAvas.size === 1 ? [...headerAvas][0] : headerAvas.size > 1 ? `${headerAvas.size} AVAs` : null,
+  ].filter(Boolean).join(' · ');
+
   return (
     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
       {onBack && <BackBtn onClick={onBack} />}
+
+      {/* Winery identity — pinned to the top of the panel so the name is always
+          on screen, however far down the vineyard list the user scrolls. */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 3,
+        background: parchment, borderBottom: `1px solid ${border}`,
+        padding: '12px 16px 10px', flexShrink: 0,
+      }}>
+        <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: ink, lineHeight: 1.2 }}>
+          {listing.title}
+        </div>
+        {headerSub && (
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 3 }}>
+            {headerSub}
+          </div>
+        )}
+      </div>
 
       {/* Hero image */}
       {listing.image_url && (
@@ -373,7 +416,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                     padding: '3px 8px', cursor: 'pointer', fontFamily: 'var(--font-sans)',
                   }}
                 >
-                  ⌖ View All
+                  ⌖ View all {vineyardGroups.length}
                 </button>
               )}
             </div>
@@ -1383,8 +1426,10 @@ export default function ExplorerSidebar({
   onListingFilterModeChange,
   selectedVineyards,
   parcelTopoStats,
+  focusedVineyard = null,   // { name, at } — vineyard a map click landed on
   onVineyardHover,
   onViewAllVineyards,
+  onVineyardScopeChange,
   isMobile = false,
   isOpen = false,
   onClose,
@@ -1420,6 +1465,14 @@ export default function ExplorerSidebar({
   const skipAvaRef    = useRef(0);
 
   const currentView = viewStack[viewStack.length - 1];
+
+  // The map's single vineyard-emphasis authority reads this: on a winery page
+  // (and the block deep-dive under it) every other vineyard is hushed so the
+  // selected estate is unmistakable; everywhere else all vineyards read equally.
+  useEffect(() => {
+    const onWineryPage = viewStack.includes('winery-detail');
+    onVineyardScopeChange?.(onWineryPage ? 'winery' : 'all');
+  }, [viewStack, onVineyardScopeChange]);
 
   // Column index for the 3-panel (+ parcel-blocks) sliding track
   const VIEW_COL = { home: 0, 'ava-list': 1, 'winery-list': 1, 'ava-detail': 2, 'winery-detail': 2, 'parcel-blocks': 3 };
@@ -1860,6 +1913,7 @@ export default function ExplorerSidebar({
                 listing={detailWinery}
                 selectedVineyards={selectedVineyards}
                 parcelTopoStats={parcelTopoStats}
+                focusedVineyard={focusedVineyard}
                 onVineyardHover={onVineyardHover}
                 onViewAllVineyards={onViewAllVineyards}
                 onParcelClick={handleParcelClick}

@@ -87,6 +87,17 @@ function normalizeVineyardName(name) {
   return (typeof name === 'string' ? name : '').trim().toLowerCase();
 }
 
+/** How many distinct vineyards a set of parcels covers (parcels ≠ vineyards). */
+function countVineyardGroups(features = []) {
+  const names = new Set();
+  let unnamed = 0;
+  for (const f of features) {
+    const key = normalizeVineyardName(getVineyardNameFromProperties(f?.properties || {}));
+    if (key) names.add(key); else unnamed += 1;
+  }
+  return names.size + unnamed;
+}
+
 // ── Listing categories ────────────────────────────────────────────────────
 export const LISTING_CATEGORIES = {
   hotel:      { label: 'Hotel / Inn',        color: TOKENS.amber, icon: '🏨', emoji: '🏨' },
@@ -170,6 +181,10 @@ const VINEYARD_MEMBER_PALETTE = [
 ];
 const VINEYARD_GREY = '#ABABAB';   // named non-member
 const VINEYARD_WHITE = '#E8E1D3';  // unnamed — "help us name it" (soft parchment)
+// Member vineyard the colouring run hasn't reached yet (no vineyard_colors row).
+// Grey means "not a member", so these must not borrow it — they get a neutral
+// vine green until assign-vineyard-colors.py gives them a palette slot.
+const VINEYARD_MEMBER_UNSLOTTED = '#6E8B5A';
 // Selection/hover highlight: a simple white line tracing the highlighted vineyard.
 const VINEYARD_HALO_CORE = '#FFFFFF';
 // audit-ignore-end
@@ -177,6 +192,7 @@ const VINEYARD_HALO_CORE = '#FFFFFF';
 /**
  * MapLibre fill-color expression for the vineyard reference layer:
  *   color_index >= 0            → member palette slot
+ *   else, member vineyard       → vine green (awaiting a palette slot)
  *   else, empty/absent name     → white (unnamed)
  *   else                        → grey (named non-member)
  */
@@ -188,6 +204,7 @@ function buildVineyardFillColorExpression() {
     'case',
     ['>=', ['coalesce', ['get', 'color_index'], -1], 0], match,
     ['==', ['coalesce', ['get', 'vineyard_name'], ''], ''], VINEYARD_WHITE,
+    ['boolean', ['get', 'is_member'], false], VINEYARD_MEMBER_UNSLOTTED,
     VINEYARD_GREY,
   ];
 }
@@ -648,13 +665,14 @@ function setListingSoftFocus(map, isSoftFocused) {
 }
 
 function setVineyardReferenceSoftFocus(map, isSoftFocused) {
-  // Identity-color fill: keep the palette clearly visible when bright, and only
-  // hush (not hide) when a single winery is soft-focused so its parcels lead.
-  const referenceFillOpacity = isSoftFocused ? 0.18 : 0.82;
-  const referenceLineOpacity = isSoftFocused ? 0.2 : 0.55;
+  // Identity-color fill: keep the palette clearly visible when bright. With one
+  // winery selected the neighbours drop to a whisper — still readable as "there
+  // is a vineyard here", but with no hue left to compete with the selection.
+  const referenceFillOpacity = isSoftFocused ? 0.09 : 0.82;
+  const referenceLineOpacity = isSoftFocused ? 0.12 : 0.55;
   // passive-fill is now an invisible hit-target only; keep it barely-there.
   const passiveFillOpacity = 0.01;
-  const passivePatternOpacity = isSoftFocused ? 0.03 : 0.2;
+  const passivePatternOpacity = isSoftFocused ? 0.02 : 0.2;
   const passiveLineOpacity = isSoftFocused ? 0.05 : 0.34;
   const passiveLineWidth = isSoftFocused ? 0.5 : 0.85;
   // Green linked line retired (membership shown by fill color now).
@@ -682,6 +700,11 @@ function setVineyardReferenceSoftFocus(map, isSoftFocused) {
   }
   if (map.getLayer('vineyards-reference-passive-fill')) {
     map.setPaintProperty('vineyards-reference-passive-fill', 'fill-opacity', passiveFillOpacity);
+  }
+  // The data-theme outline traces every vineyard, so it has to hush too or the
+  // muted neighbours keep their shapes at full strength.
+  if (map.getLayer('vineyards-theme-line')) {
+    map.setPaintProperty('vineyards-theme-line', 'line-opacity', isSoftFocused ? 0.12 : 1);
   }
   if (map.getLayer('vineyards-reference-passive-hatch')) {
     map.setPaintProperty('vineyards-reference-passive-hatch', 'fill-opacity', passivePatternOpacity);
@@ -1656,6 +1679,9 @@ const WVWAMap = forwardRef(function WVWAMap({
   //   'all'    → every vineyard visible (default for all non-winery pages)
   //   'winery' → dim everything except the selected winery's parcels
   vineyardScope    = 'all',
+  // Fired with the vineyard name a map click landed on, so the sidebar can open
+  // that vineyard rather than the winery's first one.
+  onVineyardFocus,
 }, externalRef) {
   const mapContainerRef = useRef(null);
   const mapRef          = useRef(null);
@@ -1714,6 +1740,8 @@ const WVWAMap = forwardRef(function WVWAMap({
   const missingParcelTopoStatsIdsRef = useRef(new Set());
   const selectedListingRef    = useRef(null);
   const setSelectedListingRef = useRef(null); // stable ref to the setter
+  const onVineyardFocusRef    = useRef(null); // stable ref for the map click closure
+  const focusAllVineyardsRef  = useRef(null); // stable ref to the fit-all-parcels helper
   const setHoveredListingRef  = useRef(null); // stable ref for map closure hover
   const selectedAvaRef        = useRef(selectedAva);  // always-current read in imperative callbacks
   const panelHoveredAvaRef    = useRef(null);
@@ -1930,22 +1958,7 @@ const WVWAMap = forwardRef(function WVWAMap({
     },
     // Called by ExplorerSidebar's onViewAllVineyards to zoom to parcel bounds
     viewAllVineyards(features) {
-      const map = mapRef.current;
-      if (!map || !features?.length) return;
-      setVineyardFocusMode(true);
-
-      const bounds = getVineyardFeatureBounds(features);
-      if (!bounds) return;
-
-      const isSingle = features.length === 1;
-      map.fitBounds(bounds, {
-        padding: { top: 80, bottom: 80, left: 60, right: 60 },
-        maxZoom: isSingle ? 16.2 : 14.8,
-        pitch: 40,
-        curve: 1.4,
-        speed: 0.55,
-        essential: true,
-      });
+      focusAllVineyardsRef.current?.(features);
     },
     hoverAva(slug) {
       const map = mapRef.current;
@@ -1969,8 +1982,30 @@ const WVWAMap = forwardRef(function WVWAMap({
     onListingSelect?.(listing);
   }, [onListingSelect]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Frame every parcel passed in. Shared by the sidebar's "View all vineyards"
+  // button, the on-map winery badge and the imperative viewAllVineyards handle.
+  const focusAllVineyards = useCallback((features) => {
+    const map = mapRef.current;
+    if (!map || !features?.length) return;
+    setVineyardFocusMode(true);
+
+    const bounds = getVineyardFeatureBounds(features);
+    if (!bounds) return;
+
+    map.fitBounds(bounds, {
+      padding: { top: 80, bottom: 80, left: 60, right: 60 },
+      maxZoom: features.length === 1 ? 16.2 : 14.8,
+      pitch: 40,
+      curve: 1.4,
+      speed: 0.55,
+      essential: true,
+    });
+  }, []);
+  useEffect(() => { focusAllVineyardsRef.current = focusAllVineyards; }, [focusAllVineyards]);
+
   // Store the setter in a ref so the map's [] effect closure can call it
   useEffect(() => { setSelectedListingRef.current = setSelectedListingBoth; }, [setSelectedListingBoth]);
+  useEffect(() => { onVineyardFocusRef.current = onVineyardFocus; }, [onVineyardFocus]);
 
   // Keep selectedAvaRef current so the imperative hover handler always reads the latest value
   useEffect(() => { selectedAvaRef.current = selectedAva; }, [selectedAva]);
@@ -2805,11 +2840,11 @@ const WVWAMap = forwardRef(function WVWAMap({
           if (linkedListing) {
             setSelectedListingRef.current?.(linkedListing);
           }
-          // Zoom to all parcels for this winery (matches card-click behaviour)
-          const allParcels = VINEYARD_BY_RECID[wineryRecid] ?? [];
-          if (!flyToVineyardBounds(map, allParcels.length ? allParcels : [clickedFeature])) {
-            if (linkedListing) flyToCoords(map, { lng: linkedListing.lng, lat: linkedListing.lat });
-          }
+          // Deliberately no camera move: the user picked THIS vineyard, so the
+          // view they framed is the answer. The sidebar opens the winery and
+          // expands the clicked vineyard; "View all vineyards" there (or the
+          // map's own button) is what zooms out to the rest of the estate.
+          onVineyardFocusRef.current?.(getVineyardNameFromProperties(clickedProps) || null);
         });
         map.on('mouseleave', 'vineyards-linked-fill', () => {
           map.getCanvas().style.cursor = '';
@@ -3151,6 +3186,8 @@ const WVWAMap = forwardRef(function WVWAMap({
     });
 
     mapRef.current = map;
+    // Dev-only handle so the map can be inspected from the console.
+    if (import.meta.env.DEV) window.__map = map;
 
     return () => {
       if (popupRef.current) popupRef.current.remove();
@@ -3546,8 +3583,50 @@ const WVWAMap = forwardRef(function WVWAMap({
         <HoverPill dotColor={TOKENS.vividGreen}>{hoveredVineyardOrganization}</HoverPill>
       )}
 
+      {/* Selected winery badge — takes the top-center slot from the AVA badge,
+          and carries the "zoom out to the whole estate" action that the map
+          click deliberately no longer performs on its own. */}
+      {introComplete && selectedListing && (
+        <div style={{
+          position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
+          background: MAP_GLASS.bgStrong,
+          borderRadius: MAP_GLASS.radiusCard,
+          padding: '8px 10px 8px 20px',
+          fontFamily: 'var(--font-sans)',
+          boxShadow: MAP_GLASS.shadow,
+          border: `1px solid ${MAP_GLASS.border}`,
+          zIndex: 10,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
+          whiteSpace: 'nowrap',
+        }}>
+          <span style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: MAP_GLASS.text, letterSpacing: '0.01em' }}>
+            {selectedListing.title}
+          </span>
+          {selectedVineyards.length > 1 && (
+            <button
+              onClick={() => focusAllVineyards(selectedVineyards)}
+              style={{
+                background: 'transparent',
+                border: `1px solid ${MAP_GLASS.border}`,
+                borderRadius: 7,
+                color: MAP_GLASS.text,
+                fontFamily: 'var(--font-sans)',
+                fontSize: 'var(--type-ui-label-size)',
+                fontWeight: 700,
+                padding: '5px 10px',
+                cursor: 'pointer',
+              }}
+            >
+              ⌖ View all {countVineyardGroups(selectedVineyards)} vineyards
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Selected AVA badge — top center focal point when an AVA is selected */}
-      {introComplete && selectedAva && (() => {
+      {introComplete && selectedAva && !selectedListing && (() => {
         const ava = WV_SUB_AVAS.find(a => a.slug === selectedAva);
         return ava ? (
           <div style={{

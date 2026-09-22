@@ -226,6 +226,10 @@ export default function WVWAMapPage() {
   const [insideIds, setInsideIds]                   = useState(null);
   const [vineyardRecidSet, setVineyardRecidSet]     = useState(() => new Map());
   const [vineyardTheme, setVineyardTheme]           = useState('ownership');
+  // Vineyard a map click landed on, so the sidebar opens that one rather than
+  // the winery's first. Bumped with a nonce so re-clicking the same vineyard
+  // after the user collapsed it still re-opens it.
+  const [focusedVineyard, setFocusedVineyard]       = useState(null);
   const [vineyardThemeValues, setVineyardThemeValues] = useState(null);
   // Which vineyards the map emphasizes, driven by the sidebar's page level
   // ('all' everywhere except a winery page, where it's 'winery').
@@ -323,6 +327,7 @@ export default function WVWAMapPage() {
             vineyardThemeValues={vineyardThemeValues}
             selectedVineyards={selectedVineyards}
             parcelTopoStats={parcelTopoStats}
+            focusedVineyard={focusedVineyard}
             onVineyardHover={(features) => mapRef.current?.hoverVineyards?.(features)}
             onViewAllVineyards={(features) => mapRef.current?.viewAllVineyards?.(features)}
             onVineyardScopeChange={setVineyardScope}
@@ -385,6 +390,7 @@ export default function WVWAMapPage() {
             onListingFilterModeChange={setListingFilterMode}
             vineyardTheme={vineyardTheme}
             onVineyardThemeValuesChange={setVineyardThemeValues}
+            onVineyardFocus={(name) => setFocusedVineyard({ name, at: Date.now() })}
             listingSymbologyPreset={listingSymbologyPreset}
             onListingSymbologyPresetChange={setListingSymbologyPreset}
             // Push-only callbacks

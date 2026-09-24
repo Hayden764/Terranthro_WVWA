@@ -669,25 +669,17 @@ function setListingSoftFocus(map, isSoftFocused) {
 
 // ── Vineyard glow ─────────────────────────────────────────────────────────
 // At the valley-wide opening zoom a vineyard is smaller than a pixel, so the
-// fills alone are invisible. Two glow layers sit under the fills and hand off
-// by zoom: an amber centroid heatmap owns the overview (z7–11), then a silver halo
-// traces the real polygons (z10–14) until the coloured fills carry themselves.
-// `k` scales both so soft focus / filters can hush the glow.
+// fills alone are invisible. An amber heatmap of vineyard centroids sits under
+// the fills for the overview (z7–11) and fades out as the fills take over.
+// `k` scales it so soft focus / filters can hush the glow.
 const vineyardGlowHeatOpacity = (k = 1) => [
   'interpolate', ['linear'], ['zoom'],
   7, 0.9 * k, 9.5, 0.8 * k, 11, 0.25 * k, 11.8, 0,
-];
-const vineyardGlowHaloOpacity = (k = 1) => [
-  'interpolate', ['linear'], ['zoom'],
-  9.5, 0, 10.8, 0.6 * k, 13, 0.45 * k, 15, 0.12 * k,
 ];
 
 function setVineyardGlowStrength(map, k) {
   if (map.getLayer('vineyards-glow-heat')) {
     map.setPaintProperty('vineyards-glow-heat', 'heatmap-opacity', vineyardGlowHeatOpacity(k));
-  }
-  if (map.getLayer('vineyards-glow-halo')) {
-    map.setPaintProperty('vineyards-glow-halo', 'line-opacity', vineyardGlowHaloOpacity(k));
   }
 }
 
@@ -818,7 +810,6 @@ function setVineyardVisualizationVisibility(map, isVisible) {
   const visibility = isVisible ? 'visible' : 'none';
   const vineyardLayerIds = [
     'vineyards-glow-heat',
-    'vineyards-glow-halo',
     'vineyards-reference-fill',
     'vineyards-reference-line',
     'vineyards-reference-passive-fill',
@@ -2714,7 +2705,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         });
 
         // Vineyard glow (see vineyardGlowHeatOpacity): heatmap of vineyard
-        // centroids for the overview, blurred polygon halo for mid zooms.
+        // centroids for the overview.
         // Centroids load in the background; the heatmap fills in when ready.
         map.addSource('vineyards-glow', {
           type: 'geojson',
@@ -2744,19 +2735,6 @@ const WVWAMap = forwardRef(function WVWAMap({
               1, 'rgba(255,224,170,0.92)',
             ],
             'heatmap-opacity': vineyardGlowHeatOpacity(),
-          },
-        });
-        map.addLayer({
-          id: 'vineyards-glow-halo',
-          type: 'line',
-          source: 'vineyards-reference',
-          'source-layer': 'vineyard_blocks',
-          minzoom: 9.5,
-          paint: {
-            'line-color': '#DDE3EA', // silver
-            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 5, 12, 9, 14, 7],
-            'line-blur': ['interpolate', ['linear'], ['zoom'], 10, 5, 12, 9, 14, 7],
-            'line-opacity': vineyardGlowHaloOpacity(),
           },
         });
 

@@ -5,11 +5,12 @@ import { EARTH_LAYER_TYPES, TERROIR_CLASS_COLORS } from '../config/earthLayersCo
 import { VINEYARD_THEMES, NO_DATA_COLOR } from '../config/vineyardThemes';
 import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
-import { MONTH_ABBR } from '../config/climateConfig';
+import { CLIMATE_MAP_LAYERS, VINTAGE_FIRST_YEAR, VINTAGE_LAST_YEAR, climateLegend, isClimateMapLayer } from '../config/climateMapConfig';
 import TerroirDataChips from './TerroirDataChips';
 import TerroirFactRows from './TerroirFactRows';
 import { terroirFactRows } from '../lib/terroirFacts';
 import ClimateVintages from './climate/ClimateVintages';
+import { useVintagePlayback } from './climate/VintageYearControls';
 import { apiJson } from '../lib/api';
 
 // ── Design tokens (light‑mode, eggshell base) ────────────────────────────
@@ -189,7 +190,7 @@ const fmtAcres = (n) => (Number.isFinite(n) ? Math.round(n).toLocaleString() : n
 const fmtAcresApprox = (n) => (Number.isFinite(n) ? `${(Math.floor(n / 100) * 100).toLocaleString()}+` : null); // 16622 → "16,600+"
 const fmtAcresCompact = (n) => (Number.isFinite(n) ? `${(n / 1000).toFixed(1)}k+` : null);      // 16622 → "16.6k+"
 
-function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, mappedAcres, onListingClick, onListingHover }) {
+function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, mappedAcres, climateYear, onClimateYearChange, vintageMapActive, onShowVintageMap, onListingClick, onListingHover }) {
   const meta = AVA_META[ava.slug] || {};
   const inside = insideIds
     ? listings.filter(l => l.category === 'winery' && insideIds.includes(l.id))
@@ -224,7 +225,14 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, map
         {/* Vintage climate (PRISM monthly, 1991 onward) */}
         <div>
           <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Vintage Climate</div>
-          <ClimateVintages type="ava" entityKey={ava.slug} />
+          <ClimateVintages
+            type="ava"
+            entityKey={ava.slug}
+            year={climateYear}
+            onYearChange={onClimateYearChange}
+            mapActive={vintageMapActive}
+            onShowOnMap={onShowVintageMap}
+          />
         </div>
 
         {/* Winery list inside AVA */}
@@ -949,16 +957,51 @@ function ParcelBlockView({ parcel, onBack }) {
   );
 }
 
-const CLIMATE_LAYERS = [
-  { id: 'tdmean', label: 'Mean Temperature', sub: '30-yr PRISM normals' },
-];
+// Year scrubber for the "Vintage heat" map layer: step buttons and a slider
+// (both touch-sized), plus play to sweep through every vintage.
+function VintageYearPicker({ year, onChange }) {
+  const { playing, step, setYear, togglePlay } = useVintagePlayback(year, onChange);
+  const btn = {
+    width: 36, height: 36, borderRadius: 8, border: `1px solid ${border}`, background: parchment,
+    color: ink, cursor: 'pointer', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  };
+  return (
+    <div style={{ padding: '8px 4px 2px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button type="button" aria-label="Previous vintage" style={btn} onClick={() => step(-1)} disabled={year <= VINTAGE_FIRST_YEAR}>‹</button>
+        <div style={{ flex: 1, textAlign: 'center' }}>
+          <div style={T.sectionLabel}>Vintage</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: ink, fontVariantNumeric: 'tabular-nums' }}>{year}</div>
+        </div>
+        <button type="button" aria-label="Next vintage" style={btn} onClick={() => step(1)} disabled={year >= VINTAGE_LAST_YEAR}>›</button>
+        <button
+          type="button"
+          aria-label={playing ? 'Pause' : 'Play through every vintage'}
+          aria-pressed={playing}
+          style={{ ...btn, background: playing ? TOKENS.dangerDim : parchment, color: playing ? crimson : ink }}
+          onClick={togglePlay}
+        >{playing ? '❚❚' : '▶'}</button>
+      </div>
+      <input
+        type="range" min={VINTAGE_FIRST_YEAR} max={VINTAGE_LAST_YEAR} value={year}
+        aria-label="Vintage year"
+        onChange={(e) => setYear(Number(e.target.value))}
+        style={{ width: '100%', accentColor: crimson, cursor: 'pointer', marginTop: 6, height: 24 }}
+      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: muted }}>
+        <span>{VINTAGE_FIRST_YEAR}</span><span>{VINTAGE_LAST_YEAR}</span>
+      </div>
+    </div>
+  );
+}
+
 const TOPO_LAYERS = [
   { id: 'elevation', label: 'Elevation',   sub: 'Height above sea level' },
   { id: 'slope',     label: 'Slope',       sub: 'Steepness in degrees' },
   { id: 'aspect',    label: 'Aspect',      sub: 'Direction slope faces' },
 ];
 
-function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange, topoStats, vineyardTheme = 'ownership', onVineyardThemeChange, vineyardThemeValues }) {
+function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_YEAR, onClimateYearChange, topoStats, vineyardTheme = 'ownership', onVineyardThemeChange, vineyardThemeValues }) {
   const [climateOpen, setClimateOpen] = useState(true);
   const [topoOpen, setTopoOpen] = useState(true);
   const [earthOpen, setEarthOpen] = useState(true);
@@ -1038,53 +1081,57 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
         </button>
 
         {climateOpen && (
-          <div style={{ padding: '0 12px 10px' }}>
-            {CLIMATE_LAYERS.map(layer => {
+          <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {Object.values(CLIMATE_MAP_LAYERS).map(layer => {
               const active = activeLayer === layer.id;
               return (
-                <div key={layer.id}>
-                  <button
-                    onClick={() => onLayerChange(active ? null : layer.id)}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
-                      border: `1.5px solid ${active ? crimson + '80' : border}`,
-                      background: active ? TOKENS.dangerDim : parchment,
-                      cursor: 'pointer', fontFamily: 'var(--font-sans)', marginBottom: active ? 6 : 0,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
-                      <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.sub}</div>
-                    </div>
-                    <div style={{
-                      width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>
-                      {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
-                    </div>
-                  </button>
-
-                  {/* Month slider when climate is active */}
-                  {active && (
-                    <div style={{ padding: '8px 10px 4px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <span style={T.sectionLabel}>Month</span>
-                        <span style={{ fontSize: 'var(--type-mono-size)', fontWeight: 700, color: ink }}>{MONTH_ABBR[currentMonth - 1]}</span>
-                      </div>
-                      <input
-                        type="range" min="1" max="12" value={currentMonth}
-                        onChange={e => onMonthChange(Number(e.target.value))}
-                        style={{ width: '100%', accentColor: crimson, cursor: 'pointer' }}
-                      />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
-                        <span>Jan</span><span>Jun</span><span>Dec</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <button
+                  key={layer.id}
+                  onClick={() => onLayerChange(active ? null : layer.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
+                    border: `1.5px solid ${active ? crimson + '80' : border}`,
+                    background: active ? TOKENS.dangerDim : parchment,
+                    cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
+                    <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.sub}</div>
+                  </div>
+                  <div style={{
+                    width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
+                  </div>
+                </button>
               );
             })}
+
+            {activeLayer === 'gdd_vintage' && (
+              <VintageYearPicker year={climateYear} onChange={onClimateYearChange} />
+            )}
+
+            {isClimateMapLayer(activeLayer) && (
+              <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
+                <div style={{ ...T.sectionLabel, marginBottom: 8 }}>
+                  Legend — {activeLayer === 'gdd_vintage' ? `${climateYear} vs 1991–2020` : CLIMATE_MAP_LAYERS[activeLayer].sub}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {climateLegend(activeLayer).map(({ color, label }) => (
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <span style={{ width: 11, height: 11, borderRadius: 3, flexShrink: 0, background: color }} />
+                      <span style={{ fontSize: 'var(--type-ui-label-size)', color: ink }}>{label}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 8 }}>
+                  Growing degree days above 50°F, April–October. Tap the map for the value there.
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1155,15 +1202,6 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
                     <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
                   </div>
                 )}
-              </div>
-            )}
-            {activeLayer === 'tdmean' && (
-              <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
-                <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Scale — Mean Temperature</div>
-                <div style={{ height: 8, borderRadius: 6, background: COLORMAP_CSS.plasma, marginBottom: 4, border: `1px solid ${border}` }} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: muted }}>
-                  <span>−22°C</span><span>26°C</span>
-                </div>
               </div>
             )}
           </div>
@@ -1466,6 +1504,8 @@ export default function ExplorerSidebar({
   onLayerChange,
   currentMonth,
   onMonthChange,
+  climateYear,
+  onClimateYearChange,
   topoStats,
   vineyardTheme,
   onVineyardThemeChange,
@@ -1957,8 +1997,8 @@ export default function ExplorerSidebar({
                 <LayerSection
                   activeLayer={activeLayer}
                   onLayerChange={onLayerChange}
-                  currentMonth={currentMonth}
-                  onMonthChange={onMonthChange}
+                  climateYear={climateYear}
+                  onClimateYearChange={onClimateYearChange}
                   topoStats={topoStats}
                   vineyardTheme={vineyardTheme}
                   onVineyardThemeChange={onVineyardThemeChange}
@@ -2079,6 +2119,10 @@ export default function ExplorerSidebar({
                 insideIds={insideIds}
                 vineyardRecidSet={vineyardRecidSet}
                 mappedAcres={acresData?.avas?.[detailAva.slug]}
+                climateYear={climateYear}
+                onClimateYearChange={onClimateYearChange}
+                vintageMapActive={activeLayer === 'gdd_vintage'}
+                onShowVintageMap={() => onLayerChange?.('gdd_vintage')}
                 onListingClick={handleListingClick}
                 onListingHover={(l) => mapRef.current?.hoverListing(l)}
               />

@@ -3,6 +3,8 @@ import WVWAMap, { LISTING_FILTER_MODES } from '../components/WVWAMap';
 import ExplorerSidebar, { SHEET_PEEK_PX } from '../components/ExplorerSidebar';
 import FilterModal from '../components/FilterModal';
 import { useVineyardFilters } from '../lib/useVineyardFilters';
+import { VINTAGE_LAST_YEAR } from '../config/climateMapConfig';
+import { MapVintageYearControl } from '../components/climate/VintageYearControls';
 import { alpha, border, crimson, ink, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 const UI = {
@@ -219,6 +221,8 @@ export default function WVWAMapPage() {
   const [selectedListing, setSelectedListing]       = useState(null);
   const [activeLayer, setActiveLayer]               = useState(null);
   const [currentMonth, setCurrentMonth]             = useState(new Date().getMonth() + 1);
+  // Vintage shown by the climate map layer; shared with the sidebar's vintage stripes
+  const [climateYear, setClimateYear]               = useState(VINTAGE_LAST_YEAR);
   const [listingFilterMode, setListingFilterMode]   = useState(LISTING_FILTER_MODES.allWineries);
   const [listingSymbologyPreset, setListingSymbologyPreset] = useState('topoModern');
   const [topoStats, setTopoStats]                   = useState(null);
@@ -326,6 +330,8 @@ export default function WVWAMapPage() {
             onLayerChange={(layer) => { setActiveLayer(layer); setTopoStats(null); }}
             currentMonth={currentMonth}
             onMonthChange={setCurrentMonth}
+            climateYear={climateYear}
+            onClimateYearChange={setClimateYear}
             topoStats={topoStats}
             listingFilterMode={listingFilterMode}
             onListingFilterModeChange={setListingFilterMode}
@@ -364,6 +370,8 @@ export default function WVWAMapPage() {
             onLayerChange={(layer) => { setActiveLayer(layer); setTopoStats(null); }}
             currentMonth={currentMonth}
             onMonthChange={setCurrentMonth}
+            climateYear={climateYear}
+            onClimateYearChange={setClimateYear}
             listingFilterMode={listingFilterMode}
             onListingFilterModeChange={setListingFilterMode}
             vineyardTheme={vineyardTheme}
@@ -384,6 +392,11 @@ export default function WVWAMapPage() {
             filtersActive={vineyardFilters.isActive}
             vineyardScope={vineyardScope}
           />
+          {/* Mobile: the sidebar's year picker is buried in the bottom sheet, so
+              the vintage layer gets its own year control on the map */}
+          {isMobile && !isIntro && activeLayer === 'gdd_vintage' && (
+            <MapVintageYearControl year={climateYear} onChange={setClimateYear} />
+          )}
         </div>
       </div>
 

@@ -6,6 +6,7 @@ import {
 import { alpha, TOKENS, TYPE } from '../../styles/tokens';
 import { apiJson } from '../../lib/api';
 import TerroirDataChips from '../TerroirDataChips';
+import { ANOM_COLORS, anomalyColor } from '../../config/climateMapConfig';
 
 /**
  * Vintage climate for an AVA or a vineyard, from GET /api/climate/:type/:key/vintages
@@ -19,15 +20,8 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const SEASON_ORDER = ['dormant', 'spring', 'summer', 'harvest'];
 const SEASON_SHORT = { dormant: 'Dormant · Nov–Feb', spring: 'Spring · Mar–May', summer: 'Summer · Jun–Aug', harvest: 'Harvest · Sep–Oct' };
 
-// Diverging cool ↔ warm ramp (blue / red arms, neutral midpoint) for GDD anomaly bins
-const STRIPE_COLORS = ['#184f95', '#2a78d6', '#6da7ec', '#b7d3f6', '#d6d1c7', '#f4c1b8', '#ec8a7c', '#e34948', '#a8231f'];
-const STRIPE_EDGES = [-350, -250, -150, -50, 50, 150, 250, 350]; // °F·days
-function stripeColor(anom) {
-  if (anom == null) return 'transparent';
-  let i = 0;
-  while (i < STRIPE_EDGES.length && anom > STRIPE_EDGES[i]) i++;
-  return STRIPE_COLORS[i];
-}
+// Diverging cool ↔ warm GDD anomaly bins — shared with the "Vintage heat" map layer
+const stripeColor = anomalyColor;
 
 const fmtInt = (v) => (v == null ? '—' : Math.round(v).toLocaleString());
 const signed = (v, digits = 1, unit = '') => (v == null ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v).toFixed(digits)}${unit}`);
@@ -97,7 +91,7 @@ function VintageStripes({ data, baseline, year, onSelect, colors }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--type-ui-label-size)', color: colors.sub, marginTop: 4 }}>
         <span>Cooler</span>
         <span style={{ display: 'flex', gap: 1 }}>
-          {STRIPE_COLORS.map((c) => <span key={c} style={{ width: 10, height: 6, background: c, borderRadius: 1 }} />)}
+          {ANOM_COLORS.map((c) => <span key={c} style={{ width: 10, height: 6, background: c, borderRadius: 1 }} />)}
         </span>
         <span>Warmer than {bl.label}</span>
       </div>
@@ -211,11 +205,19 @@ function MonthlyCharts({ v, data, baseline, colors }) {
   );
 }
 
-export default function ClimateVintages({ type = 'ava', entityKey, variant = 'light', compact = false }) {
+// `year` / `onYearChange` optionally make the selected vintage controlled, so it
+// can be shared with the "Vintage heat" map layer; `onShowOnMap` adds a button
+// that switches that layer on.
+export default function ClimateVintages({
+  type = 'ava', entityKey, variant = 'light', compact = false,
+  year: yearProp, onYearChange, mapActive = false, onShowOnMap,
+}) {
   const { data, error } = useVintages(type, entityKey);
   const colors = palette(variant);
   const [baseline, setBaseline] = useState('normal');
-  const [year, setYear] = useState(null);
+  const [yearState, setYearState] = useState(null);
+  const year = yearProp !== undefined && data?.vintages.some((x) => x.year === yearProp) ? yearProp : yearState;
+  const setYear = (y) => { setYearState(y); onYearChange?.(y); };
 
   // Default to the latest complete (non-provisional) vintage
   const defaultYear = useMemo(() => {
@@ -291,6 +293,21 @@ export default function ClimateVintages({ type = 'ava', entityKey, variant = 'li
       </div>
 
       <Headline v={v} data={data} baseline={baseline} colors={colors} />
+      {onShowOnMap && (
+        <button
+          type="button"
+          onClick={onShowOnMap}
+          disabled={mapActive}
+          style={{
+            alignSelf: 'flex-start', fontSize: 'var(--type-ui-label-size)', fontFamily: 'var(--font-sans)',
+            padding: '6px 10px', borderRadius: 6, border: `1px solid ${colors.line}`,
+            background: 'transparent', color: mapActive ? colors.sub : colors.text,
+            cursor: mapActive ? 'default' : 'pointer',
+          }}
+        >
+          {mapActive ? `Showing ${activeYear} on the map` : `See ${activeYear} across the map →`}
+        </button>
+      )}
       <SeasonTiles v={v} baseline={baseline} variant={variant} />
       <MonthlyCharts v={v} data={data} baseline={baseline} colors={colors} />
 

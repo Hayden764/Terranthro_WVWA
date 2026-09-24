@@ -6,7 +6,7 @@ import { Protocol } from 'pmtiles';
 // Register pmtiles:// protocol with MapLibre (must happen before any map is created)
 const pmtilesProtocol = new Protocol();
 maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile.bind(pmtilesProtocol));
-import ClimateLayer from './ClimateLayer';
+import ClimateMapLayer from './ClimateMapLayer';
 import TopographyLayer from './TopographyLayer';
 import EarthLayer from './EarthLayer';
 import MapControls from './MapControls';
@@ -18,6 +18,7 @@ import ClimateVintages from './climate/ClimateVintages';
 import HoverPill from './map/HoverPill';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { EARTH_LAYER_TYPES, TERROIR_CLASS_COLORS, isEarthLayer } from '../config/earthLayersConfig';
+import { CLIMATE_MAP_LAYERS, VINTAGE_LAST_YEAR, climateLegend, isClimateMapLayer } from '../config/climateMapConfig';
 import { VINEYARD_THEMES } from '../config/vineyardThemes';
 import { placeBelowVineyards } from '../lib/mapLayerOrder';
 import { AVA_CAMERA, WV_CAMERA } from '../config/avaCameraConfig';
@@ -1025,11 +1026,11 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
 
 /* ── Helpers ──────────────────────────────────────────────────────────── */
 const LAYER_META = {
-  tdmean:    { icon: '🌡️', label: 'Mean Temperature' },
   elevation: { icon: '⛰️',  label: 'Elevation' },
   slope:     { icon: '📐', label: 'Slope' },
   aspect:    { icon: '🧭', label: 'Aspect' },
   ...Object.fromEntries(Object.values(EARTH_LAYER_TYPES).map(t => [t.id, { icon: t.icon, label: t.label }])),
+  ...Object.fromEntries(Object.values(CLIMATE_MAP_LAYERS).map(t => [t.id, { icon: t.icon, label: t.label }])),
 };
 function getLayerIcon(id)  { return LAYER_META[id]?.icon  ?? '🗺️'; }
 function getLayerLabel(id) { return LAYER_META[id]?.label ?? id; }
@@ -1399,11 +1400,11 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
 
 /* ── Layer tab (imports from LayerDetailPanel's data) ─────────────────── */
 const LAYER_INFO_FULL = {
-  tdmean:    { why: 'Average daily mean temperature from PRISM 30-year normals (1991–2020). This helps understand the thermal character of each growing region across different months.', source: 'PRISM Climate Group, Oregon State University', period: '30-year normals (1991–2020)' },
   elevation: { why: 'Height above sea level. Higher-elevation vineyards experience cooler temperatures, more wind exposure, and often better drainage — all factors that influence grape quality.', source: 'USGS Digital Elevation Model', period: 'Static terrain data' },
   slope:     { why: 'Steepness of terrain in degrees. Slopes between 5–15° are generally ideal for viticulture, providing good drainage and sun exposure.', source: 'Derived from USGS DEM', period: 'Static terrain data' },
   aspect:    { why: 'The compass direction a slope faces. South- and southwest-facing slopes receive more sunlight in the Northern Hemisphere, producing warmer and more sun-exposed microclimates.', source: 'Derived from USGS DEM', period: 'Static terrain data' },
   ...Object.fromEntries(Object.values(EARTH_LAYER_TYPES).map(t => [t.id, { why: t.why, source: t.source, period: t.period }])),
+  ...Object.fromEntries(Object.values(CLIMATE_MAP_LAYERS).map(t => [t.id, { why: t.why, source: t.source, period: t.period }])),
 };
 
 // audit-ignore-start centralized-colormap-gradients
@@ -1473,6 +1474,21 @@ function LayerTabContent({ activeLayer, topoStats }) {
             ))}
           </div>
           <div style={{ ...TYPE.uiLabel, color: UI.labelText, textTransform: 'none', letterSpacing: 0, marginTop: 10 }}>Click anywhere on the map for unit details.</div>
+        </div>
+      )}
+
+      {isClimateMapLayer(activeLayer) && (
+        <div style={CARD}>
+          <div style={{ ...LBL, marginBottom: 8 }}>Legend — {CLIMATE_MAP_LAYERS[activeLayer].sub}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {climateLegend(activeLayer).map(({ color, label }) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                <span style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0, background: color, border: `1px solid ${alpha(TOKENS.parchment, 0.15)}` }} />
+                <span style={{ ...TYPE.uiLabel, color: UI.cardTextStrong, textTransform: 'none', letterSpacing: 0 }}>{label}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ ...TYPE.uiLabel, color: UI.labelText, textTransform: 'none', letterSpacing: 0, marginTop: 10 }}>Tap anywhere on the map for the value there.</div>
         </div>
       )}
 
@@ -1681,6 +1697,7 @@ const WVWAMap = forwardRef(function WVWAMap({
   onLayerChange:     onActiveLayerChangeProp,
   currentMonth:      currentMonthProp,
   onMonthChange,
+  climateYear = VINTAGE_LAST_YEAR,
   listingFilterMode: listingFilterModeProp,
   onListingFilterModeChange,
   vineyardTheme = 'ownership',
@@ -2351,7 +2368,7 @@ const WVWAMap = forwardRef(function WVWAMap({
     });
   }, [selectedVineyards]);
 
-  const isClimateActive = activeLayer === 'tdmean';
+  const isClimateActive = isClimateMapLayer(activeLayer);
   const isTopoActive    = ['elevation', 'slope', 'aspect'].includes(activeLayer);
   const isEarthActive   = isEarthLayer(activeLayer);
 
@@ -3813,14 +3830,12 @@ const WVWAMap = forwardRef(function WVWAMap({
         ) : null;
       })()}
 
-      {/* Climate raster layer */}
+      {/* Climate (heat accumulation) vector layers */}
       {introComplete && mapLoaded && mapRef.current && devLayerToggles.climate && (
-        <ClimateLayer
+        <ClimateMapLayer
           map={mapRef.current}
-          isVisible={isClimateActive}
-          currentMonth={currentMonth}
-          prismVar="tdmean"
-          colormap="plasma"
+          activeLayer={isClimateActive ? activeLayer : null}
+          year={climateYear}
         />
       )}
 

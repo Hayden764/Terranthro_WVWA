@@ -667,7 +667,33 @@ function setListingSoftFocus(map, isSoftFocused) {
   }
 }
 
+// ── Vineyard glow ─────────────────────────────────────────────────────────
+// At the valley-wide opening zoom a vineyard is smaller than a pixel, so the
+// fills alone are invisible. Two warm layers sit under the fills and hand off
+// by zoom: a centroid heatmap owns the overview (z7–11), then a blurred halo
+// traces the real polygons (z10–14) until the coloured fills carry themselves.
+// `k` scales both so soft focus / filters can hush the glow.
+const vineyardGlowHeatOpacity = (k = 1) => [
+  'interpolate', ['linear'], ['zoom'],
+  7, 0.9 * k, 9.5, 0.8 * k, 11, 0.25 * k, 11.8, 0,
+];
+const vineyardGlowHaloOpacity = (k = 1) => [
+  'interpolate', ['linear'], ['zoom'],
+  9.5, 0, 10.8, 0.6 * k, 13, 0.45 * k, 15, 0.12 * k,
+];
+
+function setVineyardGlowStrength(map, k) {
+  if (map.getLayer('vineyards-glow-heat')) {
+    map.setPaintProperty('vineyards-glow-heat', 'heatmap-opacity', vineyardGlowHeatOpacity(k));
+  }
+  if (map.getLayer('vineyards-glow-halo')) {
+    map.setPaintProperty('vineyards-glow-halo', 'line-opacity', vineyardGlowHaloOpacity(k));
+  }
+}
+
 function setVineyardReferenceSoftFocus(map, isSoftFocused) {
+  // A selected winery is its own highlight; the valley-wide glow would compete.
+  setVineyardGlowStrength(map, isSoftFocused ? 0.12 : 1);
   // Identity-color fill: keep the palette clearly visible when bright. With one
   // winery selected the neighbours drop to a whisper — still readable as "there
   // is a vineyard here", but with no hue left to compete with the selection.
@@ -757,6 +783,7 @@ function runWhenStyleReady(map, fn) {
  * first so this can layer cleanly on top of either visual state.
  */
 function applyVineyardFilterDim(map) {
+  setVineyardGlowStrength(map, 0.2);
   if (map.getLayer('vineyards-reference-fill'))          map.setPaintProperty('vineyards-reference-fill', 'fill-opacity', 0.12);
   if (map.getLayer('vineyards-reference-line'))          map.setPaintProperty('vineyards-reference-line', 'line-opacity', 0.18);
   if (map.getLayer('vineyards-reference-passive-fill'))  map.setPaintProperty('vineyards-reference-passive-fill', 'fill-opacity', 0.01);
@@ -790,6 +817,8 @@ function applyVineyardEmphasis(map, { scope, filtersActive }) {
 function setVineyardVisualizationVisibility(map, isVisible) {
   const visibility = isVisible ? 'visible' : 'none';
   const vineyardLayerIds = [
+    'vineyards-glow-heat',
+    'vineyards-glow-halo',
     'vineyards-reference-fill',
     'vineyards-reference-line',
     'vineyards-reference-passive-fill',
@@ -2589,6 +2618,17 @@ const WVWAMap = forwardRef(function WVWAMap({
         },
       });
 
+      // Quiet the satellite imagery at overview zooms so the warm vineyard
+      // glow reads against it; back to full colour by vineyard-detail zooms.
+      // (Starts at z6 so the globe intro keeps its natural colour.)
+      for (const id of ['Satellite', 'esri-world-imagery']) {
+        if (!map.getLayer(id)) continue;
+        map.setPaintProperty(id, 'raster-saturation',
+          ['interpolate', ['linear'], ['zoom'], 6, 0, 7, -0.4, 10, -0.25, 12.5, 0]);
+        map.setPaintProperty(id, 'raster-brightness-max',
+          ['interpolate', ['linear'], ['zoom'], 6, 1, 7, 0.72, 10, 0.82, 12.5, 1]);
+      }
+
       map.addSource('wv-boundary', { type: 'geojson', data: wvData });
       // Solid gold border around the entire WV region
       map.addLayer({
@@ -2682,6 +2722,54 @@ const WVWAMap = forwardRef(function WVWAMap({
           // vineyard. Adding promoteId here would look for a now-consumed
           // `vineyard_id` property and blank out the id instead.
         });
+
+        // Vineyard glow (see vineyardGlowHeatOpacity): heatmap of vineyard
+        // centroids for the overview, blurred polygon halo for mid zooms.
+        // Centroids load in the background; the heatmap fills in when ready.
+        map.addSource('vineyards-glow', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        fetch(`${API_BASE}/api/vineyards/centroids`, { headers: API_HEADERS })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((fc) => { if (fc) map.getSource('vineyards-glow')?.setData(fc); })
+          .catch((err) => console.warn('Vineyard glow centroids failed to load:', err));
+        map.addLayer({
+          id: 'vineyards-glow-heat',
+          type: 'heatmap',
+          source: 'vineyards-glow',
+          maxzoom: 12,
+          paint: {
+            // Median vineyard is ~7 ac; big estates glow brighter, but a small
+            // one still registers on its own.
+            'heatmap-weight': ['interpolate', ['linear'], ['get', 'acres'], 0, 0.3, 10, 0.55, 40, 1],
+            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 7, 0.6, 11, 1.4],
+            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 7, 9, 9, 16, 11, 28],
+            'heatmap-color': [
+              'interpolate', ['linear'], ['heatmap-density'],
+              0, 'rgba(255,190,100,0)',
+              0.1, 'rgba(255,170,80,0.3)',
+              0.35, 'rgba(255,170,75,0.6)',
+              0.7, 'rgba(255,196,115,0.82)',
+              1, 'rgba(255,224,170,0.92)',
+            ],
+            'heatmap-opacity': vineyardGlowHeatOpacity(),
+          },
+        });
+        map.addLayer({
+          id: 'vineyards-glow-halo',
+          type: 'line',
+          source: 'vineyards-reference',
+          'source-layer': 'vineyard_blocks',
+          minzoom: 9.5,
+          paint: {
+            'line-color': '#FFD08A',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 5, 12, 9, 14, 7],
+            'line-blur': ['interpolate', ['linear'], ['zoom'], 10, 5, 12, 9, 14, 7],
+            'line-opacity': vineyardGlowHaloOpacity(),
+          },
+        });
+
         map.addLayer({
           id: 'vineyards-reference-fill',
           type: 'fill',

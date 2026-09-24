@@ -116,6 +116,42 @@ router.get('/tiles/:z/:x/:y', async (req, res) => {
 });
 
 /**
+ * GET /api/vineyards/centroids
+ *
+ * One point per vineyard (centroid of its blocks) with total acres, as a
+ * compact GeoJSON FeatureCollection. Feeds the low-zoom heatmap glow: at the
+ * valley-wide opening view a vineyard is smaller than a pixel, so the map
+ * shows where vineyards cluster instead of the polygons themselves.
+ */
+router.get('/centroids', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT json_build_object(
+         'type', 'FeatureCollection',
+         'features', COALESCE(json_agg(json_build_object(
+           'type', 'Feature',
+           'geometry', ST_AsGeoJSON(c.pt, 5)::json,
+           'properties', json_build_object('acres', c.acres)
+         )), '[]'::json)
+       ) AS fc
+       FROM (
+         SELECT ST_Centroid(ST_Collect(b.geometry)) AS pt,
+                ROUND(COALESCE(SUM(b.acres), 0)::numeric, 1)::float AS acres
+         FROM vineyard_blocks b
+         WHERE b.geometry IS NOT NULL
+         GROUP BY b.vineyard_id
+       ) c
+       WHERE c.pt IS NOT NULL`
+    );
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.json(rows[0].fc);
+  } catch (err) {
+    console.error('GET /api/vineyards/centroids error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
  * GET /api/vineyards/parcels
  *
  * Returns vineyard footprint polygons (one feature per vineyard entity) as a

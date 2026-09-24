@@ -669,8 +669,8 @@ function setListingSoftFocus(map, isSoftFocused) {
 
 // ── Vineyard glow ─────────────────────────────────────────────────────────
 // At the valley-wide opening zoom a vineyard is smaller than a pixel, so the
-// fills alone are invisible. Two warm layers sit under the fills and hand off
-// by zoom: a centroid heatmap owns the overview (z7–11), then a blurred halo
+// fills alone are invisible. Two glow layers sit under the fills and hand off
+// by zoom: an amber centroid heatmap owns the overview (z7–11), then a silver halo
 // traces the real polygons (z10–14) until the coloured fills carry themselves.
 // `k` scales both so soft focus / filters can hush the glow.
 const vineyardGlowHeatOpacity = (k = 1) => [
@@ -2618,16 +2618,6 @@ const WVWAMap = forwardRef(function WVWAMap({
         },
       });
 
-      // Quiet the satellite imagery at overview zooms so the warm vineyard
-      // glow reads against it; back to full colour by vineyard-detail zooms.
-      // (Starts at z6 so the globe intro keeps its natural colour.)
-      for (const id of ['Satellite', 'esri-world-imagery']) {
-        if (!map.getLayer(id)) continue;
-        map.setPaintProperty(id, 'raster-saturation',
-          ['interpolate', ['linear'], ['zoom'], 6, 0, 7, -0.4, 10, -0.25, 12.5, 0]);
-        map.setPaintProperty(id, 'raster-brightness-max',
-          ['interpolate', ['linear'], ['zoom'], 6, 1, 7, 0.72, 10, 0.82, 12.5, 1]);
-      }
 
       map.addSource('wv-boundary', { type: 'geojson', data: wvData });
       // Solid gold border around the entire WV region
@@ -2763,7 +2753,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           'source-layer': 'vineyard_blocks',
           minzoom: 9.5,
           paint: {
-            'line-color': '#FFD08A',
+            'line-color': '#DDE3EA', // silver
             'line-width': ['interpolate', ['linear'], ['zoom'], 10, 5, 12, 9, 14, 7],
             'line-blur': ['interpolate', ['linear'], ['zoom'], 10, 5, 12, 9, 14, 7],
             'line-opacity': vineyardGlowHaloOpacity(),

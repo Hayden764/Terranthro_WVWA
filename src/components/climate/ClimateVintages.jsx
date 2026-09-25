@@ -3,7 +3,7 @@ import {
   ResponsiveContainer, LineChart, Line, ComposedChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend,
 } from 'recharts';
-import { alpha, TOKENS, TYPE } from '../../styles/tokens';
+import { alpha, interactive, TOKENS, TYPE } from '../../styles/tokens';
 import { apiJson } from '../../lib/api';
 import TerroirDataChips from '../TerroirDataChips';
 import { ANOM_COLORS, anomalyColor } from '../../config/climateMapConfig';
@@ -63,6 +63,7 @@ function VintageStripes({ data, baseline, year, onSelect, colors }) {
       <div style={{ display: 'flex', gap: 2, height: 28 }} onMouseLeave={() => setHover(null)}>
         {data.vintages.filter((v) => v.gdd != null).map((v) => {
           const selected = v.year === year;
+          const hovered = hover?.year === v.year;
           return (
             <button
               key={v.year}
@@ -74,7 +75,7 @@ function VintageStripes({ data, baseline, year, onSelect, colors }) {
               style={{
                 flex: 1, minWidth: 0, padding: 0, border: 'none', cursor: onSelect ? 'pointer' : 'default',
                 borderRadius: 2, background: stripeColor(v.anomaly[baseline].gdd),
-                outline: selected ? `2px solid ${colors.text}` : 'none', outlineOffset: 1,
+                outline: selected || hovered ? `2px solid ${interactive}` : 'none', outlineOffset: 1,
                 opacity: v.provisional ? 0.55 : 1,
               }}
             />
@@ -266,7 +267,7 @@ export default function ClimateVintages({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <select aria-label="Vintage" value={activeYear} onChange={(e) => setYear(Number(e.target.value))} style={selectStyle}>
+        <select aria-label="Vintage" className="tx-input" value={activeYear} onChange={(e) => setYear(Number(e.target.value))} style={selectStyle}>
           {[...data.vintages].reverse().map((x) => (
             <option key={x.year} value={x.year}>{x.year}{x.provisional ? ' (provisional)' : ''}</option>
           ))}
@@ -279,11 +280,10 @@ export default function ClimateVintages({
               type="button"
               onClick={() => setBaseline(k)}
               aria-pressed={baseline === k}
+              className={`tx-fill${baseline === k ? ' is-active' : ''}`}
               style={{
                 fontSize: 'var(--type-ui-label-size)', padding: '3px 8px', border: 'none', cursor: 'pointer',
-                fontFamily: 'var(--font-sans)',
-                background: baseline === k ? colors.text : 'transparent',
-                color: baseline === k ? (variant === 'glass' ? TOKENS.ink : TOKENS.parchment) : colors.sub,
+                fontFamily: 'var(--font-sans)', background: 'transparent', color: colors.sub,
               }}
             >
               {b.from}–{b.to}
@@ -298,6 +298,7 @@ export default function ClimateVintages({
           type="button"
           onClick={onShowOnMap}
           disabled={mapActive}
+          className={`tx-box tx-link${mapActive ? ' is-active' : ''}`}
           style={{
             alignSelf: 'flex-start', fontSize: 'var(--type-ui-label-size)', fontFamily: 'var(--font-sans)',
             padding: '6px 10px', borderRadius: 6, border: `1px solid ${colors.line}`,

@@ -1,4 +1,4 @@
-import { alpha, border, crimson, ink, muted, TOKENS } from '../styles/tokens';
+import { alpha, border, interactive, interactiveSoft, ink, muted, TOKENS } from '../styles/tokens';
 import { toggleLegendKeys } from '../lib/legendSelection';
 
 /**
@@ -16,7 +16,7 @@ export default function LegendFilter({ groups, selected = [], onChange, variant 
     text: glass ? alpha(TOKENS.parchment, 0.9) : ink,
     sub: glass ? alpha(TOKENS.parchment, 0.55) : muted,
     hover: glass ? alpha(TOKENS.parchment, 0.08) : alpha(TOKENS.ink, 0.05),
-    on: glass ? alpha(TOKENS.parchment, 0.12) : alpha(TOKENS.ink, 0.07),
+    on: interactiveSoft,
     swatchEdge: glass ? alpha(TOKENS.parchment, 0.15) : border,
   };
   const active = selected.length > 0;
@@ -40,15 +40,16 @@ export default function LegendFilter({ groups, selected = [], onChange, variant 
         type="button"
         aria-pressed={picked}
         onClick={() => toggle([key])}
+        className={`tx-box${picked ? ' is-active' : ''}`}
         style={{
           display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, width: '100%',
           minHeight: 30, padding: `3px 6px 3px ${indent ? 20 : 6}px`, borderRadius: 6,
-          border: 'none', background: picked ? c.on : 'transparent', cursor: 'pointer',
+          border: '1px solid transparent', background: picked ? c.on : 'transparent', cursor: 'pointer',
           textAlign: 'left', fontFamily: 'var(--font-sans)',
         }}
       >
         {swatch(color, on)}
-        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'var(--type-ui-label-size)', color: on ? c.text : c.sub }}>
+        <span className="tx-title" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'var(--type-ui-label-size)', color: on ? c.text : c.sub }}>
           {title ? <><strong style={{ fontWeight: 650 }}>{title}</strong> · {label}</> : label}
         </span>
       </button>
@@ -64,16 +65,17 @@ export default function LegendFilter({ groups, selected = [], onChange, variant 
         type="button"
         aria-pressed={onCount === keys.length}
         onClick={() => toggle(keys)}
+        className={`tx-box${onCount === keys.length && active ? ' is-active' : ''}`}
         style={{
           display: 'flex', alignItems: 'center', gap: 7, width: '100%', minHeight: 30, padding: '3px 6px',
-          borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', textAlign: 'left',
+          borderRadius: 6, border: '1px solid transparent', cursor: 'pointer', fontFamily: 'var(--font-sans)', textAlign: 'left',
           background: onCount === keys.length && active ? c.on : 'transparent',
         }}
       >
         <span style={{ display: 'flex', flexShrink: 0, borderRadius: 3, overflow: 'hidden', border: `1px solid ${c.swatchEdge}`, opacity: anyOn ? 1 : 0.35 }}>
           {g.rows.map((r) => <span key={r.key} style={{ width: 8, height: 12, background: r.color }} />)}
         </span>
-        <span style={{ fontSize: 'var(--type-ui-label-size)', fontWeight: 650, color: anyOn ? c.text : c.sub }}>{g.label}</span>
+        <span className="tx-title" style={{ fontSize: 'var(--type-ui-label-size)', fontWeight: 650, color: anyOn ? c.text : c.sub }}>{g.label}</span>
       </button>
     );
   };
@@ -88,9 +90,10 @@ export default function LegendFilter({ groups, selected = [], onChange, variant 
           <button
             type="button"
             onClick={() => onChange?.([])}
+            className="tx-link"
             style={{
               border: 'none', background: 'none', padding: '2px 0', cursor: 'pointer', fontFamily: 'var(--font-sans)',
-              fontSize: 'var(--type-ui-label-size)', fontWeight: 650, color: glass ? TOKENS.parchment : crimson,
+              fontSize: 'var(--type-ui-label-size)', fontWeight: 650, color: glass ? TOKENS.parchment : interactive,
             }}
           >Show all</button>
         )}

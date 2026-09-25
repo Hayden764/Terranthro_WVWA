@@ -37,13 +37,14 @@ const HEX = {
   parchment:  '#E8E2D6',
   success:    '#00C44F',
   danger:     '#E03040',
+  interactive:'#2E9BFF', // = --color-interactive (MapLibre needs a literal)
   successDark:'#062a1a', // mix(success 60%, ink) — used for stroke
 };
 
 // UI constants for map layer styling
 const UI = {
   parcelFill: HEX.success,
-  parcelHighlight: HEX.danger,
+  parcelHighlight: HEX.interactive,
   parcelStrokeBase: HEX.successDark,
   parcelLabelText: HEX.parchment,
   parcelLabelHalo: 'rgba(0,0,0,0.65)',
@@ -778,14 +779,14 @@ export default function PortalVineyardMap({
               />
               <span>Aggressive</span>
             </div>
-            <button onClick={handleSimplify} style={editSimplifyBtnStyle}>
+            <button onClick={handleSimplify} className="tx-box tx-link" style={editSimplifyBtnStyle}>
               Simplify
             </button>
             <button
               onClick={() => {
                 if (onEditCancel) onEditCancel();
               }}
-              style={editCancelBtnStyle}
+              className="tx-box tx-link" style={editCancelBtnStyle}
             >
               Cancel
             </button>
@@ -821,7 +822,7 @@ export default function PortalVineyardMap({
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             <button
               onClick={() => { if (onSplitCancel) onSplitCancel(); }}
-              style={editCancelBtnStyle}
+              className="tx-box tx-link" style={editCancelBtnStyle}
             >
               Cancel
             </button>
@@ -857,7 +858,7 @@ export default function PortalVineyardMap({
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             <button
               onClick={() => { if (onAddCancel) onAddCancel(); }}
-              style={editCancelBtnStyle}
+              className="tx-box tx-link" style={editCancelBtnStyle}
             >
               Cancel
             </button>

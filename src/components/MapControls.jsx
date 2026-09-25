@@ -115,6 +115,7 @@ function CompassDial({ map, bearing, onResetNorth }) {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       title="Drag to rotate · click to reset north"
+      className="tx-box"
       style={{
         width: 40, height: 40, borderRadius: '50%',
         cursor: isDragging ? 'grabbing' : 'grab',
@@ -139,22 +140,15 @@ function CompassDial({ map, bearing, onResetNorth }) {
   );
 }
 
+// Hover/focus highlight (blue border + icon) comes from the shared .tx-box/.tx-link classes
 function ControlBtn({ style, onClick, title, children }) {
-  const [hovered, setHovered] = useState(false);
-  // Only intensify the glass on hover when the button isn't already in an
-  // active (crimson) state — preserves active emphasis.
-  const isActive = style?.background === MAP_GLASS.bgActive;
   return (
     <button
       onClick={onClick}
       title={title}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        ...style,
-        background: hovered && !isActive ? MAP_GLASS.bgHover : style.background,
-        transform: hovered ? 'scale(1.04)' : 'scale(1)',
-      }}
+      aria-label={title}
+      className="tx-box tx-link"
+      style={style}
     >
       {children}
     </button>

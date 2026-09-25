@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
-import { alpha, border, crimson, electricBlue, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
+import { alpha, border, crimson, interactive, interactiveSoft, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { EARTH_LAYER_TYPES, earthLegendGroups } from '../config/earthLayersConfig';
 import { VINEYARD_THEMES, NO_DATA_COLOR } from '../config/vineyardThemes';
@@ -31,7 +31,7 @@ const T = {
   hoverBg:       parchment,
   activeBg:      TOKENS.dangerDim,
   // Shared hover color for card name text (vineyard groups, AVA cards, winery cards)
-  cardNameHover: TOKENS.electricBlue,
+  cardNameHover: interactive,
 };
 
 const UI = {
@@ -131,8 +131,7 @@ const BackBtn = ({ onClick }) => (
       fontFamily: 'var(--font-sans)', width: '100%', textAlign: 'left',
       borderBottom: `1px solid ${border}`,
     }}
-    onMouseEnter={e => e.currentTarget.style.color = ink}
-    onMouseLeave={e => e.currentTarget.style.color = muted}
+    className="tx-link"
   >
     <span style={{ fontSize: 'var(--type-body-size)', lineHeight: 1 }}>‹</span> Back
   </button>
@@ -142,6 +141,8 @@ function SectionHeader({ label, open, onToggle, count }) {
   return (
     <button
       onClick={onToggle}
+      aria-expanded={open}
+      className={`tx-row${open ? ' is-active' : ''}`}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         width: '100%', padding: '10px 16px',
@@ -150,7 +151,7 @@ function SectionHeader({ label, open, onToggle, count }) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={T.sectionLabel}>{label}</span>
+        <span className="tx-title" style={T.sectionLabel}>{label}</span>
         {count != null && (
           <span style={{ fontSize: 'var(--type-ui-label-size)', background: parchment, borderRadius: 10, padding: '1px 7px', color: muted, fontWeight: 600 }}>
             {count}
@@ -244,18 +245,19 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, map
                   <div
                     key={l.id}
                     onClick={() => onListingClick(l)}
+                    className="tx-box"
                     style={{
                       border: `1px solid ${border}`,
                       borderRadius: 10, background: parchment,
                       cursor: 'pointer', overflow: 'hidden',
                       transition: 'border-color 0.15s',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = T.cardNameHover + '55'; const n = e.currentTarget.querySelector('.winery-card-name'); if (n) n.style.color = T.cardNameHover; onListingHover?.(l); }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = border; const n = e.currentTarget.querySelector('.winery-card-name'); if (n) n.style.color = ink; onListingHover?.(null); }}
+                    onMouseEnter={() => onListingHover?.(l)}
+                    onMouseLeave={() => onListingHover?.(null)}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px 8px' }}>
                       <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                        <div className="winery-card-name" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div className="winery-card-name tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {l.title}
                         </div>
                         <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
@@ -441,13 +443,13 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
         {/* Contact / links */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {listing.phone && (
-            <a href={`tel:${listing.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--type-mono-size)', color: ink, textDecoration: 'none' }}>
+            <a href={`tel:${listing.phone}`} className="tx-link" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--type-mono-size)', color: ink, textDecoration: 'none' }}>
               <span>📞</span> {listing.phone}
             </a>
           )}
           {listing.url && (
             <a href={listing.url} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'block', padding: '9px 14px', background: crimson, color: parchment, borderRadius: 8, fontSize: 'var(--type-mono-size)', fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>
+              className="tx-box" style={{ display: 'block', padding: '8px 14px', background: crimson, color: parchment, border: '1px solid transparent', borderRadius: 8, fontSize: 'var(--type-mono-size)', fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>
               Visit Website ↗
             </a>
           )}
@@ -461,6 +463,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
               {vineyardGroups.length > 1 && (
                 <button
                   onClick={() => onViewAllVineyards?.(selectedVineyards)}
+                  className="tx-box tx-link"
                   style={{
                     background: UI.viewAllBtnBg, border: `1px solid ${UI.viewAllBtnBorder}`,
                     borderRadius: 6, color: UI.mapped, fontSize: 'var(--type-ui-label-size)', fontWeight: 700,
@@ -593,11 +596,11 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                   rendered.push(
                     <div
                       key={group.key}
+                      className={`tx-box${isExpanded ? ' is-active' : ''}`}
                       style={{
                         border: `1px solid ${border}`,
                         borderRadius: 10, background: parchment,
-                        transition: 'color 0.15s',
-                        overflow: 'hidden', marginBottom: 6,
+                        overflow: 'hidden', marginBottom: 6, cursor: 'default',
                       }}
                       onMouseEnter={() => { setHoveredGroup(i); onVineyardHover?.(group.features); }}
                       onMouseLeave={() => { setHoveredGroup(null); onVineyardHover?.(null); }}
@@ -608,6 +611,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                         role="button"
                         tabIndex={0}
                         aria-expanded={isExpanded}
+                        className="tx-row"
                         onClick={() => { setExpandedGroupKey(isExpanded ? null : group.key); onViewAllVineyards?.(group.features); }}
                         onKeyDown={(e) => {
                           if (e.key !== 'Enter' && e.key !== ' ') return;
@@ -618,7 +622,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px 8px', cursor: 'pointer' }}
                       >
                         <div style={{ flex: 1, paddingRight: 8, minWidth: 0 }}>
-                          <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: isHovered ? T.cardNameHover : ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: isHovered ? T.cardNameHover : ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {group.name}
                           </div>
                           {acres && (
@@ -689,6 +693,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                                     acres: group.acresCount > 0 ? group.acresTotal : null,
                                   });
                                 }}
+                                className="tx-box tx-link"
                                 style={{
                                   marginTop: 10, width: '100%', padding: '7px 0',
                                   background: 'transparent', border: `1px solid ${border}`,
@@ -914,7 +919,7 @@ function ParcelBlockView({ parcel, onBack }) {
             <thead>
               <tr>
                 {COL_DEFS.map(c => (
-                  <th key={c.key} style={thStyle(c.key)} onClick={() => toggleSort(c.key)}>
+                  <th key={c.key} className={`tx-link${sort.key === c.key ? ' is-active' : ''}`} style={thStyle(c.key)} onClick={() => toggleSort(c.key)}>
                     {c.label}{sort.key === c.key ? (sort.dir === 1 ? ' ▴' : ' ▾') : ''}
                   </th>
                 ))}
@@ -927,7 +932,7 @@ function ParcelBlockView({ parcel, onBack }) {
                   key={block.id}
                   onMouseEnter={() => setHoveredRow(block.id)}
                   onMouseLeave={() => setHoveredRow(null)}
-                  style={{ background: hoveredRow === block.id ? alpha(electricBlue, 0.06) : 'transparent', transition: 'background 0.12s' }}
+                  style={{ background: hoveredRow === block.id ? interactiveSoft : 'transparent', transition: 'background 0.12s' }}
                 >
                   {COL_DEFS.map(c => (
                     <td key={c.key} style={tdStyle(c.bold)}>
@@ -975,17 +980,18 @@ function VintageYearPicker({ year, onChange }) {
   return (
     <div style={{ padding: '8px 4px 2px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <button type="button" aria-label="Previous vintage" style={btn} onClick={() => step(-1)} disabled={year <= VINTAGE_FIRST_YEAR}>‹</button>
+        <button type="button" aria-label="Previous vintage" className="tx-box tx-link" style={btn} onClick={() => step(-1)} disabled={year <= VINTAGE_FIRST_YEAR}>‹</button>
         <div style={{ flex: 1, textAlign: 'center' }}>
           <div style={T.sectionLabel}>Vintage</div>
           <div style={{ fontSize: 20, fontWeight: 700, color: ink, fontVariantNumeric: 'tabular-nums' }}>{year}</div>
         </div>
-        <button type="button" aria-label="Next vintage" style={btn} onClick={() => step(1)} disabled={year >= VINTAGE_LAST_YEAR}>›</button>
+        <button type="button" aria-label="Next vintage" className="tx-box tx-link" style={btn} onClick={() => step(1)} disabled={year >= VINTAGE_LAST_YEAR}>›</button>
         <button
           type="button"
           aria-label={playing ? 'Pause' : 'Play through every vintage'}
           aria-pressed={playing}
-          style={{ ...btn, background: playing ? TOKENS.dangerDim : parchment, color: playing ? crimson : ink }}
+          className={`tx-fill${playing ? ' is-active' : ''}`}
+          style={btn}
           onClick={togglePlay}
         >{playing ? '❚❚' : '▶'}</button>
       </div>
@@ -993,7 +999,7 @@ function VintageYearPicker({ year, onChange }) {
         type="range" min={VINTAGE_FIRST_YEAR} max={VINTAGE_LAST_YEAR} value={year}
         aria-label="Vintage year"
         onChange={(e) => setYear(Number(e.target.value))}
-        style={{ width: '100%', accentColor: crimson, cursor: 'pointer', marginTop: 6, height: 24 }}
+        style={{ width: '100%', accentColor: interactive, cursor: 'pointer', marginTop: 6, height: 24 }}
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: muted }}>
         <span>{VINTAGE_FIRST_YEAR}</span><span>{VINTAGE_LAST_YEAR}</span>
@@ -1092,9 +1098,10 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
             aria-label="Colour vineyards by"
             value={vineyardTheme}
             onChange={(e) => onVineyardThemeChange?.(e.target.value)}
+            className={`tx-box${vineyardTheme === 'ownership' ? '' : ' is-active'}`}
             style={{
               width: '100%', padding: '7px 9px', borderRadius: 8, cursor: 'pointer',
-              border: `1.5px solid ${vineyardTheme === 'ownership' ? border : crimson + '80'}`,
+              border: `1.5px solid ${border}`,
               background: parchment, color: ink, fontFamily: 'var(--font-sans)',
               fontSize: 'var(--type-mono-size)', fontWeight: 600,
             }}
@@ -1117,10 +1124,11 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
                   type="button"
                   aria-pressed={on}
                   onClick={() => onVineyardOutlineChange?.(id)}
+                  className={`tx-fill${on ? ' is-active' : ''}`}
                   style={{
                     flex: 1, minHeight: 32, border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)',
                     fontSize: 'var(--type-ui-label-size)', fontWeight: 600,
-                    background: on ? ink : parchment, color: on ? parchment : ink,
+                    background: parchment, color: ink,
                   }}
                 >{label}</button>
               );
@@ -1163,9 +1171,11 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
       <div style={{ borderBottom: `1px solid ${border}` }}>
         <button
           onClick={() => setClimateOpen(p => !p)}
+          aria-expanded={climateOpen}
+          className={`tx-row${climateOpen ? ' is-active' : ''}`}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
         >
-          <span style={T.sectionLabel}>Climate</span>
+          <span className="tx-title" style={T.sectionLabel}>Climate</span>
           <Chevron open={climateOpen} />
         </button>
 
@@ -1180,23 +1190,25 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
                   <Fragment key={layer.id}>
                     <button
                       onClick={() => onLayerChange(active ? null : layer.id)}
+                      aria-pressed={active}
+                      className={`tx-box${active ? ' is-active' : ''}`}
                       style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
-                        border: `1.5px solid ${active ? crimson + '80' : border}`,
-                        background: active ? TOKENS.dangerDim : parchment,
+                        border: `1.5px solid ${border}`,
+                        background: active ? interactiveSoft : parchment,
                         cursor: 'pointer', fontFamily: 'var(--font-sans)',
                       }}
                     >
                       <div>
-                        <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
+                        <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>{layer.label}</div>
                         <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.sub}</div>
                       </div>
                       <div style={{
-                        width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
+                        width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? interactive : border}`,
                         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                       }}>
-                        {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
+                        {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: interactive }} />}
                       </div>
                     </button>
                     {active && climateExtras}
@@ -1213,9 +1225,11 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
       <div style={{ borderBottom: `1px solid ${border}` }}>
         <button
           onClick={() => setTopoOpen(p => !p)}
+          aria-expanded={topoOpen}
+          className={`tx-row${topoOpen ? ' is-active' : ''}`}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
         >
-          <span style={T.sectionLabel}>Topography</span>
+          <span className="tx-title" style={T.sectionLabel}>Topography</span>
           <Chevron open={topoOpen} />
         </button>
 
@@ -1228,23 +1242,25 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
                 <Fragment key={layer.id}>
                   <button
                     onClick={() => onLayerChange(active ? null : layer.id)}
+                    aria-pressed={active}
+                    className={`tx-box${active ? ' is-active' : ''}`}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
-                      border: `1.5px solid ${active ? crimson + '80' : border}`,
-                      background: active ? TOKENS.dangerDim : parchment,
+                      border: `1.5px solid ${border}`,
+                      background: active ? interactiveSoft : parchment,
                       cursor: 'pointer', fontFamily: 'var(--font-sans)',
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
+                      <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>{layer.label}</div>
                       <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.sub}</div>
                     </div>
                     <div style={{
-                      width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
+                      width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? interactive : border}`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                     }}>
-                      {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
+                      {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: interactive }} />}
                     </div>
                   </button>
                   {active && topoExtras}
@@ -1260,9 +1276,11 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
       <div style={{ borderBottom: `1px solid ${border}` }}>
         <button
           onClick={() => setEarthOpen(p => !p)}
+          aria-expanded={earthOpen}
+          className={`tx-row${earthOpen ? ' is-active' : ''}`}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
         >
-          <span style={T.sectionLabel}>Soils &amp; Geology</span>
+          <span className="tx-title" style={T.sectionLabel}>Soils &amp; Geology</span>
           <Chevron open={earthOpen} />
         </button>
 
@@ -1275,23 +1293,25 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
                 <Fragment key={layer.id}>
                   <button
                     onClick={() => onLayerChange(active ? null : layer.id)}
+                    aria-pressed={active}
+                    className={`tx-box${active ? ' is-active' : ''}`}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
-                      border: `1.5px solid ${active ? crimson + '80' : border}`,
-                      background: active ? TOKENS.dangerDim : parchment,
+                      border: `1.5px solid ${border}`,
+                      background: active ? interactiveSoft : parchment,
                       cursor: 'pointer', fontFamily: 'var(--font-sans)',
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
+                      <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>{layer.label}</div>
                       <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.description} · {layer.attribution}</div>
                     </div>
                     <div style={{
-                      width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
+                      width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? interactive : border}`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                     }}>
-                      {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
+                      {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: interactive }} />}
                     </div>
                   </button>
                   {active && earthExtras}
@@ -1383,13 +1403,14 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
             <button
               key={p.id}
               onClick={() => onListingFilterModeChange(p.id)}
+              aria-pressed={isActive}
+              className={`tx-box tx-link${isActive ? ' is-active' : ''}`}
               style={{
                 padding: '4px 12px', borderRadius: 20, fontSize: 'var(--type-ui-label-size)', fontWeight: 600,
-                border: `1px solid ${isActive ? crimson + '90' : border}`,
-                background: isActive ? TOKENS.dangerDim : parchment,
-                color: isActive ? crimson : muted,
+                border: `1px solid ${border}`,
+                background: isActive ? interactiveSoft : parchment,
+                color: muted,
                 cursor: 'pointer', fontFamily: 'var(--font-sans)',
-                transition: 'all 0.15s',
               }}
             >
               {p.label}
@@ -1399,15 +1420,15 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
       </div>
 
       {ava && (
-        <div style={{ padding: '6px 16px', background: TOKENS.dangerDim, borderBottom: `1px solid ${border}` }}>
-          <span style={{ fontSize: 'var(--type-ui-label-size)', color: crimson }}>Showing {ava.name} only — {visible.length} winer{visible.length === 1 ? 'y' : 'ies'}</span>
+        <div style={{ padding: '6px 16px', background: interactiveSoft, borderBottom: `1px solid ${border}` }}>
+          <span style={{ fontSize: 'var(--type-ui-label-size)', color: interactive }}>Showing {ava.name} only — {visible.length} winer{visible.length === 1 ? 'y' : 'ies'}</span>
         </div>
       )}
 
       {/* Filter-results banner */}
       {filterActive && (
-        <div style={{ padding: '6px 16px', background: TOKENS.dangerDim, borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span style={{ fontSize: 'var(--type-ui-label-size)', color: crimson, fontWeight: 600 }}>
+        <div style={{ padding: '6px 16px', background: interactiveSoft, borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span style={{ fontSize: 'var(--type-ui-label-size)', color: interactive, fontWeight: 600 }}>
             {vineyardFilterResult.winery_total_count} winer{vineyardFilterResult.winery_total_count === 1 ? 'y' : 'ies'} match · {vineyardFilterResult.matching_vineyard_total_count} vineyard{vineyardFilterResult.matching_vineyard_total_count === 1 ? '' : 's'}
           </span>
         </div>
@@ -1421,6 +1442,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
         <select
           value={sortKey}
           onChange={(e) => setSortKey(e.target.value)}
+          className="tx-box"
           style={{
             flex: 1,
             background: parchment,
@@ -1466,6 +1488,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
             <div
               key={l.id}
               onClick={() => onListingClick(l)}
+              className="tx-box"
               style={{
                 border: `1px solid ${border}`,
                 borderRadius: 10, background: parchment,
@@ -1473,12 +1496,12 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
                 transition: 'border-color 0.15s',
                 marginBottom: 6,
               }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = T.cardNameHover + '55'; const n = e.currentTarget.querySelector('.winery-card-name'); if (n) n.style.color = T.cardNameHover; onListingHover?.(l); }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = border; const n = e.currentTarget.querySelector('.winery-card-name'); if (n) n.style.color = ink; onListingHover?.(null); }}
+              onMouseEnter={() => onListingHover?.(l)}
+              onMouseLeave={() => onListingHover?.(null)}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px 8px' }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                  <div className="winery-card-name" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div className="winery-card-name tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {l.title}
                   </div>
                   <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
@@ -1487,7 +1510,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
                 </div>
                 <span style={{
                   width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                  background: filterActive ? crimson : (vineyardCount > 0 ? UI.mapped : muted),
+                  background: filterActive ? interactive : (vineyardCount > 0 ? UI.mapped : muted),
                 }} />
               </div>
             </div>
@@ -1544,6 +1567,7 @@ function TermsSection() {
         onChange={e => setQuery(e.target.value)}
         placeholder="Filter terms…"
         aria-label="Filter terms"
+        className="tx-input"
         style={{
           width: '100%', boxSizing: 'border-box', padding: '7px 10px', borderRadius: 7,
           border: `1px solid ${border}`, background: 'transparent', color: ink,
@@ -1897,6 +1921,8 @@ export default function ExplorerSidebar({
           {!isOnHome && (
             <button
               onClick={handleBack}
+              aria-label="Back"
+              className="tx-box tx-link"
               style={{
                 background: UI.backBtnBg, border: `1px solid ${UI.backBtnBorder}`,
                 borderRadius: 7, color: T.headerText, cursor: 'pointer',
@@ -1919,6 +1945,7 @@ export default function ExplorerSidebar({
             <button
               onClick={() => onSheetDetentChange?.('peek')}
               aria-label="Collapse panel"
+              className="tx-box tx-link"
               style={{
                 background: UI.backBtnBg, border: `1px solid ${UI.backBtnBorder}`,
                 borderRadius: 7, color: T.headerText, cursor: 'pointer',
@@ -1998,13 +2025,12 @@ export default function ExplorerSidebar({
             {/* Enhanced: Nested AVAs nav row */}
             <button
               onClick={() => setViewStack(prev => prev[prev.length - 1] === 'home' ? [...prev, 'ava-list'] : prev)}
+              className="tx-row"
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 width: '100%', padding: '13px 16px', background: 'none', border: 'none',
                 borderBottom: `1px solid ${border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
@@ -2015,7 +2041,7 @@ export default function ExplorerSidebar({
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ink} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
                 </div>
                 <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Nested AVAs</div>
+                  <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Nested AVAs</div>
                   <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>{WV_SUB_AVAS.length} viticultural areas</div>
                 </div>
               </div>
@@ -2025,13 +2051,12 @@ export default function ExplorerSidebar({
             {/* Enhanced: Wineries nav row */}
             <button
               onClick={() => setViewStack(prev => prev[prev.length - 1] === 'home' ? [...prev, 'winery-list'] : prev)}
+              className="tx-row"
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 width: '100%', padding: '13px 16px', background: 'none', border: 'none',
                 borderBottom: `1px solid ${border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
@@ -2042,7 +2067,7 @@ export default function ExplorerSidebar({
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={UI.danger75} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="M6 2h12l-3 9a5 5 0 0 1-6 0L6 2z"/></svg>
                 </div>
                 <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Wineries</div>
+                  <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Wineries</div>
                   <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>{wineryCount > 0 ? `${wineryCount} in the valley` : 'Browse all wineries'}</div>
                 </div>
               </div>
@@ -2052,13 +2077,13 @@ export default function ExplorerSidebar({
             {/* Enhanced: Data Layers nav row */}
             <button
               onClick={() => toggleSection('layers')}
+              aria-expanded={sections.layers}
+              className={`tx-row${sections.layers ? ' is-active' : ''}`}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 width: '100%', padding: '13px 16px', background: 'none', border: 'none',
                 borderBottom: `1px solid ${border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
@@ -2069,7 +2094,7 @@ export default function ExplorerSidebar({
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={UI.electric75} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                 </div>
                 <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Data Layers</div>
+                  <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Data Layers</div>
                   <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>Climate, terrain, soils &amp; bedrock</div>
                 </div>
               </div>
@@ -2099,14 +2124,13 @@ export default function ExplorerSidebar({
             {/* Wine Terms accordion */}
             <button
               onClick={() => toggleSection('terms')}
+              className={`tx-row${sections.terms ? ' is-active' : ''}`}
               aria-expanded={sections.terms}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 width: '100%', padding: '13px 16px', background: 'none', border: 'none',
                 borderBottom: `1px solid ${border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
@@ -2117,7 +2141,7 @@ export default function ExplorerSidebar({
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ink} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg>
                 </div>
                 <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Wine Terms</div>
+                  <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Wine Terms</div>
                   <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>Soils, climate &amp; vineyard vocabulary</div>
                 </div>
               </div>
@@ -2129,14 +2153,14 @@ export default function ExplorerSidebar({
             <div>
               <button
                 onClick={() => toggleSection('about')}
+                aria-expanded={sections.about}
+                className={`tx-row${sections.about ? ' is-active' : ''}`}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   width: '100%', padding: '13px 16px', background: 'none', border: 'none',
                   borderBottom: sections.about ? `1px solid ${border}` : 'none',
                   cursor: 'pointer', fontFamily: 'var(--font-sans)',
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
-                onMouseLeave={e => e.currentTarget.style.background = 'none'}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{
@@ -2145,7 +2169,7 @@ export default function ExplorerSidebar({
                     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--type-display-italic-size)',
                   }}>ℹ️</div>
                   <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>About &amp; Legend</div>
+                    <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>About &amp; Legend</div>
                     <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>Data sources &amp; map key</div>
                   </div>
                 </div>
@@ -2185,33 +2209,22 @@ export default function ExplorerSidebar({
                       )}
                       <div
                         onClick={() => handleAvaClick(ava)}
-                        className="ava-card"
+                        className={`ava-card tx-box${isSelected ? ' is-active' : ''}`}
                         style={{
                           flex: 1,
                           height: '100%',
-                          border: `1px solid ${isSelected ? crimson + '55' : border}`,
+                          border: `1px solid ${border}`,
                           borderRadius: 10,
-                          background: isSelected ? T.activeBg : parchment,
+                          background: isSelected ? interactiveSoft : parchment,
                           cursor: 'pointer', overflow: 'hidden',
-                          transition: 'border-color 0.15s',
                           display: 'flex', alignItems: 'center',
                         }}
-                        onMouseEnter={e => {
-                          if (!isSelected) e.currentTarget.style.borderColor = T.cardNameHover + '55';
-                          const nameEl = e.currentTarget.querySelector('.ava-card-name');
-                          if (nameEl && !isSelected) nameEl.style.color = T.cardNameHover;
-                          mapRef.current?.hoverAva(ava.slug);
-                        }}
-                        onMouseLeave={e => {
-                          if (!isSelected) e.currentTarget.style.borderColor = border;
-                          const nameEl = e.currentTarget.querySelector('.ava-card-name');
-                          if (nameEl && !isSelected) nameEl.style.color = ink;
-                          mapRef.current?.hoverAva(null);
-                        }}
+                        onMouseEnter={() => mapRef.current?.hoverAva(ava.slug)}
+                        onMouseLeave={() => mapRef.current?.hoverAva(null)}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', width: '100%' }}>
                           <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                            <div className="ava-card-name" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: isSelected ? crimson : ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <div className="ava-card-name tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {ava.name}
                             </div>
                             <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>

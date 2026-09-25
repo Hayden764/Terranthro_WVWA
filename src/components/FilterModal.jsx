@@ -7,7 +7,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { WV_SUB_AVAS } from '../config/topographyConfig';
-import { alpha, border, crimson, ink, parchment, TOKENS, TYPE } from '../styles/tokens';
+import { alpha, border, crimson, interactive, ink, parchment, TOKENS, TYPE } from '../styles/tokens';
 import {
   ASPECT_BUCKETS,
   EMPTY_FILTERS,
@@ -28,8 +28,8 @@ const TEXT_FAINT   = alpha(TOKENS.parchment, 0.4);
 const SECTION_BORDER = alpha(TOKENS.parchment, 0.1);
 const CHIP_IDLE_BG     = alpha(TOKENS.parchment, 0.06);
 const CHIP_IDLE_BORDER = alpha(TOKENS.parchment, 0.18);
-const CHIP_ACTIVE_BG     = alpha(TOKENS.crimson, 0.22);
-const CHIP_ACTIVE_BORDER = alpha(TOKENS.crimson, 0.7);
+const CHIP_ACTIVE_BG     = alpha(TOKENS.interactive, 0.22);
+const CHIP_ACTIVE_BORDER = interactive;
 const SCRIM_BG = alpha(TOKENS.ink, 0.55);
 
 // Hard fallback ranges; replaced by /api/vineyards/filter-ranges when loaded.
@@ -93,6 +93,7 @@ function RangeControl({ label, range, lo, hi, onChange, format, step = 1 }) {
             const v = e.target.value === '' ? null : Number(e.target.value);
             onChange(v, hi);
           }}
+          className="tx-input"
           style={inputStyle}
         />
         <span style={{ color: TEXT_FAINT }}>–</span>
@@ -107,6 +108,7 @@ function RangeControl({ label, range, lo, hi, onChange, format, step = 1 }) {
             const v = e.target.value === '' ? null : Number(e.target.value);
             onChange(lo, v);
           }}
+          className="tx-input"
           style={inputStyle}
         />
       </div>
@@ -139,6 +141,8 @@ function ChipGroup({ options, selected, onToggle, getKey = (o) => o, getLabel = 
             key={key}
             type="button"
             onClick={() => onToggle(key)}
+            aria-pressed={active}
+            className={`tx-box${active ? ' is-active' : ''}`}
             style={{
               padding: '5px 11px',
               borderRadius: 16,
@@ -148,7 +152,6 @@ function ChipGroup({ options, selected, onToggle, getKey = (o) => o, getLabel = 
               fontSize: 'var(--type-ui-label-size)',
               fontWeight: 600,
               cursor: 'pointer',
-              outline: 'none',
               transition: 'all 0.12s',
               fontFamily: 'var(--font-sans)',
             }}
@@ -187,6 +190,8 @@ function AspectGrid({ selected, onToggle }) {
             key={dir}
             type="button"
             onClick={() => onToggle(dir)}
+            aria-pressed={active}
+            className={`tx-box${active ? ' is-active' : ''}`}
             style={{
               padding: '10px 0',
               borderRadius: 8,
@@ -196,7 +201,6 @@ function AspectGrid({ selected, onToggle }) {
               fontSize: 'var(--type-body-size)',
               fontWeight: 700,
               cursor: 'pointer',
-              outline: 'none',
               transition: 'all 0.12s',
               letterSpacing: '0.04em',
             }}
@@ -348,6 +352,7 @@ export default function FilterModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            className="tx-link"
             style={{
               background: 'none',
               border: 'none',
@@ -438,6 +443,7 @@ export default function FilterModal({
                 placeholder="Or type a variety name…"
                 value={draft.variety && !topVarieties.includes(draft.variety) ? draft.variety : ''}
                 onChange={(e) => setDraft(d => ({ ...d, variety: e.target.value || null }))}
+                className="tx-input"
                 style={{ ...inputStyle, marginTop: 8, width: '100%', boxSizing: 'border-box' }}
               />
             </div>
@@ -462,6 +468,7 @@ export default function FilterModal({
             <select
               value={draft.ava || ''}
               onChange={(e) => setDraft(d => ({ ...d, ava: e.target.value || null }))}
+              className="tx-input"
               style={{
                 ...inputStyle,
                 width: '100%',
@@ -504,6 +511,7 @@ export default function FilterModal({
             <button
               type="button"
               onClick={handleReset}
+              className="tx-box tx-link"
               style={{
                 background: 'transparent',
                 border: `1px solid ${alpha(TOKENS.parchment, 0.2)}`,
@@ -521,6 +529,7 @@ export default function FilterModal({
             <button
               type="button"
               onClick={handleApply}
+              className="tx-box"
               style={{
                 background: TOKENS.crimson,
                 border: `1px solid ${TOKENS.crimson}`,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { alpha, border, crimson, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
+import { alpha, border, interactive, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 import { TERMS_BY_ID } from '../config/wineTerms';
 
 /**
@@ -15,7 +15,6 @@ function palette(variant) {
     sub:    glass ? alpha(TOKENS.parchment, 0.6) : muted,
     line:   glass ? alpha(TOKENS.parchment, 0.14) : border,
     bg:     glass ? alpha(TOKENS.parchment, 0.05) : parchment,
-    accent: glass ? TOKENS.parchment : crimson,
   };
 }
 
@@ -23,18 +22,19 @@ function palette(variant) {
 export function TermItem({ term, open, onToggle, variant = 'light' }) {
   const c = palette(variant);
   return (
-    <div style={{ border: `1px solid ${c.line}`, borderRadius: 8, background: c.bg, overflow: 'hidden' }}>
+    <div className={`tx-box${open ? ' is-active' : ''}`} style={{ border: `1px solid ${c.line}`, borderRadius: 8, background: c.bg, overflow: 'hidden', cursor: 'default' }}>
       <button
         type="button"
         aria-expanded={open}
         onClick={onToggle}
+        className="tx-row"
         style={{
           display: 'flex', alignItems: 'flex-start', gap: 8, width: '100%', textAlign: 'left',
           padding: '8px 10px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)',
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: open ? c.accent : c.text }}>{term.term}</div>
+          <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: c.text }}>{term.term}</div>
           <div style={{ fontSize: 'var(--type-ui-label-size)', color: c.sub, marginTop: 2, lineHeight: 1.45 }}>{term.short}</div>
         </div>
         <span style={{ fontSize: 'var(--type-ui-label-size)', color: c.sub, flexShrink: 0, lineHeight: 1.6 }}>{open ? '▾' : '▸'}</span>
@@ -67,6 +67,7 @@ export default function TermHelp({ label, ids, variant = 'light', style }) {
           type="button"
           aria-expanded={shown}
           onClick={() => setShown(s => !s)}
+          className={`tx-link${shown ? ' is-active' : ''}`}
           style={{
             background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0,
             fontFamily: 'var(--font-sans)', fontSize: 'var(--type-ui-label-size)',

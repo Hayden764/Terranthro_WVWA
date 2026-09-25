@@ -14,7 +14,6 @@ const UI = {
   taglineText:      alpha(TOKENS.parchment, 0.5),
   btnBorderIdle:    alpha(TOKENS.parchment, 0.25),
   btnTextIdle:      alpha(TOKENS.parchment, 0.35),
-  btnHoverBg:       alpha(TOKENS.parchment, 0.1),
   subtleLabel:      alpha(TOKENS.parchment, 0.45),
 };
 import { useIsMobile } from '../lib/useIsMobile';
@@ -38,17 +37,9 @@ function PortalHeaderButton() {
         letterSpacing: '0.1em',
         textTransform: 'uppercase',
         textDecoration: 'none',
-        transition: 'border-color 0.2s, color 0.2s',
         whiteSpace: 'nowrap',
       }}
-      onMouseEnter={e => {
-        e.currentTarget.style.borderColor = alpha(TOKENS.parchment, 0.6);
-        e.currentTarget.style.color = alpha(TOKENS.parchment, 0.95);
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.borderColor = alpha(TOKENS.parchment, 0.25);
-        e.currentTarget.style.color = alpha(TOKENS.parchment, 0.55);
-      }}
+      className="tx-box tx-link"
     >
       Winery Portal
       <span style={{ fontSize: 9, opacity: 0.7 }}>→</span>
@@ -138,15 +129,8 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
           fontWeight: 600,
           cursor: mapReady ? 'pointer' : 'default',
           fontFamily: 'var(--font-sans)',
-          transition: 'background 0.2s, color 0.2s, border-color 0.2s',
         }}
-        onMouseEnter={e => {
-          if (!mapReady) return;
-          e.currentTarget.style.background = UI.btnHoverBg;
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.background = 'transparent';
-        }}
+        className={mapReady ? 'tx-box tx-link' : undefined}
       >
         {mapReady ? 'Begin Exploring' : 'Loading map\u2026'}
       </button>
@@ -162,10 +146,8 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
             fontFamily: 'var(--font-sans)',
             fontStyle: 'italic',
             textDecoration: 'none',
-            transition: 'color 0.2s',
           }}
-          onMouseEnter={e => { e.currentTarget.style.color = alpha(TOKENS.parchment, 0.8); }}
-          onMouseLeave={e => { e.currentTarget.style.color = alpha(TOKENS.parchment, 0.35); }}
+          className="tx-link"
         >
           Winery owner? Sign in to your portal
         </a>

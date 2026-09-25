@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '../../styles/tokens';
+import { alpha, border, interactive, ink, muted, parchment, TOKENS } from '../../styles/tokens';
 import { CLIMATE_MAP_LAYERS, VINTAGE_FIRST_YEAR, VINTAGE_LAST_YEAR } from '../../config/climateMapConfig';
 
 /**
@@ -56,17 +56,18 @@ export function MapVintageYearControl({ layerId, year, onChange }) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button type="button" aria-label="Previous vintage" style={btn} onClick={() => step(-1)} disabled={year <= VINTAGE_FIRST_YEAR}>‹</button>
+        <button type="button" aria-label="Previous vintage" className="tx-box tx-link" style={btn} onClick={() => step(-1)} disabled={year <= VINTAGE_FIRST_YEAR}>‹</button>
         <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
           <div style={{ fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', color: muted }}>{cfg?.label}</div>
           <div style={{ fontSize: 20, fontWeight: 700, color: ink, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{year}</div>
         </div>
-        <button type="button" aria-label="Next vintage" style={btn} onClick={() => step(1)} disabled={year >= VINTAGE_LAST_YEAR}>›</button>
+        <button type="button" aria-label="Next vintage" className="tx-box tx-link" style={btn} onClick={() => step(1)} disabled={year >= VINTAGE_LAST_YEAR}>›</button>
         <button
           type="button"
           aria-label={playing ? 'Pause' : 'Play through every vintage'}
           aria-pressed={playing}
-          style={{ ...btn, background: playing ? TOKENS.dangerDim : parchment, color: playing ? crimson : ink, fontSize: 14 }}
+          className={`tx-fill${playing ? ' is-active' : ''}`}
+          style={{ ...btn, fontSize: 14 }}
           onClick={togglePlay}
         >{playing ? '❚❚' : '▶'}</button>
       </div>
@@ -74,7 +75,7 @@ export function MapVintageYearControl({ layerId, year, onChange }) {
         type="range" min={VINTAGE_FIRST_YEAR} max={VINTAGE_LAST_YEAR} value={year}
         aria-label="Vintage year"
         onChange={(e) => setYear(Number(e.target.value))}
-        style={{ width: '100%', accentColor: crimson, cursor: 'pointer', margin: '6px 0 2px', height: 28 }}
+        style={{ width: '100%', accentColor: interactive, cursor: 'pointer', margin: '6px 0 2px', height: 28 }}
       />
       {/* Compact key — the full legend is in the sheet */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: muted }}>

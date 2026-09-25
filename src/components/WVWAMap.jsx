@@ -138,10 +138,10 @@ const UI = {
   vineyardAccentSoft: alpha(TOKENS.vividGreen, 0.12),
   vineyardAccentBorder: alpha(TOKENS.vividGreen, 0.35),
   vineyardAccentMuted: alpha(TOKENS.vividGreen, 0.5),
-  hoverAccent: TOKENS.electricBlue,
-  hoverAccentSoft: alpha(TOKENS.electricBlue, 0.1),
-  hoverAccentBorder: alpha(TOKENS.electricBlue, 0.55),
-  hoverAccentMuted: alpha(TOKENS.electricBlue, 0.9),
+  hoverAccent: TOKENS.interactive,
+  hoverAccentSoft: alpha(TOKENS.interactive, 0.1),
+  hoverAccentBorder: TOKENS.interactive,
+  hoverAccentMuted: alpha(TOKENS.interactive, 0.9),
   subtleDivider: alpha(TOKENS.parchment, 0.06),
   faintText: alpha(TOKENS.parchment, 0.45),
   cardTextStrong: alpha(TOKENS.parchment, 0.9),
@@ -958,12 +958,13 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
+                  className={`tx-link${isActive ? ' is-active' : ''}`}
                   style={{
                     flex: 1,
                     padding: '10px 8px',
                     background: isActive ? UI.tabActiveBg : 'transparent',
                     border: 'none',
-                    borderBottom: isActive ? `2px solid ${crimson}` : '2px solid transparent',
+                    borderBottom: isActive ? `2px solid ${TOKENS.interactive}` : '2px solid transparent',
                     color: isActive ? UI.tabActiveText : UI.tabIdleText,
                     cursor: 'pointer',
                     fontSize: 'var(--type-ui-label-size)',
@@ -984,6 +985,7 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
                     role="button"
                     title={`Close ${t.label}`}
                     onClick={e => { e.stopPropagation(); t.id === 'listing' ? onCloseListing() : onCloseLayer(); }}
+                    className="tx-link"
                     style={{
                       marginLeft: 4,
                       fontSize: 'var(--type-ui-label-size)',
@@ -1018,6 +1020,8 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
             </div>
             <button
               onClick={resolvedTab === 'listing' ? onCloseListing : onCloseLayer}
+              aria-label="Close"
+              className="tx-box tx-link"
               style={{
                 background: UI.closeBtnBg,
                 border: `1px solid ${UI.closeBtnBorder}`,
@@ -1135,13 +1139,13 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
         )}
 
         {listing.phone && (
-          <a href={`tel:${listing.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--type-body-size)', color: UI.phoneText, textDecoration: 'none', marginBottom: 10 }}>
+          <a href={`tel:${listing.phone}`} className="tx-link" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--type-body-size)', color: UI.phoneText, textDecoration: 'none', marginBottom: 10 }}>
             📞 {listing.phone}
           </a>
         )}
 
         {listing.url && (
-          <a href={listing.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', padding: '8px 14px', background: cat.color, color: UI.white, borderRadius: 8, fontSize: 'var(--type-body-size)', fontWeight: 600, textDecoration: 'none', textAlign: 'center', marginTop: 4 }}>
+          <a href={listing.url} target="_blank" rel="noopener noreferrer" className="tx-box" style={{ display: 'block', padding: '7px 14px', border: '1px solid transparent', background: cat.color, color: UI.white, borderRadius: 8, fontSize: 'var(--type-body-size)', fontWeight: 600, textDecoration: 'none', textAlign: 'center', marginTop: 4 }}>
             Visit Website ↗
           </a>
         )}
@@ -1173,16 +1177,7 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                     transition: 'background 0.15s, border-color 0.15s, color 0.15s',
                     whiteSpace: 'nowrap',
                   }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = UI.hoverAccentSoft;
-                    e.currentTarget.style.borderColor = UI.hoverAccentBorder;
-                    e.currentTarget.style.color = UI.hoverAccent;
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = UI.vineyardAccentSoft;
-                    e.currentTarget.style.borderColor = UI.vineyardAccentBorder;
-                    e.currentTarget.style.color = UI.vineyardAccent;
-                  }}
+                  className="tx-box tx-link"
                   title="Fit map to all estate parcels"
                 >
                   ⌖ View All
@@ -1262,12 +1257,11 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
               return (
                 <div
                   key={group.key}
+                  className={`tx-box${isExpanded ? ' is-active' : ''}`}
                   style={{
                     ...CARD,
                     cursor: isExpanded ? 'default' : 'pointer',
-                    border: isHovered
-                      ? `1px solid ${UI.hoverAccentBorder}`
-                      : `1px solid ${UI.cardBorder}`,
+                    border: `1px solid ${UI.cardBorder}`,
                     background: isHovered
                       ? UI.hoverAccentSoft
                       : UI.cardBg,
@@ -1295,7 +1289,7 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isExpanded ? 8 : 0, cursor: 'pointer' }}
                     onClick={isExpanded ? () => onViewAllVineyards?.(group.features) : undefined}
                   >
-                    <div style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: isHovered ? UI.hoverAccent : UI.vineyardAccent, transition: 'color 0.15s', flex: 1, paddingRight: 8 }}>{group.name}</div>
+                    <div className="tx-title" style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: UI.vineyardAccent, flex: 1, paddingRight: 8 }}>{group.name}</div>
                     <span style={{
                       fontSize: 'var(--type-ui-label-size)',
                       color: isHovered ? UI.hoverAccentMuted : UI.vineyardAccentMuted,
@@ -1399,6 +1393,7 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                                   e.stopPropagation();
                                   onViewAllVineyards?.([feature]);
                                 }}
+                                className="tx-box"
                                 style={{
                                   textAlign: 'left',
                                   border: `1px solid ${UI.blockBorder}`,
@@ -1411,7 +1406,7 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                                 }}
                                 title="Zoom to this block footprint"
                               >
-                                <div style={{ fontWeight: 700 }}>Block {fi + 1}</div>
+                                <div className="tx-title" style={{ fontWeight: 700 }}>Block {fi + 1}</div>
                                 <div style={{ marginTop: 2, fontSize: 'var(--type-ui-label-size)', color: UI.bodyText }}>{fAcres || 'No acreage'} • Click to zoom</div>
                               </button>
                             );
@@ -3266,7 +3261,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         type: 'line',
         source: 'ava-hover',
         paint: {
-          'line-color': '#38BDF8',
+          'line-color': '#2E9BFF', // = --color-interactive
           'line-width': 3,
           'line-opacity': 1,
         },
@@ -3833,9 +3828,10 @@ const WVWAMap = forwardRef(function WVWAMap({
           </div>
           <button
             onClick={openPreviewedVineyard}
+            className="tx-box"
             style={{
               flexShrink: 0, minHeight: 44, padding: '0 16px',
-              background: crimson, border: 'none', borderRadius: 8,
+              background: crimson, border: '1px solid transparent', borderRadius: 8,
               color: parchment, fontFamily: 'var(--font-sans)',
               fontSize: 'var(--type-mono-size)', fontWeight: 700, cursor: 'pointer',
             }}
@@ -3870,6 +3866,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           {selectedVineyards.length > 1 && (
             <button
               onClick={() => focusAllVineyards(selectedVineyards)}
+              className="tx-box tx-link"
               style={{
                 background: 'transparent',
                 border: `1px solid ${MAP_GLASS.border}`,

@@ -16,7 +16,6 @@ export default function PortalDashboard() {
   const [loading, setLoading] = useState(true);
   const [showBulk, setShowBulk] = useState(false);
   const [bulkDone, setBulkDone] = useState(null);
-  const [hoveredGroup, setHoveredGroup] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -134,21 +133,18 @@ export default function PortalDashboard() {
                 { label: 'Aspect', value: topo ? degToCardinal(topo.aspect_dominant_deg) : '—', tone: 'blue', glow: true },
               ];
 
-              const isHovered = hoveredGroup === group.name;
               return (
                 <Link
                   key={group.name}
                   to={href}
-                  onMouseEnter={() => setHoveredGroup(group.name)}
-                  onMouseLeave={() => setHoveredGroup(null)}
+                  className="tx-box"
                   style={{
                     display: 'block', padding: '14px 16px', borderRadius: 8,
-                    border: `1px solid ${isHovered ? electricBlue : border}`, background: parchment,
+                    border: `1px solid ${border}`, background: parchment,
                     textDecoration: 'none', color: ink,
-                    transition: 'border-color 0.12s, color 0.12s',
                   }}
                 >
-                  <div style={{ fontWeight: 600, fontSize: 'var(--type-display-italic-size)', color: isHovered ? electricBlue : ink }}>{group.name}</div>
+                  <div className="tx-title" style={{ fontWeight: 600, fontSize: 'var(--type-display-italic-size)', color: ink }}>{group.name}</div>
                   <div style={{ fontSize: 'var(--type-mono-size)', color: muted, marginTop: 4 }}>
                     {ava}
                     {group.parcels.length > 1 && ` · ${group.parcels.length} parcels`}

@@ -109,12 +109,13 @@ export default function PortalLogin() {
             <button
               key={key}
               onClick={() => { setTab(key); setError(''); }}
+              className={`tx-link${tab === key ? ' is-active' : ''}`}
               style={{
                 flex: 1,
                 padding: '8px 0',
                 background: 'none',
                 border: 'none',
-                borderBottom: tab === key ? `2px solid ${ink}` : '2px solid transparent',
+                borderBottom: tab === key ? `2px solid ${TOKENS.interactive}` : '2px solid transparent',
                 marginBottom: -1,
                 fontSize: 'var(--type-body-size)',
                 fontWeight: tab === key ? 600 : 400,
@@ -171,7 +172,7 @@ export default function PortalLogin() {
             </button>
 
             <p style={{ marginTop: 14, fontSize: 'var(--type-body-size)', color: muted, textAlign: 'center' }}>
-              No password yet? Use the <button onClick={() => setTab(TAB.MAGIC)} style={{ background: 'none', border: 'none', color: crimson, fontSize: 'var(--type-body-size)', cursor: 'pointer', padding: 0 }}>email link</button> tab to log in, then set one in your profile.
+              No password yet? Use the <button onClick={() => setTab(TAB.MAGIC)} className="tx-link" style={{ background: 'none', border: 'none', color: TOKENS.interactive, fontSize: 'var(--type-body-size)', cursor: 'pointer', padding: 0 }}>email link</button> tab to log in, then set one in your profile.
             </p>
           </form>
         )}
@@ -231,7 +232,7 @@ export default function PortalLogin() {
           textAlign: 'center',
         }}>
           Don't have access?{' '}
-          <a href="mailto:info@terranthro.com" style={{ color: crimson }}>
+          <a href="mailto:info@terranthro.com" className="tx-link" style={{ color: TOKENS.interactive }}>
             Contact us
           </a>
         </p>

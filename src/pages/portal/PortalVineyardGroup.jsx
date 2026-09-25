@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import lineSplit from '@turf/line-split';
 import { feature as turfFeature } from '@turf/helpers';
-import { border, crimson, ink, muted, parchment, TOKENS } from '../../styles/tokens';
+import { border, crimson, interactive, interactiveSoft, ink, muted, parchment, TOKENS } from '../../styles/tokens';
 import { INPUT_STYLE, btn } from '../../styles/patterns';
 import { apiJson, apiPost } from '../../lib/api';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
@@ -268,7 +268,7 @@ export default function PortalVineyardGroup() {
           background: parchment, borderBottom: `1px solid ${border}`,
           padding: '12px 0', marginBottom: 8,
         }}>
-          <Link to="/portal/dashboard" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>
+          <Link to="/portal/dashboard" className="tx-link" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>
             ← Dashboard
           </Link>
         </div>
@@ -287,7 +287,7 @@ export default function PortalVineyardGroup() {
             <button onClick={submitRename} disabled={renameStatus === 'submitting'} style={smallBtnStyle}>
               {renameStatus === 'submitting' ? 'Submitting…' : 'Submit for Review'}
             </button>
-            <button onClick={() => setRenaming(false)} style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}>Cancel</button>
+            <button onClick={() => setRenaming(false)} className="tx-box tx-link" style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}>Cancel</button>
           </div>
         ) : (
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', margin: '16px 0 4px' }}>
@@ -296,7 +296,7 @@ export default function PortalVineyardGroup() {
             }}>
               {name}
             </h1>
-            <button onClick={startRename} style={editNameBtnStyle} title="Rename this vineyard">
+            <button onClick={startRename} className="tx-box tx-link" style={editNameBtnStyle} title="Rename this vineyard">
               ✎ Edit name
             </button>
           </div>
@@ -399,7 +399,7 @@ export default function PortalVineyardGroup() {
               <button onClick={submitAdd} disabled={addSubmitStatus === 'submitting' || !pendingAdd.vineyard_name.trim()} style={smallBtnStyle}>
                 {addSubmitStatus === 'submitting' ? 'Submitting…' : 'Submit for Review'}
               </button>
-              <button onClick={() => { setPendingAdd(null); setAddSubmitStatus(null); }} style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}>
+              <button onClick={() => { setPendingAdd(null); setAddSubmitStatus(null); }} className="tx-box tx-link" style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}>
                 Discard
               </button>
             </div>
@@ -457,10 +457,12 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
   return (
     <div
       id={`parcel-${parcel.id}`}
+      className={`tx-box${highlighted ? ' is-active' : ''}`}
       style={{
         borderRadius: 10,
-        border: `2px solid ${highlighted ? crimson : border}`,
-        background: highlighted ? TOKENS.dangerDim : parchment,
+        border: `2px solid ${border}`,
+        background: highlighted ? interactiveSoft : parchment,
+        cursor: 'default',
         overflow: 'hidden',
         transition: 'border-color 0.2s, background 0.2s',
       }}
@@ -474,10 +476,14 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
           justifyContent: 'space-between',
           alignItems: 'flex-start',
         }}
+        className="tx-row"
+        role="button"
+        tabIndex={0}
         onClick={onHighlight}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onHighlight?.(); } }}
       >
         <div>
-          <div style={{ fontWeight: 600, fontSize: 'var(--type-body-size)', color: ink }}>
+          <div className="tx-title" style={{ fontWeight: 600, fontSize: 'var(--type-body-size)', color: ink }}>
             {parcel.vineyard_name || 'Unnamed Parcel'}
             <span style={{ fontWeight: 400, color: muted, marginLeft: 8, fontSize: 'var(--type-body-size)' }}>
               #{parcel.id}
@@ -494,7 +500,7 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
         {highlighted && (
           <span style={{
             fontSize: 'var(--type-ui-label-size)', padding: '2px 8px', borderRadius: 10,
-            background: crimson, color: parchment, fontWeight: 600, flexShrink: 0,
+            background: interactive, color: ink, fontWeight: 600, flexShrink: 0,
           }}>
             on map
           </span>
@@ -600,7 +606,7 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
             <button onClick={onRemoveSubmit} disabled={removeSubmitStatus === 'submitting'} style={{ ...smallBtnStyle, background: crimson }}>
               {removeSubmitStatus === 'submitting' ? 'Submitting…' : 'Submit Request'}
             </button>
-            <button onClick={onRemoveCancel} style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}>Cancel</button>
+            <button onClick={onRemoveCancel} className="tx-box tx-link" style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}>Cancel</button>
           </div>
         </div>
       )}
@@ -625,7 +631,7 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
             <button onClick={onSplitSubmit} disabled={splitSubmitStatus === 'submitting'} style={smallBtnStyle}>
               {splitSubmitStatus === 'submitting' ? 'Submitting…' : 'Submit Split Request'}
             </button>
-            <button onClick={onSplitDiscard} style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}>Discard</button>
+            <button onClick={onSplitDiscard} className="tx-box tx-link" style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}>Discard</button>
           </div>
         </div>
       )}
@@ -673,7 +679,7 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
               </button>
               <button
                 onClick={onPendingDiscard}
-                style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}
+                className="tx-box tx-link" style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}
               >
                 Discard
               </button>
@@ -776,7 +782,7 @@ function RequestButton({ vineyard, type, label }) {
         </button>
         <button
           onClick={() => setOpen(false)}
-          style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}
+          className="tx-box tx-link" style={{ ...smallBtnStyle, background: 'transparent', color: muted, border: `1px solid ${border}` }}
         >
           Cancel
         </button>

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { WV_SUB_AVAS } from '../config/topographyConfig';
 import { LISTING_CATEGORIES } from './WVWAMap';
-import { alpha, border, crimson, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
+import { alpha, border, crimson, interactive, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 const API_BASE = import.meta.env.DEV
   ? ''
@@ -20,18 +20,19 @@ const CATEGORY_ICON = {
   ava:        '◇',
 };
 
-// Dark-surface palette: text reads in parchment tones, crimson stays the accent.
+// Dark-surface palette: text reads in parchment tones; focus and the
+// highlighted result use the shared interactive blue.
 const TEXT_PRIMARY = TOKENS.parchment;
 const TEXT_MUTED   = alpha(TOKENS.parchment, 0.6);
 const TEXT_FAINT   = alpha(TOKENS.parchment, 0.4);
 
 const UI = {
-  activeRowBg: alpha(TOKENS.crimson, 0.18),
+  activeRowBg: alpha(TOKENS.interactive, 0.18),
   collapsedBtnBg: alpha(TOKENS.parchment, 0.06),
   collapsedBtnBorder: alpha(TOKENS.parchment, 0.18),
   inputBorderIdle: TOKENS.border,
-  inputGlow: alpha(TOKENS.crimson, 0.22),
-  inputFocusRing: alpha(TOKENS.crimson, 0.2),
+  inputGlow: alpha(TOKENS.interactive, 0.22),
+  inputFocusRing: alpha(TOKENS.interactive, 0.2),
   inputShadow: alpha(TOKENS.ink, 0.4),
   dropdownShadow: alpha(TOKENS.ink, 0.6),
   spinnerBorder: alpha(TOKENS.parchment, 0.2),
@@ -219,7 +220,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false, onOpenF
           textAlign: 'left',
           background: isActive ? UI.activeRowBg : 'transparent',
           border: 'none',
-          borderLeft: isActive ? `3px solid ${crimson}` : '3px solid transparent',
+          borderLeft: isActive ? `3px solid ${interactive}` : '3px solid transparent',
           padding: '8px 14px',
           cursor: 'pointer',
           fontFamily: 'var(--font-sans)',
@@ -240,7 +241,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false, onOpenF
           <div style={{
             fontSize: 'var(--type-mono-size)',
             fontWeight: 600,
-            color: isActive ? crimson : TEXT_PRIMARY,
+            color: isActive ? interactive : TEXT_PRIMARY,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -262,6 +263,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false, onOpenF
       <button
         onClick={() => { setExpanded(true); setTimeout(() => inputRef.current?.focus(), 80); }}
         aria-label="Open search"
+        className="tx-box tx-link"
         style={{
           background: UI.collapsedBtnBg,
           border: `1px solid ${UI.collapsedBtnBorder}`,
@@ -306,7 +308,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false, onOpenF
         display: 'flex',
         alignItems: 'center',
         background: TOKENS.surface,
-        border: `1.5px solid ${open ? crimson : UI.inputBorderIdle}`,
+        border: `1.5px solid ${open ? interactive : UI.inputBorderIdle}`,
         borderRadius: open ? '10px 10px 0 0' : 10,
         padding: '0 12px',
         height: 36,
@@ -316,7 +318,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false, onOpenF
           : `0 2px 8px ${UI.inputShadow}`,
         transition: 'border-color 0.15s, border-radius 0.1s, box-shadow 0.15s',
       }}>
-        <span style={{ color: open ? crimson : TEXT_MUTED, flexShrink: 0, display: 'flex', transition: 'color 0.15s' }}>
+        <span style={{ color: open ? interactive : TEXT_MUTED, flexShrink: 0, display: 'flex', transition: 'color 0.15s' }}>
           {loading
             ? <SpinnerIcon />
             : <SearchIcon />}
@@ -340,7 +342,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false, onOpenF
             fontSize: 'var(--type-mono-size)',
             color: TEXT_PRIMARY,
             fontFamily: 'var(--font-sans)',
-            caretColor: crimson,
+            caretColor: interactive,
           }}
         />
 
@@ -355,6 +357,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false, onOpenF
               inputRef.current?.focus();
             }}
             aria-label="Clear search"
+            className="tx-link"
             style={{
               background: 'none',
               border: 'none',
@@ -377,12 +380,13 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false, onOpenF
             onMouseDown={(e) => { e.preventDefault(); onOpenFilters(); }}
             aria-label={activeFilterCount > 0 ? `Open filters (${activeFilterCount} active)` : 'Open filters'}
             title="Filter vineyards by elevation, slope, aspect, variety…"
+            className={`tx-box tx-link${activeFilterCount > 0 ? ' is-active' : ''}`}
             style={{
               position: 'relative',
-              background: activeFilterCount > 0 ? alpha(TOKENS.crimson, 0.16) : 'none',
-              border: `1px solid ${activeFilterCount > 0 ? alpha(TOKENS.crimson, 0.45) : 'transparent'}`,
+              background: activeFilterCount > 0 ? alpha(TOKENS.interactive, 0.16) : 'none',
+              border: '1px solid transparent',
               borderRadius: 6,
-              color: activeFilterCount > 0 ? crimson : TEXT_MUTED,
+              color: TEXT_MUTED,
               cursor: 'pointer',
               padding: '3px 6px',
               flexShrink: 0,
@@ -396,8 +400,8 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false, onOpenF
               <span style={{
                 fontSize: 11,
                 fontWeight: 700,
-                background: crimson,
-                color: 'white',
+                background: interactive,
+                color: TOKENS.ink,
                 borderRadius: 8,
                 padding: '0 5px',
                 minWidth: 14,
@@ -416,6 +420,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false, onOpenF
           <button
             onMouseDown={(e) => { e.preventDefault(); setExpanded(false); setQuery(''); setOpen(false); }}
             aria-label="Close search"
+            className="tx-link"
             style={{
               background: 'none',
               border: 'none',
@@ -440,7 +445,7 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false, onOpenF
           left: 0,
           right: 0,
           background: TOKENS.surface,
-          border: `1.5px solid ${crimson}`,
+          border: `1.5px solid ${interactive}`,
           borderTop: `1px solid ${border}`,
           borderRadius: '0 0 10px 10px',
           boxShadow: `0 8px 24px ${UI.dropdownShadow}`,
@@ -528,7 +533,7 @@ function SpinnerIcon() {
       width: 13,
       height: 13,
       border: `2px solid ${UI.spinnerBorder}`,
-      borderTopColor: crimson,
+      borderTopColor: interactive,
       borderRadius: '50%',
       animation: 'sb-spin 0.7s linear infinite',
     }}>

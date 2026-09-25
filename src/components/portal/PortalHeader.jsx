@@ -64,6 +64,7 @@ export default function PortalHeader({ title, subtitle = 'Winery Portal' }) {
           aria-haspopup="menu"
           aria-expanded={open}
           title="Account"
+          className={`tx-box tx-link${open ? ' is-active' : ''}`}
           style={{
             width: 40, height: 40, borderRadius: '50%',
             border: `1px solid ${border}`,
@@ -87,7 +88,7 @@ export default function PortalHeader({ title, subtitle = 'Winery Portal' }) {
               overflow: 'hidden',
             }}
           >
-            <Link to="/portal/settings" role="menuitem" onClick={() => setOpen(false)} style={menuItemStyle}>
+            <Link to="/portal/settings" role="menuitem" onClick={() => setOpen(false)} className="tx-link" style={menuItemStyle}>
               Account Settings
             </Link>
             <div style={{ height: 1, background: border }} />

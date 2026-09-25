@@ -1,4 +1,4 @@
-import { border, crimson, ink, muted, parchment } from '../styles/tokens';
+import { border, interactive, ink, muted, parchment } from '../styles/tokens';
 import { TOPO_CLASSES, topoRangeLabel } from '../config/topoClasses';
 
 // Where a new custom range starts: the hillside band, gentle-to-moderate
@@ -30,6 +30,7 @@ export default function TopoRangeControl({ layerId, range, onChange }) {
       <button
         type="button"
         onClick={() => onChange?.(STARTING_RANGE[layerId])}
+        className="tx-box tx-link"
         style={{
           width: '100%', minHeight: 34, padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
           border: `1px dashed ${border}`, background: 'transparent', color: ink, textAlign: 'left',
@@ -53,13 +54,13 @@ export default function TopoRangeControl({ layerId, range, onChange }) {
         type="range" min={min} max={max} step={cfg.step} value={[lo, hi][i]}
         aria-label={`${names[i]} ${cfg.unit === 'ft' ? 'elevation' : layerId}`}
         onChange={(e) => set(i, Number(e.target.value))}
-        style={{ width: '100%', accentColor: crimson, cursor: 'pointer', height: 26, margin: 0 }}
+        style={{ width: '100%', accentColor: interactive, cursor: 'pointer', height: 26, margin: 0 }}
       />
     </label>
   );
 
   return (
-    <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '8px 10px', background: parchment }}>
+    <div style={{ border: `1px solid ${interactive}`, borderRadius: 8, padding: '8px 10px', background: parchment }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
         <span style={{ fontSize: 'var(--type-ui-label-size)', color: ink, fontWeight: 650 }}>
           Showing {topoRangeLabel(layerId, range)}
@@ -67,9 +68,10 @@ export default function TopoRangeControl({ layerId, range, onChange }) {
         <button
           type="button"
           onClick={() => onChange?.(null)}
+          className="tx-link"
           style={{
             border: 'none', background: 'none', padding: '2px 0', cursor: 'pointer', fontFamily: 'var(--font-sans)',
-            fontSize: 'var(--type-ui-label-size)', fontWeight: 650, color: crimson, flexShrink: 0,
+            fontSize: 'var(--type-ui-label-size)', fontWeight: 650, color: interactive, flexShrink: 0,
           }}
         >Clear</button>
       </div>

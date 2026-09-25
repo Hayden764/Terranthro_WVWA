@@ -14,13 +14,13 @@
 
 import { Fragment, useState, useEffect, useCallback } from 'react';
 import { apiPost } from '../lib/api';
-import { alpha, border, crimson, electricBlue, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
+import { alpha, border, crimson, interactive, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 const NOTES_MAX = 500;
 
 const UI = {
   dirtyRowBg: alpha(TOKENS.crimson, 0.04),
-  hoverRowBg: alpha(electricBlue, 0.06),
+  hoverRowBg: alpha(interactive, 0.06),
   successText: TOKENS.success,
   borderFaded: (color) => alpha(color, 0.09),
   borderVeryFaded: (color) => alpha(color, 0.25),
@@ -267,7 +267,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                   {COLUMNS.map((col) => (
                     <td key={col.key} style={{ padding: '0', verticalAlign: 'middle' }}>
                       {isEditing && !col.readonly ? (
-                        <input
+                        <input className="tx-input"
                           type={col.type}
                           value={rowData[col.key]}
                           onChange={(e) => setCell(block.id, col.key, e.target.value)}
@@ -316,7 +316,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                           <button
                             onClick={(e) => { e.stopPropagation(); splitRow(block); }}
                             title="Split this block — duplicates the row so you can separate it into two varietals"
-                            style={splitBtnStyle}
+                            className="tx-box" style={splitBtnStyle}
                           >
                             Split
                           </button>
@@ -373,7 +373,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                     <td colSpan={COLUMNS.length + 1} style={{ padding: '0 10px 10px' }}>
                       <div style={{
                         fontSize: 'var(--type-mono-size)', color: muted, lineHeight: 1.5,
-                        borderLeft: `2px solid ${alpha(electricBlue, 0.4)}`, paddingLeft: 10,
+                        borderLeft: `2px solid ${alpha(interactive, 0.4)}`, paddingLeft: 10,
                       }}>
                         <span style={{ fontWeight: 600, color: ink }}>Notes: </span>{block.notes}
                       </div>
@@ -392,7 +392,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
                     {col.readonly ? (
                       <span style={{ display: 'block', padding: '9px 10px', color: muted, fontStyle: 'italic' }}>auto</span>
                     ) : (
-                      <input
+                      <input className="tx-input"
                         type={col.type}
                         value={row[col.key]}
                         onChange={(e) => setNewCell(row._tmpId, col.key, e.target.value)}
@@ -430,7 +430,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
           marginTop: 10, flexWrap: 'wrap', gap: 8,
         }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button onClick={addNewRow} style={addRowBtnStyle}>+ Add Block</button>
+            <button onClick={addNewRow} className="tx-box tx-link" style={addRowBtnStyle}>+ Add Block</button>
             <p style={{ fontSize: 'var(--type-body-size)', color: muted, margin: 0 }}>
               {hasChanges
                 ? `${changedBlocks.length + pendingNewRows.length} change${changedBlocks.length + pendingNewRows.length !== 1 ? 's' : ''}${deletedIds.length > 0 ? `, ${deletedIds.length} deletion${deletedIds.length !== 1 ? 's' : ''}` : ''} pending${onDirectApply ? '' : ' — submit for admin review'}`
@@ -447,7 +447,7 @@ export default function EditableBlocksTable({ parcelId, blocks, editMode = false
             )}
             <button
               onClick={() => { setEditMap({}); setNewRows([]); setStatus(null); onEditCancel?.(); }}
-              style={secondaryBtnStyle}
+              className="tx-box tx-link" style={secondaryBtnStyle}
             >
               Cancel
             </button>

@@ -297,7 +297,7 @@ export default function PortalVineyardDetail() {
           background: parchment, borderBottom: `1px solid ${border}`,
           padding: '12px 0', marginBottom: 8,
         }}>
-          <Link to="/portal/dashboard" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>← Dashboard</Link>
+          <Link to="/portal/dashboard" className="tx-link" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>← Dashboard</Link>
         </div>
 
         {renaming ? (
@@ -314,7 +314,7 @@ export default function PortalVineyardDetail() {
             <button onClick={submitRename} disabled={renameStatus === 'submitting'} style={smallBtnStyle}>
               {renameStatus === 'submitting' ? 'Submitting…' : 'Submit for Review'}
             </button>
-            <button onClick={() => setRenaming(false)} style={discardBtnStyle}>Cancel</button>
+            <button onClick={() => setRenaming(false)} className="tx-box tx-link" style={discardBtnStyle}>Cancel</button>
           </div>
         ) : (
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', margin: '16px 0 4px' }}>
@@ -325,7 +325,7 @@ export default function PortalVineyardDetail() {
             </h1>
             <button
               onClick={startRename}
-              style={editNameBtnStyle}
+              className="tx-box tx-link" style={editNameBtnStyle}
               title="Rename this vineyard"
             >
               ✎ Edit name
@@ -426,7 +426,7 @@ export default function PortalVineyardDetail() {
                 </button>
                 <button
                   onClick={() => { setPendingGeometry(null); setGeoSubmitStatus(null); }}
-                  style={discardBtnStyle}
+                  className="tx-box tx-link" style={discardBtnStyle}
                 >
                   Discard
                 </button>
@@ -462,7 +462,7 @@ export default function PortalVineyardDetail() {
                 </button>
                 <button
                   onClick={() => { setPendingSplit(null); setSplitSubmitStatus(null); }}
-                  style={discardBtnStyle}
+                  className="tx-box tx-link" style={discardBtnStyle}
                 >
                   Discard
                 </button>
@@ -511,7 +511,7 @@ export default function PortalVineyardDetail() {
                 </button>
                 <button
                   onClick={() => { setRemovingParcel(false); setRemoveSubmitStatus(null); setRemoveNotes(''); }}
-                  style={discardBtnStyle}
+                  className="tx-box tx-link" style={discardBtnStyle}
                 >
                   Cancel
                 </button>
@@ -553,7 +553,7 @@ export default function PortalVineyardDetail() {
                 </button>
                 <button
                   onClick={() => { setPendingAdd(null); setAddSubmitStatus(null); }}
-                  style={discardBtnStyle}
+                  className="tx-box tx-link" style={discardBtnStyle}
                 >
                   Discard
                 </button>

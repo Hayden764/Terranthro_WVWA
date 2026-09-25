@@ -69,7 +69,7 @@ export default function PortalClaim() {
         background: parchment, minHeight: '100vh',
         borderLeft: `1px solid ${border}`, borderRight: `1px solid ${border}`,
       }}>
-        <Link to="/portal/dashboard" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>← Dashboard</Link>
+        <Link to="/portal/dashboard" className="tx-link" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>← Dashboard</Link>
 
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink, margin: '16px 0 8px' }}>
           Claim a Vineyard
@@ -152,7 +152,7 @@ export default function PortalClaim() {
                         />
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => handleClaim(r.id)} style={smallBtn}>Submit Claim</button>
-                          <button onClick={() => { setClaiming(null); setClaimNotes(''); }} style={{ ...smallBtn, background: 'transparent', color: muted, border: `1px solid ${border}` }}>
+                          <button onClick={() => { setClaiming(null); setClaimNotes(''); }} className="tx-box tx-link" style={{ ...smallBtn, background: 'transparent', color: muted, border: `1px solid ${border}` }}>
                             Cancel
                           </button>
                         </div>
@@ -221,7 +221,7 @@ export default function PortalClaim() {
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="submit" style={smallBtn}>Submit</button>
-                <button type="button" onClick={() => setShowNew(false)} style={{ ...smallBtn, background: 'transparent', color: muted, border: `1px solid ${border}` }}>
+                <button type="button" onClick={() => setShowNew(false)} className="tx-box tx-link" style={{ ...smallBtn, background: 'transparent', color: muted, border: `1px solid ${border}` }}>
                   Cancel
                 </button>
               </div>

@@ -1,4 +1,5 @@
 import { TERROIR_CLASS_COLORS, UNCLASSIFIED_COLOR } from './earthLayersConfig';
+import { TOPO_CLASSES } from './topoClasses';
 
 /**
  * "Colour vineyards by" themes for the reference vineyard layer.
@@ -21,11 +22,11 @@ export const NO_DATA_COLOR = UNCLASSIFIED_COLOR;
 const ELEV = ['#274bb1', '#0e7ee4', '#00acc4', '#0dcf69', '#59de78', '#f0ec91'];
 // RdYlGn_r, 0–41° at 1.5/4.5/8/12.5/17.5/28
 const SLOPE = ['#097940', '#219c52', '#60ba62', '#a9da6c', '#e3f399', '#fdb768'];
-// hsv, 0–360° at each compass bucket's centre (N = red), as the aspect raster
-const ASPECT = {
-  N: '#ff0000', NE: '#ffbd00', E: '#84ff00', SE: '#00ff39',
-  S: '#00fff6', SW: '#004bff', W: '#7200ff', NW: '#ff00cf',
-};
+// Warm (south) ↔ cool (north), taken from the Aspect layer's classes so a
+// block and the ground around it read the same colour. Compass order for the legend.
+const ASPECT_BANDS = TOPO_CLASSES.aspect.groups.flatMap((g) => g.bands);
+const ASPECT = Object.fromEntries(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
+  .map((dir) => [dir, ASPECT_BANDS.find((b) => b.key === dir).color]));
 
 const catExpression = (field, colors) => [
   'match', ['coalesce', ['get', field], ''],
@@ -57,6 +58,14 @@ export const VINEYARD_THEMES = {
     label: 'Ownership (default)',
     description: 'Member wineries in their own colours, others grey',
     paint: null,
+    legend: null,
+  },
+  none: {
+    id: 'none',
+    label: 'None',
+    description: 'Every vineyard in one neutral colour — no classification',
+    // A constant, not an attribute: shapes only, nothing to read into the colour
+    paint: '#E6DCC3',
     legend: null,
   },
   soil: {
@@ -94,7 +103,7 @@ export const VINEYARD_THEMES = {
   aspect: {
     id: 'aspect',
     label: 'Aspect',
-    description: 'Direction each block faces — same wheel as the Aspect layer',
+    description: 'Direction each block faces — same warm/cool colours as the Aspect layer',
     paint: catExpression('aspect', ASPECT),
     legend: Object.entries(ASPECT).map(([label, color]) => ({ label, color })),
   },

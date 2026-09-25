@@ -1,8 +1,9 @@
 import { TOKENS } from '../styles/tokens';
 
-// Pre-rendered WebP raster PMTiles on R2, built by
-// data-pipeline/scripts/build-topo-tiles.py from the 3m DOGAMI COGs. Colours are
-// baked in, so each layer's `range` must match that script's LAYERS table.
+// Value tiles on R2 (topo-<layer>.pmtiles, Terrarium raster-dem) built by
+// data-pipeline/scripts/build-topo-value-tiles.py from the 3m DOGAMI COGs; the
+// map colours them in the browser (see topoClasses.js). `range`/`stats`/`legend`
+// below describe the underlying data and feed the older panels.
 export const TOPO_TILES_BASE_URL =
   import.meta.env.VITE_TOPO_TILES_BASE_URL
   || 'https://pub-9686f7c1467c4989896000832d9500b0.r2.dev/topography-tiles/OR/willamette_valley';
@@ -75,8 +76,8 @@ export const WV_SUB_AVAS = [
  */
 export const hasTopographyData = () => true;
 
-/** pmtiles:// source URL for a topography layer's pre-rendered tiles. */
-export const getTopoPmtilesUrl = (layerType) => `pmtiles://${TOPO_TILES_BASE_URL}/${layerType}.pmtiles`;
+/** pmtiles:// source URL for a topography layer's value tiles. */
+export const getTopoPmtilesUrl = (layerType) => `pmtiles://${new URL(`${TOPO_TILES_BASE_URL}/topo-${layerType}.pmtiles`, window.location.origin).href}`;
 
 /** Static range + stats for the data-range card and legend (no stats request). */
 export const getTopoStats = (layerType) => {

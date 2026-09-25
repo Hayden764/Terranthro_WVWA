@@ -5,8 +5,9 @@ import { describeLegendSelection } from '../lib/legendSelection';
  * On-map reminder that a legend filter is on (mobile, where the legend sits in
  * the closed bottom sheet). Tapping it clears the filter.
  */
-export default function LegendSelectionChip({ groups, selected, onClear }) {
-  const text = describeLegendSelection(groups, selected);
+// `text` overrides the description (e.g. a custom topography range).
+export default function LegendSelectionChip({ groups, selected, text: textProp, onClear }) {
+  const text = textProp || describeLegendSelection(groups, selected);
   if (!text) return null;
   return (
     <button

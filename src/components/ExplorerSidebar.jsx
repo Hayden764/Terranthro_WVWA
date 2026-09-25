@@ -7,6 +7,8 @@ import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
 import { CLIMATE_MAP_LAYERS, VINTAGE_FIRST_YEAR, VINTAGE_LAST_YEAR, climateLegendGroups, isClimateMapLayer, isVintageLayer, CLIMATE_MAP_GROUPS } from '../config/climateMapConfig';
 import LegendFilter from './LegendFilter';
+import TopoRangeControl from './TopoRangeControl';
+import { topoLegendGroups } from '../config/topoClasses';
 import TerroirDataChips from './TerroirDataChips';
 import TerroirFactRows from './TerroirFactRows';
 import { terroirFactRows } from '../lib/terroirFacts';
@@ -107,16 +109,6 @@ function useViewportHeight() {
   }, []);
   return h;
 }
-
-// ── Colormap gradients (matching WVWAMap / ScalePanel) ───────────────────
-// audit-ignore-start centralized-colormap-gradients
-const COLORMAP_CSS = {
-  terrain:  'linear-gradient(to right, #0B6623, #90EE90, #F5F5DC, #D2B48C, #8B4513, #FFFFFF)',
-  rdylgn_r: 'linear-gradient(to right, #1A9850, #91CF60, #D9EF8B, #FEE08B, #FC8D59, #D73027)',
-  hsv:      'linear-gradient(to right, #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000)',
-  plasma:   'linear-gradient(to right, #0D0887, #7E03A8, #CC4778, #F89441, #F0F921)',
-};
-// audit-ignore-end centralized-colormap-gradients
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const Chevron = ({ open, size = 12 }) => (
@@ -1002,13 +994,12 @@ const TOPO_LAYERS = [
   { id: 'aspect',    label: 'Aspect',      sub: 'Direction slope faces' },
 ];
 
-function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_YEAR, onClimateYearChange, legendSelection = {}, onLegendSelectionChange, topoStats, vineyardTheme = 'ownership', onVineyardThemeChange, vineyardThemeValues }) {
+function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_YEAR, onClimateYearChange, legendSelection = {}, onLegendSelectionChange, topoRanges = {}, onTopoRangeChange, vineyardTheme = 'ownership', onVineyardThemeChange, vineyardThemeValues }) {
   const [climateOpen, setClimateOpen] = useState(true);
   const [topoOpen, setTopoOpen] = useState(true);
   const [earthOpen, setEarthOpen] = useState(true);
   const earthConfig = activeLayer ? EARTH_LAYER_TYPES[activeLayer] : null;
 
-  const fmt = v => typeof v === 'number' ? v.toFixed(1) : '—';
   const topoConfig = activeLayer ? TOPO_LAYER_TYPES[activeLayer] : null;
 
   return (
@@ -1177,32 +1168,23 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
               );
             })}
 
-            {/* Legend / scale for active topo layer */}
+            {/* Custom range + filterable legend for the active topo layer */}
             {topoConfig && activeLayer && (
-              <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
-                <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Scale — {topoConfig.label}</div>
-                <div style={{ height: 8, borderRadius: 6, background: COLORMAP_CSS[topoConfig.colormap] || TOKENS.ghost, marginBottom: 4, border: `1px solid ${border}` }} />
-                {topoStats && (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: muted, marginBottom: 8 }}>
-                      <span>{topoStats.min?.toFixed(1)}{topoConfig.unit}</span>
-                      <span>{topoStats.max?.toFixed(1)}{topoConfig.unit}</span>
-                    </div>
-                    <TerroirDataChips chips={[
-                      { label: 'Min',     value: `${fmt(topoStats.min)}${topoConfig.unit}`,  tone: 'blue',      glow: true  },
-                      { label: 'Max',     value: `${fmt(topoStats.max)}${topoConfig.unit}`,  tone: 'amber',     glow: true  },
-                      { label: 'Mean',    value: `${fmt(topoStats.mean)}${topoConfig.unit}`, tone: 'green',     glow: true  },
-                      { label: 'Std Dev', value: `±${fmt(topoStats.std)}${topoConfig.unit}`,  tone: 'parchment', glow: false },
-                    ]} />
-                  </>
-                )}
-                {!topoStats && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 2 }}>
-                    <div style={{ width: 12, height: 12, borderRadius: '50%', border: `2px solid ${border}`, borderTopColor: ink, animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-                    <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>Loading statistics…</span>
-                    <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-                  </div>
-                )}
+              <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={T.sectionLabel}>Legend — {topoConfig.label}</div>
+                <TopoRangeControl
+                  layerId={activeLayer}
+                  range={topoRanges[activeLayer]}
+                  onChange={(range) => onTopoRangeChange?.(activeLayer, range)}
+                />
+                <LegendFilter
+                  groups={topoLegendGroups(activeLayer)}
+                  selected={legendSelection[activeLayer]}
+                  onChange={(keys) => onLegendSelectionChange?.(activeLayer, keys)}
+                />
+                <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>
+                  DOGAMI lidar, 3 m. Pick bands or set a custom range; everything else fades.
+                </div>
               </div>
             )}
           </div>
@@ -1506,6 +1488,8 @@ export default function ExplorerSidebar({
   onClimateYearChange,
   legendSelection,
   onLegendSelectionChange,
+  topoRanges,
+  onTopoRangeChange,
   topoStats,
   vineyardTheme,
   onVineyardThemeChange,
@@ -2001,6 +1985,8 @@ export default function ExplorerSidebar({
                   onClimateYearChange={onClimateYearChange}
                   legendSelection={legendSelection}
                   onLegendSelectionChange={onLegendSelectionChange}
+                  topoRanges={topoRanges}
+                  onTopoRangeChange={onTopoRangeChange}
                   topoStats={topoStats}
                   vineyardTheme={vineyardTheme}
                   onVineyardThemeChange={onVineyardThemeChange}

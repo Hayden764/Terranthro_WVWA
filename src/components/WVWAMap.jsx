@@ -1703,6 +1703,7 @@ const WVWAMap = forwardRef(function WVWAMap({
   onMonthChange,
   climateYear = VINTAGE_LAST_YEAR,
   legendSelection = {},
+  topoRanges = {},
   listingFilterMode: listingFilterModeProp,
   onListingFilterModeChange,
   vineyardTheme = 'ownership',
@@ -3862,6 +3863,8 @@ const WVWAMap = forwardRef(function WVWAMap({
         <TopographyLayer
           map={mapRef.current}
           activeLayer={isTopoActive ? activeLayer : null}
+          selected={legendSelection[activeLayer]}
+          range={topoRanges[activeLayer]}
           onStats={setTopoStats}
         />
       )}

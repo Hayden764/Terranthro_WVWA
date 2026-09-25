@@ -15,6 +15,8 @@ import { terroirFactRows } from '../lib/terroirFacts';
 import ClimateVintages from './climate/ClimateVintages';
 import { useVintagePlayback } from './climate/VintageYearControls';
 import { apiJson } from '../lib/api';
+import { TERM_GROUPS, TERROIR_TERM_IDS, VINTAGE_TERM_IDS, AVA_TERM_IDS, CLIMATE_LAYER_TERM_IDS, TOPO_LAYER_TERM_IDS, EARTH_LAYER_TERM_IDS } from '../config/wineTerms';
+import TermHelp, { TermItem } from './TermHelp';
 
 // ── Design tokens (light‑mode, eggshell base) ────────────────────────────
 const T = {
@@ -197,7 +199,7 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, map
       <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         <div>
-          <div style={{ ...T.sectionLabel, marginBottom: 8 }}>AVA Snapshot</div>
+          <TermHelp label="AVA Snapshot" ids={AVA_TERM_IDS} style={{ marginBottom: 8 }} />
           <TerroirDataChips chips={[
             { label: 'Established', value: meta.established ? String(meta.established) : '—', tone: 'amber', glow: false },
             { label: 'Acres', value: meta.acres || '—', tone: 'parchment', glow: false },
@@ -217,7 +219,7 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, map
 
         {/* Vintage climate (PRISM monthly, 1991 onward) */}
         <div>
-          <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Vintage Climate</div>
+          <TermHelp label="Vintage Climate" ids={VINTAGE_TERM_IDS} style={{ marginBottom: 8 }} />
           <ClimateVintages
             type="ava"
             entityKey={ava.slug}
@@ -594,15 +596,27 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                       style={{
                         border: `1px solid ${border}`,
                         borderRadius: 10, background: parchment,
-                        transition: 'color 0.15s', cursor: 'pointer',
+                        transition: 'color 0.15s',
                         overflow: 'hidden', marginBottom: 6,
                       }}
                       onMouseEnter={() => { setHoveredGroup(i); onVineyardHover?.(group.features); }}
                       onMouseLeave={() => { setHoveredGroup(null); onVineyardHover?.(null); }}
-                      onClick={() => { setExpandedGroupKey(isExpanded ? null : group.key); onViewAllVineyards?.(group.features); }}
                     >
-                      {/* Collapsed header */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px 8px' }}>
+                      {/* Collapsed header — the only toggle, so clicks inside the
+                          expanded body (vintage stripes, links) don't collapse the card */}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={isExpanded}
+                        onClick={() => { setExpandedGroupKey(isExpanded ? null : group.key); onViewAllVineyards?.(group.features); }}
+                        onKeyDown={(e) => {
+                          if (e.key !== 'Enter' && e.key !== ' ') return;
+                          e.preventDefault();
+                          setExpandedGroupKey(isExpanded ? null : group.key);
+                          onViewAllVineyards?.(group.features);
+                        }}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px 8px', cursor: 'pointer' }}
+                      >
                         <div style={{ flex: 1, paddingRight: 8, minWidth: 0 }}>
                           <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: isHovered ? T.cardNameHover : ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {group.name}
@@ -622,7 +636,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                         <div style={{ padding: '0 12px 12px', borderTop: `1px solid ${border}` }}>
                           {/* Terroir: tiles for the numbers, rows for the facts */}
                           <div style={{ paddingTop: 10 }}>
-                            <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Terroir Snapshot</div>
+                            <TermHelp label="Terroir Snapshot" ids={TERROIR_TERM_IDS} style={{ marginBottom: 8 }} />
                             <TerroirDataChips chips={terroirChips} columns={2} />
                             <div style={{ marginTop: 8 }}>
                               <TerroirFactRows rows={terroirFactRows(groupTopoStats)} />
@@ -636,7 +650,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
 
                           {groupTopoStats?.largestId != null && (
                             <div style={{ paddingTop: 10 }}>
-                              <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Vintage Climate</div>
+                              <TermHelp label="Vintage Climate" ids={VINTAGE_TERM_IDS} style={{ marginBottom: 8 }} />
                               <ClimateVintages type="vineyard" entityKey={groupTopoStats.largestId} compact />
                             </div>
                           )}
@@ -1157,6 +1171,7 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
 
         {climateOpen && (
           <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <TermHelp ids={CLIMATE_LAYER_TERM_IDS} style={{ padding: '0 2px 2px' }} />
             {CLIMATE_MAP_GROUPS.map(group => [
               <div key={group.id} style={{ fontSize: 'var(--type-ui-label-size)', color: muted, fontWeight: 650, padding: group.id === CLIMATE_MAP_GROUPS[0].id ? '0 2px' : '6px 2px 0' }}>{group.label}</div>,
               ...Object.values(CLIMATE_MAP_LAYERS).filter(l => l.group === group.id).map(layer => {
@@ -1206,6 +1221,7 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
 
         {topoOpen && (
           <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <TermHelp ids={TOPO_LAYER_TERM_IDS} style={{ padding: '0 2px 2px' }} />
             {TOPO_LAYERS.map(layer => {
               const active = activeLayer === layer.id;
               return (
@@ -1252,6 +1268,7 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
 
         {earthOpen && (
           <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <TermHelp ids={EARTH_LAYER_TERM_IDS} style={{ padding: '0 2px 2px' }} />
             {Object.values(EARTH_LAYER_TYPES).map(layer => {
               const active = activeLayer === layer.id;
               return (
@@ -1510,6 +1527,46 @@ function AboutSection({ totalAcres }) {
   );
 }
 
+// Glossary of the words the explorer uses. Each term expands in place to a
+// plain-language explanation; the filter matches term names and summaries.
+function TermsSection() {
+  const [query, setQuery] = useState('');
+  const [openId, setOpenId] = useState(null);
+  const q = query.trim().toLowerCase();
+  const groups = TERM_GROUPS
+    .map(g => ({ ...g, terms: q ? g.terms.filter(t => `${t.term} ${t.short}`.toLowerCase().includes(q)) : g.terms }))
+    .filter(g => g.terms.length > 0);
+  return (
+    <div style={{ padding: '12px 16px 14px', borderBottom: `1px solid ${border}` }}>
+      <input
+        type="search"
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        placeholder="Filter terms…"
+        aria-label="Filter terms"
+        style={{
+          width: '100%', boxSizing: 'border-box', padding: '7px 10px', borderRadius: 7,
+          border: `1px solid ${border}`, background: 'transparent', color: ink,
+          fontSize: 'var(--type-body-size)', fontFamily: 'var(--font-sans)', marginBottom: 4,
+        }}
+      />
+      {groups.length === 0 && (
+        <div style={{ fontSize: 'var(--type-body-size)', color: muted, padding: '10px 2px 0' }}>No matching terms.</div>
+      )}
+      {groups.map(g => (
+        <div key={g.id}>
+          <div style={{ ...T.sectionLabel, padding: '12px 2px 6px' }}>{g.label}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {g.terms.map(t => (
+              <TermItem key={t.id} term={t} open={openId === t.id} onToggle={() => setOpenId(openId === t.id ? null : t.id)} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Main ExplorerSidebar ──────────────────────────────────────────────────
 export default function ExplorerSidebar({
   mapRef,
@@ -1554,7 +1611,7 @@ export default function ExplorerSidebar({
   filterActiveCount = 0,
   vineyardFilterResult = null,
 }) {
-  const [sections, setSections] = useState({ layers: false, about: false });
+  const [sections, setSections] = useState({ layers: false, terms: false, about: false });
 
   // Live mapped-vineyard-acres per AVA + valley total (GET /api/avas/acres).
   // Fetched once; feeds the overview tile, the About blurb, and each AVA's
@@ -2038,6 +2095,35 @@ export default function ExplorerSidebar({
                 />
               </div>
             )}
+
+            {/* Wine Terms accordion */}
+            <button
+              onClick={() => toggleSection('terms')}
+              aria-expanded={sections.terms}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                width: '100%', padding: '13px 16px', background: 'none', border: 'none',
+                borderBottom: `1px solid ${border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                  background: UI.buttonBg1, border: `1px solid ${border}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ink} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg>
+                </div>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Wine Terms</div>
+                  <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>Soils, climate &amp; vineyard vocabulary</div>
+                </div>
+              </div>
+              <Chevron open={sections.terms} size={13} />
+            </button>
+            {sections.terms && <TermsSection />}
 
             {/* About accordion */}
             <div>

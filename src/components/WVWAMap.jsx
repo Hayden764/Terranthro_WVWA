@@ -15,6 +15,8 @@ import TerroirDataChips from './TerroirDataChips';
 import TerroirFactRows from './TerroirFactRows';
 import { terroirFactRows } from '../lib/terroirFacts';
 import ClimateVintages from './climate/ClimateVintages';
+import TermHelp from './TermHelp';
+import { TERROIR_TERM_IDS, VINTAGE_TERM_IDS } from '../config/wineTerms';
 import HoverPill from './map/HoverPill';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { EARTH_LAYER_TYPES, TERROIR_CLASS_COLORS, isEarthLayer } from '../config/earthLayersConfig';
@@ -1262,7 +1264,7 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                   key={group.key}
                   style={{
                     ...CARD,
-                    cursor: 'pointer',
+                    cursor: isExpanded ? 'default' : 'pointer',
                     border: isHovered
                       ? `1px solid ${UI.hoverAccentBorder}`
                       : `1px solid ${UI.cardBorder}`,
@@ -1281,12 +1283,18 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                     onVineyardHover?.(null);
                   }}
                   onClick={() => {
+                    // Once expanded, only the header re-zooms — clicks in the body
+                    // (vintage stripes, links) are for that content
+                    if (isExpanded) return;
                     setExpandedGroupKey(group.key);
                     onViewAllVineyards?.(group.features);
                   }}
-                  title="Click to view vineyard details and zoom"
+                  title={isExpanded ? undefined : 'Click to view vineyard details and zoom'}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isExpanded ? 8 : 0 }}>
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isExpanded ? 8 : 0, cursor: 'pointer' }}
+                    onClick={isExpanded ? () => onViewAllVineyards?.(group.features) : undefined}
+                  >
                     <div style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: isHovered ? UI.hoverAccent : UI.vineyardAccent, transition: 'color 0.15s', flex: 1, paddingRight: 8 }}>{group.name}</div>
                     <span style={{
                       fontSize: 'var(--type-ui-label-size)',
@@ -1306,7 +1314,10 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                       </div>
 
                       {groupTopoStats && (
-                        <div style={{ marginTop: 8, paddingTop: 7, borderTop: `1px solid ${UI.subtleDivider}`, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        <TermHelp label="Terroir" ids={TERROIR_TERM_IDS} variant="glass" style={{ marginTop: 8, paddingTop: 7, borderTop: `1px solid ${UI.subtleDivider}` }} />
+                      )}
+                      {groupTopoStats && (
+                        <div style={{ marginTop: 6, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                           {groupTopoStats.elev_min != null && groupTopoStats.elev_max != null && (
                             <span style={{ fontSize: 'var(--type-ui-label-size)', color: UI.faintText, display: 'flex', alignItems: 'center', gap: 3 }}>
                               <span style={{ opacity: 0.6 }}>↑</span>
@@ -1345,6 +1356,7 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
 
                       {groupTopoStats?.largestId != null && (
                         <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${UI.subtleDivider}` }}>
+                          <TermHelp label="Vintage climate" ids={VINTAGE_TERM_IDS} variant="glass" style={{ marginBottom: 8 }} />
                           <ClimateVintages type="vineyard" entityKey={groupTopoStats.largestId} variant="glass" compact />
                         </div>
                       )}

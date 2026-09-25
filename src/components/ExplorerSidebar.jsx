@@ -326,7 +326,7 @@ function degToCardinal(deg) {
   return dirs[Math.round(deg / 45) % 8];
 }
 
-function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focusedVineyard, onBack, onVineyardHover, onViewAllVineyards, onParcelClick }) {
+function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focusedVineyard, onBack, onVineyardHover, onVineyardSelect, onViewAllVineyards, onParcelClick }) {
   const [expandedGroupKey, setExpandedGroupKey] = useState(null);
   const [hoveredGroup, setHoveredGroup] = useState(null);
   const [sourcedFrom, setSourcedFrom] = useState([]);
@@ -389,6 +389,14 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
     // the effect ran once against an empty group list, found no match, and the
     // tapped vineyard silently stayed collapsed.
   }, [listing?.id, focusedVineyard?.name, focusedVineyard?.at, vineyardGroups.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The open card is the selected vineyard: the map keeps it outlined in blue
+  // until the card closes or this winery page goes away.
+  useEffect(() => {
+    const open = vineyardGroups.find(g => g.key === expandedGroupKey);
+    onVineyardSelect?.(open ? open.features : null);
+  }, [expandedGroupKey, listing?.id, vineyardGroups.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onVineyardSelect?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalAcres = vineyardGroups.reduce((sum, g) => sum + g.acresTotal, 0);
   const headerAvas = new Set();
@@ -1623,6 +1631,7 @@ export default function ExplorerSidebar({
   parcelTopoStats,
   focusedVineyard = null,   // { name, at } — vineyard a map click landed on
   onVineyardHover,
+  onVineyardSelect,
   onViewAllVineyards,
   onVineyardScopeChange,
   isMobile = false,
@@ -2265,6 +2274,7 @@ export default function ExplorerSidebar({
                 parcelTopoStats={parcelTopoStats}
                 focusedVineyard={focusedVineyard}
                 onVineyardHover={onVineyardHover}
+                onVineyardSelect={onVineyardSelect}
                 onViewAllVineyards={onViewAllVineyards}
                 onParcelClick={handleParcelClick}
               />

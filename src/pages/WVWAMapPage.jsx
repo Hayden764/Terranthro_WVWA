@@ -348,6 +348,7 @@ export default function WVWAMapPage() {
             parcelTopoStats={parcelTopoStats}
             focusedVineyard={focusedVineyard}
             onVineyardHover={(features) => mapRef.current?.hoverVineyards?.(features)}
+            onVineyardSelect={(features) => mapRef.current?.focusVineyards?.(features)}
             onViewAllVineyards={(features) => mapRef.current?.viewAllVineyards?.(features)}
             onVineyardScopeChange={setVineyardScope}
             onOpenFilters={() => setFilterModalOpen(true)}

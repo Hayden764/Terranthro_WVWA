@@ -3,7 +3,7 @@ import WVWAMap, { LISTING_FILTER_MODES } from '../components/WVWAMap';
 import ExplorerSidebar, { SHEET_PEEK_PX } from '../components/ExplorerSidebar';
 import FilterModal from '../components/FilterModal';
 import { useVineyardFilters } from '../lib/useVineyardFilters';
-import { VINTAGE_LAST_YEAR } from '../config/climateMapConfig';
+import { VINTAGE_LAST_YEAR, isVintageLayer } from '../config/climateMapConfig';
 import { MapVintageYearControl } from '../components/climate/VintageYearControls';
 import LegendSelectionChip from '../components/LegendSelectionChip';
 import { legendGroupsFor } from '../lib/legendGroups';
@@ -406,12 +406,12 @@ export default function WVWAMapPage() {
           />
           {/* Mobile: the sidebar's year picker is buried in the bottom sheet, so
               the vintage layer gets its own year control on the map */}
-          {isMobile && !isIntro && (activeLayer === 'gdd_vintage' || legendSelection[activeLayer]?.length > 0) && (
+          {isMobile && !isIntro && (isVintageLayer(activeLayer) || legendSelection[activeLayer]?.length > 0) && (
             <div style={{
               position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 20,
               width: 'calc(100% - 32px)', maxWidth: 360, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
             }}>
-              {activeLayer === 'gdd_vintage' && <MapVintageYearControl year={climateYear} onChange={setClimateYear} />}
+              {isVintageLayer(activeLayer) && <MapVintageYearControl layerId={activeLayer} year={climateYear} onChange={setClimateYear} />}
               <LegendSelectionChip
                 groups={legendGroupsFor(activeLayer)}
                 selected={legendSelection[activeLayer]}

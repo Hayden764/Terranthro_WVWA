@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '../../styles/tokens';
-import { ANOM_COLORS, VINTAGE_FIRST_YEAR, VINTAGE_LAST_YEAR } from '../../config/climateMapConfig';
+import { CLIMATE_MAP_LAYERS, VINTAGE_FIRST_YEAR, VINTAGE_LAST_YEAR } from '../../config/climateMapConfig';
 
 /**
- * Year stepping + playback for the "Vintage heat" map layer, shared by the
+ * Year stepping + playback for the vintage map layers, shared by the
  * sidebar picker and the floating on-map control (mobile, where the sidebar
  * sits in a bottom sheet).
  */
@@ -36,7 +36,8 @@ export function useVintagePlayback(year, onChange) {
 }
 
 /** Year control floated over the map (mobile); the page positions it. */
-export function MapVintageYearControl({ year, onChange }) {
+export function MapVintageYearControl({ layerId, year, onChange }) {
+  const cfg = CLIMATE_MAP_LAYERS[layerId];
   const { playing, step, setYear, togglePlay } = useVintagePlayback(year, onChange);
   const btn = {
     width: 40, height: 40, borderRadius: 10, border: `1px solid ${border}`, background: parchment,
@@ -57,7 +58,7 @@ export function MapVintageYearControl({ year, onChange }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <button type="button" aria-label="Previous vintage" style={btn} onClick={() => step(-1)} disabled={year <= VINTAGE_FIRST_YEAR}>‹</button>
         <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
-          <div style={{ fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', color: muted }}>Vintage heat</div>
+          <div style={{ fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', color: muted }}>{cfg?.label}</div>
           <div style={{ fontSize: 20, fontWeight: 700, color: ink, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{year}</div>
         </div>
         <button type="button" aria-label="Next vintage" style={btn} onClick={() => step(1)} disabled={year >= VINTAGE_LAST_YEAR}>›</button>
@@ -77,11 +78,11 @@ export function MapVintageYearControl({ year, onChange }) {
       />
       {/* Compact key — the full legend is in the sheet */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: muted }}>
-        <span>Cooler</span>
+        <span>{cfg?.keyLabels?.[0]}</span>
         <div style={{ flex: 1, display: 'flex', gap: 1, height: 6 }}>
-          {ANOM_COLORS.map((c) => <span key={c} style={{ flex: 1, background: c, borderRadius: 1 }} />)}
+          {cfg?.colors.map((c) => <span key={c} style={{ flex: 1, background: c, borderRadius: 1 }} />)}
         </div>
-        <span>Warmer</span>
+        <span>{cfg?.keyLabels?.[1]}</span>
       </div>
       <div style={{ fontSize: 11, color: muted, textAlign: 'center', marginTop: 2 }}>vs 1991–2020 normal</div>
     </div>

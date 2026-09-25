@@ -807,10 +807,14 @@ function applyVineyardEmphasis(map, { scope, filtersActive }) {
   }
 }
 
-function setVineyardVisualizationVisibility(map, isVisible) {
+// `glowVisible` defaults to `isVisible`; the glow also hides under a data layer
+// (soils, climate, topography), where its amber haze reads as data.
+function setVineyardVisualizationVisibility(map, isVisible, glowVisible = isVisible) {
   const visibility = isVisible ? 'visible' : 'none';
+  if (map.getLayer('vineyards-glow-heat')) {
+    map.setLayoutProperty('vineyards-glow-heat', 'visibility', glowVisible ? 'visible' : 'none');
+  }
   const vineyardLayerIds = [
-    'vineyards-glow-heat',
     'vineyards-reference-fill',
     'vineyards-reference-line',
     'vineyards-reference-passive-fill',
@@ -2165,6 +2169,17 @@ const WVWAMap = forwardRef(function WVWAMap({
     if (!selectedListing) setVineyardFocusMode(false);
   }, [selectedListing]);
 
+  // Vineyard glow hides under any data layer (soils, climate, topography) —
+  // its amber haze reads as data there. Own effect, without the
+  // isStyleLoaded() guard below: switching a layer on starts a tile load, so
+  // that guard would skip exactly the update this needs.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || !map.getLayer('vineyards-glow-heat')) return;
+    const vineyardsVisible = listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized;
+    map.setLayoutProperty('vineyards-glow-heat', 'visibility', vineyardsVisible && !activeLayer ? 'visible' : 'none');
+  }, [mapLoaded, activeLayer, listingFilterMode]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
@@ -2176,9 +2191,10 @@ const WVWAMap = forwardRef(function WVWAMap({
       map,
       markersVisible && listingFilterMode !== LISTING_FILTER_MODES.noWineriesVisualized,
     );
-    setVineyardVisualizationVisibility(map, listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized);
+    const vineyardsVisible = listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized;
+    setVineyardVisualizationVisibility(map, vineyardsVisible, vineyardsVisible && !activeLayer);
     // Vineyard/listing soft-focus is owned by the vineyardScope authority effect below.
-  }, [selectedListing, mapLoaded, introComplete, markersVisible, listingFilterMode]);
+  }, [selectedListing, mapLoaded, introComplete, markersVisible, listingFilterMode, activeLayer]);
 
   // ── Single authority for vineyard + listing emphasis ─────────────────
   // `vineyardScope` comes straight from the sidebar's current page level, so

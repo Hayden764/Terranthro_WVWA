@@ -1,18 +1,24 @@
 """
-Climate (Heat Accumulation) Map Tiles
-=====================================
-Builds climate-{normal,warming,vintage}.pmtiles for the map's Climate layers from the Oregon-cropped PRISM
-800m monthly tmean grids written by download-prism-monthly.py:
+Climate Map Tiles (heat + rain)
+===============================
+Builds one PMTiles file per map layer from the Oregon-cropped PRISM 800m monthly
+grids written by download-prism-monthly.py (source-layer = layer id):
 
-    source-layer `gdd_normal`   1991–2020 mean growing degree days, banded
-    source-layer `gdd_warming`  2016–2025 mean minus the 1991–2020 normal
-    source-layer `gdd_vintage`  each vintage minus the 1991–2020 normal (prop `yr`;
-                                the frontend filters by year, so the slider is instant)
+  Heat (tmean)
+    gdd_normal   climate-normal.pmtiles        1991–2020 mean growing degree days
+    gdd_warming  climate-warming.pmtiles       2016–2025 mean minus the 1991–2020 normal
+    gdd_vintage  climate-vintage.pmtiles       each vintage minus the normal (prop `yr`)
+  Rain (ppt)
+    ppt_annual   climate-rain-annual.pmtiles   1991–2020 mean annual precipitation, inches
+    ppt_harvest  climate-rain-harvest.pmtiles  1991–2020 mean Sep–Oct precipitation, inches
+    ppt_vintage  climate-rain-vintage.pmtiles  each vintage's Sep–Oct rain as % of normal (prop `yr`)
 
-GDD matches the API (server/src/routes/climate.js): Apr–Oct, base 50°F, from
-monthly means × days in month. Anomaly bins match the vintage stripes in
-src/components/climate/ClimateVintages.jsx, and band edges match
-src/config/climateMapConfig.js — keep all three in sync.
+Vintage layers hold every year in one file; the frontend filters by `yr`, so the
+year slider is instant. GDD matches the API (server/src/routes/climate.js):
+Apr–Oct, base 50°F, from monthly means × days in month; harvest = Sep–Oct, as in
+the API's season summaries. GDD anomaly bins match the vintage stripes in
+src/components/climate/ClimateVintages.jsx, and every band edge matches
+src/config/climateMapConfig.js — keep them in sync.
 
 Each grid is upsampled (bilinear) before banding so band edges are smooth rather
 than 800m stair-steps, sieved (small speckle regions merge into their neighbour,
@@ -27,6 +33,7 @@ production alongside soils/geology (R2 bucket terranthro-cogs, prefix earth/).
 
 Usage:
     python build-climate-tiles.py --public
+    python build-climate-tiles.py --public --layers ppt_annual,ppt_harvest,ppt_vintage
 """
 
 import calendar
@@ -45,7 +52,7 @@ from rasterio.features import shapes, sieve
 from shapely.geometry import MultiPolygon, mapping, shape
 
 ROOT = Path(__file__).resolve().parent / ".."
-TMEAN_DIR = ROOT / "data" / "climate" / "prism" / "monthly" / "tmean"
+PRISM_DIR = ROOT / "data" / "climate" / "prism" / "monthly"
 OUT_DIR = ROOT / "data" / "tiles"
 REPO_PUBLIC_TILES = ROOT / ".." / "public" / "tiles"
 
@@ -64,6 +71,12 @@ TIERS = [
 NORMAL_EDGES = [1500, 1750, 2000, 2250, 2500, 2750, 3000, 3500]
 # Anomaly bins — identical to STRIPE_EDGES in ClimateVintages.jsx
 ANOM_EDGES = [-350, -250, -150, -50, 50, 150, 250, 350]
+# Rain bands (inches). Valley floor ≈ 40–45 in/yr and 4–5 in over Sep–Oct.
+ANNUAL_PPT_EDGES = [15, 25, 35, 45, 55, 70, 90, 120]
+HARVEST_PPT_EDGES = [1.5, 2.5, 3.5, 4.5, 5.5, 7, 9, 12]
+# Harvest rain as % of normal; log-symmetric (½× ↔ 2×, ⅔× ↔ 1.5×, 0.8× ↔ 1.25×)
+PPT_PCT_EDGES = [50, 67, 80, 125, 150, 200]
+HARVEST_MONTHS = (9, 10)
 
 
 def winkler(lo):
@@ -76,10 +89,23 @@ def winkler(lo):
     return "Region V"
 
 
+def read_month(var, year, month):
+    with rasterio.open(PRISM_DIR / var / f"prism_{var}_or_800m_{year}{month:02d}.tif") as src:
+        return src.read(1, masked=True).astype("float64"), src.profile
+
+
+def ppt_inches(year, months):
+    total, profile = None, None
+    for m in months:
+        a, profile = read_month("ppt", year, m)
+        total = a / 25.4 if total is None else total + a / 25.4
+    return total, profile
+
+
 def gdd_year(year):
     total, profile = None, None
     for m in GDD_MONTHS:
-        with rasterio.open(TMEAN_DIR / f"prism_tmean_or_800m_{year}{m:02d}.tif") as src:
+        with rasterio.open(PRISM_DIR / "tmean" / f"prism_tmean_or_800m_{year}{m:02d}.tif") as src:
             if profile is None:
                 profile = src.profile
             a = src.read(1, masked=True).astype("float64")
@@ -133,51 +159,72 @@ def write_seq(feats, path):
             f.write(json.dumps(ft) + "\n")
 
 
+OUT_NAMES = {
+    "gdd_normal": "climate-normal", "gdd_warming": "climate-warming", "gdd_vintage": "climate-vintage",
+    "ppt_annual": "climate-rain-annual", "ppt_harvest": "climate-rain-harvest", "ppt_vintage": "climate-rain-vintage",
+}
+YEARS = range(NORMAL[0], RECENT[1] + 1)
+mean_of = lambda grids, a, b: np.ma.mean(np.ma.stack([grids[y] for y in range(a, b + 1)]), axis=0)  # noqa: E731
+
+
+def layer_grids(names):
+    """{layer: [(grid, edges, props_fn)]} for the requested layers; vintage layers get one entry per year."""
+    out, profile = {}, None
+    if any(n.startswith("gdd_") for n in names):
+        gdd = {}
+        for y in YEARS:
+            gdd[y], profile = gdd_year(y)
+        normal = mean_of(gdd, *NORMAL)
+        out["gdd_normal"] = [(normal, NORMAL_EDGES, lambda lo, hi: {"region": winkler(lo)})]
+        out["gdd_warming"] = [(mean_of(gdd, *RECENT) - normal, ANOM_EDGES, lambda lo, hi: {})]
+        out["gdd_vintage"] = [(gdd[y] - normal, ANOM_EDGES, lambda lo, hi, y=y: {"yr": y}) for y in YEARS]
+    if any(n.startswith("ppt_") for n in names):
+        annual, harvest = {}, {}
+        for y in YEARS:
+            annual[y], profile = ppt_inches(y, range(1, 13))
+            harvest[y], _ = ppt_inches(y, HARVEST_MONTHS)
+        harvest_normal = mean_of(harvest, *NORMAL)
+        # Guard the % against near-zero normals (none in Oregon, but keep it finite)
+        safe_normal = np.ma.masked_less(harvest_normal, 0.05)
+        out["ppt_annual"] = [(mean_of(annual, *NORMAL), ANNUAL_PPT_EDGES, lambda lo, hi: {})]
+        out["ppt_harvest"] = [(harvest_normal, HARVEST_PPT_EDGES, lambda lo, hi: {})]
+        out["ppt_vintage"] = [(100 * harvest[y] / safe_normal, PPT_PCT_EDGES, lambda lo, hi, y=y: {"yr": y})
+                              for y in YEARS]
+    return {n: out[n] for n in names}, profile
+
+
 @click.command()
 @click.option("--public", "copy_public", is_flag=True, default=False,
-              help="Also copy climate-*.pmtiles to public/tiles/ for local dev")
-def main(copy_public):
-    years = range(NORMAL[0], RECENT[1] + 1)
-    grids, profile = {}, None
-    for y in years:
-        grids[y], profile = gdd_year(y)
-    click.echo(f"GDD grids for {len(grids)} vintages")
-
-    normal = np.ma.mean(np.ma.stack([grids[y] for y in range(NORMAL[0], NORMAL[1] + 1)]), axis=0)
-    recent = np.ma.mean(np.ma.stack([grids[y] for y in range(RECENT[0], RECENT[1] + 1)]), axis=0)
-
-    anomalies = {"gdd_warming": recent - normal, **{y: grids[y] - normal for y in years}}
-    up = {"gdd_normal": upsample(normal, profile)}
-    up.update({k: upsample(v, profile) for k, v in anomalies.items()})
-    click.echo("upsampled")
+              help="Also copy the .pmtiles files to public/tiles/ for local dev")
+@click.option("--layers", default=",".join(OUT_NAMES), show_default=True,
+              help="Comma-separated layer ids to build")
+def main(copy_public, layers):
+    names = [n.strip() for n in layers.split(",") if n.strip()]
+    unknown = set(names) - set(OUT_NAMES)
+    if unknown:
+        raise click.BadParameter(f"unknown layers: {', '.join(sorted(unknown))}")
+    grids, profile = layer_grids(names)
+    click.echo(f"grids ready for {', '.join(names)}")
+    up = {n: [(upsample(g, profile), e, f) for g, e, f in items] for n, items in grids.items()}
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
-        parts = []
-        for tier, zmin, zmax, sieve_px, tol in TIERS:
-            layers = {
-                "gdd_normal": band_features(*up["gdd_normal"], NORMAL_EDGES,
-                                            lambda lo, hi: {"region": winkler(lo)}, sieve_px, tol),
-                "gdd_warming": band_features(*up["gdd_warming"], ANOM_EDGES, lambda lo, hi: {}, sieve_px, tol),
-                "gdd_vintage": [f for y in years for f in band_features(
-                    *up[y], ANOM_EDGES, lambda lo, hi, y=y: {"yr": y}, sieve_px, tol)],
-            }
-            part = tmp / f"{tier}.pmtiles"
-            cmd = ["tippecanoe", "-o", str(part), "--force", "-Z", str(zmin), "-z", str(zmax),
-                   "--no-feature-limit", "--no-tile-size-limit", "--detect-shared-borders"]
-            for name, feats in layers.items():
-                p = tmp / f"{tier}-{name}.geojsonl"
-                write_seq(feats, p)
-                cmd += ["-L", json.dumps({"file": str(p), "layer": name})]
-            subprocess.run(cmd, check=True, capture_output=True)
-            click.echo(f"{tier} (z{zmin}–{zmax}): " + ", ".join(f"{k} {len(v)}" for k, v in layers.items()))
-            parts.append(str(part))
-        # One file per layer, so the light normal/warming layers never download the
-        # 35 vintages packed into the vintage tiles
-        for name in ("gdd_normal", "gdd_warming", "gdd_vintage"):
-            out = OUT_DIR / f"climate-{name.removeprefix('gdd_')}.pmtiles"
-            subprocess.run(["tile-join", "-o", str(out), "--force", "--no-tile-size-limit", "-l", name, *parts],
+        for name in names:
+            parts = []
+            for tier, zmin, zmax, sieve_px, tol in TIERS:
+                feats = [f for (vals, valid, tf), edges, props in up[name]
+                         for f in band_features(vals, valid, tf, edges, props, sieve_px, tol)]
+                src = tmp / f"{name}-{tier}.geojsonl"
+                write_seq(feats, src)
+                part = tmp / f"{name}-{tier}.pmtiles"
+                subprocess.run(["tippecanoe", "-o", str(part), "--force", "-Z", str(zmin), "-z", str(zmax),
+                                "--no-feature-limit", "--no-tile-size-limit", "--detect-shared-borders",
+                                "-l", name, str(src)], check=True, capture_output=True)
+                parts.append(str(part))
+                click.echo(f"{name} {tier} (z{zmin}–{zmax}): {len(feats)} band features")
+            out = OUT_DIR / f"{OUT_NAMES[name]}.pmtiles"
+            subprocess.run(["tile-join", "-o", str(out), "--force", "--no-tile-size-limit", *parts],
                            check=True, capture_output=True)
             click.echo(f"wrote {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
             if copy_public:

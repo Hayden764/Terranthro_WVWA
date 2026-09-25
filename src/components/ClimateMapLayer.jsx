@@ -7,11 +7,12 @@ import {
   CLIMATE_MAP_OPACITY,
   bandLabel,
   binColorExpression,
+  isVintageLayer,
 } from '../config/climateMapConfig';
 
 /**
- * Heat-accumulation climate layers (one PMTiles file per layer).
- * The vintage layer holds every year; the year slider only swaps the filter, so
+ * Climate map layers — heat and rain (one PMTiles file per layer).
+ * A vintage layer holds every year; the year slider only swaps the filter, so
  * scrubbing never refetches tiles. Click/tap shows the band under the pointer —
  * except where it lands on a vineyard, which keeps its own behaviour.
  */
@@ -37,17 +38,7 @@ function popupHtml(layerId, p, year) {
   const cfg = CLIMATE_MAP_LAYERS[layerId];
   const color = cfg.colors[num(p.bin)] ?? 'transparent';
   const band = bandLabel(layerId, num(p.lo), num(p.hi));
-  let kicker = cfg.label;
-  let note = '';
-  if (layerId === 'gdd_normal') {
-    kicker = num(p.bin) === 0 ? 'Too cool for wine grapes' : `Winkler ${p.region}`;
-    note = 'Average growing season, 1991–2020';
-  } else if (layerId === 'gdd_vintage') {
-    kicker = `${year} vintage`;
-    note = 'Compared with the 1991–2020 normal';
-  } else {
-    note = '2016–2025 average vs 1991–2020';
-  }
+  const { kicker, note } = cfg.popup(p, year);
   return `<div style="font-family:var(--font-sans);padding:10px 14px 12px;font-size:12.5px;
       line-height:1.4;min-width:200px;max-width:260px;color:var(--color-ink)">
     <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.04em;
@@ -90,7 +81,7 @@ const ClimateMapLayer = ({ map, activeLayer, year, selected }) => {
         type: 'fill',
         source: SOURCE_ID,
         'source-layer': cfg.sourceLayer,
-        ...(activeLayer === 'gdd_vintage' ? { filter: ['==', ['to-number', ['get', 'yr']], yearRef.current] } : {}),
+        ...(cfg.vintage ? { filter: ['==', ['to-number', ['get', 'yr']], yearRef.current] } : {}),
         paint: {
           'fill-color': binColorExpression(cfg.colors),
           'fill-opacity': CLIMATE_MAP_OPACITY,
@@ -136,9 +127,9 @@ const ClimateMapLayer = ({ map, activeLayer, year, selected }) => {
     applySelection(map, CLIMATE_MAP_LAYERS[activeLayer], selected);
   }, [map, activeLayer, selected]);
 
-  // Year changes only re-filter the vintage layer
+  // Year changes only re-filter a vintage layer
   useEffect(() => {
-    if (!map || activeLayer !== 'gdd_vintage' || !map.getLayer(FILL_ID)) return;
+    if (!map || !isVintageLayer(activeLayer) || !map.getLayer(FILL_ID)) return;
     map.setFilter(FILL_ID, ['==', ['to-number', ['get', 'yr']], year]);
     popupRef.current?.remove();
   }, [map, activeLayer, year]);

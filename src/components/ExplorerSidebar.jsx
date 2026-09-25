@@ -5,7 +5,7 @@ import { EARTH_LAYER_TYPES, earthLegendGroups } from '../config/earthLayersConfi
 import { VINEYARD_THEMES, NO_DATA_COLOR } from '../config/vineyardThemes';
 import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
-import { CLIMATE_MAP_LAYERS, VINTAGE_FIRST_YEAR, VINTAGE_LAST_YEAR, climateLegendGroups, isClimateMapLayer } from '../config/climateMapConfig';
+import { CLIMATE_MAP_LAYERS, VINTAGE_FIRST_YEAR, VINTAGE_LAST_YEAR, climateLegendGroups, isClimateMapLayer, isVintageLayer, CLIMATE_MAP_GROUPS } from '../config/climateMapConfig';
 import LegendFilter from './LegendFilter';
 import TerroirDataChips from './TerroirDataChips';
 import TerroirFactRows from './TerroirFactRows';
@@ -958,7 +958,7 @@ function ParcelBlockView({ parcel, onBack }) {
   );
 }
 
-// Year scrubber for the "Vintage heat" map layer: step buttons and a slider
+// Year scrubber for the vintage map layers: step buttons and a slider
 // (both touch-sized), plus play to sweep through every vintage.
 function VintageYearPicker({ year, onChange }) {
   const { playing, step, setYear, togglePlay } = useVintagePlayback(year, onChange);
@@ -1083,42 +1083,45 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
 
         {climateOpen && (
           <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {Object.values(CLIMATE_MAP_LAYERS).map(layer => {
-              const active = activeLayer === layer.id;
-              return (
-                <button
-                  key={layer.id}
-                  onClick={() => onLayerChange(active ? null : layer.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
-                    border: `1.5px solid ${active ? crimson + '80' : border}`,
-                    background: active ? TOKENS.dangerDim : parchment,
-                    cursor: 'pointer', fontFamily: 'var(--font-sans)',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
-                    <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.sub}</div>
-                  </div>
-                  <div style={{
-                    width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}>
-                    {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
-                  </div>
-                </button>
-              );
-            })}
+            {CLIMATE_MAP_GROUPS.map(group => [
+              <div key={group.id} style={{ fontSize: 'var(--type-ui-label-size)', color: muted, fontWeight: 650, padding: group.id === CLIMATE_MAP_GROUPS[0].id ? '0 2px' : '6px 2px 0' }}>{group.label}</div>,
+              ...Object.values(CLIMATE_MAP_LAYERS).filter(l => l.group === group.id).map(layer => {
+                const active = activeLayer === layer.id;
+                return (
+                  <button
+                    key={layer.id}
+                    onClick={() => onLayerChange(active ? null : layer.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
+                      border: `1.5px solid ${active ? crimson + '80' : border}`,
+                      background: active ? TOKENS.dangerDim : parchment,
+                      cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
+                      <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.sub}</div>
+                    </div>
+                    <div style={{
+                      width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
+                    </div>
+                  </button>
+                );
+              }),
+            ])}
 
-            {activeLayer === 'gdd_vintage' && (
+            {isVintageLayer(activeLayer) && (
               <VintageYearPicker year={climateYear} onChange={onClimateYearChange} />
             )}
 
             {isClimateMapLayer(activeLayer) && (
               <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
                 <div style={{ ...T.sectionLabel, marginBottom: 8 }}>
-                  Legend — {activeLayer === 'gdd_vintage' ? `${climateYear} vs 1991–2020` : CLIMATE_MAP_LAYERS[activeLayer].sub}
+                  Legend — {isVintageLayer(activeLayer) ? `${climateYear} vs 1991–2020` : CLIMATE_MAP_LAYERS[activeLayer].sub}
                 </div>
                 <LegendFilter
                   groups={climateLegendGroups(activeLayer)}
@@ -1126,7 +1129,7 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
                   onChange={(keys) => onLegendSelectionChange?.(activeLayer, keys)}
                 />
                 <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 8 }}>
-                  Growing degree days above 50°F, April–October. Tap the map for the value there.
+                  {CLIMATE_MAP_LAYERS[activeLayer].period}. Tap the map for the value there.
                 </div>
               </div>
             )}

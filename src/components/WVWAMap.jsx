@@ -1698,6 +1698,7 @@ const WVWAMap = forwardRef(function WVWAMap({
   currentMonth:      currentMonthProp,
   onMonthChange,
   climateYear = VINTAGE_LAST_YEAR,
+  legendSelection = {},
   listingFilterMode: listingFilterModeProp,
   onListingFilterModeChange,
   vineyardTheme = 'ownership',
@@ -3836,6 +3837,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           map={mapRef.current}
           activeLayer={isClimateActive ? activeLayer : null}
           year={climateYear}
+          selected={legendSelection[activeLayer]}
         />
       )}
 
@@ -3853,6 +3855,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         <EarthLayer
           map={mapRef.current}
           activeLayer={isEarthActive ? activeLayer : null}
+          selected={legendSelection[activeLayer]}
         />
       )}
 

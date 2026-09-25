@@ -35,7 +35,7 @@ export function useVintagePlayback(year, onChange) {
   return { playing, step, setYear, togglePlay };
 }
 
-/** Floating year control over the map (mobile). */
+/** Year control floated over the map (mobile); the page positions it. */
 export function MapVintageYearControl({ year, onChange }) {
   const { playing, step, setYear, togglePlay } = useVintagePlayback(year, onChange);
   const btn = {
@@ -48,8 +48,7 @@ export function MapVintageYearControl({ year, onChange }) {
       role="group"
       aria-label="Vintage shown on the map"
       style={{
-        position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 20,
-        width: 'calc(100% - 32px)', maxWidth: 360, boxSizing: 'border-box',
+        width: '100%', boxSizing: 'border-box',
         background: alpha(TOKENS.parchment, 0.96), border: `1px solid ${border}`, borderRadius: 14,
         boxShadow: '0 4px 16px rgba(0,0,0,0.25)', padding: '8px 10px 8px',
         fontFamily: 'var(--font-sans)',

@@ -71,3 +71,8 @@ export const terroirClassColorExpression = () => [
   ...Object.entries(TERROIR_CLASS_COLORS).flat(),
   UNCLASSIFIED_COLOR,
 ];
+
+/** Legend for the filterable legend: one flat group keyed by `cls`. */
+export const earthLegendGroups = (layerId) => [{
+  rows: (EARTH_LAYER_TYPES[layerId]?.classes ?? []).map((cls) => ({ key: cls, color: TERROIR_CLASS_COLORS[cls], label: cls })),
+}];

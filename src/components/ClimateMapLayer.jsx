@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import { overlayBeforeId, placeBelowVineyards } from '../lib/mapLayerOrder';
+import { legendPaint } from '../lib/legendSelection';
 import {
   CLIMATE_MAP_LAYERS,
   CLIMATE_MAP_OPACITY,
@@ -18,6 +19,14 @@ import {
 const SOURCE_ID = 'climate-gdd';
 const FILL_ID = 'climate-gdd-fill';
 const VINEYARD_CLICK_LAYERS = ['vineyards-linked-fill', 'vineyards-reference-fill', 'vineyards-reference-passive-fill'];
+
+const BIN_EXPR = ['to-number', ['get', 'bin'], -1];
+
+function applySelection(map, cfg, selected) {
+  const { color, opacity } = legendPaint(selected, BIN_EXPR, binColorExpression(cfg.colors), CLIMATE_MAP_OPACITY);
+  map.setPaintProperty(FILL_ID, 'fill-color', color);
+  map.setPaintProperty(FILL_ID, 'fill-opacity', opacity);
+}
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -49,8 +58,11 @@ function popupHtml(layerId, p, year) {
   </div>`;
 }
 
-const ClimateMapLayer = ({ map, activeLayer, year }) => {
+// `selected`: legend bins to show (others fade); empty/undefined = all
+const ClimateMapLayer = ({ map, activeLayer, year, selected }) => {
   const popupRef = useRef(null);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
   const yearRef = useRef(year);
   yearRef.current = year;
 
@@ -86,6 +98,7 @@ const ClimateMapLayer = ({ map, activeLayer, year }) => {
         },
       }, overlayBeforeId(map));
       placeBelowVineyards(map, [FILL_ID]);
+      applySelection(map, cfg, selectedRef.current);
     } catch (e) {
       console.warn(`ClimateMapLayer: failed to add ${activeLayer}`, e);
       return remove;
@@ -117,6 +130,11 @@ const ClimateMapLayer = ({ map, activeLayer, year }) => {
       remove();
     };
   }, [map, activeLayer]);
+
+  useEffect(() => {
+    if (!map || !activeLayer || !map.getLayer(FILL_ID)) return;
+    applySelection(map, CLIMATE_MAP_LAYERS[activeLayer], selected);
+  }, [map, activeLayer, selected]);
 
   // Year changes only re-filter the vintage layer
   useEffect(() => {

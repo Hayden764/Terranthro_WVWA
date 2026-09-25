@@ -1,10 +1,12 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import WVWAMap, { LISTING_FILTER_MODES } from '../components/WVWAMap';
 import ExplorerSidebar, { SHEET_PEEK_PX } from '../components/ExplorerSidebar';
 import FilterModal from '../components/FilterModal';
 import { useVineyardFilters } from '../lib/useVineyardFilters';
 import { VINTAGE_LAST_YEAR } from '../config/climateMapConfig';
 import { MapVintageYearControl } from '../components/climate/VintageYearControls';
+import LegendSelectionChip from '../components/LegendSelectionChip';
+import { legendGroupsFor } from '../lib/legendGroups';
 import { alpha, border, crimson, ink, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 const UI = {
@@ -223,6 +225,12 @@ export default function WVWAMapPage() {
   const [currentMonth, setCurrentMonth]             = useState(new Date().getMonth() + 1);
   // Vintage shown by the climate map layer; shared with the sidebar's vintage stripes
   const [climateYear, setClimateYear]               = useState(VINTAGE_LAST_YEAR);
+  // Legend filter per data layer: { [layerId]: [class keys] } — empty = show all.
+  // Kept per layer, so switching Soils → Bedrock → Soils keeps the soil selection.
+  const [legendSelection, setLegendSelection]       = useState({});
+  const setLayerSelection = useCallback((layerId, keys) => {
+    setLegendSelection((prev) => ({ ...prev, [layerId]: keys }));
+  }, []);
   const [listingFilterMode, setListingFilterMode]   = useState(LISTING_FILTER_MODES.allWineries);
   const [listingSymbologyPreset, setListingSymbologyPreset] = useState('topoModern');
   const [topoStats, setTopoStats]                   = useState(null);
@@ -332,6 +340,8 @@ export default function WVWAMapPage() {
             onMonthChange={setCurrentMonth}
             climateYear={climateYear}
             onClimateYearChange={setClimateYear}
+            legendSelection={legendSelection}
+            onLegendSelectionChange={setLayerSelection}
             topoStats={topoStats}
             listingFilterMode={listingFilterMode}
             onListingFilterModeChange={setListingFilterMode}
@@ -372,6 +382,8 @@ export default function WVWAMapPage() {
             onMonthChange={setCurrentMonth}
             climateYear={climateYear}
             onClimateYearChange={setClimateYear}
+            legendSelection={legendSelection}
+            onLegendSelectionChange={setLayerSelection}
             listingFilterMode={listingFilterMode}
             onListingFilterModeChange={setListingFilterMode}
             vineyardTheme={vineyardTheme}
@@ -394,8 +406,18 @@ export default function WVWAMapPage() {
           />
           {/* Mobile: the sidebar's year picker is buried in the bottom sheet, so
               the vintage layer gets its own year control on the map */}
-          {isMobile && !isIntro && activeLayer === 'gdd_vintage' && (
-            <MapVintageYearControl year={climateYear} onChange={setClimateYear} />
+          {isMobile && !isIntro && (activeLayer === 'gdd_vintage' || legendSelection[activeLayer]?.length > 0) && (
+            <div style={{
+              position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 20,
+              width: 'calc(100% - 32px)', maxWidth: 360, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+            }}>
+              {activeLayer === 'gdd_vintage' && <MapVintageYearControl year={climateYear} onChange={setClimateYear} />}
+              <LegendSelectionChip
+                groups={legendGroupsFor(activeLayer)}
+                selected={legendSelection[activeLayer]}
+                onClear={() => setLayerSelection(activeLayer, [])}
+              />
+            </div>
           )}
         </div>
       </div>

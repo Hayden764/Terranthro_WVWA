@@ -1,11 +1,12 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { alpha, border, crimson, electricBlue, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
-import { EARTH_LAYER_TYPES, TERROIR_CLASS_COLORS } from '../config/earthLayersConfig';
+import { EARTH_LAYER_TYPES, earthLegendGroups } from '../config/earthLayersConfig';
 import { VINEYARD_THEMES, NO_DATA_COLOR } from '../config/vineyardThemes';
 import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
-import { CLIMATE_MAP_LAYERS, VINTAGE_FIRST_YEAR, VINTAGE_LAST_YEAR, climateLegend, isClimateMapLayer } from '../config/climateMapConfig';
+import { CLIMATE_MAP_LAYERS, VINTAGE_FIRST_YEAR, VINTAGE_LAST_YEAR, climateLegendGroups, isClimateMapLayer } from '../config/climateMapConfig';
+import LegendFilter from './LegendFilter';
 import TerroirDataChips from './TerroirDataChips';
 import TerroirFactRows from './TerroirFactRows';
 import { terroirFactRows } from '../lib/terroirFacts';
@@ -1001,7 +1002,7 @@ const TOPO_LAYERS = [
   { id: 'aspect',    label: 'Aspect',      sub: 'Direction slope faces' },
 ];
 
-function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_YEAR, onClimateYearChange, topoStats, vineyardTheme = 'ownership', onVineyardThemeChange, vineyardThemeValues }) {
+function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_YEAR, onClimateYearChange, legendSelection = {}, onLegendSelectionChange, topoStats, vineyardTheme = 'ownership', onVineyardThemeChange, vineyardThemeValues }) {
   const [climateOpen, setClimateOpen] = useState(true);
   const [topoOpen, setTopoOpen] = useState(true);
   const [earthOpen, setEarthOpen] = useState(true);
@@ -1119,14 +1120,11 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
                 <div style={{ ...T.sectionLabel, marginBottom: 8 }}>
                   Legend — {activeLayer === 'gdd_vintage' ? `${climateYear} vs 1991–2020` : CLIMATE_MAP_LAYERS[activeLayer].sub}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {climateLegend(activeLayer).map(({ color, label }) => (
-                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                      <span style={{ width: 11, height: 11, borderRadius: 3, flexShrink: 0, background: color }} />
-                      <span style={{ fontSize: 'var(--type-ui-label-size)', color: ink }}>{label}</span>
-                    </div>
-                  ))}
-                </div>
+                <LegendFilter
+                  groups={climateLegendGroups(activeLayer)}
+                  selected={legendSelection[activeLayer]}
+                  onChange={(keys) => onLegendSelectionChange?.(activeLayer, keys)}
+                />
                 <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 8 }}>
                   Growing degree days above 50°F, April–October. Tap the map for the value there.
                 </div>
@@ -1251,14 +1249,11 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
             {earthConfig && (
               <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
                 <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Legend — {earthConfig.label}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 10px' }}>
-                  {earthConfig.classes.map(cls => (
-                    <div key={cls} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                      <span style={{ width: 11, height: 11, borderRadius: 3, flexShrink: 0, background: TERROIR_CLASS_COLORS[cls] }} />
-                      <span style={{ fontSize: 'var(--type-ui-label-size)', color: ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cls}</span>
-                    </div>
-                  ))}
-                </div>
+                <LegendFilter
+                  groups={earthLegendGroups(activeLayer)}
+                  selected={legendSelection[activeLayer]}
+                  onChange={(keys) => onLegendSelectionChange?.(activeLayer, keys)}
+                />
                 <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 8 }}>Click the map for series, texture and formation details.</div>
               </div>
             )}
@@ -1506,6 +1501,8 @@ export default function ExplorerSidebar({
   onMonthChange,
   climateYear,
   onClimateYearChange,
+  legendSelection,
+  onLegendSelectionChange,
   topoStats,
   vineyardTheme,
   onVineyardThemeChange,
@@ -1999,6 +1996,8 @@ export default function ExplorerSidebar({
                   onLayerChange={onLayerChange}
                   climateYear={climateYear}
                   onClimateYearChange={onClimateYearChange}
+                  legendSelection={legendSelection}
+                  onLegendSelectionChange={onLegendSelectionChange}
                   topoStats={topoStats}
                   vineyardTheme={vineyardTheme}
                   onVineyardThemeChange={onVineyardThemeChange}

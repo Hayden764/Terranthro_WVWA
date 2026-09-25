@@ -116,3 +116,25 @@ export function climateLegend(layerId) {
     label: !cfg.diverging && i === 0 ? 'Too cool (under 1,500)' : bandLabel(layerId, i > 0 ? edges[i - 1] : null, i < edges.length ? edges[i] : null),
   }));
 }
+
+// Winkler regions as groups of normal-GDD bins (bin index = position in NORMAL_COLORS)
+const WINKLER_GROUPS = [
+  { label: 'Too cool', bins: [0] },
+  { label: 'Region Ia', bins: [1, 2] },
+  { label: 'Region Ib', bins: [3, 4] },
+  { label: 'Region II', bins: [5, 6] },
+  { label: 'Region III', bins: [7] },
+  { label: 'Region IV–V', bins: [8] },
+];
+
+/**
+ * Legend for the filterable legend (components/LegendFilter.jsx):
+ * [{ label?, rows: [{ key, color, label }] }]. Heat accumulation groups its
+ * 250-GDD bands under Winkler regions; the anomaly layers are one flat list.
+ */
+export function climateLegendGroups(layerId) {
+  const rows = climateLegend(layerId).map((r, i) => ({ key: i, ...r }));
+  if (layerId !== 'gdd_normal') return [{ rows }];
+  rows[0].label = 'Under 1,500 GDD';
+  return WINKLER_GROUPS.map((g) => ({ label: g.label, rows: g.bins.map((b) => rows[b]) }));
+}

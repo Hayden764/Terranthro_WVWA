@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import { overlayBeforeId, placeBelowVineyards } from '../lib/mapLayerOrder';
+import { legendPaint } from '../lib/legendSelection';
 import {
   EARTH_LAYER_TYPES,
   EARTH_LAYER_OPACITY,
@@ -19,6 +20,15 @@ const VINEYARD_CLICK_LAYERS = ['vineyards-linked-fill', 'vineyards-reference-fil
 const sourceId = (id) => `earth-${id}`;
 const fillId   = (id) => `earth-${id}-fill`;
 const lineId   = (id) => `earth-${id}-line`;
+
+const CLS_EXPR = ['coalesce', ['get', 'cls'], ''];
+
+function applySelection(map, id, selected) {
+  const { color, opacity } = legendPaint(selected, CLS_EXPR, terroirClassColorExpression(), EARTH_LAYER_OPACITY);
+  map.setPaintProperty(fillId(id), 'fill-color', color);
+  map.setPaintProperty(fillId(id), 'fill-opacity', opacity);
+  map.setPaintProperty(lineId(id), 'line-opacity', selected?.length ? ['case', ['in', CLS_EXPR, ['literal', selected]], 1, 0.2] : 1);
+}
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -73,8 +83,11 @@ function popupHtml(layerId, p) {
   </div>`;
 }
 
-const EarthLayer = ({ map, activeLayer }) => {
+// `selected`: legend classes to show (others fade); empty/undefined = all
+const EarthLayer = ({ map, activeLayer, selected }) => {
   const popupRef = useRef(null);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
 
   useEffect(() => {
     if (!map || !activeLayer) return undefined;
@@ -125,6 +138,7 @@ const EarthLayer = ({ map, activeLayer }) => {
       // The vineyard layers may not exist yet when this runs; re-assert once
       // they do so the fill never ends up covering them.
       placeBelowVineyards(map, [fid, lid]);
+      applySelection(map, activeLayer, selectedRef.current);
     } catch (e) {
       console.warn(`EarthLayer: failed to add ${activeLayer}`, e);
       return remove;
@@ -157,6 +171,11 @@ const EarthLayer = ({ map, activeLayer }) => {
       remove();
     };
   }, [map, activeLayer]);
+
+  useEffect(() => {
+    if (!map || !activeLayer || !map.getLayer(fillId(activeLayer))) return;
+    applySelection(map, activeLayer, selected);
+  }, [map, activeLayer, selected]);
 
   return null;
 };

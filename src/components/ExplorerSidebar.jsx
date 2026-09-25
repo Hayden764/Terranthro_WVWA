@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
+import { Fragment, useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { alpha, border, crimson, electricBlue, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { EARTH_LAYER_TYPES, earthLegendGroups } from '../config/earthLayersConfig';
@@ -994,13 +994,76 @@ const TOPO_LAYERS = [
   { id: 'aspect',    label: 'Aspect',      sub: 'Direction slope faces' },
 ];
 
-function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_YEAR, onClimateYearChange, legendSelection = {}, onLegendSelectionChange, topoRanges = {}, onTopoRangeChange, vineyardTheme = 'ownership', onVineyardThemeChange, vineyardThemeValues }) {
+function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_YEAR, onClimateYearChange, legendSelection = {}, onLegendSelectionChange, topoRanges = {}, onTopoRangeChange, vineyardTheme = 'ownership', onVineyardThemeChange, vineyardThemeValues, vineyardOutline = false, onVineyardOutlineChange }) {
   const [climateOpen, setClimateOpen] = useState(true);
   const [topoOpen, setTopoOpen] = useState(true);
   const [earthOpen, setEarthOpen] = useState(true);
   const earthConfig = activeLayer ? EARTH_LAYER_TYPES[activeLayer] : null;
 
   const topoConfig = activeLayer ? TOPO_LAYER_TYPES[activeLayer] : null;
+
+  // Each layer's controls + legend render directly under its own button
+  const climateExtras = (
+    <>
+      {isVintageLayer(activeLayer) && (
+        <VintageYearPicker year={climateYear} onChange={onClimateYearChange} />
+      )}
+
+      {isClimateMapLayer(activeLayer) && (
+        <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
+          <div style={{ ...T.sectionLabel, marginBottom: 8 }}>
+            Legend — {isVintageLayer(activeLayer) ? `${climateYear} vs 1991–2020` : CLIMATE_MAP_LAYERS[activeLayer].sub}
+          </div>
+          <LegendFilter
+            groups={climateLegendGroups(activeLayer)}
+            selected={legendSelection[activeLayer]}
+            onChange={(keys) => onLegendSelectionChange?.(activeLayer, keys)}
+          />
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 8 }}>
+            {CLIMATE_MAP_LAYERS[activeLayer].period}. Tap the map for the value there.
+          </div>
+        </div>
+      )}
+    </>
+  );
+  const topoExtras = (
+    <>
+      {/* Custom range + filterable legend for the active topo layer */}
+      {topoConfig && activeLayer && (
+        <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={T.sectionLabel}>Legend — {topoConfig.label}</div>
+          <TopoRangeControl
+            layerId={activeLayer}
+            range={topoRanges[activeLayer]}
+            onChange={(range) => onTopoRangeChange?.(activeLayer, range)}
+          />
+          <LegendFilter
+            groups={topoLegendGroups(activeLayer)}
+            selected={legendSelection[activeLayer]}
+            onChange={(keys) => onLegendSelectionChange?.(activeLayer, keys)}
+          />
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>
+            DOGAMI lidar, 3 m. Pick bands or set a custom range; everything else fades.
+          </div>
+        </div>
+      )}
+    </>
+  );
+  const earthExtras = (
+    <>
+      {earthConfig && (
+        <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
+          <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Legend — {earthConfig.label}</div>
+          <LegendFilter
+            groups={earthLegendGroups(activeLayer)}
+            selected={legendSelection[activeLayer]}
+            onChange={(keys) => onLegendSelectionChange?.(activeLayer, keys)}
+          />
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 8 }}>Click the map for series, texture and formation details.</div>
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -1028,6 +1091,26 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
           </select>
           <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>
             {VINEYARD_THEMES[vineyardTheme]?.description}
+          </div>
+
+          {/* Filled blocks, or borders only so the data layer underneath shows through */}
+          <div role="group" aria-label="Vineyard style" style={{ display: 'flex', border: `1px solid ${border}`, borderRadius: 8, overflow: 'hidden' }}>
+            {[{ id: false, label: 'Filled' }, { id: true, label: 'Outline only' }].map(({ id, label }) => {
+              const on = vineyardOutline === id;
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => onVineyardOutlineChange?.(id)}
+                  style={{
+                    flex: 1, minHeight: 32, border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                    fontSize: 'var(--type-ui-label-size)', fontWeight: 600,
+                    background: on ? ink : parchment, color: on ? parchment : ink,
+                  }}
+                >{label}</button>
+              );
+            })}
           </div>
 
           {VINEYARD_THEMES[vineyardTheme]?.legend && (() => {
@@ -1079,8 +1162,55 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
               ...Object.values(CLIMATE_MAP_LAYERS).filter(l => l.group === group.id).map(layer => {
                 const active = activeLayer === layer.id;
                 return (
+                  <Fragment key={layer.id}>
+                    <button
+                      onClick={() => onLayerChange(active ? null : layer.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
+                        border: `1.5px solid ${active ? crimson + '80' : border}`,
+                        background: active ? TOKENS.dangerDim : parchment,
+                        cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
+                        <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.sub}</div>
+                      </div>
+                      <div style={{
+                        width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      }}>
+                        {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
+                      </div>
+                    </button>
+                    {active && climateExtras}
+                  </Fragment>
+                );
+              }),
+            ])}
+
+          </div>
+        )}
+      </div>
+
+      {/* Topography */}
+      <div style={{ borderBottom: `1px solid ${border}` }}>
+        <button
+          onClick={() => setTopoOpen(p => !p)}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
+        >
+          <span style={T.sectionLabel}>Topography</span>
+          <Chevron open={topoOpen} />
+        </button>
+
+        {topoOpen && (
+          <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {TOPO_LAYERS.map(layer => {
+              const active = activeLayer === layer.id;
+              return (
+                <Fragment key={layer.id}>
                   <button
-                    key={layer.id}
                     onClick={() => onLayerChange(active ? null : layer.id)}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -1101,92 +1231,11 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
                       {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
                     </div>
                   </button>
-                );
-              }),
-            ])}
-
-            {isVintageLayer(activeLayer) && (
-              <VintageYearPicker year={climateYear} onChange={onClimateYearChange} />
-            )}
-
-            {isClimateMapLayer(activeLayer) && (
-              <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
-                <div style={{ ...T.sectionLabel, marginBottom: 8 }}>
-                  Legend — {isVintageLayer(activeLayer) ? `${climateYear} vs 1991–2020` : CLIMATE_MAP_LAYERS[activeLayer].sub}
-                </div>
-                <LegendFilter
-                  groups={climateLegendGroups(activeLayer)}
-                  selected={legendSelection[activeLayer]}
-                  onChange={(keys) => onLegendSelectionChange?.(activeLayer, keys)}
-                />
-                <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 8 }}>
-                  {CLIMATE_MAP_LAYERS[activeLayer].period}. Tap the map for the value there.
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Topography */}
-      <div style={{ borderBottom: `1px solid ${border}` }}>
-        <button
-          onClick={() => setTopoOpen(p => !p)}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
-        >
-          <span style={T.sectionLabel}>Topography</span>
-          <Chevron open={topoOpen} />
-        </button>
-
-        {topoOpen && (
-          <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {TOPO_LAYERS.map(layer => {
-              const active = activeLayer === layer.id;
-              return (
-                <button
-                  key={layer.id}
-                  onClick={() => onLayerChange(active ? null : layer.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
-                    border: `1.5px solid ${active ? crimson + '80' : border}`,
-                    background: active ? TOKENS.dangerDim : parchment,
-                    cursor: 'pointer', fontFamily: 'var(--font-sans)',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
-                    <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.sub}</div>
-                  </div>
-                  <div style={{
-                    width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}>
-                    {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
-                  </div>
-                </button>
+                  {active && topoExtras}
+                </Fragment>
               );
             })}
 
-            {/* Custom range + filterable legend for the active topo layer */}
-            {topoConfig && activeLayer && (
-              <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={T.sectionLabel}>Legend — {topoConfig.label}</div>
-                <TopoRangeControl
-                  layerId={activeLayer}
-                  range={topoRanges[activeLayer]}
-                  onChange={(range) => onTopoRangeChange?.(activeLayer, range)}
-                />
-                <LegendFilter
-                  groups={topoLegendGroups(activeLayer)}
-                  selected={legendSelection[activeLayer]}
-                  onChange={(keys) => onLegendSelectionChange?.(activeLayer, keys)}
-                />
-                <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>
-                  DOGAMI lidar, 3 m. Pick bands or set a custom range; everything else fades.
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -1206,42 +1255,33 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
             {Object.values(EARTH_LAYER_TYPES).map(layer => {
               const active = activeLayer === layer.id;
               return (
-                <button
-                  key={layer.id}
-                  onClick={() => onLayerChange(active ? null : layer.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
-                    border: `1.5px solid ${active ? crimson + '80' : border}`,
-                    background: active ? TOKENS.dangerDim : parchment,
-                    cursor: 'pointer', fontFamily: 'var(--font-sans)',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
-                    <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.description} · {layer.attribution}</div>
-                  </div>
-                  <div style={{
-                    width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}>
-                    {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
-                  </div>
-                </button>
+                <Fragment key={layer.id}>
+                  <button
+                    onClick={() => onLayerChange(active ? null : layer.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
+                      border: `1.5px solid ${active ? crimson + '80' : border}`,
+                      background: active ? TOKENS.dangerDim : parchment,
+                      cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
+                      <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.description} · {layer.attribution}</div>
+                    </div>
+                    <div style={{
+                      width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
+                    </div>
+                  </button>
+                  {active && earthExtras}
+                </Fragment>
               );
             })}
 
-            {earthConfig && (
-              <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
-                <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Legend — {earthConfig.label}</div>
-                <LegendFilter
-                  groups={earthLegendGroups(activeLayer)}
-                  selected={legendSelection[activeLayer]}
-                  onChange={(keys) => onLegendSelectionChange?.(activeLayer, keys)}
-                />
-                <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 8 }}>Click the map for series, texture and formation details.</div>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -1492,6 +1532,8 @@ export default function ExplorerSidebar({
   onTopoRangeChange,
   topoStats,
   vineyardTheme,
+  vineyardOutline,
+  onVineyardOutlineChange,
   onVineyardThemeChange,
   vineyardThemeValues,
   listingFilterMode,
@@ -1990,6 +2032,8 @@ export default function ExplorerSidebar({
                   topoStats={topoStats}
                   vineyardTheme={vineyardTheme}
                   onVineyardThemeChange={onVineyardThemeChange}
+                  vineyardOutline={vineyardOutline}
+                  onVineyardOutlineChange={onVineyardOutlineChange}
                   vineyardThemeValues={vineyardThemeValues}
                 />
               </div>

@@ -684,6 +684,22 @@ function setVineyardGlowStrength(map, k) {
   }
 }
 
+// ── Outline-only vineyards ────────────────────────────────────────────────
+// "Outline only" keeps vineyards-reference-fill (it is the hover/click target)
+// but makes it transparent; vineyards-outline-line draws each block's border in
+// the colour the fill would have had. Every writer of the reference fill's
+// opacity goes through setReferenceFillOpacity so outline mode always wins.
+const vineyardOutlineOnly = new WeakMap(); // map → boolean
+
+function setReferenceFillOpacity(map, opacity) {
+  if (!map.getLayer('vineyards-reference-fill')) return;
+  map.setPaintProperty('vineyards-reference-fill', 'fill-opacity', vineyardOutlineOnly.get(map) ? 0 : opacity);
+}
+
+function setVineyardOutlineOpacity(map, opacity) {
+  if (map.getLayer('vineyards-outline-line')) map.setPaintProperty('vineyards-outline-line', 'line-opacity', opacity);
+}
+
 function setVineyardReferenceSoftFocus(map, isSoftFocused) {
   // A selected winery is its own highlight; the valley-wide glow would compete.
   setVineyardGlowStrength(map, isSoftFocused ? 0.12 : 1);
@@ -712,9 +728,8 @@ function setVineyardReferenceSoftFocus(map, isSoftFocused) {
   const linkedLineColor = isSoftFocused ? '#D2DDD5' : '#3FAF79';
   const linkedFillColor = '#22C55E';
 
-  if (map.getLayer('vineyards-reference-fill')) {
-    map.setPaintProperty('vineyards-reference-fill', 'fill-opacity', referenceFillOpacity);
-  }
+  setReferenceFillOpacity(map, referenceFillOpacity);
+  setVineyardOutlineOpacity(map, isSoftFocused ? 0.15 : 1);
   if (map.getLayer('vineyards-reference-line')) {
     map.setPaintProperty('vineyards-reference-line', 'line-color', referenceLineColor);
     map.setPaintProperty('vineyards-reference-line', 'line-width', referenceLineWidth);
@@ -777,7 +792,8 @@ function runWhenStyleReady(map, fn) {
  */
 function applyVineyardFilterDim(map) {
   setVineyardGlowStrength(map, 0.2);
-  if (map.getLayer('vineyards-reference-fill'))          map.setPaintProperty('vineyards-reference-fill', 'fill-opacity', 0.12);
+  setReferenceFillOpacity(map, 0.12);
+  setVineyardOutlineOpacity(map, 0.25);
   if (map.getLayer('vineyards-reference-line'))          map.setPaintProperty('vineyards-reference-line', 'line-opacity', 0.18);
   if (map.getLayer('vineyards-reference-passive-fill'))  map.setPaintProperty('vineyards-reference-passive-fill', 'fill-opacity', 0.01);
   if (map.getLayer('vineyards-reference-passive-hatch')) map.setPaintProperty('vineyards-reference-passive-hatch', 'fill-opacity', 0.07);
@@ -1707,6 +1723,7 @@ const WVWAMap = forwardRef(function WVWAMap({
   listingFilterMode: listingFilterModeProp,
   onListingFilterModeChange,
   vineyardTheme = 'ownership',
+  vineyardOutline = false,
   onVineyardThemeValuesChange,
   listingSymbologyPreset: listingSymbologyPresetProp,
   onListingSymbologyPresetChange,
@@ -2210,6 +2227,24 @@ const WVWAMap = forwardRef(function WVWAMap({
       setListingSoftFocus(map, vineyardScope === 'winery');
     });
   }, [vineyardScope, filtersActive, mapLoaded]);
+
+  // Outline-only vineyards: flag the map, swap which outline shows, then re-run
+  // emphasis so the reference fill's opacity is rewritten under the new mode.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    vineyardOutlineOnly.set(map, vineyardOutline);
+    runWhenStyleReady(map, () => {
+      const vineyardsVisible = listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized;
+      if (map.getLayer('vineyards-outline-line')) {
+        map.setLayoutProperty('vineyards-outline-line', 'visibility', vineyardOutline && vineyardsVisible ? 'visible' : 'none');
+      }
+      if (map.getLayer('vineyards-theme-line')) {
+        map.setLayoutProperty('vineyards-theme-line', 'visibility', vineyardOutline ? 'none' : 'visible');
+      }
+      applyVineyardEmphasis(map, { scope: vineyardScope, filtersActive });
+    });
+  }, [vineyardOutline, listingFilterMode, vineyardScope, filtersActive, mapLoaded]);
   const listingFilterModeRef = useRef(LISTING_FILTER_MODES.allWineries);
   const vineyardRecidSetRef = useRef(new Map());
 
@@ -2403,6 +2438,9 @@ const WVWAMap = forwardRef(function WVWAMap({
         try { map.setPaintProperty(id, 'fill-color', expression); } catch { /* style reloading */ }
       }
     }
+    if (map.getLayer('vineyards-outline-line')) {
+      try { map.setPaintProperty('vineyards-outline-line', 'line-color', expression); } catch { /* style reloading */ }
+    }
 
     // In a data theme the fills can match the raster underneath (elevation uses
     // the same ramp as the Elevation layer), so outline the blocks to keep their
@@ -2421,6 +2459,8 @@ const WVWAMap = forwardRef(function WVWAMap({
             'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.4, 15, 1.2],
           },
         }, 'vineyards-reference-passive-fill');
+        // Outline-only mode already outlines every block, in the theme colour
+        if (vineyardOutlineOnly.get(map)) map.setLayoutProperty(OUTLINE_ID, 'visibility', 'none');
       }
     } catch { /* style reloading */ }
 
@@ -2779,6 +2819,18 @@ const WVWAMap = forwardRef(function WVWAMap({
           source: 'vineyards-reference',
           'source-layer': 'vineyard_blocks',
           paint: { 'fill-color': buildVineyardFillColorExpression(), 'fill-opacity': 0.82 },
+        });
+        // Outline-only mode (see setReferenceFillOpacity): borders in the fill colour
+        map.addLayer({
+          id: 'vineyards-outline-line',
+          type: 'line',
+          source: 'vineyards-reference',
+          'source-layer': 'vineyard_blocks',
+          layout: { visibility: 'none' },
+          paint: {
+            'line-color': buildVineyardFillColorExpression(),
+            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.6, 13, 1.4, 16, 2.4],
+          },
         });
         // No resting borders: vineyards read as solid color shapes. Adjacent
         // members always differ in hue (graph coloring), so hue alone separates

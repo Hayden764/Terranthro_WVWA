@@ -191,8 +191,11 @@ const VINEYARD_WHITE = '#E8E1D3';  // unnamed — "help us name it" (soft parchm
 // Grey means "not a member", so these must not borrow it — they get a neutral
 // vine green until assign-vineyard-colors.py gives them a palette slot.
 const VINEYARD_MEMBER_UNSLOTTED = '#6E8B5A';
-// Selection/hover highlight: a simple white line tracing the highlighted vineyard.
-const VINEYARD_HALO_CORE = '#FFFFFF';
+// Selection/hover highlight: the site-wide interactive blue (= --color-interactive;
+// MapLibre needs a literal), drawn over a dark casing so it still reads on the
+// palette's own blues (#2F8AC4, #5D69B1) and on pale satellite ground.
+const VINEYARD_HIGHLIGHT = '#2E9BFF';
+const VINEYARD_HIGHLIGHT_CASING = '#080A0F';
 // audit-ignore-end
 
 /**
@@ -592,6 +595,63 @@ function normalizeOverlayAndLabelOrder(map, basemapLabelLayerIds = []) {
  * blinkMapLayer — pulse a paint property through a sequence of timed values.
  * beats: [{ delay: ms, value: any }, ...]
  */
+// Highlight lines that get a dark casing underneath. The casing is a separate
+// layer (`<id>-casing`) kept in lockstep by withHighlightCasings().
+const CASED_HIGHLIGHT_LINES = new Set([
+  'vineyards-reference-hover-line',
+  'vineyards-passive-hover-line',
+  'vineyards-selected-line',
+  'vineyards-hovered-line',
+]);
+const HIGHLIGHT_CASING_EXTRA_PX = 2.5;
+const casingIdFor = (layerId) => `${layerId}-casing`;
+const casingWidth = (width) => (typeof width === 'number' ? width + HIGHLIGHT_CASING_EXTRA_PX : width);
+
+/**
+ * Add a highlight line layer plus its casing just below it. Paint must use
+ * plain numbers for line-width so the casing can be derived from it.
+ */
+function addCasedHighlightLine(map, { id, source, width, opacity = 1 }) {
+  const layout = { 'line-join': 'round', 'line-cap': 'round' };
+  map.addLayer({
+    id: casingIdFor(id), type: 'line', source, layout,
+    paint: { 'line-color': VINEYARD_HIGHLIGHT_CASING, 'line-width': casingWidth(width), 'line-opacity': opacity * 0.85 },
+  });
+  map.addLayer({
+    id, type: 'line', source, layout,
+    paint: { 'line-color': VINEYARD_HIGHLIGHT, 'line-width': width, 'line-opacity': opacity },
+  });
+}
+
+/**
+ * Make every setPaintProperty / setLayoutProperty / moveLayer on a cased
+ * highlight line carry over to its casing, so the many existing call sites
+ * (focus dimming, blinks, visibility toggles, re-ordering) need no changes.
+ */
+function withHighlightCasings(map) {
+  const setPaint = map.setPaintProperty.bind(map);
+  const setLayout = map.setLayoutProperty.bind(map);
+  const move = map.moveLayer.bind(map);
+  map.setPaintProperty = (layerId, prop, value, ...rest) => {
+    const result = setPaint(layerId, prop, value, ...rest);
+    if (CASED_HIGHLIGHT_LINES.has(layerId) && map.getLayer(casingIdFor(layerId))) {
+      if (prop === 'line-width') setPaint(casingIdFor(layerId), prop, casingWidth(value));
+      else if (prop === 'line-opacity') setPaint(casingIdFor(layerId), prop, typeof value === 'number' ? value * 0.85 : value);
+    }
+    return result;
+  };
+  map.setLayoutProperty = (layerId, prop, value, ...rest) => {
+    const result = setLayout(layerId, prop, value, ...rest);
+    if (CASED_HIGHLIGHT_LINES.has(layerId) && map.getLayer(casingIdFor(layerId))) setLayout(casingIdFor(layerId), prop, value, ...rest);
+    return result;
+  };
+  map.moveLayer = (layerId, beforeId) => {
+    if (CASED_HIGHLIGHT_LINES.has(layerId) && map.getLayer(casingIdFor(layerId))) move(casingIdFor(layerId), beforeId);
+    return move(layerId, beforeId);
+  };
+  return map;
+}
+
 function blinkMapLayer(map, layerId, property, beats) {
   beats.forEach(({ delay, value }) => {
     setTimeout(() => {
@@ -1956,7 +2016,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       const key = (name || '').trim().toLowerCase();
       const features = VINEYARD_ALL_BY_NAME[key] ?? [];
       // Linked = parcels with a winery association → green selected style
-      // Unlinked = reference-only parcels → white passive-hover style
+      // Unlinked = reference-only parcels → blue passive-hover outline
       const isLinked = features.some(f => f?.properties?.winery_recid != null);
 
       if (isLinked) {
@@ -1993,7 +2053,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           blinkMapLayer(map, 'vineyards-selected-line', 'line-opacity', VINE_LINE);
         });
       } else {
-        // Non-selectable vineyard: white outline blink matching the passive hover style
+        // Non-selectable vineyard: blue outline blink matching the passive hover style
         const src = map.getSource('vineyards-passive-hover');
         if (src) {
           src.setData({ type: 'FeatureCollection', features });
@@ -2003,7 +2063,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           flyToCoords(map, { lng, lat });
         }
         map.once('moveend', () => {
-          const WHITE_LINE = [
+          const OUTLINE_BLINK = [
             { delay:   0, value: 1.0 },
             { delay: 200, value: 0.06 },
             { delay: 380, value: 1.0 },
@@ -2011,7 +2071,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             { delay: 740, value: 1.0 },
             { delay: 920, value: 0.0 },  // fade out — no persistent selected state
           ];
-          blinkMapLayer(map, 'vineyards-passive-hover-line', 'line-opacity', WHITE_LINE);
+          blinkMapLayer(map, 'vineyards-passive-hover-line', 'line-opacity', OUTLINE_BLINK);
           // Clear the source after the blink finishes and restore default opacity
           setTimeout(() => {
             const passiveSrc = map.getSource('vineyards-passive-hover');
@@ -2515,6 +2575,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           : { url }
       ),
     });
+    withHighlightCasings(map);
 
     // Compass is rendered by the custom MapControls component
 
@@ -2928,32 +2989,12 @@ const WVWAMap = forwardRef(function WVWAMap({
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         });
-        map.addLayer({
-          id: 'vineyards-reference-hover-line',
-          type: 'line',
-          source: 'vineyards-reference-hover',
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: {
-            'line-color': VINEYARD_HALO_CORE,
-            'line-width': 2.5,
-            'line-opacity': 1,
-          },
-        });
+        addCasedHighlightLine(map, { id: 'vineyards-reference-hover-line', source: 'vineyards-reference-hover', width: 2.5 });
         map.addSource('vineyards-passive-hover', {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         });
-        map.addLayer({
-          id: 'vineyards-passive-hover-line',
-          type: 'line',
-          source: 'vineyards-passive-hover',
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: {
-            'line-color': VINEYARD_HALO_CORE,
-            'line-width': 1.8,
-            'line-opacity': 0.9,
-          },
-        });
+        addCasedHighlightLine(map, { id: 'vineyards-passive-hover-line', source: 'vineyards-passive-hover', width: 1.8, opacity: 0.9 });
 
         // Hover on linked vineyard parcels only.
         map.on('mouseenter', 'vineyards-linked-fill', () => {
@@ -3164,17 +3205,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         // these layers existed would sit above them and hide the vineyards.
         placeBelowVineyards(map);
 
-        map.addLayer({
-          id: 'vineyards-selected-line',
-          type: 'line',
-          source: 'vineyards-selected',
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: {
-            'line-color': VINEYARD_HALO_CORE,
-            'line-width': 2.4,
-            'line-opacity': 1,
-          },
-        });
+        addCasedHighlightLine(map, { id: 'vineyards-selected-line', source: 'vineyards-selected', width: 2.8 });
 
         // Hovered-parcel highlight — single feature swapped in on card hover
         map.addSource('vineyards-hovered', {
@@ -3186,21 +3217,11 @@ const WVWAMap = forwardRef(function WVWAMap({
           type: 'fill',
           source: 'vineyards-hovered',
           paint: {
-            'fill-color': VINEYARD_HALO_CORE,
-            'fill-opacity': 0.1,
+            'fill-color': VINEYARD_HIGHLIGHT,
+            'fill-opacity': 0.12,
           },
         });
-        map.addLayer({
-          id: 'vineyards-hovered-line',
-          type: 'line',
-          source: 'vineyards-hovered',
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: {
-            'line-color': VINEYARD_HALO_CORE,
-            'line-width': 2.5,
-            'line-opacity': 1,
-          },
-        });
+        addCasedHighlightLine(map, { id: 'vineyards-hovered-line', source: 'vineyards-hovered', width: 2.8 });
 
       } catch (e) {
         console.warn('WVWAMap: failed to load Adelsheim vineyard polygons', e);

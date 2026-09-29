@@ -3,11 +3,8 @@ import WVWAMap, { LISTING_FILTER_MODES } from '../components/WVWAMap';
 import ExplorerSidebar, { SHEET_PEEK_PX } from '../components/ExplorerSidebar';
 import FilterModal from '../components/FilterModal';
 import { useVineyardFilters } from '../lib/useVineyardFilters';
-import { VINTAGE_LAST_YEAR, isVintageLayer } from '../config/climateMapConfig';
-import { MapVintageYearControl } from '../components/climate/VintageYearControls';
-import LegendSelectionChip from '../components/LegendSelectionChip';
-import { legendGroupsFor } from '../lib/legendGroups';
-import { topoRangeLabel } from '../config/topoClasses';
+import { VINTAGE_LAST_YEAR } from '../config/climateMapConfig';
+import MapKey from '../components/MapKey';
 import { alpha, border, crimson, ink, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 const UI = {
@@ -222,6 +219,7 @@ export default function WVWAMapPage() {
     setTopoRanges((prev) => ({ ...prev, [layerId]: range }));
     if (range) setLegendSelection((prev) => ({ ...prev, [layerId]: [] }));
   }, []);
+  const handleLayerChange = useCallback((layer) => { setActiveLayer(layer); setTopoStats(null); }, []);
   const [listingFilterMode, setListingFilterMode]   = useState(LISTING_FILTER_MODES.allWineries);
   const [listingSymbologyPreset, setListingSymbologyPreset] = useState('topoModern');
   const [topoStats, setTopoStats]                   = useState(null);
@@ -327,7 +325,7 @@ export default function WVWAMapPage() {
             insideIds={insideIds}
             vineyardRecidSet={vineyardRecidSet}
             activeLayer={activeLayer}
-            onLayerChange={(layer) => { setActiveLayer(layer); setTopoStats(null); }}
+            onLayerChange={handleLayerChange}
             currentMonth={currentMonth}
             onMonthChange={setCurrentMonth}
             climateYear={climateYear}
@@ -374,7 +372,7 @@ export default function WVWAMapPage() {
             selectedListing={selectedListing}
             onListingSelect={setSelectedListing}
             activeLayer={activeLayer}
-            onLayerChange={(layer) => { setActiveLayer(layer); setTopoStats(null); }}
+            onLayerChange={handleLayerChange}
             currentMonth={currentMonth}
             onMonthChange={setCurrentMonth}
             climateYear={climateYear}
@@ -404,21 +402,26 @@ export default function WVWAMapPage() {
             filtersActive={vineyardFilters.isActive}
             vineyardScope={vineyardScope}
           />
-          {/* Mobile: the sidebar's year picker is buried in the bottom sheet, so
-              the vintage layer gets its own year control on the map */}
-          {isMobile && !isIntro && (isVintageLayer(activeLayer) || legendSelection[activeLayer]?.length > 0 || topoRanges[activeLayer]) && (
-            <div style={{
-              position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 20,
-              width: 'calc(100% - 32px)', maxWidth: 360, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-            }}>
-              {isVintageLayer(activeLayer) && <MapVintageYearControl layerId={activeLayer} year={climateYear} onChange={setClimateYear} />}
-              <LegendSelectionChip
-                groups={legendGroupsFor(activeLayer)}
-                selected={legendSelection[activeLayer]}
-                text={topoRanges[activeLayer] ? topoRangeLabel(activeLayer, topoRanges[activeLayer]) : undefined}
-                onClear={() => { setLayerSelection(activeLayer, []); setTopoRange(activeLayer, null); }}
-              />
-            </div>
+          {/* On-map key: what's showing, plus the quick switches. Shares every
+              piece of state with the sidebar's Data Layers section. */}
+          {!isIntro && mapReady && (
+            <MapKey
+              isMobile={isMobile}
+              vineyardTheme={vineyardTheme}
+              onVineyardThemeChange={setVineyardTheme}
+              vineyardOutline={vineyardOutline}
+              onVineyardOutlineChange={setVineyardOutline}
+              vineyardThemeValues={vineyardThemeValues}
+              vineyardScope={vineyardScope}
+              activeLayer={activeLayer}
+              onLayerChange={handleLayerChange}
+              climateYear={climateYear}
+              onClimateYearChange={setClimateYear}
+              legendSelection={legendSelection}
+              onLegendSelectionChange={setLayerSelection}
+              topoRanges={topoRanges}
+              onTopoRangeChange={setTopoRange}
+            />
           )}
         </div>
       </div>

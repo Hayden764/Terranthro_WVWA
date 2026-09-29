@@ -2,7 +2,7 @@ import { Fragment, useState, useEffect, useLayoutEffect, useCallback, useRef, us
 import { alpha, border, crimson, interactive, interactiveSoft, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { EARTH_LAYER_TYPES, earthLegendGroups } from '../config/earthLayersConfig';
-import { VINEYARD_THEMES, NO_DATA_COLOR } from '../config/vineyardThemes';
+import { VINEYARD_THEMES, NO_DATA_COLOR, vineyardThemeLegend } from '../config/vineyardThemes';
 import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
 import { CLIMATE_MAP_LAYERS, VINTAGE_FIRST_YEAR, VINTAGE_LAST_YEAR, climateLegendGroups, isClimateMapLayer, isVintageLayer, CLIMATE_MAP_GROUPS } from '../config/climateMapConfig';
@@ -1144,15 +1144,7 @@ function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_Y
           </div>
 
           {VINEYARD_THEMES[vineyardTheme]?.legend && (() => {
-            // Categorical legends list only the classes present in view; range
-            // legends (elevation, slope) always show every band.
-            const theme = VINEYARD_THEMES[vineyardTheme];
-            const present = vineyardThemeValues?.values;
-            const isCategorical = theme.legendKey && !theme.legendKey.startsWith('elev') && !theme.legendKey.startsWith('slope');
-            const items = isCategorical && present?.size
-              ? theme.legend.filter((it) => present.has(it.label))
-              : theme.legend;
-            const showNoData = !isCategorical || vineyardThemeValues?.missing !== false;
+            const { items, showNoData } = vineyardThemeLegend(vineyardTheme, vineyardThemeValues);
             return (
             <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 10px' }}>

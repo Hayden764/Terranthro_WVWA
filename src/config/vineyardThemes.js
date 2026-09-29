@@ -55,6 +55,7 @@ const SLOPE_BREAKS = [3, 6, 10, 15, 20];
 export const VINEYARD_THEMES = {
   ownership: {
     id: 'ownership',
+    short: 'Ownership', // chip label in the on-map key
     label: 'Ownership (default)',
     description: 'Member wineries in their own colours, others grey',
     paint: null,
@@ -62,6 +63,7 @@ export const VINEYARD_THEMES = {
   },
   none: {
     id: 'none',
+    short: 'Plain',
     label: 'None',
     description: 'Every vineyard in one neutral colour — no classification',
     // A constant, not an attribute: shapes only, nothing to read into the colour
@@ -70,6 +72,7 @@ export const VINEYARD_THEMES = {
   },
   soil: {
     id: 'soil',
+    short: 'Soil',
     label: 'Soil origin',
     description: 'What the vineyard soil formed from — USDA SSURGO',
     paint: catExpression('soil_class', TERROIR_CLASS_COLORS),
@@ -78,6 +81,7 @@ export const VINEYARD_THEMES = {
   },
   bedrock: {
     id: 'bedrock',
+    short: 'Bedrock',
     label: 'Bedrock',
     description: 'Rock beneath the soil — DOGAMI OGDC-8',
     paint: catExpression('bedrock_class', TERROIR_CLASS_COLORS),
@@ -86,6 +90,7 @@ export const VINEYARD_THEMES = {
   },
   elevation: {
     id: 'elevation',
+    short: 'Elevation',
     label: 'Elevation',
     description: 'Mean elevation per block — same ramp as the Elevation layer',
     paint: stepExpression('elev_ft', ELEV_BREAKS, ELEV),
@@ -94,6 +99,7 @@ export const VINEYARD_THEMES = {
   },
   slope: {
     id: 'slope',
+    short: 'Slope',
     label: 'Slope',
     description: 'Mean steepness per block — same ramp as the Slope layer',
     paint: stepExpression('slope_deg', SLOPE_BREAKS, SLOPE),
@@ -102,6 +108,7 @@ export const VINEYARD_THEMES = {
   },
   aspect: {
     id: 'aspect',
+    short: 'Aspect',
     label: 'Aspect',
     description: 'Direction each block faces — same warm/cool colours as the Aspect layer',
     paint: catExpression('aspect', ASPECT),
@@ -111,3 +118,25 @@ export const VINEYARD_THEMES = {
 
 export const VINEYARD_THEME_IDS = Object.keys(VINEYARD_THEMES);
 export const isVineyardTheme = (id) => id && id !== 'ownership' && VINEYARD_THEME_IDS.includes(id);
+
+/**
+ * Legend rows for a theme, shared by the sidebar and the on-map key.
+ * Categorical legends list only the classes present in view (`values` comes
+ * from WVWAMap's onVineyardThemeValuesChange); range legends (elevation,
+ * slope) always show every band. Returns { items, showNoData }.
+ */
+export function vineyardThemeLegend(themeId, values) {
+  const theme = VINEYARD_THEMES[themeId];
+  if (!theme?.legend) return { items: [], showNoData: false };
+  const present = values?.values;
+  const isCategorical = theme.legendKey && !theme.legendKey.startsWith('elev') && !theme.legendKey.startsWith('slope');
+  const items = isCategorical && present?.size
+    ? theme.legend.filter((it) => present.has(it.label))
+    : theme.legend;
+  const showNoData = !isCategorical || values?.missing !== false;
+  return { items, showNoData };
+}
+
+// Vineyard theme ↔ the background layer that maps the same thing. When both
+// are on and vineyards are filled, the fill hides the layer inside each block.
+export const THEME_MATCHING_LAYER = { elevation: 'elevation', slope: 'slope', aspect: 'aspect', soil: 'soils', bedrock: 'geology' };

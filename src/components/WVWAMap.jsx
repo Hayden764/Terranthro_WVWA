@@ -181,12 +181,12 @@ const toMapLibreColor = (color, fallback) => (
 // share a slot. The `color_index` property (0..10) carries the slot; -1 means
 // "not a colored member". Non-members render grey, unnamed parcels render white.
 // audit-ignore-start map-chrome-atmosphere
-const VINEYARD_MEMBER_PALETTE = [
+export const VINEYARD_MEMBER_PALETTE = [
   '#E58606', '#8B5E3C', '#52BCA3', '#99C945', '#CC61B0', '#24796C',
   '#DAA51B', '#7B2D43', '#764E9F', '#ED645A', '#CC3A8E',
 ];
-const VINEYARD_GREY = '#ABABAB';   // named non-member
-const VINEYARD_WHITE = '#E8E1D3';  // unnamed — "help us name it" (soft parchment)
+export const VINEYARD_GREY = '#ABABAB';   // named non-member
+export const VINEYARD_WHITE = '#E8E1D3';  // unnamed — "help us name it" (soft parchment)
 // Member vineyard the colouring run hasn't reached yet (no vineyard_colors row).
 // Grey means "not a member", so these must not borrow it — they get a neutral
 // vine green until assign-vineyard-colors.py gives them a palette slot.
@@ -195,8 +195,8 @@ const VINEYARD_MEMBER_UNSLOTTED = '#6E8B5A';
 // marks the ONE member vineyard being hovered or selected — the palette above
 // deliberately has no blues so it always reads. White traces the rest: all of
 // a winery's vineyards on its page, and hovered non-members (not clickable).
-const VINEYARD_HIGHLIGHT = '#2E9BFF';
-const VINEYARD_OUTLINE_WHITE = '#FFFFFF';
+export const VINEYARD_HIGHLIGHT = '#2E9BFF';
+export const VINEYARD_OUTLINE_WHITE = '#FFFFFF';
 // audit-ignore-end
 
 /**

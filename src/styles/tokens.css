@@ -15,6 +15,11 @@
   --color-amber:          #C87D4A;
   --color-violet:         #8A7AE8;
 
+  /* Interactive — the one highlight colour for anything clickable when it is
+     hovered, keyboard-focused or selected (see .tx-* in globals.css) */
+  --color-interactive:      var(--color-electric-blue);
+  --color-interactive-soft: rgba(46, 155, 255, 0.10);
+
   /* Semantic status */
   --color-success:        #00C44F;
   --color-success-dim:    rgba(0, 196, 79, 0.12);

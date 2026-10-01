@@ -21,6 +21,10 @@ export const crimson = v('--color-crimson');
 export const amber = v('--color-amber');
 export const violet = v('--color-violet');
 
+// Hover / focus / selected highlight for everything clickable (see .tx-* classes)
+export const interactive = v('--color-interactive');
+export const interactiveSoft = v('--color-interactive-soft');
+
 export const success = v('--color-success');
 export const successDim = v('--color-success-dim');
 export const warning = v('--color-warning');
@@ -49,6 +53,8 @@ export const TOKENS = {
   crimson,
   amber,
   violet,
+  interactive,
+  interactiveSoft,
   // Semantic status
   success,
   successDim,
@@ -120,14 +126,14 @@ export const MAP_GLASS = {
   bg:           parchment,
   bgStrong:     parchment,
   bgHover:      mix(parchment, 92, ink),     // subtle darken on hover
-  bgActive:     crimson,
+  bgActive:     interactive,
   border:       ghost,
   borderStrong: alpha(ink, 0.22),
-  borderActive: alpha(crimson, 0.55),
+  borderActive: interactive,
   text:         alpha(ink, 0.88),
   textMuted:    alpha(ink, 0.55),
   textFaint:    alpha(ink, 0.35),
-  textActive:   parchment,
+  textActive:   ink,
   // Lifted card shadow — matches .maplibregl-popup-content
   shadow:       `0 8px 32px ${alpha(ink, 0.18)}, 0 2px 8px ${alpha(ink, 0.10)}`,
   radius:       8,

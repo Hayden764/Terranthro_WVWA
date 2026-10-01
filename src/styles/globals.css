@@ -65,6 +65,28 @@ body {
 }
 .ds-btn-danger:hover { box-shadow: var(--glow-crimson); }
 
+/* ── Interactive highlight ─────────────────────────────────────────────────
+   One blue for every clickable thing, whether hovered, keyboard-focused or
+   selected. Components add a class instead of their own hover handlers:
+     .tx-box    bordered card/box — border and its .tx-title turn blue
+     .tx-row    borderless list row — only its .tx-title turns blue
+     .tx-link   text-only control (link, chip, small button) — text turns blue
+     .tx-fill   segmented/toggle button — selected state fills blue
+     .tx-input  text field / select — border turns blue on hover and focus
+   Add .is-active for the selected/open state. !important lets these win over
+   the inline styles most components use. */
+.tx-box, .tx-row, .tx-link, .tx-fill { cursor: pointer; transition: border-color 0.15s, color 0.15s, background-color 0.15s; }
+.tx-box .tx-title, .tx-row .tx-title { transition: color 0.15s; }
+.tx-box:hover, .tx-box:focus-visible, .tx-box.is-active { border-color: var(--color-interactive) !important; }
+.tx-box:hover .tx-title, .tx-box:focus-visible .tx-title, .tx-box.is-active .tx-title,
+.tx-row:hover .tx-title, .tx-row:focus-visible .tx-title, .tx-row.is-active .tx-title,
+.tx-link:hover, .tx-link:focus-visible, .tx-link.is-active { color: var(--color-interactive) !important; }
+.tx-fill:hover, .tx-fill:focus-visible { border-color: var(--color-interactive) !important; }
+.tx-fill.is-active { background: var(--color-interactive) !important; border-color: var(--color-interactive) !important; color: var(--color-ink) !important; }
+.tx-box:focus-visible, .tx-row:focus-visible, .tx-link:focus-visible, .tx-fill:focus-visible { outline: 2px solid var(--color-interactive); outline-offset: 2px; }
+.tx-input { transition: border-color 0.15s; }
+.tx-input:hover, .tx-input:focus { border-color: var(--color-interactive) !important; outline: none; }
+
 /* Per terranthro-design-system.html `.input-preview` */
 .ds-input {
   width: 100%;
@@ -84,8 +106,11 @@ body {
   color: var(--color-ghost);
 }
 
+/* !important: portal fields pair .ds-input with an inline border, which
+   would otherwise hide the focus colour */
+.ds-input:hover,
 .ds-input:focus {
-  border-color: var(--color-electric-blue);
+  border-color: var(--color-interactive) !important;
 }
 
 /* MapLibre popup overrides — uses the same recipe as MAP_GLASS in tokens.js

@@ -71,7 +71,7 @@ export default function PortalProfile() {
   return (
     <Shell>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <Link to="/portal/dashboard" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>← Dashboard</Link>
+        <Link to="/portal/dashboard" className="tx-link" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>← Dashboard</Link>
       </div>
 
       <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink, marginBottom: 8 }}>
@@ -80,7 +80,7 @@ export default function PortalProfile() {
       <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 24 }}>
         Changes are submitted for review and applied once approved. To update your
         login (username, password, email), go to{' '}
-        <Link to="/portal/settings" style={{ color: crimson, fontWeight: 600 }}>Account Settings</Link>.
+        <Link to="/portal/settings" className="tx-link" style={{ color: TOKENS.interactive, fontWeight: 600 }}>Account Settings</Link>.
       </p>
 
       {submitted ? (
@@ -89,7 +89,7 @@ export default function PortalProfile() {
           padding: '20px 16px', color: TOKENS.success, fontSize: 'var(--type-body-size)', lineHeight: 1.6,
         }}>
           <strong>Request submitted!</strong> Your changes will be reviewed shortly.{' '}
-          <Link to="/portal/dashboard" style={{ color: TOKENS.success, fontWeight: 600 }}>
+          <Link to="/portal/dashboard" className="tx-link" style={{ color: TOKENS.success, fontWeight: 600 }}>
             Back to dashboard
           </Link>
         </div>

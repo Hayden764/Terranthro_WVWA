@@ -6,13 +6,23 @@ import { Protocol } from 'pmtiles';
 // Register pmtiles:// protocol with MapLibre (must happen before any map is created)
 const pmtilesProtocol = new Protocol();
 maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile.bind(pmtilesProtocol));
-import ClimateLayer from './ClimateLayer';
+import ClimateMapLayer from './ClimateMapLayer';
 import TopographyLayer from './TopographyLayer';
+import EarthLayer from './EarthLayer';
 import MapControls from './MapControls';
 import CameraDebug from './CameraDebug';
 import TerroirDataChips from './TerroirDataChips';
+import TerroirFactRows from './TerroirFactRows';
+import { terroirFactRows } from '../lib/terroirFacts';
+import ClimateVintages from './climate/ClimateVintages';
+import TermHelp from './TermHelp';
+import { TERROIR_TERM_IDS, VINTAGE_TERM_IDS } from '../config/wineTerms';
 import HoverPill from './map/HoverPill';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
+import { EARTH_LAYER_TYPES, TERROIR_CLASS_COLORS, isEarthLayer } from '../config/earthLayersConfig';
+import { CLIMATE_MAP_LAYERS, VINTAGE_LAST_YEAR, climateLegend, isClimateMapLayer } from '../config/climateMapConfig';
+import { VINEYARD_THEMES } from '../config/vineyardThemes';
+import { placeBelowVineyards } from '../lib/mapLayerOrder';
 import { AVA_CAMERA, WV_CAMERA } from '../config/avaCameraConfig';
 import { FLY_PRESETS, flyToAva, flyToCoords, flyToVineyardBounds, flyToWillamette, flyToIntro, WV_BOUNDS } from '../config/flyTo';
 import { alpha, border, crimson, ink, MAP_GLASS, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
@@ -34,7 +44,11 @@ const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 // PostGIS (ST_AsMVT) — so DB edits appear on the map with no tile regeneration.
 // Same endpoint in dev and prod; the API key (if any) is injected via the map's
 // transformRequest below.
-const VINEYARD_TILES_URL = `${API_BASE}/api/vineyards/tiles/{z}/{x}/{y}`;
+// MapLibre fetches tiles from a worker, which cannot resolve a root-relative
+// URL, so the origin is always spelled out. In dev API_BASE is '' (Vite proxies
+// /api), which previously left this relative and broke vineyard tiles locally.
+const VINEYARD_TILES_URL =
+  `${API_BASE || (typeof window !== 'undefined' ? window.location.origin : '')}/api/vineyards/tiles/{z}/{x}/{y}`;
 const FALLBACK_STYLE = {
   version: 8,
   sources: {
@@ -76,6 +90,20 @@ function normalizeVineyardName(name) {
   return (typeof name === 'string' ? name : '').trim().toLowerCase();
 }
 
+// Layers a tap can land on and still count as "on a vineyard".
+const VINEYARD_CLICK_HIT_LAYERS = ['vineyards-linked-fill', 'vineyards-reference-passive-fill'];
+
+/** How many distinct vineyards a set of parcels covers (parcels ≠ vineyards). */
+function countVineyardGroups(features = []) {
+  const names = new Set();
+  let unnamed = 0;
+  for (const f of features) {
+    const key = normalizeVineyardName(getVineyardNameFromProperties(f?.properties || {}));
+    if (key) names.add(key); else unnamed += 1;
+  }
+  return names.size + unnamed;
+}
+
 // ── Listing categories ────────────────────────────────────────────────────
 export const LISTING_CATEGORIES = {
   hotel:      { label: 'Hotel / Inn',        color: TOKENS.amber, icon: '🏨', emoji: '🏨' },
@@ -110,10 +138,10 @@ const UI = {
   vineyardAccentSoft: alpha(TOKENS.vividGreen, 0.12),
   vineyardAccentBorder: alpha(TOKENS.vividGreen, 0.35),
   vineyardAccentMuted: alpha(TOKENS.vividGreen, 0.5),
-  hoverAccent: TOKENS.electricBlue,
-  hoverAccentSoft: alpha(TOKENS.electricBlue, 0.1),
-  hoverAccentBorder: alpha(TOKENS.electricBlue, 0.55),
-  hoverAccentMuted: alpha(TOKENS.electricBlue, 0.9),
+  hoverAccent: TOKENS.interactive,
+  hoverAccentSoft: alpha(TOKENS.interactive, 0.1),
+  hoverAccentBorder: TOKENS.interactive,
+  hoverAccentMuted: alpha(TOKENS.interactive, 0.9),
   subtleDivider: alpha(TOKENS.parchment, 0.06),
   faintText: alpha(TOKENS.parchment, 0.45),
   cardTextStrong: alpha(TOKENS.parchment, 0.9),
@@ -153,19 +181,28 @@ const toMapLibreColor = (color, fallback) => (
 // share a slot. The `color_index` property (0..10) carries the slot; -1 means
 // "not a colored member". Non-members render grey, unnamed parcels render white.
 // audit-ignore-start map-chrome-atmosphere
-const VINEYARD_MEMBER_PALETTE = [
-  '#E58606', '#5D69B1', '#52BCA3', '#99C945', '#CC61B0', '#24796C',
-  '#DAA51B', '#2F8AC4', '#764E9F', '#ED645A', '#CC3A8E',
+export const VINEYARD_MEMBER_PALETTE = [
+  '#E58606', '#8B5E3C', '#52BCA3', '#99C945', '#CC61B0', '#24796C',
+  '#DAA51B', '#7B2D43', '#764E9F', '#ED645A', '#CC3A8E',
 ];
-const VINEYARD_GREY = '#ABABAB';   // named non-member
-const VINEYARD_WHITE = '#E8E1D3';  // unnamed — "help us name it" (soft parchment)
-// Selection/hover highlight: a simple white line tracing the highlighted vineyard.
-const VINEYARD_HALO_CORE = '#FFFFFF';
+export const VINEYARD_GREY = '#ABABAB';   // named non-member
+export const VINEYARD_WHITE = '#E8E1D3';  // unnamed — "help us name it" (soft parchment)
+// Member vineyard the colouring run hasn't reached yet (no vineyard_colors row).
+// Grey means "not a member", so these must not borrow it — they get a neutral
+// vine green until assign-vineyard-colors.py gives them a palette slot.
+const VINEYARD_MEMBER_UNSLOTTED = '#6E8B5A';
+// Outlines. Blue (the site-wide --color-interactive; MapLibre needs a literal)
+// marks the ONE member vineyard being hovered or selected — the palette above
+// deliberately has no blues so it always reads. White traces the rest: all of
+// a winery's vineyards on its page, and hovered non-members (not clickable).
+export const VINEYARD_HIGHLIGHT = '#2E9BFF';
+export const VINEYARD_OUTLINE_WHITE = '#FFFFFF';
 // audit-ignore-end
 
 /**
  * MapLibre fill-color expression for the vineyard reference layer:
  *   color_index >= 0            → member palette slot
+ *   else, member vineyard       → vine green (awaiting a palette slot)
  *   else, empty/absent name     → white (unnamed)
  *   else                        → grey (named non-member)
  */
@@ -177,6 +214,7 @@ function buildVineyardFillColorExpression() {
     'case',
     ['>=', ['coalesce', ['get', 'color_index'], -1], 0], match,
     ['==', ['coalesce', ['get', 'vineyard_name'], ''], ''], VINEYARD_WHITE,
+    ['boolean', ['get', 'is_member'], false], VINEYARD_MEMBER_UNSLOTTED,
     VINEYARD_GREY,
   ];
 }
@@ -435,6 +473,7 @@ const LISTING_LAYER_ORDER = [
   'vineyards-selected-line',
   'vineyards-hovered-fill',
   'vineyards-hovered-line',
+  'vineyards-focused-line',
   'listings-clusters',
   'listings-cluster-count',
   'listings-unclustered',
@@ -558,6 +597,15 @@ function normalizeOverlayAndLabelOrder(map, basemapLabelLayerIds = []) {
  * blinkMapLayer — pulse a paint property through a sequence of timed values.
  * beats: [{ delay: ms, value: any }, ...]
  */
+/** A highlight outline layer (round joins, single colour). */
+function addOutlineLayer(map, { id, source, color, width, opacity = 1 }) {
+  map.addLayer({
+    id, type: 'line', source,
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: { 'line-color': color, 'line-width': width, 'line-opacity': opacity },
+  });
+}
+
 function blinkMapLayer(map, layerId, property, beats) {
   beats.forEach(({ delay, value }) => {
     setTimeout(() => {
@@ -636,14 +684,49 @@ function setListingSoftFocus(map, isSoftFocused) {
   }
 }
 
+// ── Vineyard glow ─────────────────────────────────────────────────────────
+// At the valley-wide opening zoom a vineyard is smaller than a pixel, so the
+// fills alone are invisible. An amber heatmap of vineyard centroids sits under
+// the fills for the overview (z7–11) and fades out as the fills take over.
+// `k` scales it so soft focus / filters can hush the glow.
+const vineyardGlowHeatOpacity = (k = 1) => [
+  'interpolate', ['linear'], ['zoom'],
+  7, 0.9 * k, 9.5, 0.8 * k, 11, 0.25 * k, 11.8, 0,
+];
+
+function setVineyardGlowStrength(map, k) {
+  if (map.getLayer('vineyards-glow-heat')) {
+    map.setPaintProperty('vineyards-glow-heat', 'heatmap-opacity', vineyardGlowHeatOpacity(k));
+  }
+}
+
+// ── Outline-only vineyards ────────────────────────────────────────────────
+// "Outline only" keeps vineyards-reference-fill (it is the hover/click target)
+// but makes it transparent; vineyards-outline-line draws each block's border in
+// the colour the fill would have had. Every writer of the reference fill's
+// opacity goes through setReferenceFillOpacity so outline mode always wins.
+const vineyardOutlineOnly = new WeakMap(); // map → boolean
+
+function setReferenceFillOpacity(map, opacity) {
+  if (!map.getLayer('vineyards-reference-fill')) return;
+  map.setPaintProperty('vineyards-reference-fill', 'fill-opacity', vineyardOutlineOnly.get(map) ? 0 : opacity);
+}
+
+function setVineyardOutlineOpacity(map, opacity) {
+  if (map.getLayer('vineyards-outline-line')) map.setPaintProperty('vineyards-outline-line', 'line-opacity', opacity);
+}
+
 function setVineyardReferenceSoftFocus(map, isSoftFocused) {
-  // Identity-color fill: keep the palette clearly visible when bright, and only
-  // hush (not hide) when a single winery is soft-focused so its parcels lead.
-  const referenceFillOpacity = isSoftFocused ? 0.18 : 0.82;
-  const referenceLineOpacity = isSoftFocused ? 0.2 : 0.55;
+  // A selected winery is its own highlight; the valley-wide glow would compete.
+  setVineyardGlowStrength(map, isSoftFocused ? 0.12 : 1);
+  // Identity-color fill: keep the palette clearly visible when bright. With one
+  // winery selected the neighbours drop to a whisper — still readable as "there
+  // is a vineyard here", but with no hue left to compete with the selection.
+  const referenceFillOpacity = isSoftFocused ? 0.09 : 0.82;
+  const referenceLineOpacity = isSoftFocused ? 0.12 : 0.55;
   // passive-fill is now an invisible hit-target only; keep it barely-there.
   const passiveFillOpacity = 0.01;
-  const passivePatternOpacity = isSoftFocused ? 0.03 : 0.2;
+  const passivePatternOpacity = isSoftFocused ? 0.02 : 0.2;
   const passiveLineOpacity = isSoftFocused ? 0.05 : 0.34;
   const passiveLineWidth = isSoftFocused ? 0.5 : 0.85;
   // Green linked line retired (membership shown by fill color now).
@@ -655,15 +738,14 @@ function setVineyardReferenceSoftFocus(map, isSoftFocused) {
   const referenceLineWidth = isSoftFocused ? 0.6 : 0.8;
   const linkedLineWidth = isSoftFocused ? 0.6 : 1.4;
   const hoverLineWidth = isSoftFocused ? 2.0 : 3.0;
-  const passiveHoverLineWidth = isSoftFocused ? 1.0 : 1.8;
+  const passiveHoverLineWidth = isSoftFocused ? 1.6 : 2.8;
   const referenceLineColor = '#FFFFFF';
   const passiveLineColor = '#FFFFFF';
   const linkedLineColor = isSoftFocused ? '#D2DDD5' : '#3FAF79';
   const linkedFillColor = '#22C55E';
 
-  if (map.getLayer('vineyards-reference-fill')) {
-    map.setPaintProperty('vineyards-reference-fill', 'fill-opacity', referenceFillOpacity);
-  }
+  setReferenceFillOpacity(map, referenceFillOpacity);
+  setVineyardOutlineOpacity(map, isSoftFocused ? 0.15 : 1);
   if (map.getLayer('vineyards-reference-line')) {
     map.setPaintProperty('vineyards-reference-line', 'line-color', referenceLineColor);
     map.setPaintProperty('vineyards-reference-line', 'line-width', referenceLineWidth);
@@ -671,6 +753,11 @@ function setVineyardReferenceSoftFocus(map, isSoftFocused) {
   }
   if (map.getLayer('vineyards-reference-passive-fill')) {
     map.setPaintProperty('vineyards-reference-passive-fill', 'fill-opacity', passiveFillOpacity);
+  }
+  // The data-theme outline traces every vineyard, so it has to hush too or the
+  // muted neighbours keep their shapes at full strength.
+  if (map.getLayer('vineyards-theme-line')) {
+    map.setPaintProperty('vineyards-theme-line', 'line-opacity', isSoftFocused ? 0.12 : 1);
   }
   if (map.getLayer('vineyards-reference-passive-hatch')) {
     map.setPaintProperty('vineyards-reference-passive-hatch', 'fill-opacity', passivePatternOpacity);
@@ -720,7 +807,9 @@ function runWhenStyleReady(map, fn) {
  * first so this can layer cleanly on top of either visual state.
  */
 function applyVineyardFilterDim(map) {
-  if (map.getLayer('vineyards-reference-fill'))          map.setPaintProperty('vineyards-reference-fill', 'fill-opacity', 0.12);
+  setVineyardGlowStrength(map, 0.2);
+  setReferenceFillOpacity(map, 0.12);
+  setVineyardOutlineOpacity(map, 0.25);
   if (map.getLayer('vineyards-reference-line'))          map.setPaintProperty('vineyards-reference-line', 'line-opacity', 0.18);
   if (map.getLayer('vineyards-reference-passive-fill'))  map.setPaintProperty('vineyards-reference-passive-fill', 'fill-opacity', 0.01);
   if (map.getLayer('vineyards-reference-passive-hatch')) map.setPaintProperty('vineyards-reference-passive-hatch', 'fill-opacity', 0.07);
@@ -750,8 +839,13 @@ function applyVineyardEmphasis(map, { scope, filtersActive }) {
   }
 }
 
-function setVineyardVisualizationVisibility(map, isVisible) {
+// `glowVisible` defaults to `isVisible`; the glow also hides under a data layer
+// (soils, climate, topography), where its amber haze reads as data.
+function setVineyardVisualizationVisibility(map, isVisible, glowVisible = isVisible) {
   const visibility = isVisible ? 'visible' : 'none';
+  if (map.getLayer('vineyards-glow-heat')) {
+    map.setLayoutProperty('vineyards-glow-heat', 'visibility', glowVisible ? 'visible' : 'none');
+  }
   const vineyardLayerIds = [
     'vineyards-reference-fill',
     'vineyards-reference-line',
@@ -766,6 +860,7 @@ function setVineyardVisualizationVisibility(map, isVisible) {
     'vineyards-selected-line',
     'vineyards-hovered-fill',
     'vineyards-hovered-line',
+    'vineyards-focused-line',
   ];
   for (const layerId of vineyardLayerIds) {
     if (map.getLayer(layerId)) {
@@ -878,12 +973,13 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
+                  className={`tx-link${isActive ? ' is-active' : ''}`}
                   style={{
                     flex: 1,
                     padding: '10px 8px',
                     background: isActive ? UI.tabActiveBg : 'transparent',
                     border: 'none',
-                    borderBottom: isActive ? `2px solid ${crimson}` : '2px solid transparent',
+                    borderBottom: isActive ? `2px solid ${TOKENS.interactive}` : '2px solid transparent',
                     color: isActive ? UI.tabActiveText : UI.tabIdleText,
                     cursor: 'pointer',
                     fontSize: 'var(--type-ui-label-size)',
@@ -904,6 +1000,7 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
                     role="button"
                     title={`Close ${t.label}`}
                     onClick={e => { e.stopPropagation(); t.id === 'listing' ? onCloseListing() : onCloseLayer(); }}
+                    className="tx-link"
                     style={{
                       marginLeft: 4,
                       fontSize: 'var(--type-ui-label-size)',
@@ -938,6 +1035,8 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
             </div>
             <button
               onClick={resolvedTab === 'listing' ? onCloseListing : onCloseLayer}
+              aria-label="Close"
+              className="tx-box tx-link"
               style={{
                 background: UI.closeBtnBg,
                 border: `1px solid ${UI.closeBtnBorder}`,
@@ -968,10 +1067,11 @@ function RightContextPanel({ listing, activeLayer, topoStats, selectedAva, viney
 
 /* ── Helpers ──────────────────────────────────────────────────────────── */
 const LAYER_META = {
-  tdmean:    { icon: '🌡️', label: 'Mean Temperature' },
   elevation: { icon: '⛰️',  label: 'Elevation' },
   slope:     { icon: '📐', label: 'Slope' },
   aspect:    { icon: '🧭', label: 'Aspect' },
+  ...Object.fromEntries(Object.values(EARTH_LAYER_TYPES).map(t => [t.id, { icon: t.icon, label: t.label }])),
+  ...Object.fromEntries(Object.values(CLIMATE_MAP_LAYERS).map(t => [t.id, { icon: t.icon, label: t.label }])),
 };
 function getLayerIcon(id)  { return LAYER_META[id]?.icon  ?? '🗺️'; }
 function getLayerLabel(id) { return LAYER_META[id]?.label ?? id; }
@@ -1054,13 +1154,13 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
         )}
 
         {listing.phone && (
-          <a href={`tel:${listing.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--type-body-size)', color: UI.phoneText, textDecoration: 'none', marginBottom: 10 }}>
+          <a href={`tel:${listing.phone}`} className="tx-link" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--type-body-size)', color: UI.phoneText, textDecoration: 'none', marginBottom: 10 }}>
             📞 {listing.phone}
           </a>
         )}
 
         {listing.url && (
-          <a href={listing.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', padding: '8px 14px', background: cat.color, color: UI.white, borderRadius: 8, fontSize: 'var(--type-body-size)', fontWeight: 600, textDecoration: 'none', textAlign: 'center', marginTop: 4 }}>
+          <a href={listing.url} target="_blank" rel="noopener noreferrer" className="tx-box" style={{ display: 'block', padding: '7px 14px', border: '1px solid transparent', background: cat.color, color: UI.white, borderRadius: 8, fontSize: 'var(--type-body-size)', fontWeight: 600, textDecoration: 'none', textAlign: 'center', marginTop: 4 }}>
             Visit Website ↗
           </a>
         )}
@@ -1092,16 +1192,7 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                     transition: 'background 0.15s, border-color 0.15s, color 0.15s',
                     whiteSpace: 'nowrap',
                   }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = UI.hoverAccentSoft;
-                    e.currentTarget.style.borderColor = UI.hoverAccentBorder;
-                    e.currentTarget.style.color = UI.hoverAccent;
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = UI.vineyardAccentSoft;
-                    e.currentTarget.style.borderColor = UI.vineyardAccentBorder;
-                    e.currentTarget.style.color = UI.vineyardAccent;
-                  }}
+                  className="tx-box tx-link"
                   title="Fit map to all estate parcels"
                 >
                   ⌖ View All
@@ -1161,7 +1252,15 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                   const vals = rows.map(r => r[key]).filter(v => v != null);
                   return vals.length ? Math.max(...vals) : null;
                 };
+                // Soil, AVA rank and vintage climate come from the largest parcel (most LiDAR pixels)
+                const largestId = group.features.map(f => f.properties?.id).filter(id => parcelTopoStats?.[id])
+                  .reduce((a, b) => ((parcelTopoStats[b].pixel_count ?? 0) > (parcelTopoStats[a].pixel_count ?? 0) ? b : a));
+                const largest = parcelTopoStats[largestId];
                 return {
+                  largestId,
+                  terroir: largest.terroir ?? null,
+                  rank: largest.rank ?? null,
+                  parcelCount: rows.length,
                   elev_min: min('elevation_min_ft'),
                   elev_max: max('elevation_max_ft'),
                   slope_mean: avg('slope_mean_deg'),
@@ -1173,12 +1272,11 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
               return (
                 <div
                   key={group.key}
+                  className={`tx-box${isExpanded ? ' is-active' : ''}`}
                   style={{
                     ...CARD,
-                    cursor: 'pointer',
-                    border: isHovered
-                      ? `1px solid ${UI.hoverAccentBorder}`
-                      : `1px solid ${UI.cardBorder}`,
+                    cursor: isExpanded ? 'default' : 'pointer',
+                    border: `1px solid ${UI.cardBorder}`,
                     background: isHovered
                       ? UI.hoverAccentSoft
                       : UI.cardBg,
@@ -1194,13 +1292,19 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                     onVineyardHover?.(null);
                   }}
                   onClick={() => {
+                    // Once expanded, only the header re-zooms — clicks in the body
+                    // (vintage stripes, links) are for that content
+                    if (isExpanded) return;
                     setExpandedGroupKey(group.key);
                     onViewAllVineyards?.(group.features);
                   }}
-                  title="Click to view vineyard details and zoom"
+                  title={isExpanded ? undefined : 'Click to view vineyard details and zoom'}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isExpanded ? 8 : 0 }}>
-                    <div style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: isHovered ? UI.hoverAccent : UI.vineyardAccent, transition: 'color 0.15s', flex: 1, paddingRight: 8 }}>{group.name}</div>
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isExpanded ? 8 : 0, cursor: 'pointer' }}
+                    onClick={isExpanded ? () => onViewAllVineyards?.(group.features) : undefined}
+                  >
+                    <div className="tx-title" style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: UI.vineyardAccent, flex: 1, paddingRight: 8 }}>{group.name}</div>
                     <span style={{
                       fontSize: 'var(--type-ui-label-size)',
                       color: isHovered ? UI.hoverAccentMuted : UI.vineyardAccentMuted,
@@ -1219,7 +1323,10 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                       </div>
 
                       {groupTopoStats && (
-                        <div style={{ marginTop: 8, paddingTop: 7, borderTop: `1px solid ${UI.subtleDivider}`, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        <TermHelp label="Terroir" ids={TERROIR_TERM_IDS} variant="glass" style={{ marginTop: 8, paddingTop: 7, borderTop: `1px solid ${UI.subtleDivider}` }} />
+                      )}
+                      {groupTopoStats && (
+                        <div style={{ marginTop: 6, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                           {groupTopoStats.elev_min != null && groupTopoStats.elev_max != null && (
                             <span style={{ fontSize: 'var(--type-ui-label-size)', color: UI.faintText, display: 'flex', alignItems: 'center', gap: 3 }}>
                               <span style={{ opacity: 0.6 }}>↑</span>
@@ -1242,6 +1349,24 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                               {groupTopoStats.aspect_label}
                             </span>
                           )}
+                        </div>
+                      )}
+
+                      {groupTopoStats && (
+                        <div style={{ marginTop: 8 }}>
+                          <TerroirFactRows rows={terroirFactRows(groupTopoStats)} variant="glass" />
+                          {groupTopoStats.parcelCount > 1 && (
+                            <div style={{ fontSize: 'var(--type-ui-label-size)', color: UI.faintText, marginTop: 6 }}>
+                              Soil, ranking and climate for the largest of {groupTopoStats.parcelCount} parcels
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {groupTopoStats?.largestId != null && (
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${UI.subtleDivider}` }}>
+                          <TermHelp label="Vintage climate" ids={VINTAGE_TERM_IDS} variant="glass" style={{ marginBottom: 8 }} />
+                          <ClimateVintages type="vineyard" entityKey={groupTopoStats.largestId} variant="glass" compact />
                         </div>
                       )}
 
@@ -1283,6 +1408,7 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                                   e.stopPropagation();
                                   onViewAllVineyards?.([feature]);
                                 }}
+                                className="tx-box"
                                 style={{
                                   textAlign: 'left',
                                   border: `1px solid ${UI.blockBorder}`,
@@ -1295,7 +1421,7 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
                                 }}
                                 title="Zoom to this block footprint"
                               >
-                                <div style={{ fontWeight: 700 }}>Block {fi + 1}</div>
+                                <div className="tx-title" style={{ fontWeight: 700 }}>Block {fi + 1}</div>
                                 <div style={{ marginTop: 2, fontSize: 'var(--type-ui-label-size)', color: UI.bodyText }}>{fAcres || 'No acreage'} • Click to zoom</div>
                               </button>
                             );
@@ -1316,10 +1442,11 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
 
 /* ── Layer tab (imports from LayerDetailPanel's data) ─────────────────── */
 const LAYER_INFO_FULL = {
-  tdmean:    { why: 'Average daily mean temperature from PRISM 30-year normals (1991–2020). This helps understand the thermal character of each growing region across different months.', source: 'PRISM Climate Group, Oregon State University', period: '30-year normals (1991–2020)' },
   elevation: { why: 'Height above sea level. Higher-elevation vineyards experience cooler temperatures, more wind exposure, and often better drainage — all factors that influence grape quality.', source: 'USGS Digital Elevation Model', period: 'Static terrain data' },
   slope:     { why: 'Steepness of terrain in degrees. Slopes between 5–15° are generally ideal for viticulture, providing good drainage and sun exposure.', source: 'Derived from USGS DEM', period: 'Static terrain data' },
   aspect:    { why: 'The compass direction a slope faces. South- and southwest-facing slopes receive more sunlight in the Northern Hemisphere, producing warmer and more sun-exposed microclimates.', source: 'Derived from USGS DEM', period: 'Static terrain data' },
+  ...Object.fromEntries(Object.values(EARTH_LAYER_TYPES).map(t => [t.id, { why: t.why, source: t.source, period: t.period }])),
+  ...Object.fromEntries(Object.values(CLIMATE_MAP_LAYERS).map(t => [t.id, { why: t.why, source: t.source, period: t.period }])),
 };
 
 // audit-ignore-start centralized-colormap-gradients
@@ -1336,6 +1463,7 @@ function LayerTabContent({ activeLayer, topoStats }) {
   if (!info) return null;
 
   const topoConfig = TOPO_LAYER_TYPES[activeLayer];
+  const earthConfig = EARTH_LAYER_TYPES[activeLayer];
 
   const CARD = { background: UI.cardBg, border: `1px solid ${UI.cardBorder}`, borderRadius: 10, padding: '12px 14px', marginBottom: 8 };
   const LBL  = { ...TYPE.uiLabel, color: UI.labelText, marginBottom: 4 };
@@ -1375,6 +1503,36 @@ function LayerTabContent({ activeLayer, topoStats }) {
           </div>
         );
       })()}
+
+      {earthConfig && (
+        <div style={CARD}>
+          <div style={{ ...LBL, marginBottom: 8 }}>Legend — {earthConfig.description}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 10px' }}>
+            {earthConfig.classes.map(cls => (
+              <div key={cls} style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                <span style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0, background: TERROIR_CLASS_COLORS[cls], border: `1px solid ${alpha(TOKENS.parchment, 0.15)}` }} />
+                <span style={{ ...TYPE.uiLabel, color: UI.cardTextStrong, textTransform: 'none', letterSpacing: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cls}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ ...TYPE.uiLabel, color: UI.labelText, textTransform: 'none', letterSpacing: 0, marginTop: 10 }}>Click anywhere on the map for unit details.</div>
+        </div>
+      )}
+
+      {isClimateMapLayer(activeLayer) && (
+        <div style={CARD}>
+          <div style={{ ...LBL, marginBottom: 8 }}>Legend — {CLIMATE_MAP_LAYERS[activeLayer].sub}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {climateLegend(activeLayer).map(({ color, label }) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                <span style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0, background: color, border: `1px solid ${alpha(TOKENS.parchment, 0.15)}` }} />
+                <span style={{ ...TYPE.uiLabel, color: UI.cardTextStrong, textTransform: 'none', letterSpacing: 0 }}>{label}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ ...TYPE.uiLabel, color: UI.labelText, textTransform: 'none', letterSpacing: 0, marginTop: 10 }}>Tap anywhere on the map for the value there.</div>
+        </div>
+      )}
 
       {!topoStats && topoConfig && (
         <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1581,8 +1739,14 @@ const WVWAMap = forwardRef(function WVWAMap({
   onLayerChange:     onActiveLayerChangeProp,
   currentMonth:      currentMonthProp,
   onMonthChange,
+  climateYear = VINTAGE_LAST_YEAR,
+  legendSelection = {},
+  topoRanges = {},
   listingFilterMode: listingFilterModeProp,
   onListingFilterModeChange,
+  vineyardTheme = 'ownership',
+  vineyardOutline = false,
+  onVineyardThemeValuesChange,
   listingSymbologyPreset: listingSymbologyPresetProp,
   onListingSymbologyPresetChange,
   // Push-only callbacks (WVWAMap notifies parent of derived state)
@@ -1600,6 +1764,9 @@ const WVWAMap = forwardRef(function WVWAMap({
   //   'all'    → every vineyard visible (default for all non-winery pages)
   //   'winery' → dim everything except the selected winery's parcels
   vineyardScope    = 'all',
+  // Fired with the vineyard name a map click landed on, so the sidebar can open
+  // that vineyard rather than the winery's first one.
+  onVineyardFocus,
 }, externalRef) {
   const mapContainerRef = useRef(null);
   const mapRef          = useRef(null);
@@ -1624,11 +1791,20 @@ const WVWAMap = forwardRef(function WVWAMap({
   const [vineyardFocusMode, setVineyardFocusMode] = useState(false);
   const [listingFilterMode, setListingFilterMode] = useState(LISTING_FILTER_MODES.allWineries);
   const [listingSymbologyPreset, setListingSymbologyPreset] = useState(DEFAULT_LISTING_SYMBOLOGY);
-  const [vineyardRecidSet, setVineyardRecidSet] = useState(() => new Set());
+  const [vineyardRecidSet, setVineyardRecidSet] = useState(() => new Map());
   const [insideIds, setInsideIds] = useState(null);
   const [activeLayer, setActiveLayer]   = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [devPanelOpen, setDevPanelOpen] = useState(true);
+  // Touch devices have no hover, so a single tap on a vineyard would open the
+  // panel for something the user never saw the name of. There, a tap previews
+  // (outline + pill) and the pill's Details button opens it.
+  const [isTouch] = useState(() => (
+    typeof window !== 'undefined'
+      && !!window.matchMedia?.('(hover: none) and (pointer: coarse)').matches
+  ));
+  const isTouchRef = useRef(isTouch);
+  const [previewVineyard, setPreviewVineyard] = useState(null); // { name, winery, listing }
   const [devLayerToggles, setDevLayerToggles] = useState(DEV_LAYER_DEFAULTS);
 
   // When controlled props are provided, sync internal state to them
@@ -1658,6 +1834,8 @@ const WVWAMap = forwardRef(function WVWAMap({
   const missingParcelTopoStatsIdsRef = useRef(new Set());
   const selectedListingRef    = useRef(null);
   const setSelectedListingRef = useRef(null); // stable ref to the setter
+  const onVineyardFocusRef    = useRef(null); // stable ref for the map click closure
+  const focusAllVineyardsRef  = useRef(null); // stable ref to the fit-all-parcels helper
   const setHoveredListingRef  = useRef(null); // stable ref for map closure hover
   const selectedAvaRef        = useRef(selectedAva);  // always-current read in imperative callbacks
   const panelHoveredAvaRef    = useRef(null);
@@ -1793,7 +1971,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       const key = (name || '').trim().toLowerCase();
       const features = VINEYARD_ALL_BY_NAME[key] ?? [];
       // Linked = parcels with a winery association → green selected style
-      // Unlinked = reference-only parcels → white passive-hover style
+      // Unlinked = reference-only parcels → white passive-hover outline
       const isLinked = features.some(f => f?.properties?.winery_recid != null);
 
       if (isLinked) {
@@ -1840,7 +2018,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           flyToCoords(map, { lng, lat });
         }
         map.once('moveend', () => {
-          const WHITE_LINE = [
+          const OUTLINE_BLINK = [
             { delay:   0, value: 1.0 },
             { delay: 200, value: 0.06 },
             { delay: 380, value: 1.0 },
@@ -1848,7 +2026,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             { delay: 740, value: 1.0 },
             { delay: 920, value: 0.0 },  // fade out — no persistent selected state
           ];
-          blinkMapLayer(map, 'vineyards-passive-hover-line', 'line-opacity', WHITE_LINE);
+          blinkMapLayer(map, 'vineyards-passive-hover-line', 'line-opacity', OUTLINE_BLINK);
           // Clear the source after the blink finishes and restore default opacity
           setTimeout(() => {
             const passiveSrc = map.getSource('vineyards-passive-hover');
@@ -1872,24 +2050,17 @@ const WVWAMap = forwardRef(function WVWAMap({
         normalizeOverlayAndLabelOrder(map, basemapLabelLayerIdsRef.current);
       }
     },
+    // Called by ExplorerSidebar when a vineyard card opens (features) or closes (null)
+    focusVineyards(features) {
+      const map = mapRef.current;
+      const src = map?.getSource('vineyards-focused');
+      if (!src) return;
+      src.setData({ type: 'FeatureCollection', features: features || [] });
+      normalizeOverlayAndLabelOrder(map, basemapLabelLayerIdsRef.current);
+    },
     // Called by ExplorerSidebar's onViewAllVineyards to zoom to parcel bounds
     viewAllVineyards(features) {
-      const map = mapRef.current;
-      if (!map || !features?.length) return;
-      setVineyardFocusMode(true);
-
-      const bounds = getVineyardFeatureBounds(features);
-      if (!bounds) return;
-
-      const isSingle = features.length === 1;
-      map.fitBounds(bounds, {
-        padding: { top: 80, bottom: 80, left: 60, right: 60 },
-        maxZoom: isSingle ? 16.2 : 14.8,
-        pitch: 40,
-        curve: 1.4,
-        speed: 0.55,
-        essential: true,
-      });
+      focusAllVineyardsRef.current?.(features);
     },
     hoverAva(slug) {
       const map = mapRef.current;
@@ -1913,8 +2084,43 @@ const WVWAMap = forwardRef(function WVWAMap({
     onListingSelect?.(listing);
   }, [onListingSelect]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Commit the tapped vineyard: this is the second, explicit step of the touch
+  // flow, doing exactly what a desktop click does — open the winery with this
+  // vineyard expanded, without moving the camera.
+  const openPreviewedVineyard = useCallback(() => {
+    const p = previewVineyard;
+    if (!p) return;
+    if (p.listing) setSelectedListingRef.current?.(p.listing);
+    onVineyardFocusRef.current?.(p.name || null);
+    const src = mapRef.current?.getSource?.('vineyards-hovered');
+    if (src) src.setData({ type: 'FeatureCollection', features: [] });
+    setPreviewVineyard(null);
+  }, [previewVineyard]);
+
+  // Frame every parcel passed in. Shared by the sidebar's "View all vineyards"
+  // button, the on-map winery badge and the imperative viewAllVineyards handle.
+  const focusAllVineyards = useCallback((features) => {
+    const map = mapRef.current;
+    if (!map || !features?.length) return;
+    setVineyardFocusMode(true);
+
+    const bounds = getVineyardFeatureBounds(features);
+    if (!bounds) return;
+
+    map.fitBounds(bounds, {
+      padding: { top: 80, bottom: 80, left: 60, right: 60 },
+      maxZoom: features.length === 1 ? 16.2 : 14.8,
+      pitch: 40,
+      curve: 1.4,
+      speed: 0.55,
+      essential: true,
+    });
+  }, []);
+  useEffect(() => { focusAllVineyardsRef.current = focusAllVineyards; }, [focusAllVineyards]);
+
   // Store the setter in a ref so the map's [] effect closure can call it
   useEffect(() => { setSelectedListingRef.current = setSelectedListingBoth; }, [setSelectedListingBoth]);
+  useEffect(() => { onVineyardFocusRef.current = onVineyardFocus; }, [onVineyardFocus]);
 
   // Keep selectedAvaRef current so the imperative hover handler always reads the latest value
   useEffect(() => { selectedAvaRef.current = selectedAva; }, [selectedAva]);
@@ -2011,6 +2217,17 @@ const WVWAMap = forwardRef(function WVWAMap({
     if (!selectedListing) setVineyardFocusMode(false);
   }, [selectedListing]);
 
+  // Vineyard glow hides under any data layer (soils, climate, topography) —
+  // its amber haze reads as data there. Own effect, without the
+  // isStyleLoaded() guard below: switching a layer on starts a tile load, so
+  // that guard would skip exactly the update this needs.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || !map.getLayer('vineyards-glow-heat')) return;
+    const vineyardsVisible = listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized;
+    map.setLayoutProperty('vineyards-glow-heat', 'visibility', vineyardsVisible && !activeLayer ? 'visible' : 'none');
+  }, [mapLoaded, activeLayer, listingFilterMode]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
@@ -2022,9 +2239,10 @@ const WVWAMap = forwardRef(function WVWAMap({
       map,
       markersVisible && listingFilterMode !== LISTING_FILTER_MODES.noWineriesVisualized,
     );
-    setVineyardVisualizationVisibility(map, listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized);
+    const vineyardsVisible = listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized;
+    setVineyardVisualizationVisibility(map, vineyardsVisible, vineyardsVisible && !activeLayer);
     // Vineyard/listing soft-focus is owned by the vineyardScope authority effect below.
-  }, [selectedListing, mapLoaded, introComplete, markersVisible, listingFilterMode]);
+  }, [selectedListing, mapLoaded, introComplete, markersVisible, listingFilterMode, activeLayer]);
 
   // ── Single authority for vineyard + listing emphasis ─────────────────
   // `vineyardScope` comes straight from the sidebar's current page level, so
@@ -2039,8 +2257,26 @@ const WVWAMap = forwardRef(function WVWAMap({
       setListingSoftFocus(map, vineyardScope === 'winery');
     });
   }, [vineyardScope, filtersActive, mapLoaded]);
+
+  // Outline-only vineyards: flag the map, swap which outline shows, then re-run
+  // emphasis so the reference fill's opacity is rewritten under the new mode.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    vineyardOutlineOnly.set(map, vineyardOutline);
+    runWhenStyleReady(map, () => {
+      const vineyardsVisible = listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized;
+      if (map.getLayer('vineyards-outline-line')) {
+        map.setLayoutProperty('vineyards-outline-line', 'visibility', vineyardOutline && vineyardsVisible ? 'visible' : 'none');
+      }
+      if (map.getLayer('vineyards-theme-line')) {
+        map.setLayoutProperty('vineyards-theme-line', 'visibility', vineyardOutline ? 'none' : 'visible');
+      }
+      applyVineyardEmphasis(map, { scope: vineyardScope, filtersActive });
+    });
+  }, [vineyardOutline, listingFilterMode, vineyardScope, filtersActive, mapLoaded]);
   const listingFilterModeRef = useRef(LISTING_FILTER_MODES.allWineries);
-  const vineyardRecidSetRef = useRef(new Set());
+  const vineyardRecidSetRef = useRef(new Map());
 
   // Keep filter refs in sync with state
   useEffect(() => {
@@ -2174,6 +2410,7 @@ const WVWAMap = forwardRef(function WVWAMap({
 
     if (!selectedListing) {
       src.setData({ type: 'FeatureCollection', features: [] });
+      map.getSource('vineyards-focused')?.setData({ type: 'FeatureCollection', features: [] });
       setSelectedVineyards([]);
       return;
     }
@@ -2215,8 +2452,69 @@ const WVWAMap = forwardRef(function WVWAMap({
     });
   }, [selectedVineyards]);
 
-  const isClimateActive = activeLayer === 'tdmean';
+  const isClimateActive = isClimateMapLayer(activeLayer);
   const isTopoActive    = ['elevation', 'slope', 'aspect'].includes(activeLayer);
+  const isEarthActive   = isEarthLayer(activeLayer);
+
+  // "Colour vineyards by": swaps the fill-colour expression on the existing
+  // vineyard fills. 'ownership' restores the member-graph identity colours;
+  // hover, selection, filters and click behaviour are untouched either way.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    const cfg = VINEYARD_THEMES[vineyardTheme] ?? VINEYARD_THEMES.ownership;
+    const expression = cfg.paint ?? buildVineyardFillColorExpression();
+    for (const id of ['vineyards-reference-fill', 'vineyards-selected-fill']) {
+      if (map.getLayer(id)) {
+        try { map.setPaintProperty(id, 'fill-color', expression); } catch { /* style reloading */ }
+      }
+    }
+    if (map.getLayer('vineyards-outline-line')) {
+      try { map.setPaintProperty('vineyards-outline-line', 'line-color', expression); } catch { /* style reloading */ }
+    }
+
+    // In a data theme the fills can match the raster underneath (elevation uses
+    // the same ramp as the Elevation layer), so outline the blocks to keep their
+    // shapes readable. Ownership needs no outline — its hues already separate.
+    const OUTLINE_ID = 'vineyards-theme-line';
+    try {
+      if (map.getLayer(OUTLINE_ID)) map.removeLayer(OUTLINE_ID);
+      if (cfg.paint && map.getLayer('vineyards-reference-fill')) {
+        map.addLayer({
+          id: OUTLINE_ID,
+          type: 'line',
+          source: 'vineyards-reference',
+          'source-layer': 'vineyard_blocks',
+          paint: {
+            'line-color': 'rgba(255, 255, 255, 0.75)',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.4, 15, 1.2],
+          },
+        }, 'vineyards-reference-passive-fill');
+        // Outline-only mode already outlines every block, in the theme colour
+        if (vineyardOutlineOnly.get(map)) map.setLayoutProperty(OUTLINE_ID, 'visibility', 'none');
+      }
+    } catch { /* style reloading */ }
+
+    // Report which classes are actually on screen so the legend can drop the
+    // ones this region never has (e.g. Ultramafic soils in the Willamette).
+    if (!cfg.legendKey || !onVineyardThemeValuesChange) return undefined;
+    const report = () => {
+      try {
+        const feats = map.querySourceFeatures('vineyards-reference', { sourceLayer: 'vineyard_blocks' });
+        const values = new Set();
+        let missing = false;
+        for (const f of feats) {
+          const v = f.properties?.[cfg.legendKey];
+          if (v === undefined || v === null || v === '') missing = true;
+          else values.add(String(v));
+        }
+        onVineyardThemeValuesChange({ values, missing });
+      } catch { /* source not ready */ }
+    };
+    report();
+    map.on('idle', report);
+    return () => { map.off('idle', report); };
+  }, [vineyardTheme, mapLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Map initialization ────────────────────────────────────────────────
   useEffect(() => {
@@ -2417,6 +2715,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         },
       });
 
+
       map.addSource('wv-boundary', { type: 'geojson', data: wvData });
       // Solid gold border around the entire WV region
       map.addLayer({
@@ -2510,12 +2809,59 @@ const WVWAMap = forwardRef(function WVWAMap({
           // vineyard. Adding promoteId here would look for a now-consumed
           // `vineyard_id` property and blank out the id instead.
         });
+
+        // Vineyard glow (see vineyardGlowHeatOpacity): heatmap of vineyard
+        // centroids for the overview.
+        // Centroids load in the background; the heatmap fills in when ready.
+        map.addSource('vineyards-glow', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        fetch(`${API_BASE}/api/vineyards/centroids`, { headers: API_HEADERS })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((fc) => { if (fc) map.getSource('vineyards-glow')?.setData(fc); })
+          .catch((err) => console.warn('Vineyard glow centroids failed to load:', err));
+        map.addLayer({
+          id: 'vineyards-glow-heat',
+          type: 'heatmap',
+          source: 'vineyards-glow',
+          maxzoom: 12,
+          paint: {
+            // Median vineyard is ~7 ac; big estates glow brighter, but a small
+            // one still registers on its own.
+            'heatmap-weight': ['interpolate', ['linear'], ['get', 'acres'], 0, 0.3, 10, 0.55, 40, 1],
+            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 7, 0.6, 11, 1.4],
+            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 7, 9, 9, 16, 11, 28],
+            'heatmap-color': [
+              'interpolate', ['linear'], ['heatmap-density'],
+              0, 'rgba(255,190,100,0)',
+              0.1, 'rgba(255,170,80,0.3)',
+              0.35, 'rgba(255,170,75,0.6)',
+              0.7, 'rgba(255,196,115,0.82)',
+              1, 'rgba(255,224,170,0.92)',
+            ],
+            'heatmap-opacity': vineyardGlowHeatOpacity(),
+          },
+        });
+
         map.addLayer({
           id: 'vineyards-reference-fill',
           type: 'fill',
           source: 'vineyards-reference',
           'source-layer': 'vineyard_blocks',
           paint: { 'fill-color': buildVineyardFillColorExpression(), 'fill-opacity': 0.82 },
+        });
+        // Outline-only mode (see setReferenceFillOpacity): borders in the fill colour
+        map.addLayer({
+          id: 'vineyards-outline-line',
+          type: 'line',
+          source: 'vineyards-reference',
+          'source-layer': 'vineyard_blocks',
+          layout: { visibility: 'none' },
+          paint: {
+            'line-color': buildVineyardFillColorExpression(),
+            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.6, 13, 1.4, 16, 2.4],
+          },
         });
         // No resting borders: vineyards read as solid color shapes. Adjacent
         // members always differ in hue (graph coloring), so hue alone separates
@@ -2606,38 +2952,19 @@ const WVWAMap = forwardRef(function WVWAMap({
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         });
-        map.addLayer({
-          id: 'vineyards-reference-hover-line',
-          type: 'line',
-          source: 'vineyards-reference-hover',
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: {
-            'line-color': VINEYARD_HALO_CORE,
-            'line-width': 2.5,
-            'line-opacity': 1,
-          },
-        });
+        addOutlineLayer(map, { id: 'vineyards-reference-hover-line', source: 'vineyards-reference-hover', color: VINEYARD_HIGHLIGHT, width: 2.8 });
         map.addSource('vineyards-passive-hover', {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         });
-        map.addLayer({
-          id: 'vineyards-passive-hover-line',
-          type: 'line',
-          source: 'vineyards-passive-hover',
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: {
-            'line-color': VINEYARD_HALO_CORE,
-            'line-width': 1.8,
-            'line-opacity': 0.9,
-          },
-        });
+        addOutlineLayer(map, { id: 'vineyards-passive-hover-line', source: 'vineyards-passive-hover', color: VINEYARD_OUTLINE_WHITE, width: 2.8, opacity: 0.9 });
 
         // Hover on linked vineyard parcels only.
         map.on('mouseenter', 'vineyards-linked-fill', () => {
           map.getCanvas().style.cursor = 'pointer';
         });
         map.on('mousemove', 'vineyards-linked-fill', (e) => {
+          if (isTouchRef.current) return;   // no hover on touch; the pill does this job
           if (!e.features?.length) return;
           const passiveHoverSrc = map.getSource('vineyards-passive-hover');
           if (passiveHoverSrc) {
@@ -2689,15 +3016,50 @@ const WVWAMap = forwardRef(function WVWAMap({
             ? Number(clickedProps.winery_recid)
             : null;
           if (wineryRecid == null) return;
-          const linkedListing = listingsRef.current.find((l) => l.id === wineryRecid);
+          const linkedListing = listingsRef.current.find((l) => l.id === wineryRecid) || null;
+          const vineyardName = getVineyardNameFromProperties(clickedProps) || null;
+
+          // Touch: first tap only previews. Outline the vineyard and name it in
+          // a pill, so the user can see what they hit before committing screen
+          // space to the panel; the pill's Details button does the opening.
+          if (isTouchRef.current) {
+            const key = normalizeVineyardName(vineyardName);
+            const groupFeatures = (key && VINEYARD_ALL_BY_NAME[key]) || [];
+            const src = map.getSource('vineyards-hovered');
+            if (src) {
+              src.setData({
+                type: 'FeatureCollection',
+                features: groupFeatures.length
+                  ? groupFeatures
+                  : [{ type: 'Feature', geometry: clickedFeature.geometry, properties: clickedProps }],
+              });
+            }
+            setPreviewVineyard({
+              name: vineyardName,
+              winery: clickedProps.winery_title || clickedProps.vineyard_org || '',
+              listing: linkedListing,
+            });
+            return;
+          }
+
           if (linkedListing) {
             setSelectedListingRef.current?.(linkedListing);
           }
-          // Zoom to all parcels for this winery (matches card-click behaviour)
-          const allParcels = VINEYARD_BY_RECID[wineryRecid] ?? [];
-          if (!flyToVineyardBounds(map, allParcels.length ? allParcels : [clickedFeature])) {
-            if (linkedListing) flyToCoords(map, { lng: linkedListing.lng, lat: linkedListing.lat });
-          }
+          // Deliberately no camera move: the user picked THIS vineyard, so the
+          // view they framed is the answer. The sidebar opens the winery and
+          // expands the clicked vineyard; "View all vineyards" there (or the
+          // map's own button) is what zooms out to the rest of the estate.
+          onVineyardFocusRef.current?.(vineyardName);
+        });
+
+        // Tapping the map away from any vineyard dismisses the preview.
+        map.on('click', (e) => {
+          if (!isTouchRef.current) return;
+          const hitLayers = VINEYARD_CLICK_HIT_LAYERS.filter((id) => map.getLayer(id));
+          if (hitLayers.length && map.queryRenderedFeatures(e.point, { layers: hitLayers }).length) return;
+          setPreviewVineyard(null);
+          const src = map.getSource('vineyards-hovered');
+          if (src) src.setData({ type: 'FeatureCollection', features: [] });
         });
         map.on('mouseleave', 'vineyards-linked-fill', () => {
           map.getCanvas().style.cursor = '';
@@ -2722,6 +3084,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           map.getCanvas().style.cursor = 'pointer';
         });
         map.on('mousemove', 'vineyards-reference-passive-fill', (e) => {
+          if (isTouchRef.current) return;   // no hover on touch
           if (!e.features?.length) return;
           const hoveredFeature = e.features[0];
           const hoveredProps = hoveredFeature?.properties || {};
@@ -2801,17 +3164,11 @@ const WVWAMap = forwardRef(function WVWAMap({
             'fill-opacity': 0.95,
           },
         });
-        map.addLayer({
-          id: 'vineyards-selected-line',
-          type: 'line',
-          source: 'vineyards-selected',
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: {
-            'line-color': VINEYARD_HALO_CORE,
-            'line-width': 2.4,
-            'line-opacity': 1,
-          },
-        });
+        // Any overlay (soils, bedrock, topography, climate) switched on before
+        // these layers existed would sit above them and hide the vineyards.
+        placeBelowVineyards(map);
+
+        addOutlineLayer(map, { id: 'vineyards-selected-line', source: 'vineyards-selected', color: VINEYARD_OUTLINE_WHITE, width: 2.4 });
 
         // Hovered-parcel highlight — single feature swapped in on card hover
         map.addSource('vineyards-hovered', {
@@ -2823,21 +3180,19 @@ const WVWAMap = forwardRef(function WVWAMap({
           type: 'fill',
           source: 'vineyards-hovered',
           paint: {
-            'fill-color': VINEYARD_HALO_CORE,
-            'fill-opacity': 0.1,
+            'fill-color': VINEYARD_HIGHLIGHT,
+            'fill-opacity': 0.12,
           },
         });
-        map.addLayer({
-          id: 'vineyards-hovered-line',
-          type: 'line',
-          source: 'vineyards-hovered',
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: {
-            'line-color': VINEYARD_HALO_CORE,
-            'line-width': 2.5,
-            'line-opacity': 1,
-          },
+        addOutlineLayer(map, { id: 'vineyards-hovered-line', source: 'vineyards-hovered', color: VINEYARD_HIGHLIGHT, width: 3 });
+
+        // The one vineyard opened on the winery page (expanded card or a map
+        // click) — stays blue after the pointer leaves its card.
+        map.addSource('vineyards-focused', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
         });
+        addOutlineLayer(map, { id: 'vineyards-focused-line', source: 'vineyards-focused', color: VINEYARD_HIGHLIGHT, width: 3 });
 
       } catch (e) {
         console.warn('WVWAMap: failed to load Adelsheim vineyard polygons', e);
@@ -2898,7 +3253,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         type: 'line',
         source: 'ava-hover',
         paint: {
-          'line-color': '#38BDF8',
+          'line-color': '#2E9BFF', // = --color-interactive
           'line-width': 3,
           'line-opacity': 1,
         },
@@ -3035,6 +3390,8 @@ const WVWAMap = forwardRef(function WVWAMap({
     });
 
     mapRef.current = map;
+    // Dev-only handle so the map can be inspected from the console.
+    if (import.meta.env.DEV) window.__map = map;
 
     return () => {
       if (popupRef.current) popupRef.current.remove();
@@ -3360,6 +3717,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       'vineyards-selected-line',
       'vineyards-hovered-fill',
       'vineyards-hovered-line',
+      'vineyards-focused-line',
     ];
     for (const layerId of vineyardHighlightLayerIds) {
       setLayerVisibility(map, layerId, devLayerToggles.vineyardHighlights);
@@ -3430,8 +3788,98 @@ const WVWAMap = forwardRef(function WVWAMap({
         <HoverPill dotColor={TOKENS.vividGreen}>{hoveredVineyardOrganization}</HoverPill>
       )}
 
+      {/* Tap preview (touch only) — names the vineyard before anything opens,
+          standing in for the hover popup a finger can never trigger. */}
+      {introComplete && isTouch && previewVineyard && (
+        <div style={{
+          // Clears the compass/reset stack now parked in the bottom-left corner.
+          position: 'absolute', bottom: 16, left: 68, right: 12,
+          background: MAP_GLASS.bgStrong,
+          border: `1px solid ${MAP_GLASS.border}`,
+          borderRadius: MAP_GLASS.radiusCard,
+          boxShadow: MAP_GLASS.shadow,
+          fontFamily: 'var(--font-sans)',
+          zIndex: 12,
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '10px 10px 10px 16px',
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontSize: 'var(--type-body-size)', fontWeight: 700, color: MAP_GLASS.text,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {previewVineyard.name || 'Vineyard'}
+            </div>
+            {previewVineyard.winery && (
+              <div style={{
+                fontSize: 'var(--type-ui-label-size)', color: alpha(MAP_GLASS.text, 0.7), marginTop: 2,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {previewVineyard.winery}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={openPreviewedVineyard}
+            className="tx-box"
+            style={{
+              flexShrink: 0, minHeight: 44, padding: '0 16px',
+              background: crimson, border: '1px solid transparent', borderRadius: 8,
+              color: parchment, fontFamily: 'var(--font-sans)',
+              fontSize: 'var(--type-mono-size)', fontWeight: 700, cursor: 'pointer',
+            }}
+          >
+            Details ›
+          </button>
+        </div>
+      )}
+
+      {/* Selected winery badge — takes the top-center slot from the AVA badge,
+          and carries the "zoom out to the whole estate" action that the map
+          click deliberately no longer performs on its own. On touch the sheet's
+          own header carries the name, and this would overflow a phone anyway. */}
+      {introComplete && selectedListing && !isTouch && (
+        <div style={{
+          position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
+          background: MAP_GLASS.bgStrong,
+          borderRadius: MAP_GLASS.radiusCard,
+          padding: '8px 10px 8px 20px',
+          fontFamily: 'var(--font-sans)',
+          boxShadow: MAP_GLASS.shadow,
+          border: `1px solid ${MAP_GLASS.border}`,
+          zIndex: 10,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
+          whiteSpace: 'nowrap',
+        }}>
+          <span style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: MAP_GLASS.text, letterSpacing: '0.01em' }}>
+            {selectedListing.title}
+          </span>
+          {selectedVineyards.length > 1 && (
+            <button
+              onClick={() => focusAllVineyards(selectedVineyards)}
+              className="tx-box tx-link"
+              style={{
+                background: 'transparent',
+                border: `1px solid ${MAP_GLASS.border}`,
+                borderRadius: 7,
+                color: MAP_GLASS.text,
+                fontFamily: 'var(--font-sans)',
+                fontSize: 'var(--type-ui-label-size)',
+                fontWeight: 700,
+                padding: '5px 10px',
+                cursor: 'pointer',
+              }}
+            >
+              ⌖ View all {countVineyardGroups(selectedVineyards)} vineyards
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Selected AVA badge — top center focal point when an AVA is selected */}
-      {introComplete && selectedAva && (() => {
+      {introComplete && selectedAva && !selectedListing && (() => {
         const ava = WV_SUB_AVAS.find(a => a.slug === selectedAva);
         return ava ? (
           <div style={{
@@ -3454,14 +3902,13 @@ const WVWAMap = forwardRef(function WVWAMap({
         ) : null;
       })()}
 
-      {/* Climate raster layer */}
+      {/* Climate (heat accumulation) vector layers */}
       {introComplete && mapLoaded && mapRef.current && devLayerToggles.climate && (
-        <ClimateLayer
+        <ClimateMapLayer
           map={mapRef.current}
-          isVisible={isClimateActive}
-          currentMonth={currentMonth}
-          prismVar="tdmean"
-          colormap="plasma"
+          activeLayer={isClimateActive ? activeLayer : null}
+          year={climateYear}
+          selected={legendSelection[activeLayer]}
         />
       )}
 
@@ -3470,11 +3917,22 @@ const WVWAMap = forwardRef(function WVWAMap({
         <TopographyLayer
           map={mapRef.current}
           activeLayer={isTopoActive ? activeLayer : null}
+          selected={legendSelection[activeLayer]}
+          range={topoRanges[activeLayer]}
           onStats={setTopoStats}
         />
       )}
 
-      // ...Show Wineries button removed...
+      {/* Soils / bedrock geology vector layers */}
+      {introComplete && mapLoaded && mapRef.current && (
+        <EarthLayer
+          map={mapRef.current}
+          activeLayer={isEarthActive ? activeLayer : null}
+          selected={legendSelection[activeLayer]}
+        />
+      )}
+
+      {/* ...Show Wineries button removed... */}
 
       {/* Map controls — floating left-center */}
       {introComplete && mapLoaded && (

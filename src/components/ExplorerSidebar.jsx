@@ -1,11 +1,22 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { alpha, border, crimson, electricBlue, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
+import { Fragment, useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
+import { alpha, border, crimson, interactive, interactiveSoft, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
+import { EARTH_LAYER_TYPES, earthLegendGroups } from '../config/earthLayersConfig';
+import { VINEYARD_THEMES, NO_DATA_COLOR, vineyardThemeLegend } from '../config/vineyardThemes';
 import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
-import { MONTH_ABBR } from '../config/climateConfig';
+import { CLIMATE_MAP_LAYERS, VINTAGE_FIRST_YEAR, VINTAGE_LAST_YEAR, climateLegendGroups, isClimateMapLayer, isVintageLayer, CLIMATE_MAP_GROUPS } from '../config/climateMapConfig';
+import LegendFilter from './LegendFilter';
+import TopoRangeControl from './TopoRangeControl';
+import { topoLegendGroups } from '../config/topoClasses';
 import TerroirDataChips from './TerroirDataChips';
+import TerroirFactRows from './TerroirFactRows';
+import { terroirFactRows } from '../lib/terroirFacts';
+import ClimateVintages from './climate/ClimateVintages';
+import { useVintagePlayback } from './climate/VintageYearControls';
 import { apiJson } from '../lib/api';
+import { TERM_GROUPS, TERROIR_TERM_IDS, VINTAGE_TERM_IDS, AVA_TERM_IDS, CLIMATE_LAYER_TERM_IDS, TOPO_LAYER_TERM_IDS, EARTH_LAYER_TERM_IDS } from '../config/wineTerms';
+import TermHelp, { TermItem } from './TermHelp';
 
 // ── Design tokens (light‑mode, eggshell base) ────────────────────────────
 const T = {
@@ -20,7 +31,7 @@ const T = {
   hoverBg:       parchment,
   activeBg:      TOKENS.dangerDim,
   // Shared hover color for card name text (vineyard groups, AVA cards, winery cards)
-  cardNameHover: TOKENS.electricBlue,
+  cardNameHover: interactive,
 };
 
 const UI = {
@@ -57,15 +68,49 @@ const SIDEBAR_W = '25vw';
 const SIDEBAR_MIN_W = 260;
 const SIDEBAR_MAX_W = 420;
 
-// ── Colormap gradients (matching WVWAMap / ScalePanel) ───────────────────
-// audit-ignore-start centralized-colormap-gradients
-const COLORMAP_CSS = {
-  terrain:  'linear-gradient(to right, #0B6623, #90EE90, #F5F5DC, #D2B48C, #8B4513, #FFFFFF)',
-  rdylgn_r: 'linear-gradient(to right, #1A9850, #91CF60, #D9EF8B, #FEE08B, #FC8D59, #D73027)',
-  hsv:      'linear-gradient(to right, #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000)',
-  plasma:   'linear-gradient(to right, #0D0887, #7E03A8, #CC4778, #F89441, #F0F921)',
-};
-// audit-ignore-end centralized-colormap-gradients
+// ── Mobile bottom sheet ──────────────────────────────────────────────────
+// On a phone the panel is a bottom sheet, not a side drawer: a side drawer
+// wide enough to read covers the map, so every selection hid the thing the
+// user had just tapped. The sheet rests at `peek` (search bar + grab handle),
+// rises to `half` when something is selected, and `full` is the old
+// full-screen panel. The map is inset above the peek height, so it is never
+// completely covered and its attribution stays visible.
+export const SHEET_PEEK_PX = 100;   // handle strip + search row, measured
+const SHEET_FULL_FRACTION = 0.92;
+const SHEET_HALF_FRACTION = 0.55;
+export const SHEET_DETENTS = ['peek', 'half', 'full'];
+
+/** Pixel height of each detent for a given viewport height. */
+function sheetHeights(viewportH) {
+  return {
+    peek: SHEET_PEEK_PX,
+    half: Math.round(viewportH * SHEET_HALF_FRACTION),
+    full: Math.round(viewportH * SHEET_FULL_FRACTION),
+  };
+}
+
+/**
+ * Visible viewport height in px, tracking the mobile URL bar.
+ *
+ * `100vh` is the *largest* the viewport ever gets, so a sheet sized in vh
+ * hangs below the browser chrome and its bottom controls become unreachable.
+ * visualViewport reports what is actually on screen.
+ */
+function useViewportHeight() {
+  const [h, setH] = useState(() => (
+    typeof window === 'undefined' ? 800 : (window.visualViewport?.height ?? window.innerHeight)
+  ));
+  useEffect(() => {
+    const read = () => setH(window.visualViewport?.height ?? window.innerHeight);
+    window.addEventListener('resize', read);
+    window.visualViewport?.addEventListener('resize', read);
+    return () => {
+      window.removeEventListener('resize', read);
+      window.visualViewport?.removeEventListener('resize', read);
+    };
+  }, []);
+  return h;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const Chevron = ({ open, size = 12 }) => (
@@ -86,8 +131,7 @@ const BackBtn = ({ onClick }) => (
       fontFamily: 'var(--font-sans)', width: '100%', textAlign: 'left',
       borderBottom: `1px solid ${border}`,
     }}
-    onMouseEnter={e => e.currentTarget.style.color = ink}
-    onMouseLeave={e => e.currentTarget.style.color = muted}
+    className="tx-link"
   >
     <span style={{ fontSize: 'var(--type-body-size)', lineHeight: 1 }}>‹</span> Back
   </button>
@@ -97,6 +141,8 @@ function SectionHeader({ label, open, onToggle, count }) {
   return (
     <button
       onClick={onToggle}
+      aria-expanded={open}
+      className={`tx-row${open ? ' is-active' : ''}`}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         width: '100%', padding: '10px 16px',
@@ -105,7 +151,7 @@ function SectionHeader({ label, open, onToggle, count }) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={T.sectionLabel}>{label}</span>
+        <span className="tx-title" style={T.sectionLabel}>{label}</span>
         {count != null && (
           <span style={{ fontSize: 'var(--type-ui-label-size)', background: parchment, borderRadius: 10, padding: '1px 7px', color: muted, fontWeight: 600 }}>
             {count}
@@ -124,7 +170,7 @@ function SectionHeader({ label, open, onToggle, count }) {
 const AVA_META = {
   'chehalem-mountains':  { acres: '~68,000', established: 1983, highlights: 'Diverse soils including Jory, Laurelwood forest, and Willakenzie. Three nested AVAs.' },
   'dundee-hills':        { acres: '~6,490',  established: 1983, highlights: 'Famous red Jory soil, premier Pinot Noir. Notable south/southwest exposures, 200–1,000 ft elevation.' },
-  'eola-amity-hills':    { acres: '~42,000', established: 2006, highlights: 'Van Duzer wind corridor creates natural cooling. Intense Pinot Noir and Chardonnay.' },
+  'eola-amity-hills':    { acres: '~39,000', established: 2006, highlights: 'Volcanic basalt soils mixed with marine sediments and alluvium. Afternoon winds through the Van Duzer Corridor cool the vines and keep acids firm.' },
   'laurelwood-district': { acres: '~8,400',  established: 2015, highlights: 'Nested in Chehalem Mountains. Unique Laurelwood soils — windblown Missoula Flood deposits over Columbia River Basalt.' },
   'lower-long-tom':      { acres: '~30,000', established: 2020, highlights: 'Southern Willamette Valley. Warmer climate, broader variety potential.' },
   'mcminnville':         { acres: '~40,000', established: 2005, highlights: 'Marine sediment soils. Pacific influence. Cool, fog-prone mornings.' },
@@ -140,39 +186,21 @@ const fmtAcres = (n) => (Number.isFinite(n) ? Math.round(n).toLocaleString() : n
 const fmtAcresApprox = (n) => (Number.isFinite(n) ? `${(Math.floor(n / 100) * 100).toLocaleString()}+` : null); // 16622 → "16,600+"
 const fmtAcresCompact = (n) => (Number.isFinite(n) ? `${(n / 1000).toFixed(1)}k+` : null);      // 16622 → "16.6k+"
 
-function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, mappedAcres, onListingClick, onListingHover }) {
+function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, mappedAcres, climateYear, onClimateYearChange, vintageMapActive, onShowVintageMap, onListingClick, onListingHover }) {
   const meta = AVA_META[ava.slug] || {};
   const inside = insideIds
     ? listings.filter(l => l.category === 'winery' && insideIds.includes(l.id))
     : listings.filter(l => l.category === 'winery');
   const withPolygons = inside.filter(l => vineyardRecidSet.has(l.id));
 
-  const [climateStats, setClimateStats] = useState(null);
-  useEffect(() => {
-    let cancelled = false;
-    setClimateStats(null);
-    apiJson(`/api/climate/${ava.slug}/stats`)
-      .then(data => { if (!cancelled) setClimateStats(data.stats || null); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [ava.slug]);
-
-  const tdmean = climateStats?.tdmean;
-  const climateChips = tdmean ? [
-    { label: 'GS Temp Mean', value: `${tdmean.mean.toFixed(1)}${tdmean.unit}`, tone: 'amber', glow: true },
-    { label: 'GS Temp Max',  value: `${tdmean.max.toFixed(1)}${tdmean.unit}`,  tone: 'green', glow: true },
-    { label: 'GS Temp Min',  value: `${tdmean.min.toFixed(1)}${tdmean.unit}`,  tone: 'blue',  glow: true },
-    { label: 'Std Dev',      value: `±${tdmean.std_dev.toFixed(1)}${tdmean.unit}`, tone: 'parchment', glow: false },
-  ] : null;
-
   return (
-    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', paddingBottom: 16 }}>
       {onBack && <BackBtn onClick={onBack} />}
 
       <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         <div>
-          <div style={{ ...T.sectionLabel, marginBottom: 8 }}>AVA Snapshot</div>
+          <TermHelp label="AVA Snapshot" ids={AVA_TERM_IDS} style={{ marginBottom: 8 }} />
           <TerroirDataChips chips={[
             { label: 'Established', value: meta.established ? String(meta.established) : '—', tone: 'amber', glow: false },
             { label: 'Acres', value: meta.acres || '—', tone: 'parchment', glow: false },
@@ -190,13 +218,18 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, map
           </div>
         )}
 
-        {/* Live climate data */}
-        {climateChips && (
-          <div>
-            <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Growing Season Climate</div>
-            <TerroirDataChips chips={climateChips} />
-          </div>
-        )}
+        {/* Vintage climate (PRISM monthly, 1991 onward) */}
+        <div>
+          <TermHelp label="Vintage Climate" ids={VINTAGE_TERM_IDS} style={{ marginBottom: 8 }} />
+          <ClimateVintages
+            type="ava"
+            entityKey={ava.slug}
+            year={climateYear}
+            onYearChange={onClimateYearChange}
+            mapActive={vintageMapActive}
+            onShowOnMap={onShowVintageMap}
+          />
+        </div>
 
         {/* Winery list inside AVA */}
         {inside.length > 0 && (
@@ -212,18 +245,19 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, map
                   <div
                     key={l.id}
                     onClick={() => onListingClick(l)}
+                    className="tx-box"
                     style={{
                       border: `1px solid ${border}`,
                       borderRadius: 10, background: parchment,
                       cursor: 'pointer', overflow: 'hidden',
                       transition: 'border-color 0.15s',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = T.cardNameHover + '55'; const n = e.currentTarget.querySelector('.winery-card-name'); if (n) n.style.color = T.cardNameHover; onListingHover?.(l); }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = border; const n = e.currentTarget.querySelector('.winery-card-name'); if (n) n.style.color = ink; onListingHover?.(null); }}
+                    onMouseEnter={() => onListingHover?.(l)}
+                    onMouseLeave={() => onListingHover?.(null)}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px 8px' }}>
                       <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                        <div className="winery-card-name" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div className="winery-card-name tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {l.title}
                         </div>
                         <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
@@ -292,7 +326,7 @@ function degToCardinal(deg) {
   return dirs[Math.round(deg / 45) % 8];
 }
 
-function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack, onVineyardHover, onViewAllVineyards, onParcelClick }) {
+function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focusedVineyard, onBack, onVineyardHover, onVineyardSelect, onViewAllVineyards, onParcelClick }) {
   const [expandedGroupKey, setExpandedGroupKey] = useState(null);
   const [hoveredGroup, setHoveredGroup] = useState(null);
   const [sourcedFrom, setSourcedFrom] = useState([]);
@@ -337,9 +371,64 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
     return avaOrder !== 0 ? avaOrder : a.name.localeCompare(b.name);
   });
 
+  // A map click names the vineyard it landed on: open that one straight away
+  // instead of making the user find it in the list.
+  //
+  // One effect, not two: the panel receives the new listing one render after
+  // the click (the sidebar sets detailWinery from an effect), so a separate
+  // "collapse on winery change" effect would fire second and close the very
+  // vineyard the click just opened. Re-deriving on either change, and only
+  // keeping a name this winery actually has, collapses stale selections too.
+  // `at` is the click timestamp, so re-clicking the same vineyard re-opens it.
+  useEffect(() => {
+    const name = (focusedVineyard?.name || '').trim().toLowerCase();
+    const key = name ? `name:${name}` : null;
+    setExpandedGroupKey(key && vineyardGroups.some(g => g.key === key) ? key : null);
+    // vineyardGroups.length is a dep because selectedVineyards reaches this
+    // panel a render AFTER the listing does (map → page → sidebar). Without it
+    // the effect ran once against an empty group list, found no match, and the
+    // tapped vineyard silently stayed collapsed.
+  }, [listing?.id, focusedVineyard?.name, focusedVineyard?.at, vineyardGroups.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The open card is the selected vineyard: the map keeps it outlined in blue
+  // until the card closes or this winery page goes away.
+  useEffect(() => {
+    const open = vineyardGroups.find(g => g.key === expandedGroupKey);
+    onVineyardSelect?.(open ? open.features : null);
+  }, [expandedGroupKey, listing?.id, vineyardGroups.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onVineyardSelect?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const totalAcres = vineyardGroups.reduce((sum, g) => sum + g.acresTotal, 0);
+  const headerAvas = new Set();
+  vineyardGroups.forEach(g => { const a = primaryAva(g.avas); if (a) headerAvas.add(avaDisplayLabel(a)); });
+  const headerSub = [
+    vineyardGroups.length
+      ? `${vineyardGroups.length} vineyard${vineyardGroups.length !== 1 ? 's' : ''}`
+      : null,
+    totalAcres > 0 ? `${Math.round(totalAcres).toLocaleString()} ac` : null,
+    headerAvas.size === 1 ? [...headerAvas][0] : headerAvas.size > 1 ? `${headerAvas.size} AVAs` : null,
+  ].filter(Boolean).join(' · ');
+
   return (
-    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', paddingBottom: 16 }}>
       {onBack && <BackBtn onClick={onBack} />}
+
+      {/* Winery identity — pinned to the top of the panel so the name is always
+          on screen, however far down the vineyard list the user scrolls. */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 3,
+        background: parchment, borderBottom: `1px solid ${border}`,
+        padding: '12px 16px 10px', flexShrink: 0,
+      }}>
+        <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: ink, lineHeight: 1.2 }}>
+          {listing.title}
+        </div>
+        {headerSub && (
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 3 }}>
+            {headerSub}
+          </div>
+        )}
+      </div>
 
       {/* Hero image */}
       {listing.image_url && (
@@ -362,13 +451,13 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
         {/* Contact / links */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {listing.phone && (
-            <a href={`tel:${listing.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--type-mono-size)', color: ink, textDecoration: 'none' }}>
+            <a href={`tel:${listing.phone}`} className="tx-link" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--type-mono-size)', color: ink, textDecoration: 'none' }}>
               <span>📞</span> {listing.phone}
             </a>
           )}
           {listing.url && (
             <a href={listing.url} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'block', padding: '9px 14px', background: crimson, color: parchment, borderRadius: 8, fontSize: 'var(--type-mono-size)', fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>
+              className="tx-box" style={{ display: 'block', padding: '8px 14px', background: crimson, color: parchment, border: '1px solid transparent', borderRadius: 8, fontSize: 'var(--type-mono-size)', fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>
               Visit Website ↗
             </a>
           )}
@@ -382,13 +471,14 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
               {vineyardGroups.length > 1 && (
                 <button
                   onClick={() => onViewAllVineyards?.(selectedVineyards)}
+                  className="tx-box tx-link"
                   style={{
                     background: UI.viewAllBtnBg, border: `1px solid ${UI.viewAllBtnBorder}`,
                     borderRadius: 6, color: UI.mapped, fontSize: 'var(--type-ui-label-size)', fontWeight: 700,
                     padding: '3px 8px', cursor: 'pointer', fontFamily: 'var(--font-sans)',
                   }}
                 >
-                  ⌖ View All
+                  ⌖ View all {vineyardGroups.length}
                 </button>
               )}
             </div>
@@ -431,7 +521,15 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                     const mx  = k => { const v = vals(k); return v.length ? Math.max(...v) : null; };
                     const aspectMeanDeg = avg('aspect_mean_deg');
                     const aspectDomDeg  = avg('aspect_dominant_deg');
+                    // Soil, AVA rank and vintage climate come from the largest parcel (most LiDAR pixels)
+                    const largestId = group.features.map(f => f.properties?.id).filter(id => parcelTopoStats?.[id])
+                      .reduce((a, b) => ((parcelTopoStats[b].pixel_count ?? 0) > (parcelTopoStats[a].pixel_count ?? 0) ? b : a));
+                    const largest = parcelTopoStats[largestId];
                     return {
+                      largestId,
+                      terroir:        largest.terroir ?? null,
+                      rank:           largest.rank ?? null,
+                      parcelCount:    rows.length,
                       elev_min:       mn('elevation_min_ft'),
                       elev_max:       mx('elevation_max_ft'),
                       slope_mean:     avg('slope_mean_deg'),
@@ -506,20 +604,33 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                   rendered.push(
                     <div
                       key={group.key}
+                      className={`tx-box${isExpanded ? ' is-active' : ''}`}
                       style={{
                         border: `1px solid ${border}`,
                         borderRadius: 10, background: parchment,
-                        transition: 'color 0.15s', cursor: 'pointer',
-                        overflow: 'hidden', marginBottom: 6,
+                        overflow: 'hidden', marginBottom: 6, cursor: 'default',
                       }}
                       onMouseEnter={() => { setHoveredGroup(i); onVineyardHover?.(group.features); }}
                       onMouseLeave={() => { setHoveredGroup(null); onVineyardHover?.(null); }}
-                      onClick={() => { setExpandedGroupKey(isExpanded ? null : group.key); onViewAllVineyards?.(group.features); }}
                     >
-                      {/* Collapsed header */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px 8px' }}>
+                      {/* Collapsed header — the only toggle, so clicks inside the
+                          expanded body (vintage stripes, links) don't collapse the card */}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={isExpanded}
+                        className="tx-row"
+                        onClick={() => { setExpandedGroupKey(isExpanded ? null : group.key); onViewAllVineyards?.(group.features); }}
+                        onKeyDown={(e) => {
+                          if (e.key !== 'Enter' && e.key !== ' ') return;
+                          e.preventDefault();
+                          setExpandedGroupKey(isExpanded ? null : group.key);
+                          onViewAllVineyards?.(group.features);
+                        }}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px 8px', cursor: 'pointer' }}
+                      >
                         <div style={{ flex: 1, paddingRight: 8, minWidth: 0 }}>
-                          <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: isHovered ? T.cardNameHover : ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: isHovered ? T.cardNameHover : ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {group.name}
                           </div>
                           {acres && (
@@ -535,11 +646,26 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                       {/* Expanded content */}
                       {isExpanded && (
                         <div style={{ padding: '0 12px 12px', borderTop: `1px solid ${border}` }}>
-                          {/* Terroir snapshot */}
+                          {/* Terroir: tiles for the numbers, rows for the facts */}
                           <div style={{ paddingTop: 10 }}>
-                            <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Terroir Snapshot</div>
+                            <TermHelp label="Terroir Snapshot" ids={TERROIR_TERM_IDS} style={{ marginBottom: 8 }} />
                             <TerroirDataChips chips={terroirChips} columns={2} />
+                            <div style={{ marginTop: 8 }}>
+                              <TerroirFactRows rows={terroirFactRows(groupTopoStats)} />
+                            </div>
+                            {groupTopoStats?.parcelCount > 1 && (
+                              <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 6 }}>
+                                Soil, ranking and climate for the largest of {groupTopoStats.parcelCount} parcels
+                              </div>
+                            )}
                           </div>
+
+                          {groupTopoStats?.largestId != null && (
+                            <div style={{ paddingTop: 10 }}>
+                              <TermHelp label="Vintage Climate" ids={VINTAGE_TERM_IDS} style={{ marginBottom: 8 }} />
+                              <ClimateVintages type="vineyard" entityKey={groupTopoStats.largestId} compact />
+                            </div>
+                          )}
 
                           {/* Block list */}
                           {blockRows.length > 0 && (
@@ -575,6 +701,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, onBack,
                                     acres: group.acresCount > 0 ? group.acresTotal : null,
                                   });
                                 }}
+                                className="tx-box tx-link"
                                 style={{
                                   marginTop: 10, width: '100%', padding: '7px 0',
                                   background: 'transparent', border: `1px solid ${border}`,
@@ -741,7 +868,7 @@ function ParcelBlockView({ parcel, onBack }) {
   });
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', paddingBottom: 16 }}>
       <BackBtn onClick={onBack} />
 
       {/* Header */}
@@ -800,7 +927,7 @@ function ParcelBlockView({ parcel, onBack }) {
             <thead>
               <tr>
                 {COL_DEFS.map(c => (
-                  <th key={c.key} style={thStyle(c.key)} onClick={() => toggleSort(c.key)}>
+                  <th key={c.key} className={`tx-link${sort.key === c.key ? ' is-active' : ''}`} style={thStyle(c.key)} onClick={() => toggleSort(c.key)}>
                     {c.label}{sort.key === c.key ? (sort.dir === 1 ? ' ▴' : ' ▾') : ''}
                   </th>
                 ))}
@@ -813,7 +940,7 @@ function ParcelBlockView({ parcel, onBack }) {
                   key={block.id}
                   onMouseEnter={() => setHoveredRow(block.id)}
                   onMouseLeave={() => setHoveredRow(null)}
-                  style={{ background: hoveredRow === block.id ? alpha(electricBlue, 0.06) : 'transparent', transition: 'background 0.12s' }}
+                  style={{ background: hoveredRow === block.id ? interactiveSoft : 'transparent', transition: 'background 0.12s' }}
                 >
                   {COL_DEFS.map(c => (
                     <td key={c.key} style={tdStyle(c.bold)}>
@@ -850,83 +977,246 @@ function ParcelBlockView({ parcel, onBack }) {
   );
 }
 
-const CLIMATE_LAYERS = [
-  { id: 'tdmean', label: 'Mean Temperature', sub: '30-yr PRISM normals' },
-];
+// Year scrubber for the vintage map layers: step buttons and a slider
+// (both touch-sized), plus play to sweep through every vintage.
+function VintageYearPicker({ year, onChange }) {
+  const { playing, step, setYear, togglePlay } = useVintagePlayback(year, onChange);
+  const btn = {
+    width: 36, height: 36, borderRadius: 8, border: `1px solid ${border}`, background: parchment,
+    color: ink, cursor: 'pointer', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  };
+  return (
+    <div style={{ padding: '8px 4px 2px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button type="button" aria-label="Previous vintage" className="tx-box tx-link" style={btn} onClick={() => step(-1)} disabled={year <= VINTAGE_FIRST_YEAR}>‹</button>
+        <div style={{ flex: 1, textAlign: 'center' }}>
+          <div style={T.sectionLabel}>Vintage</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: ink, fontVariantNumeric: 'tabular-nums' }}>{year}</div>
+        </div>
+        <button type="button" aria-label="Next vintage" className="tx-box tx-link" style={btn} onClick={() => step(1)} disabled={year >= VINTAGE_LAST_YEAR}>›</button>
+        <button
+          type="button"
+          aria-label={playing ? 'Pause' : 'Play through every vintage'}
+          aria-pressed={playing}
+          className={`tx-fill${playing ? ' is-active' : ''}`}
+          style={btn}
+          onClick={togglePlay}
+        >{playing ? '❚❚' : '▶'}</button>
+      </div>
+      <input
+        type="range" min={VINTAGE_FIRST_YEAR} max={VINTAGE_LAST_YEAR} value={year}
+        aria-label="Vintage year"
+        onChange={(e) => setYear(Number(e.target.value))}
+        style={{ width: '100%', accentColor: interactive, cursor: 'pointer', marginTop: 6, height: 24 }}
+      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: muted }}>
+        <span>{VINTAGE_FIRST_YEAR}</span><span>{VINTAGE_LAST_YEAR}</span>
+      </div>
+    </div>
+  );
+}
+
 const TOPO_LAYERS = [
   { id: 'elevation', label: 'Elevation',   sub: 'Height above sea level' },
   { id: 'slope',     label: 'Slope',       sub: 'Steepness in degrees' },
   { id: 'aspect',    label: 'Aspect',      sub: 'Direction slope faces' },
 ];
 
-function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange, topoStats }) {
+function LayerSection({ activeLayer, onLayerChange, climateYear = VINTAGE_LAST_YEAR, onClimateYearChange, legendSelection = {}, onLegendSelectionChange, topoRanges = {}, onTopoRangeChange, vineyardTheme = 'ownership', onVineyardThemeChange, vineyardThemeValues, vineyardOutline = false, onVineyardOutlineChange }) {
   const [climateOpen, setClimateOpen] = useState(true);
   const [topoOpen, setTopoOpen] = useState(true);
+  const [earthOpen, setEarthOpen] = useState(true);
+  const earthConfig = activeLayer ? EARTH_LAYER_TYPES[activeLayer] : null;
 
-  const fmt = v => typeof v === 'number' ? v.toFixed(1) : '—';
   const topoConfig = activeLayer ? TOPO_LAYER_TYPES[activeLayer] : null;
+
+  // Each layer's controls + legend render directly under its own button
+  const climateExtras = (
+    <>
+      {isVintageLayer(activeLayer) && (
+        <VintageYearPicker year={climateYear} onChange={onClimateYearChange} />
+      )}
+
+      {isClimateMapLayer(activeLayer) && (
+        <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
+          <div style={{ ...T.sectionLabel, marginBottom: 8 }}>
+            Legend — {isVintageLayer(activeLayer) ? `${climateYear} vs 1991–2020` : CLIMATE_MAP_LAYERS[activeLayer].sub}
+          </div>
+          <LegendFilter
+            groups={climateLegendGroups(activeLayer)}
+            selected={legendSelection[activeLayer]}
+            onChange={(keys) => onLegendSelectionChange?.(activeLayer, keys)}
+          />
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 8 }}>
+            {CLIMATE_MAP_LAYERS[activeLayer].period}. Tap the map for the value there.
+          </div>
+        </div>
+      )}
+    </>
+  );
+  const topoExtras = (
+    <>
+      {/* Custom range + filterable legend for the active topo layer */}
+      {topoConfig && activeLayer && (
+        <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={T.sectionLabel}>Legend — {topoConfig.label}</div>
+          <TopoRangeControl
+            layerId={activeLayer}
+            range={topoRanges[activeLayer]}
+            onChange={(range) => onTopoRangeChange?.(activeLayer, range)}
+          />
+          <LegendFilter
+            groups={topoLegendGroups(activeLayer)}
+            selected={legendSelection[activeLayer]}
+            onChange={(keys) => onLegendSelectionChange?.(activeLayer, keys)}
+          />
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>
+            DOGAMI lidar, 3 m. Pick bands or set a custom range; everything else fades.
+          </div>
+        </div>
+      )}
+    </>
+  );
+  const earthExtras = (
+    <>
+      {earthConfig && (
+        <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
+          <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Legend — {earthConfig.label}</div>
+          <LegendFilter
+            groups={earthLegendGroups(activeLayer)}
+            selected={legendSelection[activeLayer]}
+            onChange={(keys) => onLegendSelectionChange?.(activeLayer, keys)}
+          />
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 8 }}>Click the map for series, texture and formation details.</div>
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: 0 }}>
+
+      {/* Colour vineyards by */}
+      <div style={{ borderBottom: `1px solid ${border}` }}>
+        <div style={{ padding: '8px 16px 0' }}>
+          <span style={T.sectionLabel}>Colour vineyards by</span>
+        </div>
+        <div style={{ padding: '6px 12px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <select
+            aria-label="Colour vineyards by"
+            value={vineyardTheme}
+            onChange={(e) => onVineyardThemeChange?.(e.target.value)}
+            className={`tx-box${vineyardTheme === 'ownership' ? '' : ' is-active'}`}
+            style={{
+              width: '100%', padding: '7px 9px', borderRadius: 8, cursor: 'pointer',
+              border: `1.5px solid ${border}`,
+              background: parchment, color: ink, fontFamily: 'var(--font-sans)',
+              fontSize: 'var(--type-mono-size)', fontWeight: 600,
+            }}
+          >
+            {Object.values(VINEYARD_THEMES).map((t) => (
+              <option key={t.id} value={t.id}>{t.label}</option>
+            ))}
+          </select>
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>
+            {VINEYARD_THEMES[vineyardTheme]?.description}
+          </div>
+
+          {/* Filled blocks, or borders only so the data layer underneath shows through */}
+          <div role="group" aria-label="Vineyard style" style={{ display: 'flex', border: `1px solid ${border}`, borderRadius: 8, overflow: 'hidden' }}>
+            {[{ id: false, label: 'Filled' }, { id: true, label: 'Outline only' }].map(({ id, label }) => {
+              const on = vineyardOutline === id;
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => onVineyardOutlineChange?.(id)}
+                  className={`tx-fill${on ? ' is-active' : ''}`}
+                  style={{
+                    flex: 1, minHeight: 32, border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                    fontSize: 'var(--type-ui-label-size)', fontWeight: 600,
+                    background: parchment, color: ink,
+                  }}
+                >{label}</button>
+              );
+            })}
+          </div>
+
+          {VINEYARD_THEMES[vineyardTheme]?.legend && (() => {
+            const { items, showNoData } = vineyardThemeLegend(vineyardTheme, vineyardThemeValues);
+            return (
+            <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 10px' }}>
+                {items.map((item) => (
+                  <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <span style={{ width: 11, height: 11, borderRadius: 3, flexShrink: 0, background: item.color }} />
+                    <span style={{ fontSize: 'var(--type-ui-label-size)', color: ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                  </div>
+                ))}
+                {showNoData && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <span style={{ width: 11, height: 11, borderRadius: 3, flexShrink: 0, background: NO_DATA_COLOR }} />
+                    <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>No data</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            );
+          })()}
+        </div>
+      </div>
 
       {/* Climate */}
       <div style={{ borderBottom: `1px solid ${border}` }}>
         <button
           onClick={() => setClimateOpen(p => !p)}
+          aria-expanded={climateOpen}
+          className={`tx-row${climateOpen ? ' is-active' : ''}`}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
         >
-          <span style={T.sectionLabel}>Climate</span>
+          <span className="tx-title" style={T.sectionLabel}>Climate</span>
           <Chevron open={climateOpen} />
         </button>
 
         {climateOpen && (
-          <div style={{ padding: '0 12px 10px' }}>
-            {CLIMATE_LAYERS.map(layer => {
-              const active = activeLayer === layer.id;
-              return (
-                <div key={layer.id}>
-                  <button
-                    onClick={() => onLayerChange(active ? null : layer.id)}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
-                      border: `1.5px solid ${active ? crimson + '80' : border}`,
-                      background: active ? TOKENS.dangerDim : parchment,
-                      cursor: 'pointer', fontFamily: 'var(--font-sans)', marginBottom: active ? 6 : 0,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
-                      <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.sub}</div>
-                    </div>
-                    <div style={{
-                      width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>
-                      {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
-                    </div>
-                  </button>
+          <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <TermHelp ids={CLIMATE_LAYER_TERM_IDS} style={{ padding: '0 2px 2px' }} />
+            {CLIMATE_MAP_GROUPS.map(group => [
+              <div key={group.id} style={{ fontSize: 'var(--type-ui-label-size)', color: muted, fontWeight: 650, padding: group.id === CLIMATE_MAP_GROUPS[0].id ? '0 2px' : '6px 2px 0' }}>{group.label}</div>,
+              ...Object.values(CLIMATE_MAP_LAYERS).filter(l => l.group === group.id).map(layer => {
+                const active = activeLayer === layer.id;
+                return (
+                  <Fragment key={layer.id}>
+                    <button
+                      onClick={() => onLayerChange(active ? null : layer.id)}
+                      aria-pressed={active}
+                      className={`tx-box${active ? ' is-active' : ''}`}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
+                        border: `1.5px solid ${border}`,
+                        background: active ? interactiveSoft : parchment,
+                        cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                      }}
+                    >
+                      <div>
+                        <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>{layer.label}</div>
+                        <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.sub}</div>
+                      </div>
+                      <div style={{
+                        width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? interactive : border}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      }}>
+                        {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: interactive }} />}
+                      </div>
+                    </button>
+                    {active && climateExtras}
+                  </Fragment>
+                );
+              }),
+            ])}
 
-                  {/* Month slider when climate is active */}
-                  {active && (
-                    <div style={{ padding: '8px 10px 4px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <span style={T.sectionLabel}>Month</span>
-                        <span style={{ fontSize: 'var(--type-mono-size)', fontWeight: 700, color: ink }}>{MONTH_ABBR[currentMonth - 1]}</span>
-                      </div>
-                      <input
-                        type="range" min="1" max="12" value={currentMonth}
-                        onChange={e => onMonthChange(Number(e.target.value))}
-                        style={{ width: '100%', accentColor: crimson, cursor: 'pointer' }}
-                      />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
-                        <span>Jan</span><span>Jun</span><span>Dec</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
           </div>
         )}
       </div>
@@ -935,79 +1225,100 @@ function LayerSection({ activeLayer, onLayerChange, currentMonth, onMonthChange,
       <div style={{ borderBottom: `1px solid ${border}` }}>
         <button
           onClick={() => setTopoOpen(p => !p)}
+          aria-expanded={topoOpen}
+          className={`tx-row${topoOpen ? ' is-active' : ''}`}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
         >
-          <span style={T.sectionLabel}>Topography</span>
+          <span className="tx-title" style={T.sectionLabel}>Topography</span>
           <Chevron open={topoOpen} />
         </button>
 
         {topoOpen && (
           <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <TermHelp ids={TOPO_LAYER_TERM_IDS} style={{ padding: '0 2px 2px' }} />
             {TOPO_LAYERS.map(layer => {
               const active = activeLayer === layer.id;
               return (
-                <button
-                  key={layer.id}
-                  onClick={() => onLayerChange(active ? null : layer.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
-                    border: `1.5px solid ${active ? crimson + '80' : border}`,
-                    background: active ? TOKENS.dangerDim : parchment,
-                    cursor: 'pointer', fontFamily: 'var(--font-sans)',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: active ? crimson : ink }}>{layer.label}</div>
-                    <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.sub}</div>
-                  </div>
-                  <div style={{
-                    width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? crimson : border}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}>
-                    {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: crimson }} />}
-                  </div>
-                </button>
+                <Fragment key={layer.id}>
+                  <button
+                    onClick={() => onLayerChange(active ? null : layer.id)}
+                    aria-pressed={active}
+                    className={`tx-box${active ? ' is-active' : ''}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
+                      border: `1.5px solid ${border}`,
+                      background: active ? interactiveSoft : parchment,
+                      cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                    }}
+                  >
+                    <div>
+                      <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>{layer.label}</div>
+                      <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.sub}</div>
+                    </div>
+                    <div style={{
+                      width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? interactive : border}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: interactive }} />}
+                    </div>
+                  </button>
+                  {active && topoExtras}
+                </Fragment>
               );
             })}
 
-            {/* Legend / scale for active topo layer */}
-            {topoConfig && activeLayer && (
-              <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
-                <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Scale — {topoConfig.label}</div>
-                <div style={{ height: 8, borderRadius: 6, background: COLORMAP_CSS[topoConfig.colormap] || TOKENS.ghost, marginBottom: 4, border: `1px solid ${border}` }} />
-                {topoStats && (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: muted, marginBottom: 8 }}>
-                      <span>{topoStats.min?.toFixed(1)}{topoConfig.unit}</span>
-                      <span>{topoStats.max?.toFixed(1)}{topoConfig.unit}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Soils & Geology */}
+      <div style={{ borderBottom: `1px solid ${border}` }}>
+        <button
+          onClick={() => setEarthOpen(p => !p)}
+          aria-expanded={earthOpen}
+          className={`tx-row${earthOpen ? ' is-active' : ''}`}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
+        >
+          <span className="tx-title" style={T.sectionLabel}>Soils &amp; Geology</span>
+          <Chevron open={earthOpen} />
+        </button>
+
+        {earthOpen && (
+          <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <TermHelp ids={EARTH_LAYER_TERM_IDS} style={{ padding: '0 2px 2px' }} />
+            {Object.values(EARTH_LAYER_TYPES).map(layer => {
+              const active = activeLayer === layer.id;
+              return (
+                <Fragment key={layer.id}>
+                  <button
+                    onClick={() => onLayerChange(active ? null : layer.id)}
+                    aria-pressed={active}
+                    className={`tx-box${active ? ' is-active' : ''}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
+                      border: `1.5px solid ${border}`,
+                      background: active ? interactiveSoft : parchment,
+                      cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                    }}
+                  >
+                    <div>
+                      <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>{layer.label}</div>
+                      <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 1 }}>{layer.description} · {layer.attribution}</div>
                     </div>
-                    <TerroirDataChips chips={[
-                      { label: 'Min',     value: `${fmt(topoStats.min)}${topoConfig.unit}`,  tone: 'blue',      glow: true  },
-                      { label: 'Max',     value: `${fmt(topoStats.max)}${topoConfig.unit}`,  tone: 'amber',     glow: true  },
-                      { label: 'Mean',    value: `${fmt(topoStats.mean)}${topoConfig.unit}`, tone: 'green',     glow: true  },
-                      { label: 'Std Dev', value: `±${fmt(topoStats.std)}${topoConfig.unit}`,  tone: 'parchment', glow: false },
-                    ]} />
-                  </>
-                )}
-                {!topoStats && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 2 }}>
-                    <div style={{ width: 12, height: 12, borderRadius: '50%', border: `2px solid ${border}`, borderTopColor: ink, animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-                    <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>Loading statistics…</span>
-                    <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-                  </div>
-                )}
-              </div>
-            )}
-            {activeLayer === 'tdmean' && (
-              <div style={{ border: `1px solid ${border}`, borderRadius: 8, padding: '10px 12px', background: parchment, marginTop: 4 }}>
-                <div style={{ ...T.sectionLabel, marginBottom: 8 }}>Scale — Mean Temperature</div>
-                <div style={{ height: 8, borderRadius: 6, background: COLORMAP_CSS.plasma, marginBottom: 4, border: `1px solid ${border}` }} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: muted }}>
-                  <span>−22°C</span><span>26°C</span>
-                </div>
-              </div>
-            )}
+                    <div style={{
+                      width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? interactive : border}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: interactive }} />}
+                    </div>
+                  </button>
+                  {active && earthExtras}
+                </Fragment>
+              );
+            })}
+
           </div>
         )}
       </div>
@@ -1092,13 +1403,14 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
             <button
               key={p.id}
               onClick={() => onListingFilterModeChange(p.id)}
+              aria-pressed={isActive}
+              className={`tx-box tx-link${isActive ? ' is-active' : ''}`}
               style={{
                 padding: '4px 12px', borderRadius: 20, fontSize: 'var(--type-ui-label-size)', fontWeight: 600,
-                border: `1px solid ${isActive ? crimson + '90' : border}`,
-                background: isActive ? TOKENS.dangerDim : parchment,
-                color: isActive ? crimson : muted,
+                border: `1px solid ${border}`,
+                background: isActive ? interactiveSoft : parchment,
+                color: muted,
                 cursor: 'pointer', fontFamily: 'var(--font-sans)',
-                transition: 'all 0.15s',
               }}
             >
               {p.label}
@@ -1108,15 +1420,15 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
       </div>
 
       {ava && (
-        <div style={{ padding: '6px 16px', background: TOKENS.dangerDim, borderBottom: `1px solid ${border}` }}>
-          <span style={{ fontSize: 'var(--type-ui-label-size)', color: crimson }}>Showing {ava.name} only — {visible.length} winer{visible.length === 1 ? 'y' : 'ies'}</span>
+        <div style={{ padding: '6px 16px', background: interactiveSoft, borderBottom: `1px solid ${border}` }}>
+          <span style={{ fontSize: 'var(--type-ui-label-size)', color: interactive }}>Showing {ava.name} only — {visible.length} winer{visible.length === 1 ? 'y' : 'ies'}</span>
         </div>
       )}
 
       {/* Filter-results banner */}
       {filterActive && (
-        <div style={{ padding: '6px 16px', background: TOKENS.dangerDim, borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span style={{ fontSize: 'var(--type-ui-label-size)', color: crimson, fontWeight: 600 }}>
+        <div style={{ padding: '6px 16px', background: interactiveSoft, borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span style={{ fontSize: 'var(--type-ui-label-size)', color: interactive, fontWeight: 600 }}>
             {vineyardFilterResult.winery_total_count} winer{vineyardFilterResult.winery_total_count === 1 ? 'y' : 'ies'} match · {vineyardFilterResult.matching_vineyard_total_count} vineyard{vineyardFilterResult.matching_vineyard_total_count === 1 ? '' : 's'}
           </span>
         </div>
@@ -1130,6 +1442,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
         <select
           value={sortKey}
           onChange={(e) => setSortKey(e.target.value)}
+          className="tx-box"
           style={{
             flex: 1,
             background: parchment,
@@ -1175,6 +1488,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
             <div
               key={l.id}
               onClick={() => onListingClick(l)}
+              className="tx-box"
               style={{
                 border: `1px solid ${border}`,
                 borderRadius: 10, background: parchment,
@@ -1182,12 +1496,12 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
                 transition: 'border-color 0.15s',
                 marginBottom: 6,
               }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = T.cardNameHover + '55'; const n = e.currentTarget.querySelector('.winery-card-name'); if (n) n.style.color = T.cardNameHover; onListingHover?.(l); }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = border; const n = e.currentTarget.querySelector('.winery-card-name'); if (n) n.style.color = ink; onListingHover?.(null); }}
+              onMouseEnter={() => onListingHover?.(l)}
+              onMouseLeave={() => onListingHover?.(null)}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px 8px' }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                  <div className="winery-card-name" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div className="winery-card-name tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {l.title}
                   </div>
                   <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
@@ -1196,7 +1510,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
                 </div>
                 <span style={{
                   width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                  background: filterActive ? crimson : (vineyardCount > 0 ? UI.mapped : muted),
+                  background: filterActive ? interactive : (vineyardCount > 0 ? UI.mapped : muted),
                 }} />
               </div>
             </div>
@@ -1236,6 +1550,47 @@ function AboutSection({ totalAcres }) {
   );
 }
 
+// Glossary of the words the explorer uses. Each term expands in place to a
+// plain-language explanation; the filter matches term names and summaries.
+function TermsSection() {
+  const [query, setQuery] = useState('');
+  const [openId, setOpenId] = useState(null);
+  const q = query.trim().toLowerCase();
+  const groups = TERM_GROUPS
+    .map(g => ({ ...g, terms: q ? g.terms.filter(t => `${t.term} ${t.short}`.toLowerCase().includes(q)) : g.terms }))
+    .filter(g => g.terms.length > 0);
+  return (
+    <div style={{ padding: '12px 16px 14px', borderBottom: `1px solid ${border}` }}>
+      <input
+        type="search"
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        placeholder="Filter terms…"
+        aria-label="Filter terms"
+        className="tx-input"
+        style={{
+          width: '100%', boxSizing: 'border-box', padding: '7px 10px', borderRadius: 7,
+          border: `1px solid ${border}`, background: 'transparent', color: ink,
+          fontSize: 'var(--type-body-size)', fontFamily: 'var(--font-sans)', marginBottom: 4,
+        }}
+      />
+      {groups.length === 0 && (
+        <div style={{ fontSize: 'var(--type-body-size)', color: muted, padding: '10px 2px 0' }}>No matching terms.</div>
+      )}
+      {groups.map(g => (
+        <div key={g.id}>
+          <div style={{ ...T.sectionLabel, padding: '12px 2px 6px' }}>{g.label}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {g.terms.map(t => (
+              <TermItem key={t.id} term={t} open={openId === t.id} onToggle={() => setOpenId(openId === t.id ? null : t.id)} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Main ExplorerSidebar ──────────────────────────────────────────────────
 export default function ExplorerSidebar({
   mapRef,
@@ -1250,14 +1605,30 @@ export default function ExplorerSidebar({
   onLayerChange,
   currentMonth,
   onMonthChange,
+  climateYear,
+  onClimateYearChange,
+  legendSelection,
+  onLegendSelectionChange,
+  topoRanges,
+  onTopoRangeChange,
   topoStats,
+  vineyardTheme,
+  vineyardOutline,
+  onVineyardOutlineChange,
+  onVineyardThemeChange,
+  vineyardThemeValues,
   listingFilterMode,
   onListingFilterModeChange,
   selectedVineyards,
   parcelTopoStats,
+  focusedVineyard = null,   // { name, at } — vineyard a map click landed on
   onVineyardHover,
+  onVineyardSelect,
   onViewAllVineyards,
+  onVineyardScopeChange,
   isMobile = false,
+  sheetDetent = 'peek',       // mobile only: 'peek' | 'half' | 'full'
+  onSheetDetentChange,
   isOpen = false,
   onClose,
   // Vineyard filter modal hooks (optional)
@@ -1265,7 +1636,7 @@ export default function ExplorerSidebar({
   filterActiveCount = 0,
   vineyardFilterResult = null,
 }) {
-  const [sections, setSections] = useState({ layers: false, about: false });
+  const [sections, setSections] = useState({ layers: false, terms: false, about: false });
 
   // Live mapped-vineyard-acres per AVA + valley total (GET /api/avas/acres).
   // Fetched once; feeds the overview tile, the About blurb, and each AVA's
@@ -1292,6 +1663,66 @@ export default function ExplorerSidebar({
   const skipAvaRef    = useRef(0);
 
   const currentView = viewStack[viewStack.length - 1];
+
+  // The map's single vineyard-emphasis authority reads this: on a winery page
+  // (and the block deep-dive under it) every other vineyard is hushed so the
+  // selected estate is unmistakable; everywhere else all vineyards read equally.
+  useEffect(() => {
+    const onWineryPage = viewStack.includes('winery-detail');
+    onVineyardScopeChange?.(onWineryPage ? 'winery' : 'all');
+  }, [viewStack, onVineyardScopeChange]);
+
+  // ── Mobile sheet drag ──────────────────────────────────────────────────
+  // Dragging sets an explicit pixel height so the sheet tracks the finger;
+  // releasing snaps to the nearest detent and hands control back to the
+  // transition. draggedRef stops the handle's click from also toggling.
+  const viewportH = useViewportHeight();
+  const [dragHeight, setDragHeight] = useState(null);
+  const draggedRef = useRef(false);
+  // Measured, not assumed: the header grows a row when a back button appears.
+  const chromeRef = useRef(null);
+  const [chromeH, setChromeH] = useState(0);
+  useLayoutEffect(() => {
+    const el = chromeRef.current;
+    if (!isMobile || !el) return undefined;
+    setChromeH(el.offsetHeight);
+    const ro = new ResizeObserver(([entry]) => setChromeH(entry.contentRect.height));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isMobile]);
+
+  const onHandlePointerDown = useCallback((e) => {
+    if (!isMobile) return;
+    const heights = sheetHeights(viewportH);
+    const startY = e.clientY;
+    const startH = heights[sheetDetent] ?? heights.peek;
+    draggedRef.current = false;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+
+    const move = (ev) => {
+      const dy = startY - ev.clientY;             // up is positive
+      if (Math.abs(dy) > 4) draggedRef.current = true;
+      setDragHeight(Math.max(48, Math.min(heights.full, startH + dy)));
+    };
+    const up = (ev) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      const dy = startY - ev.clientY;
+      const finalH = Math.max(48, Math.min(heights.full, startH + dy));
+      setDragHeight(null);
+      if (!draggedRef.current) return;            // a tap; let onClick decide
+      const nearest = SHEET_DETENTS.reduce((best, d) => (
+        Math.abs(heights[d] - finalH) < Math.abs(heights[best] - finalH) ? d : best
+      ), 'peek');
+      onSheetDetentChange?.(nearest);
+      // Let the click that follows pointerup see the drag, then clear it.
+      setTimeout(() => { draggedRef.current = false; }, 0);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  }, [isMobile, sheetDetent, viewportH, onSheetDetentChange]);
 
   // Column index for the 3-panel (+ parcel-blocks) sliding track
   const VIEW_COL = { home: 0, 'ava-list': 1, 'winery-list': 1, 'ava-detail': 2, 'winery-detail': 2, 'parcel-blocks': 3 };
@@ -1407,25 +1838,83 @@ export default function ExplorerSidebar({
     : currentView === 'parcel-blocks' ? (detailParcel?.parcel_label ?? 'Blocks')
     : '';
 
+  // Sheet geometry: the sheet is always full height and slid down to expose
+  // only the active detent, so the content below never reflows while dragging.
+  const heights = sheetHeights(viewportH);
+  const visibleH = dragHeight ?? heights[sheetDetent] ?? heights.peek;
+  const sheetStyle = isMobile ? {
+    width: '100%', minWidth: 'unset', maxWidth: 'unset',
+    height: heights.full,
+    position: 'fixed', left: 0, right: 0, bottom: 0,
+    borderRight: 'none',
+    borderTop: `1px solid ${border}`,
+    borderRadius: '16px 16px 0 0',
+    zIndex: 200,
+    transform: `translateY(${heights.full - visibleH}px)`,
+    transition: dragHeight == null ? 'transform 260ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+    boxShadow: `0 -8px 32px ${UI.mobileShadow}`,
+  } : {
+    width: SIDEBAR_W,
+    minWidth: SIDEBAR_MIN_W,
+    maxWidth: SIDEBAR_MAX_W,
+    height: '100%',
+    borderRight: `1px solid ${border}`,
+    position: 'relative',
+    zIndex: 10,
+  };
+
   return (
+    <>
+    {/* Invisible grab strip sitting ON the map, directly above the sheet's top
+        edge. Reaching for a 5px handle means starting the gesture on the map,
+        and MapLibre claimed the drag as a pan. This widens the target upward
+        without widening the visible handle. */}
+    {isMobile && (
+      <div
+        onPointerDown={onHandlePointerDown}
+        onClick={() => {
+          if (draggedRef.current) return;
+          onSheetDetentChange?.(sheetDetent === 'peek' ? 'half' : 'peek');
+        }}
+        style={{
+          position: 'fixed', left: 0, right: 0,
+          bottom: visibleH, height: 26,
+          zIndex: 201, touchAction: 'none', background: 'transparent',
+        }}
+        aria-hidden="true"
+      />
+    )}
     <div style={{
-      width: isMobile ? '85vw' : SIDEBAR_W,
-      minWidth: isMobile ? 'unset' : SIDEBAR_MIN_W,
-      maxWidth: isMobile ? 360 : SIDEBAR_MAX_W,
-      height: '100%',
       background: T.sidebarBg,
-      borderRight: `1px solid ${border}`,
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      position: isMobile ? 'fixed' : 'relative',
-      top: isMobile ? 0 : undefined,
-      left: isMobile ? 0 : undefined,
-      zIndex: isMobile ? 200 : 10,
-      transform: isMobile ? (isOpen ? 'translateX(0)' : 'translateX(-100%)') : undefined,
-      transition: isMobile ? 'transform 220ms cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
-      boxShadow: isMobile && isOpen ? `4px 0 24px ${UI.mobileShadow}` : undefined,
+      ...sheetStyle,
     }}>
+
+      {/* Handle + header measured together: the scrolling area below is sized
+          to the visible part of the sheet, so its last row is always reachable. */}
+      <div ref={chromeRef} style={{ flexShrink: 0 }}>
+
+      {/* Grab handle — drag to any detent, tap to toggle peek ↔ half */}
+      {isMobile && (
+        <div
+          onPointerDown={onHandlePointerDown}
+          onClick={() => {
+            if (draggedRef.current) return;   // the drag already chose a detent
+            onSheetDetentChange?.(sheetDetent === 'peek' ? 'half' : 'peek');
+          }}
+          style={{
+            background: T.headerBg,
+            padding: '14px 0 10px', cursor: 'grab', touchAction: 'none',
+            display: 'flex', justifyContent: 'center',
+          }}
+          aria-label={sheetDetent === 'peek' ? 'Expand panel' : 'Collapse panel'}
+          role="button"
+        >
+          <div style={{ width: 44, height: 5, borderRadius: 3, background: alpha(parchment, 0.5) }} />
+        </div>
+      )}
 
       {/* Sidebar header — search bar + optional back button on same line */}
       <div style={{ background: T.headerBg, padding: '10px 12px', flexShrink: 0 }}>
@@ -1433,10 +1922,13 @@ export default function ExplorerSidebar({
           {!isOnHome && (
             <button
               onClick={handleBack}
+              aria-label="Back"
+              className="tx-box tx-link"
               style={{
                 background: UI.backBtnBg, border: `1px solid ${UI.backBtnBorder}`,
                 borderRadius: 7, color: T.headerText, cursor: 'pointer',
-                width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: isMobile ? 40 : 30, height: isMobile ? 40 : 30,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 'var(--type-display-italic-size)', flexShrink: 0,
               }}
             >
@@ -1450,25 +1942,37 @@ export default function ExplorerSidebar({
               else onSelectAva(slug);
             }} />
           </div>
-          {isMobile && (
+          {isMobile && sheetDetent !== 'peek' && (
             <button
-              onClick={onClose}
-              aria-label="Close menu"
+              onClick={() => onSheetDetentChange?.('peek')}
+              aria-label="Collapse panel"
+              className="tx-box tx-link"
               style={{
                 background: UI.backBtnBg, border: `1px solid ${UI.backBtnBorder}`,
                 borderRadius: 7, color: T.headerText, cursor: 'pointer',
-                width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 'var(--type-display-italic-size)', flexShrink: 0, lineHeight: 1,
               }}
             >
-              ×
+              ⌄
             </button>
           )}
         </div>
       </div>
 
-      {/* 4-panel sliding content area */}
-      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+      </div>{/* /chrome */}
+
+      {/* 4-panel sliding content area.
+          On the sheet this is sized to the *visible* height rather than left to
+          flex inside a full-height sheet — otherwise the bottom of the scroll
+          container sat below the fold and the last rows of a long vineyard list
+          could never be scrolled into view. */}
+      <div style={{
+        overflow: 'hidden', position: 'relative',
+        ...(isMobile
+          ? { height: Math.max(0, (heights[sheetDetent] ?? heights.peek) - chromeH), flex: '0 0 auto' }
+          : { flex: 1 }),
+      }}>
         <div style={{
           display: 'flex',
           width: '400%',
@@ -1481,12 +1985,15 @@ export default function ExplorerSidebar({
           {/* ── Panel 0: Home menu ── */}
           <div style={{ width: '25%', height: '100%', overflowY: 'auto', overflowX: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column', scrollbarWidth: 'thin', scrollbarColor: `${alpha(ink, 0.18)} transparent` }}>
 
-            {/* Hero welcome card — light, stretches to fill remaining space */}
+            {/* Hero welcome card — stretches to fill the desktop sidebar, but on
+                the mobile sheet it sits below the navigation instead of pushing
+                it off the bottom of a half-height sheet. */}
             <div style={{
               background: parchment,
               padding: '16px 16px 14px',
               borderBottom: `1px solid ${border}`,
-              flex: 1,
+              order: isMobile ? 2 : 0,
+              flex: isMobile ? '0 0 auto' : 1,
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
@@ -1519,13 +2026,12 @@ export default function ExplorerSidebar({
             {/* Enhanced: Nested AVAs nav row */}
             <button
               onClick={() => setViewStack(prev => prev[prev.length - 1] === 'home' ? [...prev, 'ava-list'] : prev)}
+              className="tx-row"
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 width: '100%', padding: '13px 16px', background: 'none', border: 'none',
                 borderBottom: `1px solid ${border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
@@ -1536,7 +2042,7 @@ export default function ExplorerSidebar({
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ink} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
                 </div>
                 <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Nested AVAs</div>
+                  <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Nested AVAs</div>
                   <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>{WV_SUB_AVAS.length} viticultural areas</div>
                 </div>
               </div>
@@ -1546,13 +2052,12 @@ export default function ExplorerSidebar({
             {/* Enhanced: Wineries nav row */}
             <button
               onClick={() => setViewStack(prev => prev[prev.length - 1] === 'home' ? [...prev, 'winery-list'] : prev)}
+              className="tx-row"
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 width: '100%', padding: '13px 16px', background: 'none', border: 'none',
                 borderBottom: `1px solid ${border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
@@ -1563,7 +2068,7 @@ export default function ExplorerSidebar({
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={UI.danger75} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="M6 2h12l-3 9a5 5 0 0 1-6 0L6 2z"/></svg>
                 </div>
                 <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Wineries</div>
+                  <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Wineries</div>
                   <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>{wineryCount > 0 ? `${wineryCount} in the valley` : 'Browse all wineries'}</div>
                 </div>
               </div>
@@ -1573,13 +2078,13 @@ export default function ExplorerSidebar({
             {/* Enhanced: Data Layers nav row */}
             <button
               onClick={() => toggleSection('layers')}
+              aria-expanded={sections.layers}
+              className={`tx-row${sections.layers ? ' is-active' : ''}`}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 width: '100%', padding: '13px 16px', background: 'none', border: 'none',
                 borderBottom: `1px solid ${border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
@@ -1590,8 +2095,8 @@ export default function ExplorerSidebar({
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={UI.electric75} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                 </div>
                 <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Data Layers</div>
-                  <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>Climate &amp; topography overlays</div>
+                  <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Data Layers</div>
+                  <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>Climate, terrain, soils &amp; bedrock</div>
                 </div>
               </div>
               <Chevron open={sections.layers} size={13} />
@@ -1601,25 +2106,62 @@ export default function ExplorerSidebar({
                 <LayerSection
                   activeLayer={activeLayer}
                   onLayerChange={onLayerChange}
-                  currentMonth={currentMonth}
-                  onMonthChange={onMonthChange}
+                  climateYear={climateYear}
+                  onClimateYearChange={onClimateYearChange}
+                  legendSelection={legendSelection}
+                  onLegendSelectionChange={onLegendSelectionChange}
+                  topoRanges={topoRanges}
+                  onTopoRangeChange={onTopoRangeChange}
                   topoStats={topoStats}
+                  vineyardTheme={vineyardTheme}
+                  onVineyardThemeChange={onVineyardThemeChange}
+                  vineyardOutline={vineyardOutline}
+                  onVineyardOutlineChange={onVineyardOutlineChange}
+                  vineyardThemeValues={vineyardThemeValues}
                 />
               </div>
             )}
+
+            {/* Wine Terms accordion */}
+            <button
+              onClick={() => toggleSection('terms')}
+              className={`tx-row${sections.terms ? ' is-active' : ''}`}
+              aria-expanded={sections.terms}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                width: '100%', padding: '13px 16px', background: 'none', border: 'none',
+                borderBottom: `1px solid ${border}`, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                  background: UI.buttonBg1, border: `1px solid ${border}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ink} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg>
+                </div>
+                <div style={{ textAlign: 'left' }}>
+                  <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Wine Terms</div>
+                  <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>Soils, climate &amp; vineyard vocabulary</div>
+                </div>
+              </div>
+              <Chevron open={sections.terms} size={13} />
+            </button>
+            {sections.terms && <TermsSection />}
 
             {/* About accordion */}
             <div>
               <button
                 onClick={() => toggleSection('about')}
+                aria-expanded={sections.about}
+                className={`tx-row${sections.about ? ' is-active' : ''}`}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   width: '100%', padding: '13px 16px', background: 'none', border: 'none',
                   borderBottom: sections.about ? `1px solid ${border}` : 'none',
                   cursor: 'pointer', fontFamily: 'var(--font-sans)',
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
-                onMouseLeave={e => e.currentTarget.style.background = 'none'}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{
@@ -1628,7 +2170,7 @@ export default function ExplorerSidebar({
                     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--type-display-italic-size)',
                   }}>ℹ️</div>
                   <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>About &amp; Legend</div>
+                    <div className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>About &amp; Legend</div>
                     <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>Data sources &amp; map key</div>
                   </div>
                 </div>
@@ -1668,33 +2210,22 @@ export default function ExplorerSidebar({
                       )}
                       <div
                         onClick={() => handleAvaClick(ava)}
-                        className="ava-card"
+                        className={`ava-card tx-box${isSelected ? ' is-active' : ''}`}
                         style={{
                           flex: 1,
                           height: '100%',
-                          border: `1px solid ${isSelected ? crimson + '55' : border}`,
+                          border: `1px solid ${border}`,
                           borderRadius: 10,
-                          background: isSelected ? T.activeBg : parchment,
+                          background: isSelected ? interactiveSoft : parchment,
                           cursor: 'pointer', overflow: 'hidden',
-                          transition: 'border-color 0.15s',
                           display: 'flex', alignItems: 'center',
                         }}
-                        onMouseEnter={e => {
-                          if (!isSelected) e.currentTarget.style.borderColor = T.cardNameHover + '55';
-                          const nameEl = e.currentTarget.querySelector('.ava-card-name');
-                          if (nameEl && !isSelected) nameEl.style.color = T.cardNameHover;
-                          mapRef.current?.hoverAva(ava.slug);
-                        }}
-                        onMouseLeave={e => {
-                          if (!isSelected) e.currentTarget.style.borderColor = border;
-                          const nameEl = e.currentTarget.querySelector('.ava-card-name');
-                          if (nameEl && !isSelected) nameEl.style.color = ink;
-                          mapRef.current?.hoverAva(null);
-                        }}
+                        onMouseEnter={() => mapRef.current?.hoverAva(ava.slug)}
+                        onMouseLeave={() => mapRef.current?.hoverAva(null)}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', width: '100%' }}>
                           <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                            <div className="ava-card-name" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: isSelected ? crimson : ink, transition: 'color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <div className="ava-card-name tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {ava.name}
                             </div>
                             <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
@@ -1720,6 +2251,10 @@ export default function ExplorerSidebar({
                 insideIds={insideIds}
                 vineyardRecidSet={vineyardRecidSet}
                 mappedAcres={acresData?.avas?.[detailAva.slug]}
+                climateYear={climateYear}
+                onClimateYearChange={onClimateYearChange}
+                vintageMapActive={activeLayer === 'gdd_vintage'}
+                onShowVintageMap={() => onLayerChange?.('gdd_vintage')}
                 onListingClick={handleListingClick}
                 onListingHover={(l) => mapRef.current?.hoverListing(l)}
               />
@@ -1729,7 +2264,9 @@ export default function ExplorerSidebar({
                 listing={detailWinery}
                 selectedVineyards={selectedVineyards}
                 parcelTopoStats={parcelTopoStats}
+                focusedVineyard={focusedVineyard}
                 onVineyardHover={onVineyardHover}
+                onVineyardSelect={onVineyardSelect}
                 onViewAllVineyards={onViewAllVineyards}
                 onParcelClick={handleParcelClick}
               />
@@ -1749,5 +2286,6 @@ export default function ExplorerSidebar({
         </div>
       </div>
     </div>
+    </>
   );
 }

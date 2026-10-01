@@ -132,13 +132,15 @@ export default function ParcelHistorySection({ parcelId }) {
       {/* Toggle header */}
       <button
         onClick={handleToggle}
+        aria-expanded={open}
+        className={`tx-row${open ? ' is-active' : ''}`}
         style={{
           width: '100%', background: 'none', border: 'none', cursor: 'pointer',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           padding: '10px 0', borderTop: `1px solid ${border}`,
         }}
       >
-        <span style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Edit History</span>
+        <span className="tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>Edit History</span>
         <span style={{ fontSize: 'var(--type-body-size)', color: muted }}>{open ? '▲' : '▼'}</span>
       </button>
 

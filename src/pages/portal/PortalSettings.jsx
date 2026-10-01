@@ -34,7 +34,7 @@ export default function PortalSettings() {
   return (
     <Shell>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <Link to="/portal/dashboard" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>← Dashboard</Link>
+        <Link to="/portal/dashboard" className="tx-link" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>← Dashboard</Link>
       </div>
 
       <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink, marginBottom: 8 }}>
@@ -42,7 +42,7 @@ export default function PortalSettings() {
       </h1>
       <p style={{ color: muted, fontSize: 'var(--type-mono-size)', marginBottom: 24 }}>
         Manage how you sign in. To edit your public winery profile,{' '}
-        <Link to="/portal/profile" style={{ color: crimson, fontWeight: 600 }}>go to Edit Profile</Link>.
+        <Link to="/portal/profile" className="tx-link" style={{ color: TOKENS.interactive, fontWeight: 600 }}>go to Edit Profile</Link>.
       </p>
 
       {mustChangePassword && (

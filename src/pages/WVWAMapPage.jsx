@@ -1,17 +1,17 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import WVWAMap, { LISTING_FILTER_MODES } from '../components/WVWAMap';
-import ExplorerSidebar from '../components/ExplorerSidebar';
+import ExplorerSidebar, { SHEET_PEEK_PX } from '../components/ExplorerSidebar';
 import FilterModal from '../components/FilterModal';
 import { useVineyardFilters } from '../lib/useVineyardFilters';
-import { alpha, border, crimson, ink, MAP_GLASS, parchment, TOKENS, TYPE } from '../styles/tokens';
+import { VINTAGE_LAST_YEAR } from '../config/climateMapConfig';
+import MapKey from '../components/MapKey';
+import { alpha, border, crimson, ink, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 const UI = {
   taglineText:      alpha(TOKENS.parchment, 0.5),
   btnBorderIdle:    alpha(TOKENS.parchment, 0.25),
   btnTextIdle:      alpha(TOKENS.parchment, 0.35),
-  btnHoverBg:       alpha(TOKENS.parchment, 0.1),
   subtleLabel:      alpha(TOKENS.parchment, 0.45),
-  scrimBg:          alpha('black', 0.45),
 };
 import { useIsMobile } from '../lib/useIsMobile';
 
@@ -34,17 +34,9 @@ function PortalHeaderButton() {
         letterSpacing: '0.1em',
         textTransform: 'uppercase',
         textDecoration: 'none',
-        transition: 'border-color 0.2s, color 0.2s',
         whiteSpace: 'nowrap',
       }}
-      onMouseEnter={e => {
-        e.currentTarget.style.borderColor = alpha(TOKENS.parchment, 0.6);
-        e.currentTarget.style.color = alpha(TOKENS.parchment, 0.95);
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.borderColor = alpha(TOKENS.parchment, 0.25);
-        e.currentTarget.style.color = alpha(TOKENS.parchment, 0.55);
-      }}
+      className="tx-box tx-link"
     >
       Winery Portal
       <span style={{ fontSize: 9, opacity: 0.7 }}>→</span>
@@ -134,15 +126,8 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
           fontWeight: 600,
           cursor: mapReady ? 'pointer' : 'default',
           fontFamily: 'var(--font-sans)',
-          transition: 'background 0.2s, color 0.2s, border-color 0.2s',
         }}
-        onMouseEnter={e => {
-          if (!mapReady) return;
-          e.currentTarget.style.background = UI.btnHoverBg;
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.background = 'transparent';
-        }}
+        className={mapReady ? 'tx-box tx-link' : undefined}
       >
         {mapReady ? 'Begin Exploring' : 'Loading map\u2026'}
       </button>
@@ -158,10 +143,8 @@ function EntrancePanel({ onEnter, mapReady, isMobile }) {
             fontFamily: 'var(--font-sans)',
             fontStyle: 'italic',
             textDecoration: 'none',
-            transition: 'color 0.2s',
           }}
-          onMouseEnter={e => { e.currentTarget.style.color = alpha(TOKENS.parchment, 0.8); }}
-          onMouseLeave={e => { e.currentTarget.style.color = alpha(TOKENS.parchment, 0.35); }}
+          className="tx-link"
         >
           Winery owner? Sign in to your portal
         </a>
@@ -174,7 +157,9 @@ export default function WVWAMapPage() {
   const mapRef = useRef(null);
 
   const isMobile = useIsMobile();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Mobile panel is a bottom sheet with three resting heights; it is never
+  // fully dismissed, so there is no open/closed state to get stuck in.
+  const [sheetDetent, setSheetDetent] = useState('peek');
 
   // ── Entrance state ───────────────────────────────────────────────────
   // Skip intro on reload if the user has already seen it this tab session,
@@ -218,13 +203,37 @@ export default function WVWAMapPage() {
   const [selectedListing, setSelectedListing]       = useState(null);
   const [activeLayer, setActiveLayer]               = useState(null);
   const [currentMonth, setCurrentMonth]             = useState(new Date().getMonth() + 1);
+  // Vintage shown by the climate map layer; shared with the sidebar's vintage stripes
+  const [climateYear, setClimateYear]               = useState(VINTAGE_LAST_YEAR);
+  // Legend filter per data layer: { [layerId]: [class keys] } — empty = show all.
+  // Kept per layer, so switching Soils → Bedrock → Soils keeps the soil selection.
+  const [legendSelection, setLegendSelection]       = useState({});
+  // Topography custom ranges: { [layerId]: [lo, hi] } (aspect: [from, to] clockwise).
+  // A range and a legend selection are alternatives — setting one clears the other.
+  const [topoRanges, setTopoRanges]                 = useState({});
+  const setLayerSelection = useCallback((layerId, keys) => {
+    setLegendSelection((prev) => ({ ...prev, [layerId]: keys }));
+    if (keys?.length) setTopoRanges((prev) => ({ ...prev, [layerId]: null }));
+  }, []);
+  const setTopoRange = useCallback((layerId, range) => {
+    setTopoRanges((prev) => ({ ...prev, [layerId]: range }));
+    if (range) setLegendSelection((prev) => ({ ...prev, [layerId]: [] }));
+  }, []);
+  const handleLayerChange = useCallback((layer) => { setActiveLayer(layer); setTopoStats(null); }, []);
   const [listingFilterMode, setListingFilterMode]   = useState(LISTING_FILTER_MODES.allWineries);
   const [listingSymbologyPreset, setListingSymbologyPreset] = useState('topoModern');
   const [topoStats, setTopoStats]                   = useState(null);
   const [parcelTopoStats, setParcelTopoStats]       = useState({});
   const [selectedVineyards, setSelectedVineyards]   = useState([]);
   const [insideIds, setInsideIds]                   = useState(null);
-  const [vineyardRecidSet, setVineyardRecidSet]     = useState(() => new Set());
+  const [vineyardRecidSet, setVineyardRecidSet]     = useState(() => new Map());
+  const [vineyardTheme, setVineyardTheme]           = useState('ownership');
+  const [vineyardOutline, setVineyardOutline]       = useState(false); // outline-only vineyards
+  // Vineyard a map click landed on, so the sidebar opens that one rather than
+  // the winery's first. Bumped with a nonce so re-clicking the same vineyard
+  // after the user collapsed it still re-opens it.
+  const [focusedVineyard, setFocusedVineyard]       = useState(null);
+  const [vineyardThemeValues, setVineyardThemeValues] = useState(null);
   // Which vineyards the map emphasizes, driven by the sidebar's page level
   // ('all' everywhere except a winery page, where it's 'winery').
   const [vineyardScope, setVineyardScope]           = useState('all');
@@ -233,12 +242,14 @@ export default function WVWAMapPage() {
   const vineyardFilters = useVineyardFilters();
   const [filterModalOpen, setFilterModalOpen] = useState(false);
 
-  // Auto-open sidebar on mobile when a map interaction selects content
-  useEffect(() => { if (isMobile && selectedListing) setSidebarOpen(true); }, [isMobile, selectedListing]);
-  useEffect(() => { if (isMobile && selectedAva) setSidebarOpen(true); }, [isMobile, selectedAva]);
+  // Raise the sheet to half height when a map interaction selects something —
+  // enough to read the winery and its vineyards while the map stays on screen.
+  // Deliberately not 'full': burying the map was the old drawer's whole problem.
+  useEffect(() => { if (isMobile && selectedListing) setSheetDetent(d => (d === 'peek' ? 'half' : d)); }, [isMobile, selectedListing]);
+  useEffect(() => { if (isMobile && selectedAva) setSheetDetent(d => (d === 'peek' ? 'half' : d)); }, [isMobile, selectedAva]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', overflow: 'hidden', background: parchment, fontFamily: 'var(--font-sans)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100dvh', overflow: 'hidden', background: parchment, fontFamily: 'var(--font-sans)' }}>
 
       {/* ── Slim header ─────────────────────────────────────────────── */}
       <header style={{
@@ -279,10 +290,14 @@ export default function WVWAMapPage() {
             />
           </a>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ fontSize: 'var(--type-body-size)', color: UI.subtleLabel, fontFamily: 'var(--font-sans)', letterSpacing: '0.02em' }}>
-            Wineries &amp; AVA Explorer
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>
+          {/* Phone widths can't fit the tagline: it wrapped to three lines and
+              spilled out of the 48px bar, over both logos. */}
+          {!isMobile && (
+            <div style={{ fontSize: 'var(--type-body-size)', color: UI.subtleLabel, fontFamily: 'var(--font-sans)', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
+              Wineries &amp; AVA Explorer
+            </div>
+          )}
           <PortalHeaderButton />
         </div>
       </header>
@@ -299,8 +314,8 @@ export default function WVWAMapPage() {
         {!isIntro && (
           <ExplorerSidebar
             isMobile={isMobile}
-            isOpen={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
+            sheetDetent={sheetDetent}
+            onSheetDetentChange={setSheetDetent}
             mapRef={mapRef}
             selectedAva={selectedAva}
             onSelectAva={setSelectedAva}
@@ -310,15 +325,28 @@ export default function WVWAMapPage() {
             insideIds={insideIds}
             vineyardRecidSet={vineyardRecidSet}
             activeLayer={activeLayer}
-            onLayerChange={(layer) => { setActiveLayer(layer); setTopoStats(null); }}
+            onLayerChange={handleLayerChange}
             currentMonth={currentMonth}
             onMonthChange={setCurrentMonth}
+            climateYear={climateYear}
+            onClimateYearChange={setClimateYear}
+            legendSelection={legendSelection}
+            onLegendSelectionChange={setLayerSelection}
+            topoRanges={topoRanges}
+            onTopoRangeChange={setTopoRange}
             topoStats={topoStats}
             listingFilterMode={listingFilterMode}
             onListingFilterModeChange={setListingFilterMode}
+            vineyardTheme={vineyardTheme}
+            onVineyardThemeChange={setVineyardTheme}
+            vineyardThemeValues={vineyardThemeValues}
+            vineyardOutline={vineyardOutline}
+            onVineyardOutlineChange={setVineyardOutline}
             selectedVineyards={selectedVineyards}
             parcelTopoStats={parcelTopoStats}
+            focusedVineyard={focusedVineyard}
             onVineyardHover={(features) => mapRef.current?.hoverVineyards?.(features)}
+            onVineyardSelect={(features) => mapRef.current?.focusVineyards?.(features)}
             onViewAllVineyards={(features) => mapRef.current?.viewAllVineyards?.(features)}
             onVineyardScopeChange={setVineyardScope}
             onOpenFilters={() => setFilterModalOpen(true)}
@@ -327,42 +355,13 @@ export default function WVWAMapPage() {
           />
         )}
 
-        {/* Mobile scrim — tap outside drawer to close */}
-        {isMobile && sidebarOpen && (
-          <div
-            onClick={() => setSidebarOpen(false)}
-            style={{
-              position: 'fixed', inset: 0,
-              background: UI.scrimBg,
-              zIndex: 199,
-            }}
-          />
-        )}
-
-        {/* Map */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          {/* Mobile hamburger FAB — MAP_GLASS card to match the rail / badge / pills / popup */}
-          {isMobile && !isIntro && (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open menu"
-              style={{
-                position: 'absolute', top: 12, left: 12, zIndex: 100,
-                width: 42, height: 42,
-                background: MAP_GLASS.bg,
-                border: `1px solid ${MAP_GLASS.border}`,
-                borderRadius: MAP_GLASS.radiusCard,
-                color: MAP_GLASS.text,
-                fontSize: 'var(--type-display-italic-size)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer',
-                boxShadow: MAP_GLASS.shadow,
-                fontFamily: 'var(--font-sans)', lineHeight: 1,
-              }}
-            >
-              ☰
-            </button>
-          )}
+        {/* Map — on mobile it ends above the sheet's resting height, so the
+            sheet never covers the whole map and the attribution stays legible.
+            The hamburger is gone: the sheet's own handle is always on screen. */}
+        <div style={{
+          flex: 1, position: 'relative', overflow: 'hidden',
+          marginBottom: isMobile && !isIntro ? SHEET_PEEK_PX : 0,
+        }}>
           <WVWAMap
             ref={mapRef}
             selectedAva={selectedAva}
@@ -373,11 +372,21 @@ export default function WVWAMapPage() {
             selectedListing={selectedListing}
             onListingSelect={setSelectedListing}
             activeLayer={activeLayer}
-            onLayerChange={(layer) => { setActiveLayer(layer); setTopoStats(null); }}
+            onLayerChange={handleLayerChange}
             currentMonth={currentMonth}
             onMonthChange={setCurrentMonth}
+            climateYear={climateYear}
+            onClimateYearChange={setClimateYear}
+            legendSelection={legendSelection}
+            onLegendSelectionChange={setLayerSelection}
+            topoRanges={topoRanges}
+            onTopoRangeChange={setTopoRange}
             listingFilterMode={listingFilterMode}
             onListingFilterModeChange={setListingFilterMode}
+            vineyardTheme={vineyardTheme}
+            vineyardOutline={vineyardOutline}
+            onVineyardThemeValuesChange={setVineyardThemeValues}
+            onVineyardFocus={(name) => setFocusedVineyard({ name, at: Date.now() })}
             listingSymbologyPreset={listingSymbologyPreset}
             onListingSymbologyPresetChange={setListingSymbologyPreset}
             // Push-only callbacks
@@ -393,6 +402,27 @@ export default function WVWAMapPage() {
             filtersActive={vineyardFilters.isActive}
             vineyardScope={vineyardScope}
           />
+          {/* On-map key: what's showing, plus the quick switches. Shares every
+              piece of state with the sidebar's Data Layers section. */}
+          {!isIntro && mapReady && (
+            <MapKey
+              isMobile={isMobile}
+              vineyardTheme={vineyardTheme}
+              onVineyardThemeChange={setVineyardTheme}
+              vineyardOutline={vineyardOutline}
+              onVineyardOutlineChange={setVineyardOutline}
+              vineyardThemeValues={vineyardThemeValues}
+              vineyardScope={vineyardScope}
+              activeLayer={activeLayer}
+              onLayerChange={handleLayerChange}
+              climateYear={climateYear}
+              onClimateYearChange={setClimateYear}
+              legendSelection={legendSelection}
+              onLegendSelectionChange={setLayerSelection}
+              topoRanges={topoRanges}
+              onTopoRangeChange={setTopoRange}
+            />
+          )}
         </div>
       </div>
 

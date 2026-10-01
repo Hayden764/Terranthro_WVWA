@@ -48,6 +48,7 @@ router.get('/', async (req, res) => {
           ST_Y(w.location::geometry) AS lat
         FROM wineries w
         WHERE w.id IN ${membersOf('$5')}
+          AND w.location IS NOT NULL
           AND w.title ILIKE $1
         ORDER BY
           CASE WHEN LOWER(w.title) = LOWER($2) THEN 0

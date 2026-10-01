@@ -1,0 +1,262 @@
+import { alpha, TOKENS, TYPE } from '@terranthro/shared/styles/tokens.js';
+import { GLASS } from './glassTokens';
+import { REGION_AVAS, TOPO_LAYER_TYPES } from '../../config/topographyConfig';
+import TerroirDataChips from '@terranthro/shared/components/TerroirDataChips.jsx';
+import { panelCard } from '@terranthro/shared/styles/patterns.js';
+
+/**
+ * LayerDetailPanel — right-side context panel shown when a data layer is active.
+ * Displays layer description, data source, colour ramp, and live stats.
+ * Closing this panel clears the active layer.
+ */
+
+/* ─── Color ramp gradients matching TiTiler colormaps ────────────────── */
+// audit-ignore-start colormap-gradients
+const COLORMAP_CSS = {
+  terrain:  'linear-gradient(to right, #0B6623, #90EE90, #F5F5DC, #D2B48C, #8B4513, #FFFFFF)',
+  rdylgn_r: 'linear-gradient(to right, #1A9850, #91CF60, #D9EF8B, #FEE08B, #FC8D59, #D73027)',
+  hsv:      'linear-gradient(to right, #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000)',
+  plasma:   'linear-gradient(to right, #0D0887, #7E03A8, #CC4778, #F89441, #F0F921)',
+};
+// audit-ignore-end
+
+/* ─── Layer metadata ──────────────────────────────────────────────────── */
+const LAYER_INFO = {
+  tdmean: {
+    icon: '🌡️',
+    label: 'Mean Temperature',
+    why: 'Average daily mean temperature from PRISM 30-year normals (1991–2020). This helps understand the thermal character of each growing region across different months.',
+    source: 'PRISM Climate Group, Oregon State University',
+    period: '30-year normals (1991–2020)',
+  },
+  elevation: {
+    icon: '⛰️',
+    label: 'Elevation',
+    why: 'Height above sea level. Higher-elevation vineyards experience cooler temperatures, more wind exposure, and often better drainage — all factors that influence grape quality.',
+    source: 'USGS Digital Elevation Model',
+    period: 'Static terrain data',
+  },
+  slope: {
+    icon: '📐',
+    label: 'Slope',
+    why: 'Steepness of terrain in degrees. Slopes between 5–15° are generally ideal for viticulture, providing good drainage and sun exposure.',
+    source: 'Derived from USGS DEM',
+    period: 'Static terrain data',
+  },
+  aspect: {
+    icon: '🧭',
+    label: 'Aspect',
+    why: 'The compass direction a slope faces. South- and southwest-facing slopes receive more sunlight in the Northern Hemisphere, producing warmer and more sun-exposed microclimates.',
+    source: 'Derived from USGS DEM',
+    period: 'Static terrain data',
+  },
+};
+
+const CARD = panelCard();
+
+const LBL = {
+  ...TYPE.uiLabel,
+  fontSize: 'var(--type-ui-label-size)',
+  color: GLASS.textDim,
+  marginBottom: 4,
+};
+
+const VAL = {
+  fontSize: 'var(--type-mono-size)',
+  color: GLASS.text,
+  lineHeight: 1.55,
+};
+
+const UI = {
+  panelBg:        alpha(TOKENS.ink, 0.92),
+  panelBorder:    alpha(TOKENS.parchment, 0.12),
+  panelShadow:    alpha(TOKENS.ink, 0.45),
+  headerDivider:  alpha(TOKENS.parchment, 0.08),
+  closeBtnBg:     alpha(TOKENS.ink, 0.7),
+  closeBtnBorder: alpha(TOKENS.parchment, 0.15),
+  closeBtnText:   alpha(TOKENS.parchment, 0.7),
+  scrollbar:      alpha(TOKENS.parchment, 0.15),
+  rampBarBorder:  alpha(TOKENS.parchment, 0.1),
+  spinnerBorder:  alpha(TOKENS.parchment, 0.15),
+};
+
+export default function LayerDetailPanel({ activeLayer, topoStats, selectedAva, onClose }) {
+  const layerInfo = activeLayer ? LAYER_INFO[activeLayer] : null;
+  if (!layerInfo) return null;
+
+  const avaName = selectedAva
+    ? REGION_AVAS.find(a => a.slug === selectedAva)?.name ?? 'AVA'
+    : null;
+
+  return (
+    <div style={{
+      position: 'absolute',
+      right: 16,
+      top: '50%',
+      transform: 'translateY(-50%)',
+      width: 288,
+      maxHeight: 'calc(100vh - 120px)',
+      background: UI.panelBg,
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      border: `1px solid ${UI.panelBorder}`,
+      borderRadius: 14,
+      boxShadow: `0 8px 40px ${UI.panelShadow}`,
+      fontFamily: 'var(--font-sans)',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      zIndex: 40,
+      animation: 'layerPanelFadeIn 0.2s ease-out',
+    }}>
+      <style>{`
+        @keyframes layerPanelFadeIn {
+          from { opacity: 0; transform: translateY(-50%) translateX(8px); }
+          to   { opacity: 1; transform: translateY(-50%) translateX(0); }
+        }
+      `}</style>
+
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <div style={{
+        padding: '12px 16px',
+        borderBottom: `1px solid ${UI.headerDivider}`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 'var(--type-display-italic-size)' }}>{layerInfo.icon}</span>
+          <div>
+            <div style={{
+              ...TYPE.uiLabel,
+              fontSize: 'var(--type-ui-label-size)',
+              color: GLASS.textDim,
+              lineHeight: 1,
+              marginBottom: 2,
+            }}>
+              Active Layer
+            </div>
+            <div style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: GLASS.text, lineHeight: 1.2 }}>
+              {layerInfo.label}
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          title="Deactivate layer"
+          style={{
+            background: UI.closeBtnBg,
+            border: `1px solid ${UI.closeBtnBorder}`,
+            borderRadius: 8,
+            color: UI.closeBtnText,
+            width: 28,
+            height: 28,
+            cursor: 'pointer',
+            fontSize: 'var(--type-body-size)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            lineHeight: 1,
+            flexShrink: 0,
+          }}
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* ── Body ────────────────────────────────────────────────────── */}
+      <div style={{
+        overflowY: 'auto',
+        flex: 1,
+        padding: '12px 12px 16px',
+        scrollbarWidth: 'thin',
+        scrollbarColor: `${UI.scrollbar} transparent`,
+      }}>
+
+        {/* Description */}
+        <div style={CARD}>
+          <p style={{ fontSize: 'var(--type-body-size)', color: GLASS.textDim, lineHeight: 1.7, margin: 0 }}>
+            {layerInfo.why}
+          </p>
+        </div>
+
+        {/* Source + Period */}
+        <div style={CARD}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <div style={LBL}>Period</div>
+              <div style={VAL}>{layerInfo.period}</div>
+            </div>
+            <div>
+              <div style={LBL}>Source</div>
+              <div style={{ ...VAL, fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim }}>{layerInfo.source}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Stats card (topo layers, when stats are loaded) ────────── */}
+        {topoStats && activeLayer && TOPO_LAYER_TYPES[activeLayer] && (() => {
+          const { min, max, mean, std } = topoStats;
+          const layerCfg = TOPO_LAYER_TYPES[activeLayer];
+          const unit = layerCfg.unit ?? '';
+          const gradient = COLORMAP_CSS[layerCfg.colormap] ?? COLORMAP_CSS.terrain;
+          const fmt = (v) => typeof v === 'number' ? v.toFixed(1) : '—';
+          return (
+            <div style={CARD}>
+              <div style={{ ...LBL, marginBottom: 8 }}>
+                Data Range{avaName ? ` — ${avaName}` : ''}
+              </div>
+
+              {/* Color ramp bar */}
+              <div style={{
+                height: 10,
+                borderRadius: 6,
+                background: gradient,
+                marginBottom: 4,
+                border: `1px solid ${UI.rampBarBorder}`,
+              }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim, marginBottom: 12 }}>
+                <span>{fmt(min)}{unit}</span>
+                <span>{fmt(max)}{unit}</span>
+              </div>
+
+              {/* Stats chips */}
+              <TerroirDataChips variant="glass" chips={[
+                { label: 'Min',     value: `${fmt(min)}${unit}`,   tone: 'blue',     glow: true  },
+                { label: 'Max',     value: `${fmt(max)}${unit}`,   tone: 'amber',    glow: true  },
+                { label: 'Mean',    value: `${fmt(mean)}${unit}`,  tone: 'green',    glow: true  },
+                { label: 'Std Dev', value: `±${fmt(std)}${unit}`,  tone: 'parchment', glow: false },
+              ]} />
+            </div>
+          );
+        })()}
+
+        {/* Loading state */}
+        {!topoStats && activeLayer && TOPO_LAYER_TYPES[activeLayer] && selectedAva && (
+          <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              width: 14, height: 14, borderRadius: '50%',
+              border: `2px solid ${UI.spinnerBorder}`,
+              borderTopColor: GLASS.text,
+              animation: 'spin 0.8s linear infinite',
+              flexShrink: 0,
+            }} />
+            <span style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim }}>Loading data range…</span>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
+        )}
+
+        {/* Hint when no AVA is selected and topo is active */}
+        {!topoStats && activeLayer && TOPO_LAYER_TYPES[activeLayer] && !selectedAva && (
+          <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 'var(--type-display-italic-size)', flexShrink: 0 }}>💡</span>
+            <span style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim, lineHeight: 1.5 }}>
+              Select an AVA to see terrain statistics for that region.
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

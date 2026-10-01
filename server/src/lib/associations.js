@@ -5,10 +5,14 @@
  * association's members with ?association=<slug>. Until every deployed client
  * sends the param, a missing value means 'wvwa', the only consumer before the
  * multi-app split.
+ *
+ * ?association=all is the statewide view (OWB): every organization counts, so
+ * "member" just means "has an owner on record".
  */
 import { pool } from '../db/pool.js';
 
 export const DEFAULT_ASSOCIATION = 'wvwa';
+export const ALL_ASSOCIATIONS = 'all';
 
 const SLUG_RE = /^[a-z0-9-]{1,40}$/;
 const CACHE_MS = 5 * 60 * 1000;
@@ -30,18 +34,22 @@ export async function resolveAssociation(req) {
   const raw = req.query.association;
   const slug = raw == null || raw === '' ? DEFAULT_ASSOCIATION : String(raw).toLowerCase();
   if (!SLUG_RE.test(slug)) return null;
+  if (slug === ALL_ASSOCIATIONS) return slug;
   return (await knownSlugs()).has(slug) ? slug : null;
 }
 
 /**
  * SQL subquery of organization ids (wineries.id) belonging to the association
- * whose slug is bound at `param` (e.g. '$4'). Use as `w.id IN ${membersOf('$4')}`.
+ * whose slug is bound at `param` (e.g. '$4'), or every organization when that
+ * slug is 'all'. Use as `w.id IN ${membersOf('$4')}`.
  */
 export function membersOf(param) {
   return `(SELECT oa.organization_id
            FROM organization_associations oa
            JOIN associations a ON a.id = oa.association_id
-           WHERE a.slug = ${param})`;
+           WHERE a.slug = ${param}
+           UNION ALL
+           SELECT org.id FROM wineries org WHERE ${param} = '${ALL_ASSOCIATIONS}')`;
 }
 
 export function badAssociation(res) {

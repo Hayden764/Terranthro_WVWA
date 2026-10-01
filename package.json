@@ -10,8 +10,10 @@
   "scripts": {
     "dev:wvwa": "npm run dev -w @terranthro/wvwa",
     "dev:portal": "npm run dev -w @terranthro/portal",
+    "dev:owb": "npm run dev -w @terranthro/owb",
     "build:wvwa": "npm run build -w @terranthro/wvwa",
     "build:portal": "npm run build -w @terranthro/portal",
+    "build:owb": "npm run build -w @terranthro/owb",
     "build": "npm run build --workspaces --if-present",
     "audit:colors": "node scripts/audit-hardcoded-colors.mjs",
     "audit:colors:strict": "node scripts/audit-hardcoded-colors.mjs --strict"

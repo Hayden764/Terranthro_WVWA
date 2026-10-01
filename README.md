@@ -41,6 +41,9 @@ Vercel project; growers sign in at a single portal whichever explorer sent them.
 │   ├── wvwa/                # WVWA members explorer → wvwa.terranthro.com
 │   │   ├── src/             #   map, sidebar, climate/topo/soil layers
 │   │   └── public/data/     #   static AVA boundary GeoJSON the map draws
+│   ├── owb/                 # OWB statewide explorer ("Oregon Vineyard Atlas") → owb.terranthro.com
+│   │   ├── src/config/      #   regionConfig.js + oregonAvas.generated.js (all 23 OR AVAs)
+│   │   └── public/data/     #   simplified AVA boundaries (export-owb-avas.mjs)
 │   └── portal/              # Grower portal + admin console + winery sites → portal.terranthro.com
 │       └── src/pages/       #   portal/, admin/, site/ (/w/:slug), EditorPage
 ├── packages/
@@ -48,14 +51,18 @@ Vercel project; growers sign in at a single portal whichever explorer sent them.
 │                            #   TerroirDataChips, cross-app URLs (PORTAL_URL)
 ├── server/                  # Express API (Railway) — shared by every frontend
 │   ├── src/routes/          #   ?association=<slug> scopes membership (default wvwa)
-│   └── scripts/             #   load-avas.mjs, generate-portal-credentials.mjs
+│   └── scripts/             #   load-avas.mjs, export-owb-avas.mjs, generate-portal-credentials.mjs
 ├── database/
 │   ├── schema.sql
 │   └── migrations/          # incremental migrations (002–026)
 └── data-pipeline/scripts/   # Python & Node ingestion / processing scripts
 ```
 
-Planned: `apps/owb/` — OWB statewide explorer → owb.terranthro.com.
+`apps/owb` began as a copy of `apps/wvwa`; the statewide differences live in
+`apps/owb/src/config/regionConfig.js`. It calls the API with `?association=all`
+(every organization counts) and `/api/avas/acres?state=OR`. After reloading AVA
+boundaries (`node server/scripts/load-avas.mjs`), regenerate its AVA files with
+`node server/scripts/export-owb-avas.mjs` (run from `server/`) and commit them.
 
 ---
 
@@ -147,10 +154,14 @@ npm run dev:wvwa
 
 # Terminal 3 — grower portal + admin
 npm run dev:portal
+
+# Terminal 4 — OWB statewide explorer
+npm run dev:owb
 ```
 
 Explorer: `http://localhost:3002`
 Portal:   `http://localhost:3003`
+OWB:      `http://localhost:3004`
 Server:   `http://localhost:8000`
 
 Build one app with `npm run build:wvwa` / `npm run build:portal` (output in `apps/<app>/dist`).
@@ -161,6 +172,7 @@ Build one app with `npm run build:wvwa` / `npm run build:portal` (output in `app
 |---|---|---|
 | `apps/wvwa` | `apps/wvwa` | wvwa.terranthro.com |
 | `apps/portal` | `apps/portal` | portal.terranthro.com |
+| `apps/owb` | `apps/owb` | owb.terranthro.com |
 
 The server deploys from `server/` on Railway (see `railway.toml`).
 

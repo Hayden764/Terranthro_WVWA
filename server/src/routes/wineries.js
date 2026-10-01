@@ -115,6 +115,7 @@ router.get('/', async (req, res) => {
       FROM wineries w
       WHERE ${bboxCondition}
         AND ${memberCondition}
+        AND w.location IS NOT NULL
         ${parcelsCondition}
       ORDER BY w.title
       `,

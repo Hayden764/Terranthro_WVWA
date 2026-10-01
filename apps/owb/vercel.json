@@ -1,0 +1,17 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install --include=dev",
+  "framework": "vite",
+  "redirects": [
+    { "source": "/portal", "destination": "https://portal.terranthro.com/portal", "permanent": false },
+    { "source": "/portal/:path*", "destination": "https://portal.terranthro.com/portal/:path*", "permanent": false },
+    { "source": "/admin", "destination": "https://portal.terranthro.com/admin", "permanent": false },
+    { "source": "/admin/:path*", "destination": "https://portal.terranthro.com/admin/:path*", "permanent": false },
+    { "source": "/w/:path*", "destination": "https://portal.terranthro.com/w/:path*", "permanent": false }
+  ],
+  "rewrites": [
+    { "source": "/data/(.*)", "destination": "/data/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

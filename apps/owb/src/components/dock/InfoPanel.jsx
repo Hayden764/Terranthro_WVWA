@@ -1,0 +1,417 @@
+import React from 'react';
+import { alpha, TOKENS, TYPE } from '@terranthro/shared/styles/tokens.js';
+import { GLASS } from './glassTokens';
+import { REGION_AVAS } from '../../config/topographyConfig';
+import TerroirDataChips from '@terranthro/shared/components/TerroirDataChips.jsx';
+import { panelCard } from '@terranthro/shared/styles/patterns.js';
+
+/**
+ * InfoPanel — "Info" panel content (right side).
+ * Shows selected AVA metadata, or general WV info if nothing selected.
+ * When a data layer is active, shows layer description too.
+ */
+
+const CARD = panelCard();
+
+const LBL = {
+  ...TYPE.uiLabel,
+  fontSize: 'var(--type-ui-label-size)',
+  color: GLASS.textDim,
+  marginBottom: 4,
+};
+
+const VAL = {
+  fontSize: 'var(--type-mono-size)',
+  color: GLASS.text,
+  lineHeight: 1.55,
+};
+
+const UI = {
+  // AVA button states
+  hoverBorder:      alpha(TOKENS.electricBlue, 0.55),
+  hoverBg:          alpha(TOKENS.electricBlue, 0.12),
+  hoverText:        TOKENS.electricBlue,
+  hoverGlowOuter:   alpha(TOKENS.electricBlue, 0.18),
+  hoverGlowInner:   alpha(TOKENS.electricBlue, 0.06),
+  idleBorder:       alpha(TOKENS.parchment, 0.10),
+  idleBg:           alpha(TOKENS.parchment, 0.05),
+  // Badges
+  nestedBadgeBorder: alpha(TOKENS.crimson, 0.35),
+  parentBadgeBg:     alpha(TOKENS.amber, 0.15),
+  parentBadgeBorder: alpha(TOKENS.amber, 0.4),
+  // Amber parent button
+  amberBtnBg:        alpha(TOKENS.amber, 0.08),
+  amberBtnBorder:    alpha(TOKENS.amber, 0.3),
+};
+
+/* ─── Color ramp gradients matching TiTiler colormaps ────────────────── */
+// audit-ignore-start colormap-gradients
+const COLORMAP_CSS = {
+  terrain:  'linear-gradient(to right, #0B6623, #90EE90, #F5F5DC, #D2B48C, #8B4513, #FFFFFF)',
+  rdylgn_r: 'linear-gradient(to right, #1A9850, #91CF60, #D9EF8B, #FEE08B, #FC8D59, #D73027)',
+  hsv:      'linear-gradient(to right, #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000)',
+  plasma:   'linear-gradient(to right, #0D0887, #7E03A8, #CC4778, #F89441, #F0F921)',
+};
+// audit-ignore-end
+
+/* ─── Layer info map ──────────────────────────────────────────────────── */
+const LAYER_INFO = {
+  tdmean: {
+    icon: '🌡️',
+    label: 'Mean Temperature',
+    why: 'Average daily mean temperature from PRISM 30-year normals (1991–2020). This helps understand the thermal character of each growing region across different months.',
+    source: 'PRISM Climate Group, Oregon State University',
+    period: '30-year normals (1991–2020)',
+  },
+  elevation: {
+    icon: '⛰️',
+    label: 'Elevation',
+    why: 'Height above sea level. Higher-elevation vineyards experience cooler temperatures, more wind exposure, and often better drainage — all factors that influence grape quality.',
+    source: 'USGS Digital Elevation Model',
+    period: 'Static terrain data',
+  },
+  slope: {
+    icon: '📐',
+    label: 'Slope',
+    why: 'Steepness of terrain in degrees. Slopes between 5–15° are generally ideal for viticulture, providing good drainage and sun exposure.',
+    source: 'Derived from USGS DEM',
+    period: 'Static terrain data',
+  },
+  aspect: {
+    icon: '🧭',
+    label: 'Aspect',
+    why: 'The compass direction a slope faces. South- and southwest-facing slopes receive more sunlight in the Northern Hemisphere, producing warmer and more sun-exposed microclimates.',
+    source: 'Derived from USGS DEM',
+    period: 'Static terrain data',
+  },
+};
+
+/* ── Clickable AVA list item ─────────────────────────────────────────── */
+function AVAButton({ item, onSelectAva, onHoverAva, indent }) {
+  const [hovered, setHovered] = React.useState(false);
+
+  const btn = (
+    <button
+      onClick={() => onSelectAva?.(item.slug)}
+      onMouseEnter={() => { setHovered(true);  onHoverAva?.(item.slug); }}
+      onMouseLeave={() => { setHovered(false); onHoverAva?.(null); }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+        padding: indent ? '6px 10px' : '8px 12px',
+        borderRadius: 8,
+        border: `1px solid ${hovered ? UI.hoverBorder : UI.idleBorder}`,
+        background: hovered ? UI.hoverBg : UI.idleBg,
+        color: hovered ? UI.hoverText : GLASS.textDim,
+        boxShadow: hovered ? `0 0 0 2px ${UI.hoverGlowOuter}, inset 0 0 8px ${UI.hoverGlowInner}` : 'none',
+        fontSize: indent ? 11 : 12,
+        fontWeight: 500,
+        fontFamily: 'var(--font-sans)',
+        cursor: 'pointer',
+        textAlign: 'left',
+        transition: 'background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s',
+      }}
+    >
+      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {item.name}
+      </span>
+      <span style={{ fontSize: 'var(--type-mono-size)', marginLeft: 8, opacity: 0.55, flexShrink: 0 }}>↗</span>
+    </button>
+  );
+
+  if (indent) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, paddingLeft: 14 }}>
+        <span style={{ color: GLASS.textMuted, fontSize: 'var(--type-ui-label-size)', flexShrink: 0, userSelect: 'none', lineHeight: 1 }}>↳</span>
+        {btn}
+      </div>
+    );
+  }
+  return btn;
+}
+
+/* ── Renders a hierarchical AVA list, indenting children under parents ── */
+function renderAvaTree(avas, onSelectAva, onHoverAva) {
+  const slugSet = new Set(avas.map(a => a.slug));
+  const topLevel = avas.filter(a => !a.parentAva || !slugSet.has(a.parentAva));
+  return topLevel.map(a => {
+    const children = a.subAvas
+      ? a.subAvas.map(s => avas.find(x => x.slug === s)).filter(Boolean)
+      : [];
+    return (
+      <React.Fragment key={a.slug}>
+        <AVAButton item={a} onSelectAva={onSelectAva} onHoverAva={onHoverAva} />
+        {children.map(child => (
+          <AVAButton key={child.slug} item={child} onSelectAva={onSelectAva} onHoverAva={onHoverAva} indent />
+        ))}
+      </React.Fragment>
+    );
+  });
+}
+
+export default function InfoPanel({ selectedAva, onSelectAva, onHoverAva }) {
+  const ava = REGION_AVAS.find(a => a.slug === selectedAva);
+
+  // Nesting helpers
+  const parentAvaSlug = ava?.parentAva ?? null;
+  const parentAva = parentAvaSlug ? REGION_AVAS.find(a => a.slug === parentAvaSlug) : null;
+  const subAvas = ava?.subAvas
+    ? REGION_AVAS.filter(a => ava.subAvas.includes(a.slug))
+    : [];
+  const isDoubleNested = !!parentAva;
+  const isChehalemParent = (ava?.subAvas?.length ?? 0) > 0;
+
+  // AVAs shown in the "siblings" list — exclude self, and for double-nested exclude
+  // the parent (shown separately in breadcrumb)
+  const siblingAvas = REGION_AVAS.filter(a => a.slug !== selectedAva);
+  const topLevelAvas = REGION_AVAS.filter(a => !a.parentAva);
+
+  const selectedAvaChips = [
+    { label: 'Tier', value: isDoubleNested ? 'Double' : 'Nested', tone: 'blue', glow: true },
+    { label: 'Sub-AVAs', value: String(subAvas.length), tone: 'green', glow: true },
+    { label: 'Siblings', value: String(siblingAvas.length), tone: 'amber', glow: false },
+    {
+      label: 'Parent',
+      value: isDoubleNested ? (parentAva?.name || 'Willamette Valley') : 'Willamette Valley',
+      tone: 'parchment',
+      glow: false,
+    },
+  ];
+
+  const valleyChips = [
+    { label: 'Nested AVAs', value: String(REGION_AVAS.length), tone: 'green', glow: true },
+    { label: 'Parent AVAs', value: String(topLevelAvas.length), tone: 'blue', glow: true },
+    { label: 'Region', value: 'Oregon', tone: 'parchment', glow: false },
+    { label: 'Known For', value: 'Pinot Noir', tone: 'amber', glow: false },
+  ];
+
+  return (
+    <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+
+      {/* ── AVA Information ──────────────────────────────────────────── */}
+      {ava ? (
+        <>
+          <div style={CARD}>
+            {/* Nesting badge */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+              <div style={{
+                ...TYPE.uiLabel,
+                display: 'inline-block',
+                padding: '3px 10px',
+                borderRadius: 20,
+                fontSize: 'var(--type-ui-label-size)',
+                background: GLASS.accentDim,
+                border: `1px solid ${UI.nestedBadgeBorder}`,
+                color: GLASS.text,
+              }}>
+                {isDoubleNested ? 'Double-Nested AVA' : 'Nested AVA'}
+              </div>
+              {isChehalemParent && (
+                <div style={{
+                  ...TYPE.uiLabel,
+                  display: 'inline-block',
+                  padding: '3px 10px',
+                  borderRadius: 20,
+                  fontSize: 'var(--type-ui-label-size)',
+                  background: UI.parentBadgeBg,
+                  border: `1px solid ${UI.parentBadgeBorder}`,
+                  color: TOKENS.amber,
+                }}>
+                  Parent AVA
+                </div>
+              )}
+            </div>
+
+            {/* Breadcrumb for double-nested */}
+            {isDoubleNested && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
+                <button
+                  onClick={() => onSelectAva?.(null)}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim, fontFamily: 'var(--font-sans)' }}
+                >
+                  Willamette Valley
+                </button>
+                <span style={{ color: GLASS.textMuted, fontSize: 'var(--type-ui-label-size)' }}>›</span>
+                <button
+                  onClick={() => onSelectAva?.(parentAvaSlug)}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 'var(--type-ui-label-size)', color: TOKENS.amber, fontFamily: 'var(--font-sans)', fontWeight: 600 }}
+                >
+                  {parentAva.name}
+                </button>
+                <span style={{ color: GLASS.textMuted, fontSize: 'var(--type-ui-label-size)' }}>›</span>
+                <span style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.text, fontWeight: 600 }}>{ava.name}</span>
+              </div>
+            )}
+
+            <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: GLASS.text, fontFamily: 'var(--font-display)', marginBottom: 4 }}>
+              {ava.name}
+            </div>
+            <div style={{ fontSize: 'var(--type-body-size)', color: GLASS.textDim }}>
+              {isDoubleNested
+                ? `${parentAva.name} · Willamette Valley, Oregon`
+                : 'Willamette Valley, Oregon'}
+            </div>
+          </div>
+
+          <div style={CARD}>
+            <div style={{ ...LBL, marginBottom: 8 }}>AVA Snapshot</div>
+            <TerroirDataChips chips={selectedAvaChips} variant="glass" />
+          </div>
+
+          {/* ── Sub-AVAs (shown only for Chehalem Mountains) ─────────── */}
+          {isChehalemParent && (
+            <div style={CARD}>
+              <div style={{ ...LBL, marginBottom: 2 }}>
+                Contains Sub-AVAs
+                <span style={{ fontWeight: 400, opacity: 0.6, marginLeft: 6 }}>({subAvas.length})</span>
+              </div>
+              <div style={{ fontSize: 'var(--type-ui-label-size)', color: GLASS.textDim, lineHeight: 1.5, marginBottom: 8 }}>
+                These appellations are nested within Chehalem Mountains and also within the broader Willamette Valley AVA — making them double-nested.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {subAvas.map(sub => (
+                  <AVAButton key={sub.slug} item={sub} onSelectAva={onSelectAva} onHoverAva={onHoverAva} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Parent AVA breadcrumb card */}
+          <div style={CARD}>
+            <div style={LBL}>{isDoubleNested ? 'Parent AVAs' : 'Part of'}</div>
+
+            {isDoubleNested ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {/* Chehalem Mountains parent */}
+                <button
+                  onClick={() => onSelectAva?.(parentAvaSlug)}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = UI.hoverBg;
+                    e.currentTarget.style.borderColor = UI.hoverBorder;
+                    e.currentTarget.style.color = UI.hoverText;
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = UI.amberBtnBg;
+                    e.currentTarget.style.borderColor = UI.amberBtnBorder;
+                    e.currentTarget.style.color = TOKENS.amber;
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    width: '100%', padding: '8px 12px', borderRadius: 8,
+                     border: `1px solid ${UI.amberBtnBorder}`,
+                    background: UI.amberBtnBg,
+                    color: TOKENS.amber, fontSize: 'var(--type-body-size)', fontWeight: 600,
+                    fontFamily: 'var(--font-sans)', cursor: 'pointer',
+                    transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span>{parentAva.name}</span>
+                  <span style={{ fontSize: 'var(--type-ui-label-size)', opacity: 0.7, marginLeft: 8 }}>Direct parent ↗</span>
+                </button>
+                {/* Willamette Valley grandparent */}
+                <button
+                  onClick={() => onSelectAva?.(null)}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = UI.hoverBg;
+                    e.currentTarget.style.borderColor = UI.hoverBorder;
+                    e.currentTarget.style.color = UI.hoverText;
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = UI.idleBg;
+                    e.currentTarget.style.borderColor = UI.idleBorder;
+                    e.currentTarget.style.color = GLASS.textDim;
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    width: '100%', padding: '8px 12px', borderRadius: 8,
+                     border: `1px solid ${UI.idleBorder}`,
+                    background: UI.idleBg,
+                    color: GLASS.textDim, fontSize: 'var(--type-body-size)', fontWeight: 500,
+                    fontFamily: 'var(--font-sans)', cursor: 'pointer',
+                    transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span>Willamette Valley AVA</span>
+                  <span style={{ fontSize: 'var(--type-mono-size)', marginLeft: 8, opacity: 0.55 }}>↗</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => onSelectAva?.(null)}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = UI.hoverBg;
+                  e.currentTarget.style.borderColor = UI.hoverBorder;
+                  e.currentTarget.style.color = UI.hoverText;
+                   e.currentTarget.style.boxShadow = `0 0 0 2px ${UI.hoverGlowOuter}, inset 0 0 8px ${UI.hoverGlowInner}`;
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = UI.idleBg;
+                  e.currentTarget.style.borderColor = UI.idleBorder;
+                  e.currentTarget.style.color = GLASS.textDim;
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  width: '100%', padding: '8px 12px', borderRadius: 8,
+                   border: `1px solid ${UI.idleBorder}`,
+                  background: UI.idleBg,
+                  color: GLASS.textDim, fontSize: 'var(--type-body-size)', fontWeight: 500,
+                  fontFamily: 'var(--font-sans)', cursor: 'pointer',
+                  transition: 'background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s',
+                  textAlign: 'left',
+                }}
+              >
+                <span>Willamette Valley AVA</span>
+                <span style={{ fontSize: 'var(--type-mono-size)', marginLeft: 8, opacity: 0.55, flexShrink: 0 }}>↗</span>
+              </button>
+            )}
+          </div>
+
+          {/* Sibling AVAs */}
+          <div style={CARD}>
+            <div style={{ ...LBL, marginBottom: 6 }}>
+              Other AVAs
+              <span style={{ fontWeight: 400, opacity: 0.6, marginLeft: 6 }}>({siblingAvas.length})</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: `${GLASS.textMuted} transparent` }}>
+              {renderAvaTree(siblingAvas, onSelectAva, onHoverAva)}
+            </div>
+          </div>
+        </>
+      ) : (
+        /* ── No AVA selected — general info ──────────────────────── */
+        <>
+          <div style={CARD}>
+            <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: GLASS.text, fontFamily: 'var(--font-display)', marginBottom: 6 }}>
+              Willamette Valley
+            </div>
+            <div style={{ fontSize: 'var(--type-body-size)', color: GLASS.textDim, lineHeight: 1.6 }}>
+              Oregon's premier wine region, home to {REGION_AVAS.length} distinct nested AVAs.
+              Known world-wide for Pinot Noir, the valley's diverse terroir creates unique growing conditions across its appellations.
+            </div>
+          </div>
+
+          <div style={CARD}>
+            <div style={{ ...LBL, marginBottom: 6 }}>
+              Nested AVAs
+              <span style={{ fontWeight: 400, opacity: 0.6, marginLeft: 6 }}>({REGION_AVAS.length})</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 280, overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: `${GLASS.textMuted} transparent` }}>
+              {renderAvaTree(REGION_AVAS, onSelectAva, onHoverAva)}
+            </div>
+          </div>
+
+          <div style={CARD}>
+            <div style={{ ...LBL, marginBottom: 8 }}>Valley Snapshot</div>
+            <TerroirDataChips chips={valleyChips} variant="glass" />
+          </div>
+        </>
+      )}
+
+    </div>
+  );
+}

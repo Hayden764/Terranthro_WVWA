@@ -96,7 +96,7 @@ router.get('/state/:stateAbbrev', async (req, res) => {
 // so cache briefly per scope. Block geometry changes rarely (admin edits); a
 // short TTL keeps the number effectively live.
 const ACRES_CACHE_TTL_MS = 5 * 60 * 1000;
-const acresCache = new Map(); // parent slug → { at, payload }
+const acresCache = new Map(); // 'parent:<slug>' | 'state:<abbr>' → { at, payload }
 
 /**
  * GET /api/avas/acres?parent=willamette-valley
@@ -111,13 +111,18 @@ const acresCache = new Map(); // parent slug → { at, payload }
  * parents, and the parent total counts every block once.
  *
  * Response: { avas: { '<slug>': <acres>, ... }, total: <parent acres> }
+ *
+ * GET /api/avas/acres?state=OR instead covers every AVA in the state; `total`
+ * then counts each block once even where AVAs overlap.
  */
 router.get('/acres', async (req, res) => {
+  if (req.query.state) return stateAcres(req, res);
+
   const parent = String(req.query.parent || 'willamette-valley').toLowerCase();
   if (!/^[a-z0-9-]+$/.test(parent)) {
     return res.status(400).json({ error: 'Invalid AVA slug' });
   }
-  const cached = acresCache.get(parent);
+  const cached = acresCache.get(`parent:${parent}`);
   if (cached && Date.now() - cached.at < ACRES_CACHE_TTL_MS) {
     return res.json(cached.payload);
   }
@@ -155,13 +160,64 @@ router.get('/acres', async (req, res) => {
     delete avas[parent];
 
     const payload = { avas, total };
-    acresCache.set(parent, { at: Date.now(), payload });
+    acresCache.set(`parent:${parent}`, { at: Date.now(), payload });
     res.json(payload);
   } catch (err) {
     console.error('GET /api/avas/acres error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+async function stateAcres(req, res) {
+  const abbr = String(req.query.state).toUpperCase();
+  if (!/^[A-Z]{2}$/.test(abbr)) {
+    return res.status(400).json({ error: 'Invalid state' });
+  }
+  const cached = acresCache.get(`state:${abbr}`);
+  if (cached && Date.now() - cached.at < ACRES_CACHE_TTL_MS) {
+    return res.json(cached.payload);
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `
+      WITH scope AS (
+        SELECT a.id, a.slug, a.geometry
+        FROM avas a
+        JOIN ava_states av ON av.ava_id = a.id
+        JOIN states s ON s.id = av.state_id
+        WHERE s.abbreviation = $1
+      ),
+      hits AS (
+        SELECT a.slug, b.id AS block_id, b.acres
+        FROM scope a
+        JOIN vineyard_blocks b
+          ON b.geometry IS NOT NULL
+         AND b.geometry && a.geometry
+         AND ST_Contains(a.geometry, ST_PointOnSurface(b.geometry))
+      )
+      SELECT a.slug,
+             COALESCE((SELECT SUM(h.acres) FROM hits h WHERE h.slug = a.slug), 0)::float AS acres,
+             (SELECT COALESCE(SUM(acres), 0) FROM (SELECT DISTINCT block_id, acres FROM hits) d)::float AS total
+      FROM scope a
+      `,
+      [abbr]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: `No AVAs found for state: ${abbr}` });
+    }
+
+    const avas = {};
+    for (const r of rows) avas[r.slug] = r.acres;
+    const payload = { avas, total: rows[0].total };
+    acresCache.set(`state:${abbr}`, { at: Date.now(), payload });
+    res.json(payload);
+  } catch (err) {
+    console.error('GET /api/avas/acres?state error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
 
 /**
  * GET /api/avas/:slug

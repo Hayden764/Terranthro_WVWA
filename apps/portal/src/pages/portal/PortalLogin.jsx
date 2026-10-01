@@ -1,0 +1,242 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '@terranthro/shared/styles/tokens.js';
+import { INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
+import { apiPost } from '@terranthro/shared/lib/api.js';
+
+const TAB = { MAGIC: 'magic', PASSWORD: 'password' };
+
+export default function PortalLogin() {
+  const navigate = useNavigate();
+  const [tab, setTab] = useState(TAB.PASSWORD);
+
+  // Magic-link state
+  const [mlEmail, setMlEmail] = useState('');
+  const [sent, setSent] = useState(false);
+
+  // Password state — identifier is a username or email
+  const [pwIdentifier, setPwIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function handleMagicLink(e) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await apiPost('/api/auth/magic-link', { email: mlEmail });
+      setSent(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handlePasswordLogin(e) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const result = await apiPost('/api/auth/login', { identifier: pwIdentifier, password });
+      if (result.mustChangePassword) {
+        navigate('/portal/settings', { state: { mustChangePassword: true } });
+      } else {
+        navigate('/portal/dashboard');
+      }
+    } catch (err) {
+      setError(err.message || 'Invalid username or password');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const inputStyle = {
+    ...INPUT_STYLE,
+    marginBottom: 16,
+  };
+
+  const labelStyle = {
+    display: 'block',
+    fontSize: 'var(--type-mono-size)',
+    fontWeight: 500,
+    color: muted,
+    marginBottom: 6,
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: parchment,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: 'var(--font-sans)',
+    }}>
+      <div style={{
+        background: parchment,
+        borderRadius: 12,
+        padding: '48px 40px',
+        width: '100%',
+        maxWidth: 420,
+        boxShadow: `0 4px 24px ${alpha(TOKENS.ink, 0.1)}`,
+        border: `1px solid ${border}`,
+      }}>
+        <h1 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 'var(--type-display-medium-size)',
+          color: ink,
+          marginBottom: 8,
+        }}>
+          Winery Portal
+        </h1>
+        <p style={{ color: muted, fontSize: 'var(--type-body-size)', marginBottom: 24 }}>
+          Sign in to your winery account
+        </p>
+
+        {/* Tabs */}
+        <div style={{
+          display: 'flex',
+          borderBottom: `1px solid ${border}`,
+          marginBottom: 28,
+        }}>
+          {[
+            { key: TAB.PASSWORD, label: 'Password' },
+            { key: TAB.MAGIC, label: 'Email link' },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => { setTab(key); setError(''); }}
+              className={`tx-link${tab === key ? ' is-active' : ''}`}
+              style={{
+                flex: 1,
+                padding: '8px 0',
+                background: 'none',
+                border: 'none',
+                borderBottom: tab === key ? `2px solid ${TOKENS.interactive}` : '2px solid transparent',
+                marginBottom: -1,
+                fontSize: 'var(--type-body-size)',
+                fontWeight: tab === key ? 600 : 400,
+                color: tab === key ? ink : muted,
+                cursor: 'pointer',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === TAB.PASSWORD && (
+          <form onSubmit={handlePasswordLogin}>
+            <label style={labelStyle}>Username or email</label>
+            <input
+              type="text"
+              required
+              value={pwIdentifier}
+              onChange={(e) => setPwIdentifier(e.target.value)}
+              placeholder="username or winery@example.com"
+              autoCapitalize="none"
+              autoCorrect="off"
+              className="ds-input"
+              style={inputStyle}
+            />
+            <label style={labelStyle}>Password</label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="ds-input"
+              style={inputStyle}
+            />
+
+            {error && (
+              <p style={{ color: crimson, fontSize: 'var(--type-mono-size)', marginBottom: 12 }}>
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                ...btn('primary', { width: '100%' }),
+                cursor: loading ? 'wait' : 'pointer',
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              {loading ? 'Signing in…' : 'Sign In'}
+            </button>
+
+            <p style={{ marginTop: 14, fontSize: 'var(--type-body-size)', color: muted, textAlign: 'center' }}>
+              No password yet? Use the <button onClick={() => setTab(TAB.MAGIC)} className="tx-link" style={{ background: 'none', border: 'none', color: TOKENS.interactive, fontSize: 'var(--type-body-size)', cursor: 'pointer', padding: 0 }}>email link</button> tab to log in, then set one in your profile.
+            </p>
+          </form>
+        )}
+
+        {tab === TAB.MAGIC && (
+          sent ? (
+            <div style={{
+              background: TOKENS.successDim,
+              border: `1px solid ${alpha(TOKENS.success, 0.35)}`,
+              borderRadius: 8,
+              padding: '20px 16px',
+              color: TOKENS.success,
+              fontSize: 'var(--type-body-size)',
+              lineHeight: 1.6,
+            }}>
+              <strong>Check your inbox.</strong> We've sent a sign-in link to{' '}
+              <strong>{mlEmail}</strong>. It expires in 15 minutes.
+            </div>
+          ) : (
+            <form onSubmit={handleMagicLink}>
+              <label style={labelStyle}>Email address</label>
+              <input
+                type="email"
+                required
+                value={mlEmail}
+                onChange={(e) => setMlEmail(e.target.value)}
+                placeholder="winery@example.com"
+                className="ds-input"
+                style={inputStyle}
+              />
+
+              {error && (
+                <p style={{ color: crimson, fontSize: 'var(--type-mono-size)', marginBottom: 12 }}>
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  ...btn('primary', { width: '100%' }),
+                  cursor: loading ? 'wait' : 'pointer',
+                  opacity: loading ? 0.7 : 1,
+                }}
+              >
+                {loading ? 'Sending…' : 'Send Sign-In Link'}
+              </button>
+            </form>
+          )
+        )}
+
+        <p style={{
+          marginTop: 32,
+          fontSize: 'var(--type-body-size)',
+          color: muted,
+          textAlign: 'center',
+        }}>
+          Don't have access?{' '}
+          <a href="mailto:info@terranthro.com" className="tx-link" style={{ color: TOKENS.interactive }}>
+            Contact us
+          </a>
+        </p>
+      </div>
+    </div>
+  );
+}

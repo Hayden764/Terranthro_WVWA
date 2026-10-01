@@ -1,0 +1,13 @@
+{
+  "name": "@terranthro/shared",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Design tokens, base styles, API client and shared components used by every Terranthro frontend",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0"
+  }
+}

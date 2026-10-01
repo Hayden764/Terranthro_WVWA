@@ -9,7 +9,7 @@ import { classifyListingCategory } from '../lib/listingCategories.js';
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const LOCAL_WINERIES_GEOJSON_PATH = path.resolve(__dirname, '../../../src/data/wineries.geojson');
+const LOCAL_WINERIES_GEOJSON_PATH = path.resolve(__dirname, '../../../apps/wvwa/src/data/wineries.geojson');
 
 function isPointWithinBbox(geometry, bbox) {
   if (!bbox || !geometry || geometry.type !== 'Point' || !Array.isArray(geometry.coordinates)) {

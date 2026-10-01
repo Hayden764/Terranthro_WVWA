@@ -1,38 +1,19 @@
 {
-  "name": "wvwa-map",
+  "name": "terranthro",
+  "private": true,
   "version": "0.1.0",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev:wvwa": "npm run dev -w @terranthro/wvwa",
+    "dev:portal": "npm run dev -w @terranthro/portal",
+    "build:wvwa": "npm run build -w @terranthro/wvwa",
+    "build:portal": "npm run build -w @terranthro/portal",
+    "build": "npm run build --workspaces --if-present",
     "audit:colors": "node scripts/audit-hardcoded-colors.mjs",
     "audit:colors:strict": "node scripts/audit-hardcoded-colors.mjs --strict"
-  },
-  "dependencies": {
-    "@mapbox/mapbox-gl-draw": "^1.5.1",
-    "@turf/area": "^7.3.5",
-    "@turf/bbox": "^7.3.5",
-    "@turf/boolean-point-in-polygon": "^7.3.5",
-    "@turf/centroid": "^7.3.5",
-    "@turf/helpers": "^7.3.5",
-    "@turf/line-intersect": "^7.3.5",
-    "@turf/line-split": "^7.3.5",
-    "@vitejs/plugin-react": "^4.2.1",
-    "maplibre-gl": "^5.16.0",
-    "papaparse": "^5.5.3",
-    "pmtiles": "^4.4.1",
-    "polygon-clipping": "^0.15.7",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^7.14.1",
-    "recharts": "^2.15.4",
-    "vite": "^5.0.8"
-  },
-  "devDependencies": {
-    "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.32",
-    "tailwindcss": "^3.4.0",
-    "terser": "^5.46.0"
   }
 }

@@ -54,7 +54,7 @@ from shapely.geometry import MultiPolygon, mapping, shape
 ROOT = Path(__file__).resolve().parent / ".."
 PRISM_DIR = ROOT / "data" / "climate" / "prism" / "monthly"
 OUT_DIR = ROOT / "data" / "tiles"
-REPO_PUBLIC_TILES = ROOT / ".." / "public" / "tiles"
+REPO_PUBLIC_TILES = ROOT / ".." / "apps" / "wvwa" / "public" / "tiles"
 
 GDD_MONTHS = range(4, 11)
 NORMAL = (1991, 2020)

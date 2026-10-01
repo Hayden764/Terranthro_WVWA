@@ -5,7 +5,7 @@ Reads the Oregon-cropped PRISM monthly grids written by download-prism-monthly.p
 and writes one row per (entity, year, month) to climate_monthly (migration 024):
 
   - AVAs:      mean over every 800m cell whose centre falls inside the AVA
-               boundary (public/data/<slug>.geojson); small AVAs with fewer than
+               boundary (apps/wvwa/public/data/<slug>.geojson); small AVAs with fewer than
                4 such cells fall back to every cell the boundary touches.
   - Vineyards: the cell under ST_PointOnSurface(vineyards.geometry).
 
@@ -34,7 +34,7 @@ from tqdm import tqdm
 
 ROOT = Path(__file__).resolve().parent / ".."
 PRISM_DIR = ROOT / "data" / "climate" / "prism" / "monthly"
-AVA_DIR = ROOT / ".." / "public" / "data"
+AVA_DIR = ROOT / ".." / "apps" / "wvwa" / "public" / "data"
 AVA_FILES = [
     "willamette_valley", "chehalem_mountains", "laurelwood_district", "ribbon_ridge",
     "dundee_hills", "eola_amity_hills", "lower_long_tom", "mcminnville",

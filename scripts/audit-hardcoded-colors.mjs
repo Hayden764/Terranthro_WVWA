@@ -3,16 +3,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const srcRoot = path.join(root, 'src');
+// Every workspace's source tree (apps/*/src, packages/*/src).
+const srcRoots = ['apps', 'packages'].flatMap((group) =>
+  fs.readdirSync(path.join(root, group), { withFileTypes: true })
+    .filter((e) => e.isDirectory() && fs.existsSync(path.join(root, group, e.name, 'src')))
+    .map((e) => path.join(root, group, e.name, 'src')));
 const strict = process.argv.includes('--strict');
 
 const targets = new Set(['.js', '.jsx', '.ts', '.tsx']);
 const ignoreFiles = new Set([
-  'src/config/topographyConfig.js',
-  'src/config/climateConfig.js',
-  'src/components/ClimateLayer.jsx',
-  'src/components/TopographyLayer.jsx',
-  'src/components/dock/glassTokens.js',
+  'apps/wvwa/src/config/topographyConfig.js',
+  'apps/wvwa/src/config/climateConfig.js',
+  'apps/wvwa/src/components/ClimateLayer.jsx',
+  'apps/wvwa/src/components/TopographyLayer.jsx',
+  'apps/wvwa/src/components/dock/glassTokens.js',
 ]);
 
 const allowedLinePatterns = [
@@ -57,7 +61,7 @@ function blockIgnored(lines, idx) {
 }
 
 const findings = [];
-for (const filePath of walk(srcRoot)) {
+for (const filePath of srcRoots.flatMap(walk)) {
   const fileRel = rel(filePath);
   if (ignoreFiles.has(fileRel)) continue;
   if (!fileRel.startsWith('src/components/') && !fileRel.startsWith('src/pages/')) continue;

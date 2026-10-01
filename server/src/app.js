@@ -44,6 +44,8 @@ const extraOrigins = process.env.CORS_ORIGINS
 
 const PROD_ORIGINS = [
   'https://wvwa.terranthro.com',
+  'https://portal.terranthro.com', // grower portal + admin + winery sites (apps/portal)
+  'https://owb.terranthro.com',    // OWB statewide explorer (apps/owb)
   'https://terranthro.com',
   'https://www.terranthro.com',
   ...extraOrigins,
@@ -57,6 +59,8 @@ const DEV_ORIGINS = [
   'http://127.0.0.1:3001',
   'http://localhost:3002',
   'http://127.0.0.1:3002',
+  'http://localhost:3003', // apps/portal dev server
+  'http://127.0.0.1:3003',
 ];
 
 app.use(cors({

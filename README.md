@@ -32,30 +32,30 @@ Terranthro is a full-stack web application built around a MapLibre GL map interf
 
 ## Project Structure
 
+One repo, several frontends, one API and one database. Each frontend is its own
+Vercel project; growers sign in at a single portal whichever explorer sent them.
+
 ```
 /
-├── src/                     # React frontend
-│   ├── components/          # Map components (WVWAMap, ClimateLayer, TopographyLayer, etc.)
-│   ├── pages/
-│   │   ├── WVWAMapPage.jsx  # Main public map page
-│   │   ├── EditorPage.jsx   # Admin parcel editor (admin-gated)
-│   │   ├── admin/           # Admin console (login, dashboard, request review)
-│   │   └── portal/          # Winery owner portal (login, dashboard, vineyard management)
-│   ├── config/              # AVA camera, brand colors, climate & topography config
-│   └── lib/api.js           # Fetch wrapper
-├── server/
-│   └── src/
-│       ├── app.js           # Express app entry point
-│       ├── routes/          # API routes (admin, portal, auth, vineyards, wineries, etc.)
-│       ├── middleware/       # adminAuth, portalAuth, apiKey
-│       └── db/pool.js       # PostgreSQL connection pool
+├── apps/
+│   ├── wvwa/                # WVWA members explorer → wvwa.terranthro.com
+│   │   ├── src/             #   map, sidebar, climate/topo/soil layers
+│   │   └── public/data/     #   static AVA boundary GeoJSON the map draws
+│   └── portal/              # Grower portal + admin console + winery sites → portal.terranthro.com
+│       └── src/pages/       #   portal/, admin/, site/ (/w/:slug), EditorPage
+├── packages/
+│   └── shared/              # @terranthro/shared: design tokens, base CSS, API client,
+│                            #   TerroirDataChips, cross-app URLs (PORTAL_URL)
+├── server/                  # Express API (Railway) — shared by every frontend
+│   ├── src/routes/          #   ?association=<slug> scopes membership (default wvwa)
+│   └── scripts/             #   load-avas.mjs, generate-portal-credentials.mjs
 ├── database/
-│   ├── schema.sql           # Full schema (PostGIS, all tables)
-│   └── migrations/          # Incremental migrations (002–005)
-├── data-pipeline/
-│   └── scripts/             # Python & Node scripts for data ingestion and processing
-└── public/data/             # Static GeoJSON files (AVA boundaries, sample vineyard data)
+│   ├── schema.sql
+│   └── migrations/          # incremental migrations (002–026)
+└── data-pipeline/scripts/   # Python & Node ingestion / processing scripts
 ```
+
+Planned: `apps/owb/` — OWB statewide explorer → owb.terranthro.com.
 
 ---
 
@@ -73,20 +73,21 @@ Terranthro is a full-stack web application built around a MapLibre GL map interf
 git clone https://github.com/Hayden764/Terranthro_WVWA.git
 cd Terranthro_WVWA
 
-# Frontend
+# Frontends (npm workspaces: apps/* + packages/*)
 npm install
 
-# Server
+# Server (not a workspace — Railway builds it on its own)
 cd server && npm install && cd ..
 ```
 
 ### 2. Environment variables
 
-**Root `.env`** (Vite):
+**Root `.env`** (Vite — shared by every app via `envDir`):
 ```env
 VITE_MAPTILER_KEY=your_maptiler_key
 VITE_API_BASE_URL=https://your-production-server.com
 VITE_API_PROXY_TARGET=http://localhost:8000   # points to local Express in dev
+VITE_PORTAL_URL=http://localhost:3003         # optional; where explorers send growers to sign in
 ```
 
 **`server/.env`**:
@@ -97,7 +98,7 @@ NODE_ENV=development
 
 ADMIN_JWT_SECRET=<random 64-char hex>
 PORTAL_JWT_SECRET=<random 64-char hex>
-PORTAL_BASE_URL=http://localhost:3002
+PORTAL_BASE_URL=http://localhost:3003   # portal app; magic-link emails point here
 
 RESEND_API_KEY=re_...
 EMAIL_FROM=noreply@yourdomain.com
@@ -141,20 +142,39 @@ VALUES ('admin@example.com', '<hash>', 'Admin', 'superadmin');
 # Terminal 1 — Express server
 cd server && npm run dev
 
-# Terminal 2 — Vite dev server (proxies /api → localhost:8000)
-npm run dev
+# Terminal 2 — WVWA explorer (proxies /api → localhost:8000)
+npm run dev:wvwa
+
+# Terminal 3 — grower portal + admin
+npm run dev:portal
 ```
 
-Frontend: `http://localhost:3002`
+Explorer: `http://localhost:3002`
+Portal:   `http://localhost:3003`
 Server:   `http://localhost:8000`
+
+Build one app with `npm run build:wvwa` / `npm run build:portal` (output in `apps/<app>/dist`).
+
+### Deploying
+
+| App | Vercel root directory | Domain |
+|---|---|---|
+| `apps/wvwa` | `apps/wvwa` | wvwa.terranthro.com |
+| `apps/portal` | `apps/portal` | portal.terranthro.com |
+
+The server deploys from `server/` on Railway (see `railway.toml`).
 
 ---
 
 ## Application Routes
 
+**Explorer (`apps/wvwa`)**: `/` — the interactive map. Old `/portal/*`, `/admin/*` and `/w/*`
+links are redirected to the portal app (`apps/wvwa/vercel.json`).
+
+**Portal (`apps/portal`)**:
+
 | Path | Description |
 |---|---|
-| `/` | Main interactive map |
 | `/admin` | Admin login |
 | `/admin/dashboard` | Edit request queue, request review |
 | `/admin/requests/:id` | Individual request review with diff viewer |
@@ -164,6 +184,8 @@ Server:   `http://localhost:8000`
 | `/portal/vineyards/:id` | Vineyard parcel detail & edit submission |
 | `/portal/claim` | Claim an unlinked vineyard parcel |
 | `/portal/profile` | Winery profile editor |
+| `/portal/site` | Winery vineyard page settings |
+| `/w/:slug[/:vineyardKey]` | Public winery vineyard page (`?embed=1` for iframes) |
 
 ---
 

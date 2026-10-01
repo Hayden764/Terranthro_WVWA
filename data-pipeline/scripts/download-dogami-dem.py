@@ -586,7 +586,7 @@ def run_clip_elevation_feet(clip_geojson: str, output_dir, dry_run: bool) -> Non
     "--geojson-dir",
     type=click.Path(exists=True),
     default=None,
-    help="Directory containing AVA GeoJSON files. Default: ../../public/data/",
+    help="Directory containing AVA GeoJSON files. Default: ../../apps/wvwa/public/data/",
 )
 @click.option(
     "--output-dir",
@@ -627,7 +627,7 @@ def main(avas, bbox, clip, geojson_dir, output_dir, upload, bucket, overwrite, d
     script_dir = Path(__file__).resolve().parent
 
     if geojson_dir is None:
-        geojson_dir = script_dir / ".." / ".." / "public" / "data"
+        geojson_dir = script_dir / ".." / ".." / "apps" / "wvwa" / "public" / "data"
     geojson_dir = Path(geojson_dir).resolve()
 
     if output_dir is None:

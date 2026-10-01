@@ -6,7 +6,7 @@ service (AVAs_Production, published by TTB's Regulations and Rulings Division)
 and replaces the AVA boundary files the app and pipeline read.
 
 Outputs:
-  public/data/<slug>.geojson               the 12 Willamette Valley files the map,
+  apps/wvwa/public/data/<slug>.geojson     the 12 Willamette Valley files the map,
                                            /api/avas and the stats scripts read
                                            (existing properties kept, geometry swapped)
   data-pipeline/data/ava/oregon_avas.geojson
@@ -42,7 +42,7 @@ SERVICE_URL = (
 SOURCE = "TTB AVA Map Explorer (AVAs_Production feature service)"
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PUBLIC_DATA = REPO_ROOT / "public" / "data"
+PUBLIC_DATA = REPO_ROOT / "apps" / "wvwa" / "public" / "data"
 PIPELINE_DATA = REPO_ROOT / "data-pipeline" / "data"
 COVERAGE = PIPELINE_DATA / "topography" / "coverage"
 

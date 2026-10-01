@@ -1,0 +1,33 @@
+{
+  "name": "@terranthro/portal",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Grower portal, admin console and winery vineyard sites (portal.terranthro.com)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@terranthro/shared": "*",
+    "@mapbox/mapbox-gl-draw": "^1.5.1",
+    "@turf/area": "^7.3.5",
+    "@turf/helpers": "^7.3.5",
+    "@turf/line-intersect": "^7.3.5",
+    "@turf/line-split": "^7.3.5",
+    "maplibre-gl": "^5.16.0",
+    "papaparse": "^5.5.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^7.14.1"
+  },
+  "devDependencies": {
+    "vite": "^5.0.8",
+    "@vitejs/plugin-react": "^4.2.1",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.32",
+    "autoprefixer": "^10.4.16",
+    "terser": "^5.46.0"
+  }
+}

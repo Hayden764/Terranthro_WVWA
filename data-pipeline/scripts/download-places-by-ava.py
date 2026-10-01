@@ -42,7 +42,7 @@ from shapely.geometry import Point, shape
 
 SCRIPT_DIR   = Path(__file__).resolve().parent
 REPO_ROOT    = SCRIPT_DIR.parent.parent
-AVA_DATA_DIR = REPO_ROOT / "public" / "data"
+AVA_DATA_DIR = REPO_ROOT / "apps" / "wvwa" / "public" / "data"
 
 # ── Config ────────────────────────────────────────────────────────────────────
 

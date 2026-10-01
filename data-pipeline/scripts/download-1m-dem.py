@@ -753,7 +753,7 @@ def process_ava(
     type=click.Path(exists=True),
     default=None,
     help="Directory containing AVA boundary GeoJSON files. "
-         "Default: ../../public/data/ (relative to this script).",
+         "Default: ../../apps/wvwa/public/data/ (relative to this script).",
 )
 @click.option(
     "--output-dir",
@@ -811,7 +811,7 @@ def main(avas, bbox, tiles, geojson_dir, output_dir, workers, upload, bucket, dr
 
     # Resolve directories
     if geojson_dir is None:
-        geojson_dir = str(script_dir / ".." / ".." / "public" / "data")
+        geojson_dir = str(script_dir / ".." / ".." / "apps" / "wvwa" / "public" / "data")
     if output_dir is None:
         output_dir = str(script_dir / ".." / "data" / "topography")
 

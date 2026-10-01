@@ -8,7 +8,7 @@
  *   data-pipeline/data/ava/oregon_avas.geojson   TTB AVA Map Explorer polygons for
  *       every established AVA touching Oregon (written by
  *       data-pipeline/scripts/fetch-ttb-avas.py — run that first to refresh).
- *   public/data/<slug>.geojson   the Willamette Valley files, which also carry the
+ *   apps/wvwa/public/data/<slug>.geojson   the Willamette Valley files, which also carry the
  *       UC Davis AVA-project metadata (petitioner, CFR history, boundary text,
  *       accurate county list). Used where present; TTB fields fill the rest.
  *
@@ -35,7 +35,7 @@ import { pool } from '../src/db/pool.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '../..');
 const STATEWIDE = path.join(REPO, 'data-pipeline/data/ava/oregon_avas.geojson');
-const WV_DIR = path.join(REPO, 'public/data');
+const WV_DIR = path.join(REPO, 'apps/wvwa/public/data');
 const DRY_RUN = process.argv.includes('--dry-run');
 
 const STATE_NAMES = { OR: 'Oregon', WA: 'Washington', ID: 'Idaho' };

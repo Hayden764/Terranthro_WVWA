@@ -35,7 +35,7 @@ from terroir_classes import geology_class  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent / ".."
 DATA_DIR = ROOT / "data"
-REPO_PUBLIC_TILES = ROOT / ".." / "public" / "tiles"
+REPO_PUBLIC_TILES = ROOT / ".." / "apps" / "wvwa" / "public" / "tiles"
 DEFAULT_GDB = (DATA_DIR / "geology" / "OR" / "OGDC8_GIS_bundle_5.15" /
                "OGDC8_Geodatabase_5.15" / "OGDC8.gdb")
 DEFAULT_SSURGO = DATA_DIR / "soils" / "OR" / "ssurgo_or.gpkg"

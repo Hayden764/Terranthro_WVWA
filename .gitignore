@@ -11,19 +11,20 @@ server/.env.docker
 
 # Build output
 dist/
+apps/*/dist/
 .vite/
 
 # PMTiles (generated artifacts, serve from R2)
 *.pmtiles
-public/tiles/
+apps/wvwa/public/tiles/
 
 # Large GeoJSON source files (replaced by PostGIS API + PMTiles)
-# AVA boundary files in public/data/ are kept (still fetched by the map)
-src/data/
-public/data/Wineries_with_Polygons_Adelsheim.geojson
-public/data/ChehalemMtn_DundeeHills_Vineyards_merged.geojson
-public/data/YC_Vineyards_gdb.geojson
-public/data/vineyards.geojson
+# AVA boundary files in apps/wvwa/public/data/ are kept (still fetched by the map)
+apps/wvwa/src/data/
+apps/wvwa/public/data/Wineries_with_Polygons_Adelsheim.geojson
+apps/wvwa/public/data/ChehalemMtn_DundeeHills_Vineyards_merged.geojson
+apps/wvwa/public/data/YC_Vineyards_gdb.geojson
+apps/wvwa/public/data/vineyards.geojson
 
 # macOS metadata (AppleDouble files from external drives)
 .DS_Store

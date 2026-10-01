@@ -101,7 +101,7 @@ def fetch_vineyards(conn):
         WHERE vp.vineyard_name IS NOT NULL
           AND TRIM(vp.vineyard_name) <> ''
           AND vp.geometry IS NOT NULL
-          AND COALESCE(w.is_wvwa_member, false) = true
+          AND w.id IN (SELECT oa.organization_id FROM organization_associations oa JOIN associations a ON a.id = oa.association_id WHERE a.slug = 'wvwa')
     """
     with conn.cursor() as cur:
         cur.execute(sql)

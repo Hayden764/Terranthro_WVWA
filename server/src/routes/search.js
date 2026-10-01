@@ -1,5 +1,6 @@
 import express from 'express';
 import { pool } from '../db/pool.js';
+import { resolveAssociation, membersOf, badAssociation } from '../lib/associations.js';
 import { classifyListingCategory } from '../lib/listingCategories.js';
 
 const router = express.Router();
@@ -16,6 +17,7 @@ const router = express.Router();
  * Query params:
  *   ?q=<string>   — search term (required, min 1 char)
  *   ?limit=<n>    — max results per entity type (default 10, max 25)
+ *   ?association= — whose member listings are searched (default wvwa)
  */
 router.get('/', async (req, res) => {
   const q = (req.query.q || '').trim();
@@ -31,6 +33,9 @@ router.get('/', async (req, res) => {
   const term = `%${q}%`;
 
   try {
+    const association = await resolveAssociation(req);
+    if (!association) return badAssociation(res);
+
     const [wineryRows, vineyardRows] = await Promise.all([
       // Wineries / tasting rooms / hotels / restaurants
       pool.query(
@@ -42,7 +47,7 @@ router.get('/', async (req, res) => {
           ST_X(w.location::geometry) AS lng,
           ST_Y(w.location::geometry) AS lat
         FROM wineries w
-        WHERE w.is_wvwa_member
+        WHERE w.id IN ${membersOf('$5')}
           AND w.title ILIKE $1
         ORDER BY
           CASE WHEN LOWER(w.title) = LOWER($2) THEN 0
@@ -52,7 +57,7 @@ router.get('/', async (req, res) => {
           w.title
         LIMIT $4
         `,
-        [term, q, `${q.toLowerCase()}%`, limit]
+        [term, q, `${q.toLowerCase()}%`, limit, association]
       ),
 
       // Vineyard names (distinct — one result per unique name)

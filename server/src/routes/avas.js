@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pool } from '../db/pool.js';
+import { resolveAssociation, membersOf, badAssociation } from '../lib/associations.js';
 
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -374,7 +375,7 @@ router.get('/:slug/parents', async (req, res) => {
 /**
  * GET /api/avas/:slug/members
  *
- * Returns the recids of WVWA member wineries that own at least one vineyard
+ * Returns the recids of member wineries (?association=, default wvwa) that own at least one vineyard
  * whose representative interior point falls inside this AVA boundary.
  *
  * This is the vineyard-ownership complement to the frontend's client-side
@@ -403,6 +404,9 @@ router.get('/:slug/members', async (req, res) => {
   const filePath = path.join(AVA_DATA_DIR, `${slug.replace(/-/g, '_')}.geojson`);
 
   try {
+    const association = await resolveAssociation(req);
+    if (!association) return badAssociation(res);
+
     let geojson;
     try {
       geojson = JSON.parse(await readFile(filePath, 'utf8'));
@@ -428,12 +432,12 @@ router.get('/:slug/members', async (req, res) => {
       FROM vineyards v
       JOIN wineries w ON w.id = v.winery_id
       CROSS JOIN ava
-      WHERE w.is_wvwa_member
+      WHERE w.id IN ${membersOf('$2')}
         AND v.geometry && ava.g
         AND ST_Contains(ava.g, ST_PointOnSurface(v.geometry))
       ORDER BY w.recid
       `,
-      [geometries]
+      [geometries, association]
     );
 
     res.json({ slug, recids: rows.map((r) => r.recid) });

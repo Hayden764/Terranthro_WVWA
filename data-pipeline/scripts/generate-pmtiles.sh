@@ -77,7 +77,7 @@ ogr2ogr \
       v.acres AS vineyard_acres,
       w.recid AS winery_recid,
       w.title AS winery_title,
-      (v.winery_id IS NOT NULL AND COALESCE(w.is_wvwa_member, false)) AS is_member,
+      (v.winery_id IS NOT NULL AND v.winery_id IN (SELECT oa.organization_id FROM organization_associations oa JOIN associations a ON a.id = oa.association_id WHERE a.slug = 'wvwa')) AS is_member,
       COALESCE(vc.color_index, -1) AS color_index,
       b.geometry
     FROM vineyard_blocks b
@@ -85,8 +85,7 @@ ogr2ogr \
     LEFT JOIN wineries w ON v.winery_id = w.id
     LEFT JOIN vineyard_colors vc
       ON vc.vineyard_key = LOWER(TRIM(v.vineyard_name))
-      AND v.winery_id IS NOT NULL
-      AND COALESCE(w.is_wvwa_member, false) = true
+      AND v.winery_id IN (SELECT oa.organization_id FROM organization_associations oa JOIN associations a ON a.id = oa.association_id WHERE a.slug = 'wvwa')
     WHERE b.geometry IS NOT NULL
   "
 
@@ -126,7 +125,7 @@ ogr2ogr \
       (SELECT COUNT(*) FROM vineyards v WHERE v.winery_id = w.id) AS parcel_count,
       w.location AS geometry
     FROM wineries w
-    WHERE w.is_wvwa_member
+    WHERE w.id IN (SELECT oa.organization_id FROM organization_associations oa JOIN associations a ON a.id = oa.association_id WHERE a.slug = 'wvwa')
   "
 
 echo "  Exported: ${WINERIES_GEOJSON}"

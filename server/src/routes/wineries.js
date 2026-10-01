@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pool } from '../db/pool.js';
+import { resolveAssociation, membersOf, badAssociation } from '../lib/associations.js';
 import { classifyListingCategory } from '../lib/listingCategories.js';
 
 const router = express.Router();
@@ -74,6 +75,7 @@ async function loadLocalWineriesFallback({ bbox, hasParcels, category }) {
  *   ?bbox=west,south,east,north  — spatial filter
  *   ?has_parcels=true            — only wineries with linked vineyard parcels
  *   ?category=winery|hotel|...   — filter by category
+ *   ?association=wvwa            — whose member listings to return (default wvwa)
  */
 router.get('/', async (req, res) => {
   const bbox = parseBbox(req.query.bbox);
@@ -81,12 +83,16 @@ router.get('/', async (req, res) => {
   const category = req.query.category || null;
 
   try {
+    const association = await resolveAssociation(req);
+    if (!association) return badAssociation(res);
+
     const params = [];
     let bboxCondition = 'TRUE';
     if (bbox) {
       params.push(...bbox);
       bboxCondition = `ST_Intersects(w.location, ST_MakeEnvelope($1, $2, $3, $4, 4326))`;
     }
+    const memberCondition = `w.id IN ${membersOf(`$${params.push(association)}`)}`;
 
     const parcelsCondition = hasParcels
       ? `AND EXISTS (SELECT 1 FROM vineyards v WHERE v.winery_id = w.id)`
@@ -108,7 +114,7 @@ router.get('/', async (req, res) => {
         (SELECT COUNT(*) FROM vineyards v WHERE v.winery_id = w.id) AS parcel_count
       FROM wineries w
       WHERE ${bboxCondition}
-        AND w.is_wvwa_member
+        AND ${memberCondition}
         ${parcelsCondition}
       ORDER BY w.title
       `,

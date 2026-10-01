@@ -1,5 +1,6 @@
 import express from 'express';
 import { pool } from '../db/pool.js';
+import { resolveAssociation, membersOf, badAssociation } from '../lib/associations.js';
 
 const router = express.Router();
 
@@ -30,6 +31,8 @@ function parseBbox(bboxStr) {
  *
  * Because tiles come straight from the DB, edits (QGIS, portal, admin) appear
  * on the live map on the next tile fetch — no regeneration/upload step.
+ *
+ * ?association=<slug> (default 'wvwa') decides which owners count as members.
  */
 router.get('/tiles/:z/:x/:y', async (req, res) => {
   const z = Number.parseInt(req.params.z, 10);
@@ -45,6 +48,8 @@ router.get('/tiles/:z/:x/:y', async (req, res) => {
   }
 
   try {
+    const association = await resolveAssociation(req);
+    if (!association) return badAssociation(res);
     // vineyard_blocks.geometry is stored in EPSG:4326; ST_TileEnvelope returns
     // EPSG:3857, so we transform geometry into 3857 for ST_AsMVTGeom and filter
     // with the index-friendly && against the tile envelope reprojected to 4326.
@@ -69,7 +74,7 @@ router.get('/tiles/:z/:x/:y', async (req, res) => {
            v.acres AS vineyard_acres,
            w.recid AS winery_recid,
            w.title AS winery_title,
-           (v.winery_id IS NOT NULL AND COALESCE(w.is_wvwa_member, false)) AS is_member,
+           (v.winery_id IS NOT NULL AND v.winery_id IN ${membersOf('$4')}) AS is_member,
            COALESCE(vc.color_index, -1) AS color_index,
            -- Attributes the map's "colour vineyards by" themes paint from
            -- (migrations 012 / 022 / 023). Per block, so a vineyard whose
@@ -87,8 +92,7 @@ router.get('/tiles/:z/:x/:y', async (req, res) => {
          LEFT JOIN vineyard_block_topo_stats bt ON bt.block_id = b.id
          LEFT JOIN vineyard_colors vc
            ON vc.vineyard_key = LOWER(TRIM(v.vineyard_name))
-           AND v.winery_id IS NOT NULL
-           AND COALESCE(w.is_wvwa_member, false) = true
+           AND v.winery_id IN ${membersOf('$4')}
          CROSS JOIN bounds
          WHERE b.geometry IS NOT NULL
            AND b.geometry && bounds.env4326
@@ -96,7 +100,7 @@ router.get('/tiles/:z/:x/:y', async (req, res) => {
        SELECT ST_AsMVT(features, 'vineyard_blocks', 4096, 'geom', 'vineyard_id') AS tile
        FROM features
        WHERE geom IS NOT NULL`,
-      [z, x, y]
+      [z, x, y, association]
     );
 
     const tile = rows[0]?.tile;
@@ -164,6 +168,7 @@ router.get('/centroids', async (_req, res) => {
  *   ?variety=Pinot+Noir            — ILIKE match on varietals_list
  *   ?winery_id=42                  — only vineyards for a specific winery db id
  *   ?linked=true                   — only vineyards with a winery_id (linked to a winery record)
+ *   ?association=wvwa              — whose members get is_member / colours (default wvwa)
  */
 router.get('/parcels', async (req, res) => {
   const bbox = parseBbox(req.query.bbox);
@@ -218,6 +223,10 @@ router.get('/parcels', async (req, res) => {
   }
 
   try {
+    const association = await resolveAssociation(req);
+    if (!association) return badAssociation(res);
+    const assocParam = `$${params.push(association)}`;
+
     const { rows } = await pool.query(
       `
       SELECT
@@ -233,15 +242,14 @@ router.get('/parcels', async (req, res) => {
         vp.varietals_list,
         w.recid AS winery_recid,
         w.title AS winery_title,
-        (vp.winery_id IS NOT NULL AND COALESCE(w.is_wvwa_member, false)) AS is_member,
+        (vp.winery_id IS NOT NULL AND vp.winery_id IN ${membersOf(assocParam)}) AS is_member,
         COALESCE(vc.color_index, -1) AS color_index,
         ST_AsGeoJSON(vp.geometry)::json AS geometry
       FROM vineyards vp
       LEFT JOIN wineries w ON vp.winery_id = w.id
       LEFT JOIN vineyard_colors vc
         ON vc.vineyard_key = LOWER(TRIM(vp.vineyard_name))
-        AND vp.winery_id IS NOT NULL
-        AND COALESCE(w.is_wvwa_member, false) = true
+        AND vp.winery_id IN ${membersOf(assocParam)}
       WHERE ${bboxCondition}
         ${avaCondition}
         ${datasetCondition}

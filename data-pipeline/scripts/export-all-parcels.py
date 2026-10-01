@@ -69,8 +69,7 @@ FROM vineyards vp
 LEFT JOIN wineries w ON vp.winery_id = w.id
 LEFT JOIN vineyard_colors vc
     ON vc.vineyard_key = LOWER(TRIM(vp.vineyard_name))
-    AND vp.winery_id IS NOT NULL
-    AND COALESCE(w.is_wvwa_member, false) = true
+    AND vp.winery_id IN (SELECT oa.organization_id FROM organization_associations oa JOIN associations a ON a.id = oa.association_id WHERE a.slug = 'wvwa')
 ORDER BY vp.id
 """
 

@@ -16,6 +16,7 @@
 import express from 'express';
 import { pool } from '../db/pool.js';
 import { applyDataRequest, IMMEDIATE_APPLY_TYPES } from '../services/applyDataRequest.js';
+import { SLUG_RE, SITE_ACCENTS } from '../services/wineSite.js';
 
 const router = express.Router();
 
@@ -563,6 +564,85 @@ router.get('/vineyards/:id/history', async (req, res) => {
   } catch (err) {
     console.error('Portal history error:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * GET /api/portal/site
+ * Settings for this winery's public vineyard page (/w/:slug).
+ */
+router.get('/site', async (req, res) => {
+  const { wineryId } = req.portalAccount;
+  try {
+    const { rows } = await pool.query(
+      `SELECT site_slug AS slug, site_published AS published, site_accent AS accent
+       FROM wineries WHERE id = $1`,
+      [wineryId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Winery not found' });
+    const { rows: vineyards } = await pool.query(
+      `SELECT id, vineyard_name, acres, site_key, site_hidden
+       FROM vineyards WHERE winery_id = $1
+       ORDER BY vineyard_name NULLS LAST, id`,
+      [wineryId]
+    );
+    res.json({ ...rows[0], accents: SITE_ACCENTS, vineyards });
+  } catch (err) {
+    console.error('Portal site error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * PATCH /api/portal/site
+ * Body (all optional): { slug, published, accent, hidden: { [vineyardId]: bool } }
+ * Presentation settings only — applied immediately, no admin review.
+ */
+router.patch('/site', async (req, res) => {
+  const { wineryId } = req.portalAccount;
+  const { slug, published, accent, hidden } = req.body || {};
+
+  const sets = [];
+  const params = [wineryId];
+  if (slug !== undefined) {
+    const s = String(slug).trim().toLowerCase();
+    if (!SLUG_RE.test(s)) {
+      return res.status(400).json({ error: 'Page address may use lowercase letters, numbers and dashes only.' });
+    }
+    params.push(s); sets.push(`site_slug = $${params.length}`);
+  }
+  if (published !== undefined) { params.push(Boolean(published)); sets.push(`site_published = $${params.length}`); }
+  if (accent !== undefined) {
+    if (accent !== null && !SITE_ACCENTS.includes(accent)) return res.status(400).json({ error: 'Unknown accent' });
+    params.push(accent); sets.push(`site_accent = $${params.length}`);
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    if (sets.length) {
+      await client.query(`UPDATE wineries SET ${sets.join(', ')} WHERE id = $1`, params);
+    }
+    if (hidden && typeof hidden === 'object') {
+      for (const [id, isHidden] of Object.entries(hidden)) {
+        // winery_id guard keeps one winery from toggling another's vineyards.
+        await client.query(
+          `UPDATE vineyards SET site_hidden = $1 WHERE id = $2 AND winery_id = $3`,
+          [Boolean(isHidden), parseInt(id, 10), wineryId]
+        );
+      }
+    }
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'That page address is already taken.' });
+    }
+    console.error('Portal site update error:', err);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 });
 

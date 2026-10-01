@@ -1,0 +1,106 @@
+/* Public winery vineyard site (/w/:slug). Fixed format — wineries customise
+   content and one accent colour (--ws-accent), never layout or type. Hover,
+   focus and selected states use the site-wide --color-interactive blue so
+   "clickable" reads the same here as on the map. */
+
+.ws {
+  --ws-ink: #1F1D1A;
+  --ws-muted: #6B665E;
+  --ws-rule: #E3DCCF;
+  --ws-paper: #FBF8F3;
+  --ws-card: #FFFFFF;
+  font-family: var(--font-sans);
+  color: var(--ws-ink);
+  background: var(--ws-paper);
+  min-height: 100%;
+}
+.ws--embed { background: transparent; min-height: 0; }
+
+.ws-inner { max-width: 1040px; margin: 0 auto; padding: 40px 24px 32px; }
+.ws--embed .ws-inner { padding: 8px 4px 16px; }
+
+.ws-preview {
+  background: #FFF4D6; border: 1px solid #E8D48F; color: #6B5310;
+  font-size: 13px; padding: 10px 14px; border-radius: 6px; margin-bottom: 24px;
+}
+
+.ws-eyebrow {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--ws-accent); margin: 0 0 6px;
+}
+.ws-title {
+  font-family: var(--font-display); font-weight: 500; font-size: 40px; line-height: 1.1; margin: 0;
+}
+.ws-sub { color: var(--ws-muted); font-size: 14px; margin: 8px 0 0; }
+.ws-lede { font-size: 15px; line-height: 1.6; max-width: 68ch; margin: 16px 0 0; color: var(--ws-ink); }
+.ws-head { display: flex; gap: 20px; align-items: center; margin-bottom: 28px; }
+.ws-logo { width: 64px; height: 64px; object-fit: contain; border-radius: 6px; background: #fff; flex: none; }
+
+.ws-back {
+  display: inline-block; font-size: 13px; color: var(--ws-accent); text-decoration: none; margin-bottom: 16px;
+}
+.ws-back:hover, .ws-back:focus-visible { text-decoration: underline; color: var(--color-interactive); }
+
+.ws-stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  border-top: 1px solid var(--ws-rule); border-bottom: 1px solid var(--ws-rule);
+  margin: 24px 0;
+}
+.ws-stat { padding: 14px 12px 14px 0; }
+.ws-stat-label {
+  font-size: 10px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ws-muted);
+}
+.ws-stat-value { font-family: var(--font-display); font-size: 24px; font-weight: 500; margin-top: 2px; }
+.ws-stat-sub { font-size: 11px; color: var(--ws-muted); }
+
+.ws-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0; font-size: 12px; color: var(--ws-muted); }
+.ws-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+.ws-section-title {
+  font-family: var(--font-display); font-weight: 500; font-size: 26px; margin: 36px 0 14px;
+}
+
+.ws-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.ws-card {
+  display: block; background: var(--ws-card); border: 1px solid var(--ws-rule); border-radius: 8px;
+  padding: 18px; color: inherit; text-decoration: none; transition: border-color 0.15s, box-shadow 0.15s;
+}
+a.ws-card:hover, a.ws-card:focus-visible { border-color: var(--color-interactive); box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+a.ws-card:hover .ws-card-title, a.ws-card:focus-visible .ws-card-title { color: var(--color-interactive); }
+.ws-card-title { transition: color 0.15s; }
+.ws-card-title { font-family: var(--font-display); font-size: 22px; font-weight: 500; margin: 0; }
+.ws-card-meta { font-size: 13px; color: var(--ws-muted); margin-top: 4px; }
+.ws-card-facts { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; margin-top: 12px; }
+.ws-card-more { font-size: 13px; color: var(--ws-accent); margin-top: 12px; }
+
+.ws-blocks { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.ws-block {
+  background: var(--ws-card); border: 1px solid var(--ws-rule); border-left: 4px solid var(--ws-block-color);
+  border-radius: 6px; padding: 14px; cursor: pointer; text-align: left; font: inherit; color: inherit;
+  transition: border-color 0.15s;
+}
+.ws-block[style*="pointer"]:hover, .ws-block:focus-visible { border-color: var(--color-interactive); border-left-color: var(--ws-block-color); }
+.ws-block[aria-pressed="true"] { border-color: var(--color-interactive); border-left-color: var(--ws-block-color); box-shadow: 0 0 0 1px var(--color-interactive); }
+.ws-block[style*="pointer"]:hover .ws-block-name, .ws-block[aria-pressed="true"] .ws-block-name { color: var(--color-interactive); }
+.ws-block-name { font-weight: 500; font-size: 14px; }
+.ws-block-variety { font-family: var(--font-display); font-size: 19px; margin-top: 2px; }
+.ws-dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; margin: 10px 0 0; }
+.ws-dl dt { color: var(--ws-muted); }
+.ws-dl dd { margin: 0; }
+.ws-notes { font-size: 13px; line-height: 1.5; color: var(--ws-ink); margin: 10px 0 0; font-style: italic; }
+
+.ws-foot {
+  margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--ws-rule);
+  font-size: 11px; color: var(--ws-muted); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.ws-foot a { color: var(--ws-muted); }
+.ws-foot a:hover, .ws-foot a:focus-visible { color: var(--color-interactive); }
+
+.ws-empty { color: var(--ws-muted); font-size: 14px; padding: 60px 0; text-align: center; }
+
+@media (max-width: 600px) {
+  .ws-inner { padding: 24px 16px; }
+  .ws-title { font-size: 30px; }
+  .ws-head { align-items: flex-start; }
+  .ws-logo { width: 48px; height: 48px; }
+}

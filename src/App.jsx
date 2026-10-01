@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import WVWAMapPage from './pages/WVWAMapPage';
 import EditorPage from './pages/EditorPage';
@@ -12,6 +13,10 @@ import PortalSettings from './pages/portal/PortalSettings';
 import PortalVineyardDetail from './pages/portal/PortalVineyardDetail';
 import PortalVineyardGroup from './pages/portal/PortalVineyardGroup';
 import PortalClaim from './pages/portal/PortalClaim';
+import PortalSite from './pages/portal/PortalSite';
+
+// Public winery vineyard site — lazy so embeds don't download the explorer/portal/admin code.
+const WinerySitePage = lazy(() => import('./pages/site/WinerySitePage'));
 
 // Admin pages
 import AdminLogin from './pages/admin/AdminLogin';
@@ -37,6 +42,11 @@ export default function App() {
         <Route path="/portal/vineyards/group" element={<PortalVineyardGroup />} />
         <Route path="/portal/vineyards/:id" element={<PortalVineyardDetail />} />
         <Route path="/portal/claim" element={<PortalClaim />} />
+        <Route path="/portal/site" element={<PortalSite />} />
+
+        {/* Public winery vineyard pages (embeddable with ?embed=1) */}
+        <Route path="/w/:slug" element={<Suspense fallback={null}><WinerySitePage /></Suspense>} />
+        <Route path="/w/:slug/:vineyardKey" element={<Suspense fallback={null}><WinerySitePage /></Suspense>} />
 
         {/* Admin console */}
         <Route path="/admin" element={<AdminLogin />} />

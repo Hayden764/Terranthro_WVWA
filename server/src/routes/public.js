@@ -5,6 +5,8 @@
  */
 import express from 'express';
 import { pool } from '../db/pool.js';
+import { readPortalAccount } from '../middleware/portalAuth.js';
+import { loadWinerySite, SLUG_RE } from '../services/wineSite.js';
 
 const router = express.Router();
 
@@ -42,6 +44,28 @@ router.get('/wineries/:recid/sourced-from', async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error('public sourced-from error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * GET /api/public/sites/:slug
+ * A winery's public vineyard page payload. 404 unless published — except for
+ * the signed-in owner, who gets an unpublished preview (preview: true).
+ */
+router.get('/sites/:slug', async (req, res) => {
+  const slug = String(req.params.slug || '').toLowerCase();
+  if (!SLUG_RE.test(slug)) return res.status(404).json({ error: 'Not found' });
+  try {
+    const viewer = readPortalAccount(req);
+    const site = await loadWinerySite({ slug, viewerWineryId: viewer?.wineryId ?? null });
+    if (!site) return res.status(404).json({ error: 'Not found' });
+    // Published pages are shared across viewers and change rarely; a short TTL
+    // keeps portal edits visible within a minute. Previews must never be cached.
+    res.set('Cache-Control', site.preview ? 'private, no-store' : 'public, max-age=60');
+    res.json(site);
+  } catch (err) {
+    console.error('public site error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

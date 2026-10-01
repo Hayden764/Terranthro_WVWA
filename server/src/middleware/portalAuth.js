@@ -44,3 +44,20 @@ export function requirePortalAuth(req, res, next) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
+
+/**
+ * Non-blocking variant: returns { accountId, wineryId } when the request carries
+ * a valid portal cookie, otherwise null. Used by public routes that show extra
+ * content (e.g. an unpublished site preview) to the signed-in owner.
+ */
+export function readPortalAccount(req) {
+  const token = req.cookies?.portal_token;
+  if (!token) return null;
+  try {
+    const payload = jwt.verify(token, JWT_SECRET());
+    if (payload.scope !== 'portal') return null;
+    return { accountId: payload.sub, wineryId: payload.winery_id };
+  } catch {
+    return null;
+  }
+}

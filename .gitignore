@@ -47,3 +47,13 @@ data-pipeline/**/*.pyc
 
 # Claude Code local config
 .claude/
+
+# Local DB dumps
+backups/
+
+# Contract / proposal drafts (keep out of the repo)
+docs/vineyard-mapping-sow.md
+docs/private/
+
+# Ad-hoc pipeline outputs at the repo root
+/*_places.geojson

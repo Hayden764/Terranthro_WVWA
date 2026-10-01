@@ -23,15 +23,15 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiPost } from '../lib/api';
-import { alpha, border, crimson, electricBlue, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
+import { alpha, border, crimson, interactive, ink, muted, parchment, TOKENS, TYPE } from '../styles/tokens';
 
 const NOTES_MAX = 500;
 
 const UI = {
   dirtyRowBg: alpha(TOKENS.crimson, 0.04),
   dirtyCardBg: alpha(TOKENS.crimson, 0.03),
-  selectedRowBg: alpha(electricBlue, 0.10),
-  hoverRowBg: alpha(electricBlue, 0.06),
+  selectedRowBg: alpha(interactive, 0.10),
+  hoverRowBg: alpha(interactive, 0.06),
   successText: TOKENS.success,
   borderFaded: (color) => alpha(color, 0.09),
   borderVeryFaded: (color) => alpha(color, 0.25),
@@ -359,7 +359,7 @@ export default function EditableBlocksTable({
           marginTop: 12, padding: '10px 0 2px', flexWrap: 'wrap', gap: 8,
         }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button onClick={addNewRow} style={addRowBtnStyle}>+ Add Block</button>
+            <button onClick={addNewRow} className="tx-box tx-link" style={addRowBtnStyle}>+ Add Block</button>
             <p style={{ fontSize: 'var(--type-body-size)', color: muted, margin: 0 }}>
               {hasChanges
                 ? `${changedBlocks.length + pendingNewRows.length} change${changedBlocks.length + pendingNewRows.length !== 1 ? 's' : ''}${deletedIds.length > 0 ? `, ${deletedIds.length} deletion${deletedIds.length !== 1 ? 's' : ''}` : ''} pending${(onDirectApply || autoApply) ? '' : ' — submit for admin review'}`
@@ -371,7 +371,7 @@ export default function EditableBlocksTable({
             {status === 'error' && <span style={{ fontSize: 'var(--type-body-size)', color: crimson }}>Error — try again</span>}
             <button
               onClick={() => { setEditMap({}); setNewRows([]); setDeletedIds([]); setStatus(null); onEditCancel?.(); }}
-              style={secondaryBtnStyle}
+              className="tx-box tx-link" style={secondaryBtnStyle}
             >
               Cancel
             </button>
@@ -391,7 +391,7 @@ export default function EditableBlocksTable({
 function BlockEditCard({ cardRef, title, displayName, rowData, topo, isNew, isDirty, isDeleted, isSelected, allowDelete, onHover, onCell, onRevert, onSplit, onToggleDelete, onRemoveNew }) {
   const terroir = fmtTopo(topo);
   // Selection highlight mirrors the portal card pattern: electric-blue border + title.
-  const borderColor = isDeleted ? alpha(crimson, 0.4) : isSelected ? electricBlue : isDirty ? alpha(crimson, 0.35) : border;
+  const borderColor = isDeleted ? alpha(crimson, 0.4) : isSelected ? interactive : isDirty ? alpha(crimson, 0.35) : border;
   const bg = isDeleted ? alpha(crimson, 0.05) : isDirty ? UI.dirtyCardBg : isSelected ? UI.selectedRowBg : parchment;
   return (
     <div
@@ -406,17 +406,17 @@ function BlockEditCard({ cardRef, title, displayName, rowData, topo, isNew, isDi
     >
       {/* Card header: title + row actions */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8 }}>
-        <span style={{ fontSize: 'var(--type-body-size)', fontWeight: 600, color: isSelected ? electricBlue : ink }}>
+        <span style={{ fontSize: 'var(--type-body-size)', fontWeight: 600, color: isSelected ? interactive : ink }}>
           {isNew ? '＋ New block' : (rowData.block_name || title)}
           {isDirty && !isNew && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: crimson, marginLeft: 8, verticalAlign: 'middle' }} title="Unsaved change" />}
         </span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {isNew ? (
-            <button onClick={onRemoveNew} title="Remove this new block" style={textBtnStyle}>✕ Remove</button>
+            <button onClick={onRemoveNew} title="Remove this new block" className="tx-link" style={textBtnStyle}>✕ Remove</button>
           ) : (
             <>
-              {isDirty && <button onClick={onRevert} title="Discard changes to this block" style={textBtnStyle}>↩ Revert</button>}
-              {allowDelete && !isDirty && !isDeleted && <button onClick={onSplit} title="Split into two varietals" style={splitBtnStyle}>Split</button>}
+              {isDirty && <button onClick={onRevert} title="Discard changes to this block" className="tx-link" style={textBtnStyle}>↩ Revert</button>}
+              {allowDelete && !isDirty && !isDeleted && <button onClick={onSplit} title="Split into two varietals" className="tx-box" style={splitBtnStyle}>Split</button>}
               {allowDelete && !isDirty && (
                 <button onClick={onToggleDelete} title={isDeleted ? 'Undo delete' : 'Delete this block'} style={{ ...textBtnStyle, color: isDeleted ? crimson : muted }}>
                   {isDeleted ? '↩ Undo' : '🗑 Delete'}
@@ -437,7 +437,7 @@ function BlockEditCard({ cardRef, title, displayName, rowData, topo, isNew, isDi
                 {rowData[col.key] || (isNew ? 'auto' : '—')}
               </span>
             ) : (
-              <input
+              <input className="tx-input"
                 type={col.type}
                 value={rowData[col.key] || ''}
                 onChange={(e) => onCell(col.key, e.target.value)}
@@ -463,7 +463,7 @@ function BlockEditCard({ cardRef, title, displayName, rowData, topo, isNew, isDi
           <span>Notes</span>
           <span style={{ color: (rowData.notes || '').length >= NOTES_MAX ? crimson : muted }}>{(rowData.notes || '').length}/{NOTES_MAX}</span>
         </span>
-        <textarea
+        <textarea className="tx-input"
           value={rowData.notes || ''}
           maxLength={NOTES_MAX}
           onChange={(e) => onCell('notes', e.target.value)}
@@ -502,7 +502,7 @@ const stickyCellStyle = {
 function cellTextStyle(value, blue = false) {
   return {
     display: 'block', padding: '9px 12px', whiteSpace: 'nowrap',
-    color: blue ? electricBlue : value ? ink : muted,
+    color: blue ? interactive : value ? ink : muted,
     fontWeight: blue ? 600 : 400,
     fontStyle: value ? 'normal' : 'italic',
   };

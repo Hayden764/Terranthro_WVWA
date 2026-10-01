@@ -362,7 +362,7 @@ export default function PortalVineyardDetail() {
                     <button onClick={submitRemove} disabled={removeSubmitStatus === 'submitting'} style={{ ...smallBtnStyle, background: crimson }}>
                       {removeSubmitStatus === 'submitting' ? 'Submitting…' : 'Submit Request'}
                     </button>
-                    <button onClick={() => { setRemovingParcel(false); setRemoveSubmitStatus(null); setRemoveNotes(''); }} style={discardBtnStyle}>Cancel</button>
+                    <button onClick={() => { setRemovingParcel(false); setRemoveSubmitStatus(null); setRemoveNotes(''); }} className="tx-box tx-link" style={discardBtnStyle}>Cancel</button>
                   </div>
                 </div>
               )}
@@ -382,7 +382,7 @@ export default function PortalVineyardDetail() {
           background: parchment, borderBottom: `1px solid ${border}`,
           padding: '12px 0', marginBottom: 8,
         }}>
-          <Link to="/portal/dashboard" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>← Dashboard</Link>
+          <Link to="/portal/dashboard" className="tx-link" style={{ color: muted, fontSize: 'var(--type-mono-size)' }}>← Dashboard</Link>
         </div>
 
         {/* Success feedback for geometry actions */}
@@ -404,14 +404,14 @@ export default function PortalVineyardDetail() {
             <button onClick={submitRename} disabled={renameStatus === 'submitting'} style={smallBtnStyle}>
               {renameStatus === 'submitting' ? 'Submitting…' : 'Submit for Review'}
             </button>
-            <button onClick={() => setRenaming(false)} style={discardBtnStyle}>Cancel</button>
+            <button onClick={() => setRenaming(false)} className="tx-box tx-link" style={discardBtnStyle}>Cancel</button>
           </div>
         ) : (
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', margin: '16px 0 4px' }}>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--type-display-italic-size)', color: ink, margin: 0 }}>
               {vineyard.vineyard_name || 'Unnamed Parcel'}
             </h1>
-            <button onClick={startRename} style={editNameBtnStyle} title="Rename this vineyard">✎ Edit name</button>
+            <button onClick={startRename} className="tx-box tx-link" style={editNameBtnStyle} title="Rename this vineyard">✎ Edit name</button>
           </div>
         )}
         {renameStatus === 'success' && (
@@ -489,7 +489,7 @@ function PendingCard({ title, body, extraField, notePlaceholder, noteValue, onNo
         <button onClick={onSubmit} disabled={submitting || submitDisabled} style={smallBtnStyle}>
           {submitting ? 'Submitting…' : submitLabel}
         </button>
-        <button onClick={onDiscard} style={discardBtnStyle}>Discard</button>
+        <button onClick={onDiscard} className="tx-box tx-link" style={discardBtnStyle}>Discard</button>
       </div>
     </div>
   );
@@ -536,11 +536,16 @@ function Section({ title, children, action, collapsible = false, defaultOpen = t
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isOpen ? 12 : 0, gap: 8 }}>
         <h2
+          className={collapsible ? 'tx-row' : undefined}
           style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 600, color: ink, margin: 0, cursor: collapsible ? 'pointer' : 'default', userSelect: 'none' }}
           onClick={collapsible ? () => setOpen((o) => !o) : undefined}
+          role={collapsible ? 'button' : undefined}
+          tabIndex={collapsible ? 0 : undefined}
+          aria-expanded={collapsible ? isOpen : undefined}
+          onKeyDown={collapsible ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((o) => !o); } } : undefined}
         >
           {collapsible && <span style={{ color: muted, marginRight: 6, fontSize: 14 }}>{isOpen ? '▾' : '▸'}</span>}
-          {title}
+          <span className="tx-title">{title}</span>
         </h2>
         {action}
       </div>

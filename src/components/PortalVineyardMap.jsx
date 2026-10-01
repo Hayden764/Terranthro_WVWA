@@ -35,9 +35,8 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
+import { MAP_STYLE } from '../config/baseMapStyle';
 import { alpha, border, crimson, ink, MAP_GLASS, mix, muted, parchment, TOKENS } from '../styles/tokens';
-
-const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 
 // MapLibre's color parser does not understand CSS variables (var(--…)) or
 // color-mix(), so we use literal hex/rgba values for everything actually
@@ -47,6 +46,7 @@ const HEX = {
   parchment:  '#E8E2D6',
   success:    '#00C44F',
   danger:     '#E03040',
+  interactive:'#2E9BFF', // = --color-interactive (MapLibre needs a literal)
   successDark:'#062a1a', // mix(success 60%, ink) — used for stroke
 };
 
@@ -75,7 +75,7 @@ function blockColorExpr() {
 // UI constants for map layer styling
 const UI = {
   parcelFill: HEX.success,
-  parcelHighlight: HEX.danger,
+  parcelHighlight: HEX.interactive,
   parcelStrokeBase: HEX.successDark,
   parcelLabelText: HEX.parchment,
   parcelLabelHalo: 'rgba(0,0,0,0.65)',
@@ -124,21 +124,6 @@ const DRAW_STYLES = [
   // Static point
   { id: 'gl-draw-point-static', type: 'circle', filter: ['all', ['==', 'mode', 'static'], ['==', '$type', 'Point']], paint: { 'circle-radius': 5, 'circle-color': '#404040' } },
 ];
-
-const MAP_STYLE = MAPTILER_KEY
-  ? `https://api.maptiler.com/maps/019d98dc-0865-7ac5-a184-a072f37b9509/style.json?key=${MAPTILER_KEY}`
-  : {
-      version: 8,
-      sources: {
-        esri: {
-          type: 'raster',
-          tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-          tileSize: 256,
-          attribution: 'Sources: Esri, Maxar, Earthstar Geographics',
-        },
-      },
-      layers: [{ id: 'esri-bg', type: 'raster', source: 'esri' }],
-    };
 
 // Compute bounding box [[minLng, minLat], [maxLng, maxLat]] from an array of GeoJSON geometries.
 function bboxFromGeometries(geometries) {
@@ -903,17 +888,17 @@ export default function PortalVineyardMap({
           padding: 6,
         }}>
           {onStartEditBoundary && (
-            <button onClick={onStartEditBoundary} style={toolbarBtnStyle} title="Correct the vineyard boundary">
+            <button onClick={onStartEditBoundary} className="tx-box tx-link" style={toolbarBtnStyle} title="Correct the vineyard boundary">
               ✎ Boundary
             </button>
           )}
           {onStartSplit && (
-            <button onClick={onStartSplit} style={toolbarBtnStyle} title="Split this parcel with a line">
+            <button onClick={onStartSplit} className="tx-box tx-link" style={toolbarBtnStyle} title="Split this parcel with a line">
               ✂ Split
             </button>
           )}
           {onStartAdd && (
-            <button onClick={onStartAdd} style={toolbarBtnStyle} title="Draw a new parcel">
+            <button onClick={onStartAdd} className="tx-box tx-link" style={toolbarBtnStyle} title="Draw a new parcel">
               ＋ Add
             </button>
           )}
@@ -958,14 +943,14 @@ export default function PortalVineyardMap({
               />
               <span>Aggressive</span>
             </div>
-            <button onClick={handleSimplify} style={editSimplifyBtnStyle}>
+            <button onClick={handleSimplify} className="tx-box tx-link" style={editSimplifyBtnStyle}>
               Simplify
             </button>
             <button
               onClick={() => {
                 if (onEditCancel) onEditCancel();
               }}
-              style={editCancelBtnStyle}
+              className="tx-box tx-link" style={editCancelBtnStyle}
             >
               Cancel
             </button>
@@ -1001,7 +986,7 @@ export default function PortalVineyardMap({
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             <button
               onClick={() => { if (onSplitCancel) onSplitCancel(); }}
-              style={editCancelBtnStyle}
+              className="tx-box tx-link" style={editCancelBtnStyle}
             >
               Cancel
             </button>
@@ -1037,7 +1022,7 @@ export default function PortalVineyardMap({
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             <button
               onClick={() => { if (onAddCancel) onAddCancel(); }}
-              style={editCancelBtnStyle}
+              className="tx-box tx-link" style={editCancelBtnStyle}
             >
               Cancel
             </button>

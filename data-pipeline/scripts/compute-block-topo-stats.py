@@ -20,6 +20,7 @@ Usage:
 
 import os
 import sys
+import math
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -30,15 +31,19 @@ import numpy as np
 import psycopg2
 import psycopg2.extras
 import rasterio
-from rasterio.mask import mask as rasterio_mask
+from rasterio.features import geometry_mask, bounds as feature_bounds
 from rasterio.warp import transform_geom
+from rasterio.windows import from_bounds as window_from_bounds, Window
 from tqdm import tqdm
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-METERS_TO_FEET = 3.28084
+# Elevation rasters are stored in FEET; horizontal grid is metres (UTM). To get
+# slope in degrees, the metre pixel run is expressed in feet via this factor
+# (equivalent to gdaldem -s 3.28084). Aspect is direction-only, unit-free.
+FT_PER_M = 3.28084
 NODATA = -9999.0
 
 COMPASS_LABELS_16 = [
@@ -179,90 +184,90 @@ def upsert_stats(conn, stats_row: dict, dry_run: bool = False) -> None:
 # ---------------------------------------------------------------------------
 
 
+def slope_aspect_horn(z: np.ndarray, res_m: float, nodata) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Derive slope (degrees) and aspect (GDAL convention: 0=N clockwise, flat=-1)
+    from an elevation window using Horn's 3x3 method — the same algorithm gdaldem
+    uses. Elevation is FEET; the metre pixel run is expressed in feet so the
+    rise/run ratio is unit-consistent (equiv. gdaldem -s 3.28084). Edges are
+    replicated (like computeEdges). nodata pixels become NaN and propagate.
+    """
+    z = z.astype("float64")
+    if nodata is not None:
+        z = np.where(z == nodata, np.nan, z)
+    run = res_m * FT_PER_M  # pixel size in feet (matches feet elevation)
+    zp = np.pad(z, 1, mode="edge")
+    nw, n, ne = zp[:-2, :-2], zp[:-2, 1:-1], zp[:-2, 2:]
+    w,      e = zp[1:-1, :-2],                zp[1:-1, 2:]
+    sw, s, se = zp[2:, :-2],  zp[2:, 1:-1],   zp[2:, 2:]
+    dzdx = ((ne + 2 * e + se) - (nw + 2 * w + sw)) / (8 * run)
+    dzdy = ((sw + 2 * s + se) - (nw + 2 * n + ne)) / (8 * run)
+    slope = np.degrees(np.arctan(np.hypot(dzdx, dzdy)))
+    aspect = np.degrees(np.arctan2(dzdy, -dzdx))
+    aspect = np.where(aspect < 0, 90.0 - aspect,
+             np.where(aspect > 90.0, 360.0 - aspect + 90.0, 90.0 - aspect))
+    aspect = np.where((dzdx == 0) & (dzdy == 0), -1.0, aspect)  # flat
+    return slope, aspect
+
+
 def compute_block_stats(
     block: dict,
     elev_src: rasterio.DatasetReader,
-    slope_src: rasterio.DatasetReader,
-    aspect_src: rasterio.DatasetReader,
-    data_source_label: str = "3DEP 1m",
+    data_source_label: str,
+    buffer_px: int = 2,
 ) -> Optional[dict]:
+    """
+    Compute elevation/slope/aspect stats for one block from a single elevation
+    raster. Slope and aspect are derived on the fly (no stored rasters). A small
+    pixel buffer around the block keeps edge pixels' neighbours for a correct
+    3x3 slope. Returns None if the block has no valid data here (→ tier fallback).
+    """
     block_id = block["id"]
-    geom_wgs84 = block["geom"]
-
-    cog_crs = elev_src.crs
     try:
-        geom_utm = transform_geom(
-            src_crs="EPSG:4326",
-            dst_crs=cog_crs,
-            geom=geom_wgs84,
-        )
+        geom = transform_geom(src_crs="EPSG:4326", dst_crs=elev_src.crs, geom=block["geom"])
     except Exception as e:
         logger.warning(f"Block {block_id}: CRS transform failed: {e}")
         return None
 
-    shapes = [geom_utm]
-
-    # --- Elevation ---
+    # Windowed read: block bounds + buffer, clamped to the raster.
+    minx, miny, maxx, maxy = feature_bounds(geom)
     try:
-        elev_data, _ = rasterio_mask(
-            elev_src, shapes, crop=True, nodata=NODATA, all_touched=False
-        )
-        elev_vals = elev_data[0][elev_data[0] != NODATA]
-        src_nodata = elev_src.nodata
-        if src_nodata is not None and src_nodata != NODATA:
-            elev_vals = elev_vals[elev_vals != src_nodata]
-        elev_ft = elev_vals * METERS_TO_FEET
-        elev_ft = elev_ft[(elev_ft > -500) & (elev_ft < 15_000)]
-    except Exception as e:
-        logger.warning(f"Block {block_id}: elevation mask failed: {e}")
+        win = window_from_bounds(minx, miny, maxx, maxy, transform=elev_src.transform)
+    except Exception:
+        return None
+    col_off = max(0, math.floor(win.col_off) - buffer_px)
+    row_off = max(0, math.floor(win.row_off) - buffer_px)
+    col_end = min(elev_src.width,  math.ceil(win.col_off + win.width)  + buffer_px)
+    row_end = min(elev_src.height, math.ceil(win.row_off + win.height) + buffer_px)
+    if col_end <= col_off or row_end <= row_off:
+        return None
+    window = Window(col_off, row_off, col_end - col_off, row_end - row_off)
+
+    elev = elev_src.read(1, window=window)
+    if elev.size == 0:
+        return None
+    wt = elev_src.window_transform(window)
+    nodata = elev_src.nodata
+
+    # Mask to the block polygon (all_touched so sub-pixel blocks still catch a cell).
+    poly_mask = geometry_mask([geom], out_shape=elev.shape, transform=wt,
+                              invert=True, all_touched=True)
+    valid = poly_mask & (elev != nodata) if nodata is not None else poly_mask
+    if not np.any(valid):
         return None
 
-    if len(elev_ft) == 0:
-        # Blocks are small (often sub-acre); allow all_touched fallback so we
-        # don't drop tiny blocks that have no fully-covered pixels.
-        try:
-            elev_data, _ = rasterio_mask(
-                elev_src, shapes, crop=True, nodata=NODATA, all_touched=True
-            )
-            elev_vals = elev_data[0][elev_data[0] != NODATA]
-            src_nodata = elev_src.nodata
-            if src_nodata is not None and src_nodata != NODATA:
-                elev_vals = elev_vals[elev_vals != src_nodata]
-            elev_ft = elev_vals * METERS_TO_FEET
-            elev_ft = elev_ft[(elev_ft > -500) & (elev_ft < 15_000)]
-        except Exception:
-            return None
-
+    elev_ft = elev[valid].astype("float64")  # already feet
+    elev_ft = elev_ft[(elev_ft > -500) & (elev_ft < 15_000)]
     if len(elev_ft) == 0:
         return None
 
-    # --- Slope ---
-    try:
-        slope_data, _ = rasterio_mask(
-            slope_src, shapes, crop=True, nodata=NODATA, all_touched=True
-        )
-        slope_vals = slope_data[0][slope_data[0] != NODATA]
-        src_slope_nodata = slope_src.nodata
-        if src_slope_nodata is not None and src_slope_nodata != NODATA:
-            slope_vals = slope_vals[slope_vals != src_slope_nodata]
-        slope_vals = slope_vals[(slope_vals >= 0) & (slope_vals <= 90)]
-    except Exception as e:
-        logger.warning(f"Block {block_id}: slope mask failed: {e}")
-        slope_vals = np.array([])
-
-    # --- Aspect ---
-    try:
-        aspect_data, _ = rasterio_mask(
-            aspect_src, shapes, crop=True, nodata=NODATA, all_touched=True
-        )
-        aspect_vals = aspect_data[0][aspect_data[0] != NODATA]
-        src_aspect_nodata = aspect_src.nodata
-        if src_aspect_nodata is not None and src_aspect_nodata != NODATA:
-            aspect_vals = aspect_vals[aspect_vals != src_aspect_nodata]
-        aspect_vals = aspect_vals[(aspect_vals >= -1) & (aspect_vals <= 360)]
-    except Exception as e:
-        logger.warning(f"Block {block_id}: aspect mask failed: {e}")
-        aspect_vals = np.array([])
+    # Derive slope/aspect over the buffered window, then sample inside the polygon.
+    res_m = abs(elev_src.res[0])
+    slope, aspect = slope_aspect_horn(elev, res_m, nodata)
+    slope_vals = slope[valid]
+    slope_vals = slope_vals[np.isfinite(slope_vals) & (slope_vals >= 0) & (slope_vals <= 90)]
+    aspect_vals = aspect[valid]
+    aspect_vals = aspect_vals[np.isfinite(aspect_vals) & (aspect_vals >= -1) & (aspect_vals <= 360)]
 
     row = {
         "block_id":            block_id,
@@ -294,15 +299,10 @@ def process_block_worker(args) -> Tuple[int, Optional[dict], Optional[str]]:
     block, sources = args
     block_id = block["id"]
     last_err = None
-    for label, elev_path, slope_path, aspect_path in sources:
+    for label, elev_path in sources:
         try:
-            with rasterio.open(elev_path) as elev_src, \
-                 rasterio.open(slope_path) as slope_src, \
-                 rasterio.open(aspect_path) as aspect_src:
-                row = compute_block_stats(
-                    block, elev_src, slope_src, aspect_src,
-                    data_source_label=label,
-                )
+            with rasterio.open(elev_path) as elev_src:
+                row = compute_block_stats(block, elev_src, label)
                 if row is not None:
                     return block_id, row, None
         except Exception as e:
@@ -317,8 +317,8 @@ def process_block_worker(args) -> Tuple[int, Optional[dict], Optional[str]]:
 
 @click.command()
 @click.option("--cog-dir", type=click.Path(exists=True), default=None,
-              help="Directory containing willamette_valley_1m/ COG subfolder. "
-                   "Default: ../data/topography/OR/")
+              help="Directory containing the willamette_valley_1m/ and "
+                   "willamette_valley_dogami/ elevation stores. Default: ../data/topography/OR/")
 @click.option("--block-ids", type=str, default=None,
               help="Comma-separated block IDs to process (default: all with geometry).")
 @click.option("--workers", type=int, default=4, show_default=True,
@@ -328,36 +328,36 @@ def process_block_worker(args) -> Tuple[int, Optional[dict], Optional[str]]:
 @click.option("--verbose", is_flag=True, default=False,
               help="Print per-block stats as they are computed.")
 def main(cog_dir, block_ids, workers, dry_run, verbose):
-    """Compute per-vineyard-block topography statistics from 1m LiDAR COGs."""
+    """Compute per-vineyard-block topography statistics from the 1m/3m elevation
+    stores (feet). Slope and aspect are derived on the fly; 1m is preferred with
+    3m DOGAMI fallback, and the tier used is recorded per block as data_source."""
     script_dir = Path(__file__).resolve().parent
 
     if cog_dir is None:
         cog_dir = script_dir / ".." / "data" / "topography" / "OR"
     cog_dir = Path(cog_dir).resolve()
 
-    primary_dir  = cog_dir / "willamette_valley_1m"
-    fallback_dir = cog_dir / "willamette_valley_dogami"
+    # Elevation-only tiers (feet). Slope/aspect are derived per block.
+    primary_elev  = cog_dir / "willamette_valley_1m" / "elevation_1m.vrt"
+    fallback_elev = cog_dir / "willamette_valley_dogami" / "elevation_3m.tif"
 
-    sources: List[Tuple[str, Path, Path, Path]] = []
-    if (primary_dir / "elevation.tif").exists():
-        sources.append(("3DEP 1m",
-                        primary_dir / "elevation.tif",
-                        primary_dir / "slope.tif",
-                        primary_dir / "aspect.tif"))
-    if (fallback_dir / "elevation.tif").exists():
-        sources.append(("DOGAMI 3ft",
-                        fallback_dir / "elevation.tif",
-                        fallback_dir / "slope.tif",
-                        fallback_dir / "aspect.tif"))
+    sources: List[Tuple[str, Path]] = []
+    if primary_elev.exists():
+        sources.append(("3DEP 1m", primary_elev))
+    if fallback_elev.exists():
+        sources.append(("DOGAMI 3m", fallback_elev))
 
     if not sources:
-        click.echo(f"Error: no COGs found under {cog_dir}", err=True)
-        click.echo("Run download-1m-dem.py and/or download-dogami-dem.py first.", err=True)
+        click.echo(f"Error: no elevation rasters found under {cog_dir}", err=True)
+        click.echo("Expected willamette_valley_1m/elevation_1m.vrt and/or "
+                   "willamette_valley_dogami/elevation_3m.tif.", err=True)
+        click.echo("Run download-1m-dem.py --tiles ... and download-dogami-dem.py --clip ... first.",
+                   err=True)
         sys.exit(1)
 
-    click.echo(f"\nPer-Block Topography Stats")
-    for label, elev, _, _ in sources:
-        click.echo(f"  Source:   {label} ({elev.parent})")
+    click.echo(f"\nPer-Block Topography Stats (feet; slope/aspect derived on the fly)")
+    for label, elev in sources:
+        click.echo(f"  Source:   {label} ({elev.name})")
     click.echo(f"  Workers:  {workers}")
     click.echo(f"  Dry run:  {dry_run}\n")
 
@@ -384,7 +384,7 @@ def main(cog_dir, block_ids, workers, dry_run, verbose):
         conn.close()
         sys.exit(0)
 
-    source_tuples = [(label, str(e), str(s), str(a)) for (label, e, s, a) in sources]
+    source_tuples = [(label, str(e)) for (label, e) in sources]
     work_args = [(b, source_tuples) for b in blocks]
 
     completed = 0

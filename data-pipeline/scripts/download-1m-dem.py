@@ -422,6 +422,171 @@ def merge_vrts(utm_dem_paths: List[str], merged_vrt_path: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Tile allow-list mode (compute-only: download tiles → feet → VRT)
+# ---------------------------------------------------------------------------
+
+FT_PER_M = 3.28084  # metres → feet; USGS 1m DEM elevation is metres, we store feet
+
+
+def load_tile_allowlist(geojson_path: str) -> List[dict]:
+    """Read a GeoJSON allow-list and return [{url, title, size_mb}] for every
+    feature that carries a downloadURL (e.g. coverage/usgs_1m_available_tiles.geojson)."""
+    with open(geojson_path) as f:
+        data = json.load(f)
+    feats = data.get("features", []) if data.get("type") == "FeatureCollection" else [data]
+    tiles: List[dict] = []
+    for ft in feats:
+        p = ft.get("properties", {})
+        url = p.get("downloadURL")
+        if not url:
+            continue
+        tiles.append({"url": url, "title": p.get("title", ""), "size_mb": p.get("sizeMB")})
+    return tiles
+
+
+def convert_tile_to_feet(src_path: str, dst_path: str) -> str:
+    """
+    Scale a DEM tile's elevation values metres → feet (× 3.28084), preserving
+    nodata, CRS and transform. Uses rasterio because the osgeo gdal_array binding
+    is unavailable in this environment.
+    """
+    import rasterio
+    with rasterio.open(src_path) as src:
+        profile = src.profile.copy()
+        arr = src.read(1)
+        nodata = src.nodata
+        mask = (arr == nodata) if nodata is not None else None
+        arr = (arr * FT_PER_M).astype("float32")
+        if mask is not None:
+            arr[mask] = nodata
+        profile.update(dtype="float32", compress="deflate", tiled=True,
+                       blockxsize=512, blockysize=512, bigtiff="IF_SAFER")
+        with rasterio.open(dst_path, "w", **profile) as dst:
+            dst.write(arr, 1)
+    return dst_path
+
+
+def tile_crs_epsg(path: str) -> Optional[str]:
+    """Return the EPSG authority code of a raster's CRS (or None)."""
+    from osgeo import osr
+    ds = gdal.Open(path)
+    if ds is None:
+        return None
+    wkt = ds.GetProjection()
+    ds = None
+    sr = osr.SpatialReference()
+    sr.ImportFromWkt(wkt)
+    return sr.GetAuthorityCode(None)
+
+
+def build_elevation_vrt(tile_paths: List[str], vrt_path: str) -> str:
+    """Build a VRT mosaic over feet-unit elevation tiles (no resampling — sources
+    share CRS/resolution). Nodata taken from the first tile."""
+    if not tile_paths:
+        raise RuntimeError("No tiles to build VRT from")
+    ds0 = gdal.Open(tile_paths[0])
+    nd = ds0.GetRasterBand(1).GetNoDataValue()
+    ds0 = None
+    opts = gdal.BuildVRTOptions(resampleAlg="nearest", srcNodata=nd, VRTNodata=nd)
+    vrt = gdal.BuildVRT(vrt_path, tile_paths, options=opts)
+    if vrt is None:
+        raise RuntimeError(f"gdal.BuildVRT returned None for {len(tile_paths)} tiles")
+    vrt.FlushCache()
+    vrt = None
+    logger.info(f"Built elevation VRT from {len(tile_paths)} tiles: {vrt_path}")
+    return vrt_path
+
+
+def run_tiles_mode(tiles_geojson: str, output_dir: Path, workers: int,
+                   overwrite: bool, dry_run: bool) -> None:
+    """
+    Lean compute-only flow (Phase 1): download an allow-list of 1m tiles, convert
+    each metres → feet, and build elevation_1m.vrt. No mosaic/slope/aspect/COG/upload.
+    """
+    out_base  = output_dir / "OR" / "willamette_valley_1m"
+    tiles_dir = out_base / "tiles"
+    vrt_path  = out_base / "elevation_1m.vrt"
+
+    allow = load_tile_allowlist(tiles_geojson)
+    total_gb = sum((t["size_mb"] or 0) for t in allow) / 1024
+
+    click.echo(f"\nUSGS 1m — tile allow-list mode (feet, VRT)")
+    click.echo(f"  Allow-list:  {Path(tiles_geojson).name} ({len(allow)} tiles)")
+    click.echo(f"  Est. raw DL: {total_gb:.1f} GB")
+    click.echo(f"  Output:      {out_base}")
+    click.echo(f"  Dry run:     {dry_run}\n")
+
+    if not allow:
+        click.echo("No tiles with downloadURL in allow-list. Exiting.", err=True)
+        sys.exit(1)
+
+    if dry_run:
+        for i, t in enumerate(allow[:10]):
+            click.echo(f"  [{i+1}] {t['size_mb'] or '?'} MB  {t['url'].split('/')[-1]}")
+        if len(allow) > 10:
+            click.echo(f"  ... and {len(allow) - 10} more")
+        click.echo("\n[DRY RUN] Would download → convert m→ft → build VRT. No files written.")
+        return
+
+    tiles_dir.mkdir(parents=True, exist_ok=True)
+    session = requests.Session()
+    session.headers.update({"User-Agent": "Terranthro/1.0 (1m-dem-downloader)"})
+
+    feet_paths: List[str] = []
+    failed = 0
+    with tempfile.TemporaryDirectory(prefix="wv_1m_raw_") as raw_dir:
+        def fetch_and_convert(t: dict) -> Tuple[Optional[str], bool]:
+            fname = t["url"].split("/")[-1]
+            feet_path = os.path.join(str(tiles_dir), fname)
+            if os.path.exists(feet_path) and not overwrite:
+                return feet_path, True  # already converted on a previous run
+            raw_path = os.path.join(raw_dir, fname)
+            if not download_tile(t["url"], raw_path, session):
+                return None, False
+            try:
+                convert_tile_to_feet(raw_path, feet_path)
+            except Exception as e:
+                logger.error(f"Feet conversion failed for {fname}: {e}")
+                return None, False
+            finally:
+                try:
+                    os.remove(raw_path)
+                except OSError:
+                    pass
+            return feet_path, True
+
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = {ex.submit(fetch_and_convert, t): t for t in allow}
+            with tqdm(total=len(futures), desc="1m tiles (dl+ft)", unit="tile") as pbar:
+                for fut in as_completed(futures):
+                    path, ok = fut.result()
+                    if ok and path:
+                        feet_paths.append(path)
+                    else:
+                        failed += 1
+                    pbar.update(1)
+
+    click.echo(f"\n  Converted {len(feet_paths)} tiles to feet, {failed} failed")
+    if not feet_paths:
+        click.echo("No tiles produced. Exiting.", err=True)
+        sys.exit(1)
+
+    # CRS consistency — a clean VRT needs all tiles in one CRS
+    crs_counts: Dict[Optional[str], int] = {}
+    for p in feet_paths:
+        e = tile_crs_epsg(p)
+        crs_counts[e] = crs_counts.get(e, 0) + 1
+    click.echo(f"  Tile CRS distribution (EPSG): {crs_counts}")
+    if len(crs_counts) > 1:
+        click.echo("  ⚠️  Tiles span multiple CRS — the VRT may misalign. Warp the minority "
+                   "tiles to the majority CRS before relying on it.", err=True)
+
+    build_elevation_vrt(feet_paths, str(vrt_path))
+    click.echo(f"\n✓ Phase 1 complete: {len(feet_paths)} feet tiles + {vrt_path.name}")
+    click.echo(f"  {vrt_path}")
+
+
+# ---------------------------------------------------------------------------
 # R2 upload
 # ---------------------------------------------------------------------------
 
@@ -575,6 +740,15 @@ def process_ava(
     help="Alternative to --avas: supply a custom bbox 'west,south,east,north' directly.",
 )
 @click.option(
+    "--tiles",
+    type=click.Path(exists=True),
+    default=None,
+    help="GeoJSON allow-list of specific 1m tiles to fetch (features carry downloadURL). "
+         "Runs the lean compute-only flow: download → convert m→ft → build elevation_1m.vrt. "
+         "Skips mosaic/slope/aspect/COG/upload. Example: "
+         "--tiles ../data/topography/coverage/usgs_1m_available_tiles.geojson",
+)
+@click.option(
     "--geojson-dir",
     type=click.Path(exists=True),
     default=None,
@@ -625,7 +799,7 @@ def process_ava(
     default=False,
     help="Keep downloaded raw tiles after processing (default: delete with temp dir).",
 )
-def main(avas, bbox, geojson_dir, output_dir, workers, upload, bucket, dry_run, overwrite, keep_tiles):
+def main(avas, bbox, tiles, geojson_dir, output_dir, workers, upload, bucket, dry_run, overwrite, keep_tiles):
     """
     Download USGS 1m LiDAR DEM tiles for specified Willamette Valley AVAs,
     merge them, derive slope and aspect, and write Cloud Optimized GeoTIFFs.
@@ -643,6 +817,12 @@ def main(avas, bbox, geojson_dir, output_dir, workers, upload, bucket, dry_run, 
 
     geojson_dir = Path(geojson_dir).resolve()
     output_dir  = Path(output_dir).resolve()
+
+    # ── Tile allow-list mode (Phase 1 lean flow) ───────────────────────────
+    # Bypasses the AVA/bbox → mosaic → slope/aspect → COG → R2 pipeline entirely.
+    if tiles:
+        run_tiles_mode(str(tiles), output_dir, workers, overwrite, dry_run)
+        return
 
     # Validate: must provide --avas or --bbox
     if not avas and not bbox:

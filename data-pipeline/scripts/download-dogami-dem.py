@@ -185,10 +185,13 @@ def download_dogami_tile(
     bbox_lcc: Tuple[float, float, float, float],
     output_path: str,
     dry_run: bool = False,
+    pixel_size_ft: float = DOGAMI_PIXEL_SIZE,
 ) -> bool:
     """
     Download a single tile from DOGAMI's ImageServer.
     bbox_lcc: (xmin, ymin, xmax, ymax) in Oregon LCC (EPSG:102970).
+    pixel_size_ft: requested ground sampling in LCC feet (default = native 3 ft;
+    the clip/feet flow passes 3 m ≈ 9.843 ft so the whole valley stays a sane size).
     Returns True on success.
     """
     xmin, ymin, xmax, ymax = bbox_lcc
@@ -197,16 +200,18 @@ def download_dogami_tile(
     width_km = width_ft * FT_TO_M / 1000
     height_km = height_ft * FT_TO_M / 1000
 
-    # Compute pixel dimensions at native 3-ft resolution
-    px_w = min(int(width_ft / DOGAMI_PIXEL_SIZE) + 1, MAX_EXPORT_PIXELS)
-    px_h = min(int(height_ft / DOGAMI_PIXEL_SIZE) + 1, MAX_EXPORT_PIXELS)
+    # Compute pixel dimensions at the requested resolution
+    px_w = min(int(width_ft / pixel_size_ft) + 1, MAX_EXPORT_PIXELS)
+    px_h = min(int(height_ft / pixel_size_ft) + 1, MAX_EXPORT_PIXELS)
 
-    # If area is larger than MAX_EXPORT_PIXELS, we'd need to tile — log a warning
-    if (width_ft / DOGAMI_PIXEL_SIZE) > MAX_EXPORT_PIXELS or (height_ft / DOGAMI_PIXEL_SIZE) > MAX_EXPORT_PIXELS:
+    # Warn only if the area genuinely needs more than MAX_EXPORT_PIXELS to hit the
+    # requested resolution (i.e. we're forced to downsample). Chunks sized exactly
+    # to MAX_EXPORT_PIXELS must NOT trip this (avoids a false alarm every tile).
+    if int(width_ft / pixel_size_ft) > MAX_EXPORT_PIXELS or int(height_ft / pixel_size_ft) > MAX_EXPORT_PIXELS:
         logger.warning(
-            f"Requested area ({width_km:.1f}km × {height_km:.1f}km) exceeds "
-            f"{MAX_EXPORT_PIXELS}px limit at 3ft. Output will be at reduced resolution. "
-            f"Consider splitting into smaller AVAs."
+            f"Requested area ({width_km:.1f}km × {height_km:.1f}km) needs more than "
+            f"{MAX_EXPORT_PIXELS}px at {pixel_size_ft:.2f}ft/px — output will be downsampled. "
+            f"Split into smaller chunks to keep full resolution."
         )
 
     params = {
@@ -430,6 +435,126 @@ def upload_to_r2(local_path: str, r2_key: str, bucket: str, dry_run: bool = Fals
 
 
 # ---------------------------------------------------------------------------
+# Clip / elevation-only / feet mode (compute-only pipeline)
+# ---------------------------------------------------------------------------
+
+
+def _reproject_ring(ring, ct) -> list:
+    pts = ct.TransformPoints([(float(x), float(y)) for x, y, *_ in ring])
+    return [(p[0], p[1]) for p in pts]
+
+
+def clip_polygon_lcc(clip_geojson: str):
+    """Load a WGS84 GeoJSON boundary and return it as a shapely polygon in Oregon
+    LCC (feet) for chunk-intersection tests."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    src = osr.SpatialReference(); src.ImportFromEPSG(4326)
+    src.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+    dst = osr.SpatialReference(); dst.ImportFromEPSG(DOGAMI_SR)
+    ct = osr.CoordinateTransformation(src, dst)
+    with open(clip_geojson) as f:
+        data = json.load(f)
+    feats = data["features"] if data.get("type") == "FeatureCollection" else [data]
+    polys = []
+    for ft in feats:
+        g = ft.get("geometry", ft); t = g.get("type")
+        rings_list = [g["coordinates"]] if t == "Polygon" else (g["coordinates"] if t == "MultiPolygon" else [])
+        for poly in rings_list:
+            outer = _reproject_ring(poly[0], ct)
+            holes = [_reproject_ring(r, ct) for r in poly[1:]]
+            polys.append(Polygon(outer, holes))
+    return unary_union(polys)
+
+
+def run_clip_elevation_feet(clip_geojson: str, output_dir, dry_run: bool) -> None:
+    """
+    Compute-only DOGAMI flow (Phase 2): download 3 m elevation over a clip polygon,
+    keep values in FEET (no feet→meters), warp to UTM 10N, merge, clip to the
+    boundary, write a single elevation_3m.tif. No slope/aspect/COG/upload.
+    """
+    from shapely.geometry import box
+
+    out_base = output_dir / "OR" / OUTPUT_FOLDER_NAME  # willamette_valley_dogami
+    out_base.mkdir(parents=True, exist_ok=True)
+    final_elev = out_base / "elevation_3m.tif"
+
+    poly = clip_polygon_lcc(clip_geojson)
+    xmin, ymin, xmax, ymax = poly.bounds
+    px_ft = OUTPUT_PIXEL_SIZE / FT_TO_M        # LCC feet per 3 m output pixel (~9.843)
+    tile_ft = MAX_EXPORT_PIXELS * px_ft
+
+    chunks = []
+    y = ymin
+    while y < ymax:
+        x = xmin
+        while x < xmax:
+            cxmax = min(x + tile_ft, xmax); cymax = min(y + tile_ft, ymax)
+            if box(x, y, cxmax, cymax).intersects(poly):
+                chunks.append((x, y, cxmax, cymax))
+            x += tile_ft
+        y += tile_ft
+
+    area_km2 = poly.area * (FT_TO_M ** 2) / 1e6
+    click.echo(f"\nDOGAMI 3 m elevation (feet) — clip mode")
+    click.echo(f"  Clip:     {Path(clip_geojson).name}  (~{area_km2:.0f} km²)")
+    click.echo(f"  Output:   {final_elev}")
+    click.echo(f"  Chunks:   {len(chunks)} intersecting @ ~{MAX_EXPORT_PIXELS}px 3 m "
+               f"(~{len(chunks) * 25} MB raw)")
+    click.echo(f"  Dry run:  {dry_run}\n")
+
+    if dry_run:
+        click.echo("[DRY RUN] Would download chunks → warp UTM10N 3 m (feet) → merge → clip. "
+                   "No files written.")
+        return
+
+    tmp_parent = output_dir / "_tmp"; tmp_parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="dogami_feet_", dir=str(tmp_parent)) as tmp:
+        tmp = Path(tmp)
+        utm_tiles = []
+        for i, ch in enumerate(chunks):
+            raw = str(tmp / f"raw_{i:04d}.tif")
+            if not download_dogami_tile(ch, raw, dry_run=False, pixel_size_ft=px_ft):
+                click.echo(f"  chunk {i} download failed — aborting so we don't build a "
+                           f"DEM with holes.", err=True)
+                sys.exit(1)
+            utm = str(tmp / f"utm_{i:04d}.tif")
+            warp_to_utm(raw, utm)      # LCC → UTM 10N @ 3 m; pixel values (feet) unchanged
+            os.remove(raw)
+            utm_tiles.append(utm)
+            if (i + 1) % 25 == 0 or (i + 1) == len(chunks):
+                click.echo(f"  {i + 1}/{len(chunks)} chunks done")
+
+        vrt = str(tmp / "merged.vrt")
+        merge_dems_vrt(utm_tiles, vrt)
+
+        # Reproject the WGS84 boundary to the target CRS for a clean cutline —
+        # this GDAL's WarpOptions doesn't accept cutlineSRS, so match CRS up front.
+        cutline_utm = str(tmp / "cutline_utm.geojson")
+        gdal.VectorTranslate(
+            cutline_utm, clip_geojson,
+            options=gdal.VectorTranslateOptions(dstSRS=TARGET_CRS, reproject=True, format="GeoJSON"),
+        )
+
+        click.echo("Clipping to boundary → elevation_3m.tif (feet)...")
+        warp_opts = gdal.WarpOptions(
+            format="GTiff",
+            cutlineDSName=cutline_utm, cropToCutline=True,
+            dstNodata=NODATA,
+            creationOptions=["COMPRESS=DEFLATE", "TILED=YES",
+                             "BLOCKXSIZE=512", "BLOCKYSIZE=512", "BIGTIFF=IF_SAFER"],
+            multithread=True, warpOptions=["NUM_THREADS=ALL_CPUS"],
+        )
+        ds = gdal.Warp(str(final_elev), vrt, options=warp_opts)
+        if ds is None:
+            raise RuntimeError("final clip warp failed")
+        ds = None
+
+    mb = final_elev.stat().st_size / 1_048_576
+    click.echo(f"\n✓ DOGAMI elevation (feet) complete: {final_elev} ({mb:.1f} MB, 3 m, UTM 10N)")
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -447,6 +572,15 @@ def upload_to_r2(local_path: str, r2_key: str, bucket: str, dry_run: bool = Fals
     type=str,
     default=None,
     help="Custom bbox 'west,south,east,north' in WGS84. Overrides --avas.",
+)
+@click.option(
+    "--clip",
+    type=click.Path(exists=True),
+    default=None,
+    help="GeoJSON boundary to clip to. Runs the compute-only flow: download 3 m "
+         "elevation over the boundary, keep FEET, warp UTM 10N, merge, clip → "
+         "elevation_3m.tif. Skips slope/aspect/COG/upload. Example: "
+         "--clip ../data/topography/coverage/willamette_valley_boundary.geojson",
 )
 @click.option(
     "--geojson-dir",
@@ -485,7 +619,7 @@ def upload_to_r2(local_path: str, r2_key: str, bucket: str, dry_run: bool = Fals
     default=False,
     help="Show what would be downloaded without actually downloading.",
 )
-def main(avas, bbox, geojson_dir, output_dir, upload, bucket, overwrite, dry_run):
+def main(avas, bbox, clip, geojson_dir, output_dir, upload, bucket, overwrite, dry_run):
     """
     Download DOGAMI LiDAR DEMs for WV AVAs and produce elevation/slope/aspect COGs.
     DOGAMI provides complete 3m coverage where USGS 1m tiles are absent.
@@ -499,6 +633,11 @@ def main(avas, bbox, geojson_dir, output_dir, upload, bucket, overwrite, dry_run
     if output_dir is None:
         output_dir = script_dir / ".." / "data" / "topography"
     output_dir = Path(output_dir).resolve()
+
+    # ── Clip / elevation-only / feet mode (compute-only pipeline) ──────────
+    if clip:
+        run_clip_elevation_feet(str(clip), output_dir, dry_run)
+        return
 
     final_dir = output_dir / "OR" / OUTPUT_FOLDER_NAME
     final_dir.mkdir(parents=True, exist_ok=True)

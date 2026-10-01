@@ -91,11 +91,13 @@ def iso_date(ms):
 
 
 def clean_props(p: dict) -> dict:
-    """TTB attribute names → snake_case, with 'None' strings nulled."""
+    """TTB attribute names → snake_case, with 'None' strings and NaN nulled."""
     def v(x):
         if isinstance(x, str):
             x = x.strip()
             return None if x in ("", "None", "<Null>") else x
+        if isinstance(x, float) and x != x:  # pandas NaN → JSON null, not bare NaN
+            return None
         return x
     return {
         "name": v(p["Name"]),
@@ -118,7 +120,7 @@ def as_multi(geom):
 def write_json(path: Path, obj: dict):
     path.parent.mkdir(parents=True, exist_ok=True)
     # 6 decimals ≈ 0.1 m, well under the service's 2.5 m generalization
-    path.write_text(json.dumps(obj, separators=(",", ":")))
+    path.write_text(json.dumps(obj, separators=(",", ":"), allow_nan=False))
 
 
 def round_coords(geom_json: dict) -> dict:

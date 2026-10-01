@@ -1,32 +1,11 @@
 import express from 'express';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { pool } from '../db/pool.js';
 import { resolveAssociation, membersOf, badAssociation } from '../lib/associations.js';
 
 const router = express.Router();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// AVA boundary polygons the map renders live as static files at the repo root.
-const AVA_DATA_DIR = path.resolve(__dirname, '../../../public/data');
 
-/**
- * Pulls every geometry out of a GeoJSON boundary file (Feature,
- * FeatureCollection, or bare geometry) as an array of geometry JSON strings.
- */
-function extractGeometryStrings(geojson) {
-  const out = [];
-  const push = (geom) => { if (geom && geom.type) out.push(JSON.stringify(geom)); };
-  if (geojson?.type === 'FeatureCollection') {
-    for (const f of geojson.features || []) push(f?.geometry);
-  } else if (geojson?.type === 'Feature') {
-    push(geojson.geometry);
-  } else {
-    push(geojson);
-  }
-  return out;
-}
+// AVA boundaries + hierarchy come from the avas / ava_hierarchy tables
+// (migration 026, loaded by server/scripts/load-avas.mjs from TTB's polygons).
 
 /**
  * GET /api/avas/state/:stateAbbrev
@@ -113,91 +92,70 @@ router.get('/state/:stateAbbrev', async (req, res) => {
   }
 });
 
-// Willamette Valley sub-AVAs (matches the frontend WV_SUB_AVAS list + AVA_META).
-// 'willamette-valley' is included to get the de-duplicated valley-wide total
-// (its polygon nests every sub-AVA, so summing per sub-AVA would double count).
-const WV_AVA_SLUGS = [
-  'chehalem-mountains', 'dundee-hills', 'eola-amity-hills', 'laurelwood-district',
-  'lower-long-tom', 'mcminnville', 'mount-pisgah-polk-county', 'ribbon-ridge',
-  'tualatin-hills', 'van-duzer-corridor', 'yamhill-carlton', 'willamette-valley',
-];
-
-// Recomputing the spatial sums reads 12 boundary files and unions them against
-// every block on each hit, so cache the result briefly. Block geometry changes
-// rarely (admin edits); a short TTL keeps the number effectively live.
+// Recomputing the spatial sums unions every block against each AVA in scope,
+// so cache briefly per scope. Block geometry changes rarely (admin edits); a
+// short TTL keeps the number effectively live.
 const ACRES_CACHE_TTL_MS = 5 * 60 * 1000;
-let acresCache = null; // { at: number, payload: { avas: {...}, total: number } }
+const acresCache = new Map(); // parent slug → { at, payload }
 
 /**
- * GET /api/avas/acres
+ * GET /api/avas/acres?parent=willamette-valley
  *
- * Live "mapped vineyard acres" per Willamette Valley sub-AVA plus the
- * de-duplicated valley-wide total, computed from vineyard_blocks.acres.
+ * Live "mapped vineyard acres" for every AVA nested (at any depth) inside
+ * `parent` (default 'willamette-valley'), plus the parent's own de-duplicated
+ * total, computed from vineyard_blocks.acres.
  *
  * A block counts toward an AVA when its representative interior point falls
  * inside that AVA's boundary — the same rule /members and the export scripts
  * use — so nested sub-AVAs (Ribbon Ridge, Laurelwood) roll up into their
- * parents. Boundaries come from the static public/data/*.geojson the map
- * renders, keeping the acreage consistent with what's on screen.
+ * parents, and the parent total counts every block once.
  *
- * Response: { avas: { '<slug>': <acres>, ... }, total: <acres> }
- * where `total` is the 'willamette-valley' figure (every mapped block, once).
+ * Response: { avas: { '<slug>': <acres>, ... }, total: <parent acres> }
  */
-router.get('/acres', async (_req, res) => {
-  if (acresCache && Date.now() - acresCache.at < ACRES_CACHE_TTL_MS) {
-    return res.json(acresCache.payload);
+router.get('/acres', async (req, res) => {
+  const parent = String(req.query.parent || 'willamette-valley').toLowerCase();
+  if (!/^[a-z0-9-]+$/.test(parent)) {
+    return res.status(400).json({ error: 'Invalid AVA slug' });
+  }
+  const cached = acresCache.get(parent);
+  if (cached && Date.now() - cached.at < ACRES_CACHE_TTL_MS) {
+    return res.json(cached.payload);
   }
 
   try {
-    // Flatten every AVA's boundary geometries into parallel (slug, geojson)
-    // arrays; a FeatureCollection contributes multiple rows sharing one slug,
-    // re-unioned per slug in SQL below.
-    const slugs = [];
-    const geoms = [];
-    await Promise.all(
-      WV_AVA_SLUGS.map(async (slug) => {
-        const filePath = path.join(AVA_DATA_DIR, `${slug.replace(/-/g, '_')}.geojson`);
-        try {
-          const geojson = JSON.parse(await readFile(filePath, 'utf8'));
-          for (const g of extractGeometryStrings(geojson)) {
-            slugs.push(slug);
-            geoms.push(g);
-          }
-        } catch (fileErr) {
-          if (fileErr.code !== 'ENOENT') throw fileErr;
-          // Missing boundary file → that AVA simply reports no acreage.
-        }
-      })
-    );
-
     const { rows } = await pool.query(
       `
-      WITH parts AS (
-        SELECT slug, ST_SetSRID(ST_GeomFromGeoJSON(g), 4326) AS geom
-        FROM unnest($1::text[], $2::text[]) AS t(slug, g)
-      ),
-      ava AS (
-        SELECT slug, ST_Union(geom) AS g FROM parts GROUP BY slug
+      WITH RECURSIVE scope AS (
+        SELECT id, slug, geometry FROM avas WHERE slug = $1
+        UNION
+        SELECT c.id, c.slug, c.geometry
+        FROM scope s
+        JOIN ava_hierarchy h ON h.parent_id = s.id
+        JOIN avas c ON c.id = h.child_id
       )
       SELECT a.slug,
              COALESCE(SUM(b.acres), 0)::float AS acres
-      FROM ava a
+      FROM scope a
       LEFT JOIN vineyard_blocks b
         ON b.geometry IS NOT NULL
-       AND b.geometry && a.g
-       AND ST_Contains(a.g, ST_PointOnSurface(b.geometry))
+       AND b.geometry && a.geometry
+       AND ST_Contains(a.geometry, ST_PointOnSurface(b.geometry))
       GROUP BY a.slug
       `,
-      [slugs, geoms]
+      [parent]
     );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: `AVA not found: ${parent}` });
+    }
 
     const avas = {};
     for (const r of rows) avas[r.slug] = r.acres;
-    const total = avas['willamette-valley'] ?? 0;
-    delete avas['willamette-valley'];
+    const total = avas[parent] ?? 0;
+    delete avas[parent];
 
     const payload = { avas, total };
-    acresCache = { at: Date.now(), payload };
+    acresCache.set(parent, { at: Date.now(), payload });
     res.json(payload);
   } catch (err) {
     console.error('GET /api/avas/acres error:', err);
@@ -383,9 +341,7 @@ router.get('/:slug/parents', async (req, res) => {
  * the AVA but whose tasting room sits elsewhere still belongs in the AVA's
  * directory. The frontend unions these recids with the point-inside set.
  *
- * The AVA boundary is read from the same static GeoJSON the map renders
- * (public/data/<slug>.geojson, slug hyphens → underscores) rather than the DB
- * `avas` table, keeping the membership boundary identical to what's on screen.
+ * The AVA boundary comes from the `avas` table (TTB polygons, migration 026).
  *
  * Interior-point rule (ST_PointOnSurface + ST_Contains) mirrors the
  * export-ava-vineyards.py classification convention, so a vineyard lists in
@@ -396,48 +352,32 @@ router.get('/:slug/parents', async (req, res) => {
 router.get('/:slug/members', async (req, res) => {
   const { slug } = req.params;
 
-  // Guard against path traversal — slugs are lowercase kebab-case only.
+  // Slugs are lowercase kebab-case only.
   if (!/^[a-z0-9-]+$/.test(slug)) {
     return res.status(400).json({ error: 'Invalid AVA slug' });
   }
-
-  const filePath = path.join(AVA_DATA_DIR, `${slug.replace(/-/g, '_')}.geojson`);
 
   try {
     const association = await resolveAssociation(req);
     if (!association) return badAssociation(res);
 
-    let geojson;
-    try {
-      geojson = JSON.parse(await readFile(filePath, 'utf8'));
-    } catch (fileErr) {
-      if (fileErr.code === 'ENOENT') {
-        return res.status(404).json({ error: `No boundary file for AVA: ${slug}` });
-      }
-      throw fileErr;
-    }
-
-    const geometries = extractGeometryStrings(geojson);
-    if (geometries.length === 0) {
-      return res.json({ slug, recids: [] });
+    const { rows: found } = await pool.query('SELECT 1 FROM avas WHERE slug = $1', [slug]);
+    if (found.length === 0) {
+      return res.status(404).json({ error: `AVA not found: ${slug}` });
     }
 
     const { rows } = await pool.query(
       `
-      WITH ava AS (
-        SELECT ST_Union(ST_SetSRID(ST_GeomFromGeoJSON(g), 4326)) AS g
-        FROM unnest($1::text[]) AS t(g)
-      )
       SELECT DISTINCT w.recid
-      FROM vineyards v
+      FROM avas a
+      JOIN vineyards v ON v.geometry && a.geometry
+                      AND ST_Contains(a.geometry, ST_PointOnSurface(v.geometry))
       JOIN wineries w ON w.id = v.winery_id
-      CROSS JOIN ava
-      WHERE w.id IN ${membersOf('$2')}
-        AND v.geometry && ava.g
-        AND ST_Contains(ava.g, ST_PointOnSurface(v.geometry))
+      WHERE a.slug = $1
+        AND w.id IN ${membersOf('$2')}
       ORDER BY w.recid
       `,
-      [geometries, association]
+      [slug, association]
     );
 
     res.json({ slug, recids: rows.map((r) => r.recid) });

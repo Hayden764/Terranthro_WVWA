@@ -1,5 +1,7 @@
 # Everything except the server source and root config files
 data-pipeline/
+apps/
+packages/
 public/
 src/
 scripts/

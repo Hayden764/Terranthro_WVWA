@@ -14,6 +14,8 @@ import searchRoutes from './routes/search.js';
 import authRoutes from './routes/auth.js';
 import portalRoutes from './routes/portal.js';
 import adminRoutes from './routes/admin.js';
+import adminContractRoutes from './routes/adminContracts.js';
+import clientRoutes from './routes/client.js';
 import publicRoutes from './routes/public.js';
 import { requireApiKey } from './middleware/apiKey.js';
 import { requirePortalAuth } from './middleware/portalAuth.js';
@@ -83,6 +85,8 @@ app.use('/api/vineyards', requireApiKey, vineyardRoutes);
 app.use('/api/search', requireApiKey, searchRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/portal', requirePortalAuth, portalRoutes);
+app.use('/api/client', clientRoutes);             // OWB Portal (shared client login)
+app.use('/api/admin/contracts', adminContractRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/public', publicRoutes);
 

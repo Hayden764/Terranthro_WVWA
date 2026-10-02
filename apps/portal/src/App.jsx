@@ -25,6 +25,11 @@ import AdminVineyardBlocks from './pages/admin/AdminVineyardBlocks';
 import AdminVineyardBlockDetail from './pages/admin/AdminVineyardBlockDetail';
 import AdminBulkBlockImport from './pages/admin/AdminBulkBlockImport';
 import AdminAccountIntel from './pages/admin/AdminAccountIntel';
+import AdminContract from './pages/admin/AdminContract';
+
+// OWB Portal — the Oregon Wine Board's shared login for contract progress + data
+import OwbLogin from './pages/owb/OwbLogin';
+import OwbPortal from './pages/owb/OwbPortal';
 
 // The single sign-in point for every grower, whichever explorer (WVWA, OWB, …)
 // sent them here. Paths keep their /portal and /admin prefixes so links issued
@@ -47,6 +52,10 @@ export default function App() {
         <Route path="/portal/claim" element={<PortalClaim />} />
         <Route path="/portal/site" element={<PortalSite />} />
 
+        {/* OWB Portal */}
+        <Route path="/owb" element={<OwbLogin />} />
+        <Route path="/owb/:tab" element={<OwbPortal />} />
+
         {/* Public winery vineyard pages (embeddable with ?embed=1) */}
         <Route path="/w/:slug" element={<Suspense fallback={null}><WinerySitePage /></Suspense>} />
         <Route path="/w/:slug/:vineyardKey" element={<Suspense fallback={null}><WinerySitePage /></Suspense>} />
@@ -55,6 +64,7 @@ export default function App() {
         <Route path="/admin" element={<AdminLogin />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/intel" element={<AdminAccountIntel />} />
+        <Route path="/admin/contracts" element={<AdminContract />} />
         <Route path="/admin/requests/:id" element={<AdminRequestDetail />} />
         {/* Parcel editor — admin-only, full-screen */}
         <Route path="/admin/editor" element={<EditorPage />} />

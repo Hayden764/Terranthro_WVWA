@@ -150,6 +150,20 @@ export default function AdminDashboard() {
         >
           ⊞ Block Manager
         </Link>
+        {/* OWB contract — milestones, invoices and updates shown in the OWB Portal */}
+        <Link
+          to="/admin/contracts"
+          style={{
+            padding: '7px 18px', borderRadius: 6,
+            background: alpha(TOKENS.electricBlue, 0.12),
+            color: TOKENS.electricBlue,
+            fontSize: 'var(--type-mono-size)', fontWeight: 600,
+            textDecoration: 'none',
+            border: `1px solid ${alpha(TOKENS.electricBlue, 0.25)}`,
+          }}
+        >
+          ▤ OWB Contract
+        </Link>
         {/* Editor shortcut — navigates to the full-screen parcel editor */}
         <Link
           to="/admin/editor"

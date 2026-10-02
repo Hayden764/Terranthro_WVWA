@@ -6,6 +6,11 @@ const API_BASE = import.meta.env.DEV
   ? ''
   : (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
+/** Absolute URL for an API path — for links the browser opens itself (file downloads). */
+export function apiUrl(path) {
+  return `${API_BASE}${path}`;
+}
+
 export async function apiFetch(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',

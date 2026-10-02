@@ -4,7 +4,7 @@
  *
  * GET    /                                    — contracts with their client
  * GET    /:id                                 — full timeline + client notify list
- * PATCH  /:id                                 — { effective_date }
+ * PATCH  /:id                                 — { effective_date, contractor_email }
  * PATCH  /milestones/:mid                     — status, dates, delivery note, delay
  * POST   /milestones/:mid/send-delivery-notice — email the client that it was delivered
  * POST   /milestones/:mid/tasks               — { label }
@@ -92,19 +92,26 @@ router.get('/', handle(async (_req, res) => {
 router.get('/:id(\\d+)', handle(async (req, res) => {
   const timeline = await loadContractTimeline(pool, intParam(req.params.id));
   if (!timeline) return res.status(404).json({ error: 'Contract not found' });
-  const { rows: [client] } = await pool.query(
-    `SELECT id, name, username, notify_emails, last_login FROM client_accounts WHERE id = $1`,
-    [timeline.contract.client_id]
-  );
-  res.json({ ...timeline, client });
+  const [{ rows: [client] }, { rows: [{ contractor_email }] }] = await Promise.all([
+    pool.query(
+      `SELECT id, name, username, notify_emails, last_login FROM client_accounts WHERE id = $1`,
+      [timeline.contract.client_id]
+    ),
+    pool.query(`SELECT contractor_email FROM contracts WHERE id = $1`, [timeline.contract.id]),
+  ]);
+  res.json({ ...timeline, contract: { ...timeline.contract, contractor_email }, client });
 }));
 
 router.patch('/:id(\\d+)', handle(async (req, res) => {
   const { effective_date } = req.body;
+  const contractorEmail = emptyToNull(String(req.body.contractor_email ?? '').trim().toLowerCase());
   if (badDate(effective_date)) return res.status(400).json({ error: 'Dates must be YYYY-MM-DD' });
+  if (contractorEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contractorEmail)) {
+    return res.status(400).json({ error: 'Invalid email address' });
+  }
   const { rowCount } = await pool.query(
-    `UPDATE contracts SET effective_date = $1 WHERE id = $2`,
-    [emptyToNull(effective_date), intParam(req.params.id)]
+    `UPDATE contracts SET effective_date = $1, contractor_email = $2 WHERE id = $3`,
+    [emptyToNull(effective_date), contractorEmail, intParam(req.params.id)]
   );
   if (!rowCount) return res.status(404).json({ error: 'Contract not found' });
   res.json({ success: true });
@@ -152,6 +159,7 @@ router.patch('/milestones/:mid', handle(async (req, res) => {
     if (status !== 'accepted') {
       patch.accepted_at = null;
       patch.acceptance = null;
+      patch.accepted_by = null;
     }
   }
   if (patch.acceptance != null && !['explicit', 'deemed', 'on_execution'].includes(patch.acceptance)) {

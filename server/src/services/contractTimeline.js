@@ -117,7 +117,8 @@ export async function loadContractTimeline(db, contractId) {
       `SELECT id, kind, number, sort_order, title, work, base_amount, additional_amount,
               additional_label, due_label, target_date::text, revised_target_date::text,
               delay_reason, status, started_at::text, delivered_at::text, accepted_at::text,
-              acceptance, delivery_note, delivery_emailed_at, updated_at
+              acceptance, accepted_by, rejected_at::text, rejected_by, rejection_note,
+              delivery_note, delivery_emailed_at, updated_at
        FROM contract_milestones WHERE contract_id = $1 ORDER BY sort_order`,
       [contractId]
     ),
@@ -133,7 +134,7 @@ export async function loadContractTimeline(db, contractId) {
     ),
     db.query(
       `SELECT id, milestone_id, invoice_number, amount, issued_on::text, due_on::text,
-              paid_on::text, file_id, notes
+              paid_on::text, approved_on::text, approved_by, file_id, notes
        FROM contract_invoices WHERE contract_id = $1 ORDER BY issued_on, id`,
       [contractId]
     ),

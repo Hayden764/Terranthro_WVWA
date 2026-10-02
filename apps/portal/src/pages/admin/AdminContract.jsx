@@ -51,14 +51,17 @@ export default function AdminContract() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Run an action, report failures, then reload.
+  // Run an action, report failures, then reload. Resolves true if it worked.
   const act = useCallback(async (fn) => {
+    let ok = true;
     try {
       await fn();
     } catch (err) {
+      ok = false;
       alert(err.message);
     }
     await load();
+    return ok;
   }, [load]);
 
   if (!data) return <Shell><p style={{ color: TOKENS.muted }}>Loading…</p></Shell>;
@@ -90,6 +93,7 @@ export default function AdminContract() {
           notifyEmails={client.notify_emails}
           open={openId === m.id}
           onToggle={() => setOpenId(openId === m.id ? null : m.id)}
+          onSaved={() => setOpenId(null)}
           act={act}
         />
       ))}
@@ -108,27 +112,40 @@ export default function AdminContract() {
 function ClientSettings({ contract, client, act }) {
   const [emails, setEmails] = useState(client.notify_emails.join(', '));
   const [effective, setEffective] = useState(contract.effective_date || '');
+  const [contractorEmail, setContractorEmail] = useState(contract.contractor_email || '');
+  const [saved, setSaved] = useState(false);
+
+  async function save() {
+    const ok = await act(async () => {
+      await apiPatch(`/api/admin/contracts/clients/${client.id}`, {
+        notify_emails: emails.split(/[,\s]+/).filter(Boolean),
+      });
+      await apiPatch(`/api/admin/contracts/${contract.id}`, {
+        effective_date: effective || null,
+        contractor_email: contractorEmail,
+      });
+    });
+    if (ok) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }
+  }
+
   return (
     <div style={{ ...cardStyle, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 20 }}>
       <label style={{ flex: '2 1 280px' }}>
         <span style={adminLabel}>Delivery emails go to</span>
         <input value={emails} onChange={(e) => setEmails(e.target.value)} style={adminInput} />
       </label>
+      <label style={{ flex: '1 1 220px' }}>
+        <span style={adminLabel}>OWB actions email</span>
+        <input value={contractorEmail} onChange={(e) => setContractorEmail(e.target.value)} style={adminInput} />
+      </label>
       <label style={{ flex: '1 1 150px' }}>
         <span style={adminLabel}>Contract effective date</span>
         <input type="date" value={effective} onChange={(e) => setEffective(e.target.value)} style={adminInput} />
       </label>
-      <button
-        style={primaryBtn}
-        onClick={() => act(async () => {
-          await apiPatch(`/api/admin/contracts/clients/${client.id}`, {
-            notify_emails: emails.split(/[,\s]+/).filter(Boolean),
-          });
-          await apiPatch(`/api/admin/contracts/${contract.id}`, { effective_date: effective || null });
-        })}
-      >
-        Save
-      </button>
+      <button style={primaryBtn} onClick={save}>{saved ? 'Saved ✓' : 'Save'}</button>
       <span style={{ ...adminLabel, flexBasis: '100%', margin: 0 }}>
         Shared login <code>{client.username}</code>
         {client.last_login ? ` · last signed in ${new Date(client.last_login).toLocaleString()}` : ' · never signed in'}
@@ -139,7 +156,7 @@ function ClientSettings({ contract, client, act }) {
 
 // ─── Milestone ───────────────────────────────────────────────────
 
-function MilestoneEditor({ m, contractId, notifyEmails, open, onToggle, act }) {
+function MilestoneEditor({ m, contractId, notifyEmails, open, onToggle, onSaved, act }) {
   const [form, setForm] = useState(() => pick(m));
   useEffect(() => { setForm(pick(m)); }, [m]);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -154,13 +171,14 @@ function MilestoneEditor({ m, contractId, notifyEmails, open, onToggle, act }) {
       delete patch.accepted_at;
       delete patch.acceptance;
     }
-    await act(async () => {
+    const ok = await act(async () => {
       await apiPatch(`/api/admin/contracts/milestones/${m.id}`, patch);
       if (becameDelivered && m.kind === 'milestone' && notifyEmails.length
           && confirm(`Email the delivery notice for ${lineLabel(m)} to ${notifyEmails.join(', ')}?`)) {
         await apiPost(`/api/admin/contracts/milestones/${m.id}/send-delivery-notice`, {});
       }
     });
+    if (ok) onSaved();
   }
 
   return (
@@ -183,6 +201,17 @@ function MilestoneEditor({ m, contractId, notifyEmails, open, onToggle, act }) {
 
       {open && (
         <div style={{ padding: '4px 14px 16px', borderTop: `1px solid ${alpha(TOKENS.parchment, 0.06)}` }}>
+          {m.status === 'accepted' && m.accepted_by && (
+            <p style={{ ...ownerNote, borderColor: TOKENS.success }}>
+              Accepted in the OWB Portal by {m.accepted_by} on {fmtDate(m.accepted_at)}.
+            </p>
+          )}
+          {m.status === 'revising' && m.rejection_note && (
+            <p style={{ ...ownerNote, borderColor: TOKENS.crimson }}>
+              <strong>Changes requested by {m.rejected_by} on {fmtDate(m.rejected_at)}:</strong>{'\n'}{m.rejection_note}
+              {'\n'}Revise, then set the status back to Delivered to re-deliver.
+            </p>
+          )}
           <div style={grid}>
             <Field label="Status">
               <select value={form.status} onChange={set('status')} style={adminInput}>
@@ -326,6 +355,9 @@ function InvoiceEditor({ m, contractId, act }) {
           {inv.file_id
             ? <a href={apiUrl(`/api/admin/contracts/files/${inv.file_id}`)} target="_blank" rel="noreferrer" style={{ color: TOKENS.electricBlue }}>PDF</a>
             : <span style={{ color: TOKENS.warning }}>no PDF</span>}
+          {inv.approved_on && !inv.paid_on && (
+            <span style={{ color: TOKENS.success }}>approved by {inv.approved_by} {fmtDate(inv.approved_on)}</span>
+          )}
           {inv.paid_on
             ? <span style={{ color: TOKENS.success }}>paid {fmtDate(inv.paid_on)}</span>
             : (
@@ -428,6 +460,11 @@ const primaryBtn = {
   padding: '7px 16px', borderRadius: 6, border: 'none',
   background: TOKENS.electricBlue, color: TOKENS.ink, fontSize: 'var(--type-body-size)',
   fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+};
+const ownerNote = {
+  margin: '10px 0 4px', padding: '8px 12px', borderLeft: '3px solid', borderRadius: 4,
+  background: alpha(TOKENS.parchment, 0.04), color: TOKENS.parchment,
+  fontSize: 'var(--type-body-size)', whiteSpace: 'pre-line',
 };
 const xBtn = { background: 'none', border: 'none', color: TOKENS.muted, fontSize: 18, cursor: 'pointer', lineHeight: 1 };
 const adminLabel = { display: 'block', fontSize: 'var(--type-ui-label-size)', color: TOKENS.muted, marginBottom: 3 };

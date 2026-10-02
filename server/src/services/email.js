@@ -181,6 +181,49 @@ export async function sendMilestoneDeliveredEmail(p) {
   }
 }
 
+/**
+ * Tell Terranthro the client acted in its portal (accepted a milestone,
+ * requested changes, approved an invoice).
+ *
+ * @param {object} p
+ * @param {string}   p.to
+ * @param {string}   p.subject
+ * @param {string}   p.summary   one sentence, plain text
+ * @param {string}   [p.note]    the client's own words (e.g. requested changes)
+ */
+export async function sendClientActionEmail(p) {
+  const link = `${PORTAL_BASE_URL}/admin/contracts`;
+  const noteHtml = p.note
+    ? `<blockquote style="margin: 16px 0; padding: 10px 14px; border-left: 3px solid rgb(200, 125, 74); background: rgb(245, 241, 232);">
+         ${escapeHtml(p.note).replace(/\n/g, '<br>')}
+       </blockquote>`
+    : '';
+
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to: p.to,
+    subject: p.subject,
+    html: `
+      <div style="font-family: serif; max-width: 560px; margin: 0 auto; color: rgb(8, 10, 15);">
+        <p>${escapeHtml(p.summary)}</p>
+        ${noteHtml}
+        <p style="margin: 24px 0;">
+          <a href="${link}"
+             style="background: rgb(0, 196, 79); color: white; padding: 12px 28px;
+                    border-radius: 6px; text-decoration: none; font-size: 16px;">
+            Open the contract
+          </a>
+        </p>
+      </div>
+    `,
+  });
+
+  if (error) {
+    console.error('Failed to send client action email:', error);
+    throw new Error('Email delivery failed');
+  }
+}
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')

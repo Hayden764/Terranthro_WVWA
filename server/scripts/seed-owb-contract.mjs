@@ -1,7 +1,7 @@
 /**
  * seed-owb-contract.mjs
  * =====================
- * Seeds the OWB Portal (migration 030): the shared OWB login, the signed
+ * Seeds the OWB Portal (migrations 030 + 031): the shared OWB login, the signed
  * contract, and its payment schedule — build-phase hosting plus the 16
  * milestones, with scope and amounts copied from Exhibit A of the
  * DOJ-approved contract (v2026.09.30 v2, approved 2026-10-01).
@@ -39,6 +39,8 @@ const CONTRACT = {
   slug: 'owb-statewide-vineyard-mapping',
   title: 'Oregon Statewide Vineyard Mapping',
   nteAmount: 141800,
+  // Contractor's Contract Administrator — emailed when OWB acts in the portal.
+  contractorEmail: 'hayden@terranthro.com',
 };
 
 const WV_SUB_AVAS = [
@@ -156,11 +158,12 @@ async function main() {
     }
 
     const { rows: [contract] } = await client.query(
-      `INSERT INTO contracts (client_account_id, slug, title, nte_amount)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (slug) DO UPDATE SET title = EXCLUDED.title, nte_amount = EXCLUDED.nte_amount
+      `INSERT INTO contracts (client_account_id, slug, title, nte_amount, contractor_email)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (slug) DO UPDATE SET title = EXCLUDED.title, nte_amount = EXCLUDED.nte_amount,
+         contractor_email = COALESCE(contracts.contractor_email, EXCLUDED.contractor_email)
        RETURNING id`,
-      [account.id, CONTRACT.slug, CONTRACT.title, CONTRACT.nteAmount]
+      [account.id, CONTRACT.slug, CONTRACT.title, CONTRACT.nteAmount, CONTRACT.contractorEmail]
     );
 
     const { rows: [{ n }] } = await client.query(

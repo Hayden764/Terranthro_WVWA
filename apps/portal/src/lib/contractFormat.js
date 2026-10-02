@@ -56,7 +56,10 @@ export function billingText(m) {
     return { text: `Paid ${fmtDate(last.paid_on, { month: 'short', day: 'numeric' })}`, color: TOKENS.vividGreen };
   }
   if (m.billing === 'overdue') return { text: `Invoice past due (${fmtDate(open.due_on, { month: 'short', day: 'numeric' })})`, color: TOKENS.crimson };
-  if (m.billing === 'invoiced') return { text: `Invoiced · due ${fmtDate(open.due_on, { month: 'short', day: 'numeric' })}`, color: TOKENS.violet };
+  if (m.billing === 'invoiced') {
+    const step = open.approved_on ? 'Approved for payment' : 'Invoiced';
+    return { text: `${step} · due ${fmtDate(open.due_on, { month: 'short', day: 'numeric' })}`, color: TOKENS.violet };
+  }
   if (m.billing === 'ready_to_invoice') return { text: 'Invoice coming', color: TOKENS.electricBlue };
   return null;
 }

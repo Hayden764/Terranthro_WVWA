@@ -1,7 +1,7 @@
 /**
  * TimelineTab — the OWB Portal's build-out timeline: contract value by stage,
- * anything waiting on OWB, the full payment schedule (expandable per line),
- * invoices, and the activity feed.
+ * anything waiting on OWB (with Accept / Request changes), the full payment
+ * schedule (expandable per line), invoices (with Approve), and the activity feed.
  */
 import { useState } from 'react';
 import { alpha, ink, muted, TOKENS } from '@terranthro/shared/styles/tokens.js';
@@ -9,13 +9,14 @@ import { apiUrl } from '@terranthro/shared/lib/api.js';
 import {
   STAGES, STATUS, billingText, fileSize, fmtDate, lineLabel, money, stageOf,
 } from '../../lib/contractFormat';
+import { ApproveInvoiceForm, ReviewActions } from './ClientActions';
 
 const line = alpha(TOKENS.ink, 0.15);
 const card = { border: `1px solid ${line}`, borderRadius: 10, padding: '18px 18px', marginBottom: 20 };
 const h2 = { fontSize: 'var(--type-display-italic-size)', fontFamily: 'var(--font-display)', fontWeight: 600, margin: '0 0 12px' };
 const small = { fontSize: 'var(--type-mono-size)', color: muted };
 
-export default function TimelineTab({ data }) {
+export default function TimelineTab({ data, onChanged }) {
   const { contract, totals, milestones, updates, general_files: generalFiles } = data;
   const inReview = milestones.filter((m) => m.status === 'delivered');
   const upcoming = milestones.find((m) => m.status === 'in_progress' || m.status === 'revising')
@@ -29,11 +30,14 @@ export default function TimelineTab({ data }) {
       {(inReview.length > 0 || upcoming) && (
         <section style={{ ...card, background: alpha(TOKENS.ink, 0.03) }}>
           {inReview.map((m) => (
-            <p key={m.id} style={{ margin: '0 0 10px', lineHeight: 1.5 }}>
-              <Dot color={TOKENS.amber} /> <strong>{lineLabel(m)} is waiting on your review.</strong>{' '}
-              Delivered {fmtDate(m.delivered_at)}. It is accepted automatically on{' '}
-              <strong>{fmtDate(m.deemed_acceptance_on)}</strong> unless OWB sends a written rejection.
-            </p>
+            <div key={m.id} style={{ marginBottom: 16 }}>
+              <p style={{ margin: 0, lineHeight: 1.5 }}>
+                <Dot color={TOKENS.amber} /> <strong>{lineLabel(m)} {m.title} is waiting on your review.</strong>{' '}
+                Delivered {fmtDate(m.delivered_at)}. It is accepted automatically on{' '}
+                <strong>{fmtDate(m.deemed_acceptance_on)}</strong> unless OWB requests changes.
+              </p>
+              <ReviewActions m={m} onChanged={onChanged} />
+            </div>
           ))}
           {upcoming && (
             <p style={{ margin: 0, lineHeight: 1.5 }}>
@@ -47,12 +51,12 @@ export default function TimelineTab({ data }) {
       <section style={{ marginBottom: 20 }}>
         <h2 style={h2}>Milestones &amp; payment schedule</h2>
         <div style={{ border: `1px solid ${line}`, borderRadius: 10, overflow: 'hidden' }}>
-          {milestones.map((m, i) => <ScheduleRow key={m.id} m={m} first={i === 0} />)}
+          {milestones.map((m, i) => <ScheduleRow key={m.id} m={m} first={i === 0} onChanged={onChanged} />)}
         </div>
         <p style={{ ...small, marginTop: 8 }}>
           Each milestone is invoiced once accepted; payment terms are Net {contract.payment_terms_days}.
           A delivered milestone is accepted automatically after {contract.review_business_days} business days
-          unless OWB sends a written rejection.
+          unless OWB requests changes.
         </p>
       </section>
 
@@ -62,7 +66,7 @@ export default function TimelineTab({ data }) {
           {invoices.length === 0 ? (
             <p style={{ ...small, margin: 0 }}>No invoices yet. Each is issued here, with a copy of the PDF, once its milestone is accepted.</p>
           ) : (
-            <InvoiceTable invoices={invoices} />
+            <InvoiceTable invoices={invoices} onChanged={onChanged} />
           )}
         </section>
 
@@ -155,7 +159,7 @@ function targetText(m) {
   return m.target_date || m.revised_target_date ? `Target ${dueText(m)}` : dueText(m);
 }
 
-function ScheduleRow({ m, first }) {
+function ScheduleRow({ m, first, onChanged }) {
   const [open, setOpen] = useState(false);
   const status = STATUS[m.status];
   const billing = billingText(m);
@@ -185,10 +189,12 @@ function ScheduleRow({ m, first }) {
           <span className="tx-title" style={{ display: 'block', fontWeight: 500, fontSize: 'var(--type-body-size)' }}>{m.title}</span>
           <span style={{ ...small, display: 'block', marginTop: 2 }}>
             {m.status === 'accepted' && m.accepted_at
-              ? `Accepted ${fmtDate(m.accepted_at)}${m.acceptance === 'deemed' ? ' (review period ended)' : ''}`
+              ? `Accepted ${fmtDate(m.accepted_at)}${m.accepted_by ? ` by ${m.accepted_by}` : ''}${m.acceptance === 'deemed' ? ' (review period ended)' : ''}`
               : m.status === 'delivered'
                 ? `Delivered ${fmtDate(m.delivered_at)} · auto-accepts ${fmtDate(m.deemed_acceptance_on)}`
-                : <>
+                : m.status === 'revising' && m.rejected_at
+                  ? `Changes requested ${fmtDate(m.rejected_at)} · being revised`
+                  : <>
                     {targetText(m)}
                     {m.revised_target_date && m.due_label && <s style={{ marginLeft: 6, opacity: 0.7 }}>{m.due_label}</s>}
                   </>}
@@ -211,12 +217,12 @@ function ScheduleRow({ m, first }) {
         <span aria-hidden style={{ color: muted, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>›</span>
       </button>
 
-      {open && <MilestoneDetail id={detailId} m={m} />}
+      {open && <MilestoneDetail id={detailId} m={m} onChanged={onChanged} />}
     </div>
   );
 }
 
-function MilestoneDetail({ id, m }) {
+function MilestoneDetail({ id, m, onChanged }) {
   const sub = { ...small, textTransform: 'uppercase', letterSpacing: '0.12em', margin: '14px 0 6px' };
   return (
     <div id={id} style={{ padding: '4px 16px 18px clamp(16px, 8vw, 82px)', background: alpha(TOKENS.ink, 0.03) }}>
@@ -227,6 +233,14 @@ function MilestoneDetail({ id, m }) {
         {m.additional_amount > 0 && ` + ${money(m.additional_amount)} ${m.additional_label || 'additional'}`}
         {m.due_label && ` · Schedule: ${m.due_label}`}
       </p>
+
+      {m.status === 'delivered' && <ReviewActions m={m} onChanged={onChanged} />}
+
+      {m.status === 'revising' && m.rejection_note && (
+        <p style={{ margin: '10px 0 0', padding: '8px 12px', borderLeft: `3px solid ${TOKENS.crimson}`, background: alpha(TOKENS.crimson, 0.06), fontSize: 'var(--type-body-size)', whiteSpace: 'pre-line' }}>
+          <strong>Changes requested{m.rejected_by ? ` by ${m.rejected_by}` : ''} on {fmtDate(m.rejected_at)}:</strong>{'\n'}{m.rejection_note}
+        </p>
+      )}
 
       {m.delay_reason && (
         <p style={{ margin: '10px 0 0', padding: '8px 12px', borderLeft: `3px solid ${TOKENS.amber}`, background: alpha(TOKENS.amber, 0.08), fontSize: 'var(--type-body-size)' }}>
@@ -268,7 +282,8 @@ function MilestoneDetail({ id, m }) {
 
 // ─── Invoices + files ────────────────────────────────────────────
 
-function InvoiceTable({ invoices }) {
+function InvoiceTable({ invoices, onChanged }) {
+  const [approving, setApproving] = useState(null);
   const th = { ...small, textAlign: 'left', fontWeight: 500, padding: '4px 8px 6px 0' };
   const td = { fontSize: 'var(--type-body-size)', padding: '7px 8px 7px 0', borderTop: `1px solid ${alpha(TOKENS.ink, 0.07)}`, fontVariantNumeric: 'tabular-nums' };
   return (
@@ -287,8 +302,22 @@ function InvoiceTable({ invoices }) {
               <td style={td}>{lineLabel(inv.milestone)}</td>
               <td style={{ ...td, textAlign: 'right' }}>{money(inv.amount)}</td>
               <td style={td}>
-                {inv.paid_on ? `Paid ${fmtDate(inv.paid_on, { month: 'short', day: 'numeric' })}`
-                  : `Due ${fmtDate(inv.due_on, { month: 'short', day: 'numeric' })}`}
+                {inv.paid_on ? `Paid ${fmtDate(inv.paid_on, { month: 'short', day: 'numeric' })}` : (
+                  <>
+                    Due {fmtDate(inv.due_on, { month: 'short', day: 'numeric' })}
+                    <div style={small}>
+                      {inv.approved_on
+                        ? `Approved ${fmtDate(inv.approved_on, { month: 'short', day: 'numeric' })}${inv.approved_by ? ` by ${inv.approved_by}` : ''}`
+                        : (
+                          <button type="button" onClick={() => setApproving(inv)} className="tx-link" style={{
+                            background: 'none', border: 'none', padding: 0, font: 'inherit', color: TOKENS.interactive, cursor: 'pointer',
+                          }}>
+                            Approve for payment
+                          </button>
+                        )}
+                    </div>
+                  </>
+                )}
               </td>
               <td style={td}>
                 {inv.file_id && (
@@ -300,6 +329,14 @@ function InvoiceTable({ invoices }) {
           ))}
         </tbody>
       </table>
+      {approving && (
+        <ApproveInvoiceForm
+          key={approving.id}
+          inv={approving}
+          onChanged={() => { setApproving(null); onChanged(); }}
+          onCancel={() => setApproving(null)}
+        />
+      )}
     </div>
   );
 }

@@ -321,6 +321,48 @@ router.get('/:slug', async (req, res) => {
 });
 
 /**
+ * GET /api/avas/:slug/terroir
+ *
+ * Soil and bedrock make-up of the AVA (ava_terroir_composition, migration 027):
+ * share of the AVA's Oregon land in each class, largest first.
+ *   soil / bedrock          every class (shares sum to 100)
+ *   soil_series / formation the 12 largest named units
+ *   states                  states the AVA touches; the sources are Oregon-only,
+ *                           so a multi-state AVA is summarised over its Oregon part
+ */
+router.get('/:slug/terroir', async (req, res) => {
+  const { slug } = req.params;
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    return res.status(400).json({ error: 'Invalid AVA slug' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT c.layer, c.class, c.acres::float AS acres, c.pct::float AS pct,
+              (SELECT array_agg(st.abbreviation ORDER BY st.abbreviation) FROM ava_states av
+                JOIN states st ON st.id = av.state_id WHERE av.ava_id = a.id) AS states
+       FROM ava_terroir_composition c
+       JOIN avas a ON a.id = c.ava_id
+       WHERE a.slug = $1
+       ORDER BY c.layer, c.rank`,
+      [slug]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: `No soil or bedrock data for AVA: ${slug}` });
+    }
+
+    const out = { slug, states: rows[0].states || [], soil: [], soil_series: [], bedrock: [], formation: [] };
+    for (const r of rows) out[r.layer]?.push({ class: r.class, pct: r.pct, acres: r.acres });
+    // Changes only when the pipeline re-runs.
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.json(out);
+  } catch (err) {
+    console.error('GET /api/avas/:slug/terroir error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/avas/:slug/children
  *
  * Returns all direct child AVAs (sub-AVAs) of the given AVA.

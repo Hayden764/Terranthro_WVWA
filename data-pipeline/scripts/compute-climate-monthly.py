@@ -4,9 +4,12 @@ Monthly PRISM Climate per AVA and per Vineyard
 Reads the Oregon-cropped PRISM monthly grids written by download-prism-monthly.py
 and writes one row per (entity, year, month) to climate_monthly (migration 024):
 
-  - AVAs:      mean over every 800m cell whose centre falls inside the AVA
-               boundary (apps/wvwa/public/data/<slug>.geojson); small AVAs with fewer than
-               4 such cells fall back to every cell the boundary touches.
+  - AVAs:      every AVA touching Oregon, from the avas table (migration 026):
+               mean over every 800m cell whose centre falls inside the AVA
+               boundary; small AVAs with fewer than 4 such cells fall back to
+               every cell the boundary touches. AVAs that extend past Oregon
+               (Columbia Valley, Walla Walla, Snake River, Columbia Gorge) are
+               averaged over their Oregon part only — the grids are Oregon crops.
   - Vineyards: the cell under ST_PointOnSurface(vineyards.geometry).
 
 All grids share one Oregon window, so masks / pixel indices are built once.
@@ -14,6 +17,7 @@ All grids share one Oregon window, so masks / pixel indices are built once.
 Usage:
     python compute-climate-monthly.py                 # all years on disk
     python compute-climate-monthly.py --start 2025 --skip-vineyards
+    python compute-climate-monthly.py --skip-vineyards --dry-run   # compute, write nothing
 """
 
 import io
@@ -34,25 +38,27 @@ from tqdm import tqdm
 
 ROOT = Path(__file__).resolve().parent / ".."
 PRISM_DIR = ROOT / "data" / "climate" / "prism" / "monthly"
-AVA_DIR = ROOT / ".." / "apps" / "wvwa" / "public" / "data"
-AVA_FILES = [
-    "willamette_valley", "chehalem_mountains", "laurelwood_district", "ribbon_ridge",
-    "dundee_hills", "eola_amity_hills", "lower_long_tom", "mcminnville",
-    "mount_pisgah_polk_county", "tualatin_hills", "van_duzer_corridor", "yamhill_carlton",
-]
 VARS = {"tmean": "tmean_c", "tmin": "tmin_c", "tmax": "tmax_c", "ppt": "ppt_mm"}
 NAME_RE = re.compile(r"prism_(\w+)_or_800m_(\d{4})(\d{2})\.tif$")
 
 
-def ava_masks(transform, shape):
+def ava_masks(conn, transform, shape):
+    with conn.cursor() as cur:
+        cur.execute("""SELECT a.slug, ST_AsGeoJSON(a.geometry)
+                       FROM avas a
+                       WHERE a.id IN (SELECT av.ava_id FROM ava_states av
+                                      JOIN states s ON s.id = av.state_id
+                                      WHERE s.abbreviation = 'OR')
+                       ORDER BY a.slug""")
+        rows = cur.fetchall()
     masks = {}
-    for stem in AVA_FILES:
-        gj = json.loads((AVA_DIR / f"{stem}.geojson").read_text())
-        geoms = [f["geometry"] for f in gj["features"]] if gj.get("type") == "FeatureCollection" else [gj["geometry"]]
+    for slug, geojson in rows:
+        geoms = [json.loads(geojson)]
         inside = ~geometry_mask(geoms, out_shape=shape, transform=transform, all_touched=False)
         if inside.sum() < 4:
             inside = ~geometry_mask(geoms, out_shape=shape, transform=transform, all_touched=True)
-        masks[stem.replace("_", "-")] = inside
+        if inside.any():
+            masks[slug] = inside
     return masks
 
 
@@ -74,7 +80,8 @@ def vineyard_pixels(conn, transform, shape):
 @click.option("--start", default=1991, show_default=True)
 @click.option("--end", default=2100, show_default=True)
 @click.option("--skip-vineyards", is_flag=True, default=False)
-def main(start, end, skip_vineyards):
+@click.option("--dry-run", is_flag=True, default=False, help="Compute and summarise; write nothing.")
+def main(start, end, skip_vineyards, dry_run):
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
         click.echo("Error: DATABASE_URL is not set", err=True)
@@ -93,7 +100,7 @@ def main(start, end, skip_vineyards):
 
     with rasterio.open(files[0][3]) as ref:
         transform, shape = ref.transform, (ref.height, ref.width)
-    masks = ava_masks(transform, shape)
+    masks = ava_masks(conn, transform, shape)
     vpix = {} if skip_vineyards else vineyard_pixels(conn, transform, shape)
     click.echo(f"{len(files)} grids · {len(masks)} AVAs · {len(vpix)} vineyards")
     if vpix:
@@ -123,6 +130,15 @@ def main(start, end, skip_vineyards):
                     values[("vineyard", k, year, month)][col] = float(v)
 
     click.echo(f"{len(values):,} entity-months → climate_monthly")
+    if dry_run:
+        out = ROOT / "data" / "climate" / "climate_monthly_dryrun.tsv"
+        with out.open("w") as fh:
+            for (etype, key, year, month), v in sorted(values.items()):
+                fh.write("\t".join([etype, key, str(year), str(month)] +
+                                    ["" if v.get(c) is None else f"{v[c]:.4f}" for c in VARS.values()]) + "\n")
+        click.echo(f"--dry-run: nothing written to the database; values in {out.relative_to(ROOT)}")
+        conn.close()
+        return
     buf = io.StringIO()
     for (etype, key, year, month), v in values.items():
         cells = [v.get(c) for c in VARS.values()]

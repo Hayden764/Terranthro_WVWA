@@ -1,7 +1,8 @@
 import { Fragment, useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { alpha, border, crimson, interactive, interactiveSoft, ink, muted, parchment, TOKENS, TYPE } from '@terranthro/shared/styles/tokens.js';
 import { WV_SUB_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
-import { EARTH_LAYER_TYPES, earthLegendGroups } from '../config/earthLayersConfig';
+import { EARTH_LAYER_TYPES, TERROIR_CLASS_COLORS, earthLegendGroups } from '../config/earthLayersConfig';
+import AvaTerroirComposition from '@terranthro/shared/components/AvaTerroirComposition.jsx';
 import { VINEYARD_THEMES, NO_DATA_COLOR, vineyardThemeLegend } from '../config/vineyardThemes';
 import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
@@ -217,6 +218,10 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, map
             <p style={{ fontSize: 'var(--type-mono-size)', color: ink, lineHeight: 1.65, margin: 0 }}>{meta.highlights}</p>
           </div>
         )}
+
+        {/* Soil + bedrock make-up (ava_terroir_composition) */}
+        <AvaTerroirComposition slug={ava.slug} colors={TERROIR_CLASS_COLORS}
+          fallbackColor={NO_DATA_COLOR} labelStyle={T.sectionLabel} />
 
         {/* Vintage climate (PRISM monthly, 1991 onward) */}
         <div>

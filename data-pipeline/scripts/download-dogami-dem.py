@@ -467,15 +467,21 @@ def clip_polygon_lcc(clip_geojson: str):
     return unary_union(polys)
 
 
-def run_clip_elevation_feet(clip_geojson: str, output_dir, dry_run: bool) -> None:
+def run_clip_elevation_feet(clip_geojson: str, output_dir, dry_run: bool,
+                            folder: str = OUTPUT_FOLDER_NAME, workers: int = 1) -> None:
     """
     Compute-only DOGAMI flow (Phase 2): download 3 m elevation over a clip polygon,
     keep values in FEET (no feet→meters), warp to UTM 10N, merge, clip to the
     boundary, write a single elevation_3m.tif. No slope/aspect/COG/upload.
+
+    `folder` names the output under OR/ (default willamette_valley_dogami; the
+    statewide regions use e.g. southern_oregon_dogami). Chunks are downloaded by
+    `workers` threads into a persistent _tmp/<folder>/ work dir and reused on a
+    re-run, so a failure part-way through a long region resumes where it stopped.
     """
     from shapely.geometry import box
 
-    out_base = output_dir / "OR" / OUTPUT_FOLDER_NAME  # willamette_valley_dogami
+    out_base = output_dir / "OR" / folder
     out_base.mkdir(parents=True, exist_ok=True)
     final_elev = out_base / "elevation_3m.tif"
 
@@ -508,47 +514,66 @@ def run_clip_elevation_feet(clip_geojson: str, output_dir, dry_run: bool) -> Non
                    "No files written.")
         return
 
-    tmp_parent = output_dir / "_tmp"; tmp_parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="dogami_feet_", dir=str(tmp_parent)) as tmp:
-        tmp = Path(tmp)
-        utm_tiles = []
-        for i, ch in enumerate(chunks):
-            raw = str(tmp / f"raw_{i:04d}.tif")
-            if not download_dogami_tile(ch, raw, dry_run=False, pixel_size_ft=px_ft):
-                click.echo(f"  chunk {i} download failed — aborting so we don't build a "
-                           f"DEM with holes.", err=True)
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    tmp = output_dir / "_tmp" / folder
+    tmp.mkdir(parents=True, exist_ok=True)
+
+    def fetch(i_ch):
+        """Download + warp one chunk; an existing utm_####.tif is reused (resume)."""
+        i, ch = i_ch
+        utm = str(tmp / f"utm_{i:04d}.tif")
+        if Path(utm).exists() and Path(utm).stat().st_size > 0:
+            return utm
+        raw = str(tmp / f"raw_{i:04d}.tif")
+        if not download_dogami_tile(ch, raw, dry_run=False, pixel_size_ft=px_ft):
+            raise RuntimeError(f"chunk {i} download failed")
+        part = utm + ".part"
+        warp_to_utm(raw, part)     # LCC → UTM 10N @ 3 m; pixel values (feet) unchanged
+        os.replace(part, utm)
+        os.remove(raw)
+        return utm
+
+    utm_tiles, done = [], 0
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(fetch, (i, ch)) for i, ch in enumerate(chunks)]
+        for fut in as_completed(futures):
+            try:
+                utm_tiles.append(fut.result())
+            except Exception as e:
+                click.echo(f"  {e} — aborting so we don't build a DEM with holes "
+                           f"(re-run to resume; finished chunks are kept).", err=True)
+                for f in futures:
+                    f.cancel()
                 sys.exit(1)
-            utm = str(tmp / f"utm_{i:04d}.tif")
-            warp_to_utm(raw, utm)      # LCC → UTM 10N @ 3 m; pixel values (feet) unchanged
-            os.remove(raw)
-            utm_tiles.append(utm)
-            if (i + 1) % 25 == 0 or (i + 1) == len(chunks):
-                click.echo(f"  {i + 1}/{len(chunks)} chunks done")
+            done += 1
+            if done % 25 == 0 or done == len(chunks):
+                click.echo(f"  {done}/{len(chunks)} chunks done")
+    utm_tiles.sort()
 
-        vrt = str(tmp / "merged.vrt")
-        merge_dems_vrt(utm_tiles, vrt)
+    vrt = str(tmp / "merged.vrt")
+    merge_dems_vrt(utm_tiles, vrt)
 
-        # Reproject the WGS84 boundary to the target CRS for a clean cutline —
-        # this GDAL's WarpOptions doesn't accept cutlineSRS, so match CRS up front.
-        cutline_utm = str(tmp / "cutline_utm.geojson")
-        gdal.VectorTranslate(
-            cutline_utm, clip_geojson,
-            options=gdal.VectorTranslateOptions(dstSRS=TARGET_CRS, reproject=True, format="GeoJSON"),
-        )
+    # Reproject the WGS84 boundary to the target CRS for a clean cutline —
+    # this GDAL's WarpOptions doesn't accept cutlineSRS, so match CRS up front.
+    cutline_utm = str(tmp / "cutline_utm.geojson")
+    gdal.VectorTranslate(
+        cutline_utm, clip_geojson,
+        options=gdal.VectorTranslateOptions(dstSRS=TARGET_CRS, reproject=True, format="GeoJSON"),
+    )
 
-        click.echo("Clipping to boundary → elevation_3m.tif (feet)...")
-        warp_opts = gdal.WarpOptions(
-            format="GTiff",
-            cutlineDSName=cutline_utm, cropToCutline=True,
-            dstNodata=NODATA,
-            creationOptions=["COMPRESS=DEFLATE", "TILED=YES",
-                             "BLOCKXSIZE=512", "BLOCKYSIZE=512", "BIGTIFF=IF_SAFER"],
-            multithread=True, warpOptions=["NUM_THREADS=ALL_CPUS"],
-        )
-        ds = gdal.Warp(str(final_elev), vrt, options=warp_opts)
-        if ds is None:
-            raise RuntimeError("final clip warp failed")
-        ds = None
+    click.echo("Clipping to boundary → elevation_3m.tif (feet)...")
+    warp_opts = gdal.WarpOptions(
+        format="GTiff",
+        cutlineDSName=cutline_utm, cropToCutline=True,
+        dstNodata=NODATA,
+        creationOptions=["COMPRESS=DEFLATE", "TILED=YES",
+                         "BLOCKXSIZE=512", "BLOCKYSIZE=512", "BIGTIFF=IF_SAFER"],
+        multithread=True, warpOptions=["NUM_THREADS=ALL_CPUS"],
+    )
+    ds = gdal.Warp(str(final_elev), vrt, options=warp_opts)
+    if ds is None:
+        raise RuntimeError("final clip warp failed")
+    ds = None
 
     mb = final_elev.stat().st_size / 1_048_576
     click.echo(f"\n✓ DOGAMI elevation (feet) complete: {final_elev} ({mb:.1f} MB, 3 m, UTM 10N)")
@@ -581,6 +606,20 @@ def run_clip_elevation_feet(clip_geojson: str, output_dir, dry_run: bool) -> Non
          "elevation over the boundary, keep FEET, warp UTM 10N, merge, clip → "
          "elevation_3m.tif. Skips slope/aspect/COG/upload. Example: "
          "--clip ../data/topography/coverage/willamette_valley_boundary.geojson",
+)
+@click.option(
+    "--folder",
+    type=str,
+    default=OUTPUT_FOLDER_NAME,
+    show_default=True,
+    help="Clip mode: output folder under OR/ (e.g. southern_oregon_dogami).",
+)
+@click.option(
+    "--workers",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Clip mode: parallel chunk downloads.",
 )
 @click.option(
     "--geojson-dir",
@@ -619,7 +658,7 @@ def run_clip_elevation_feet(clip_geojson: str, output_dir, dry_run: bool) -> Non
     default=False,
     help="Show what would be downloaded without actually downloading.",
 )
-def main(avas, bbox, clip, geojson_dir, output_dir, upload, bucket, overwrite, dry_run):
+def main(avas, bbox, clip, folder, workers, geojson_dir, output_dir, upload, bucket, overwrite, dry_run):
     """
     Download DOGAMI LiDAR DEMs for WV AVAs and produce elevation/slope/aspect COGs.
     DOGAMI provides complete 3m coverage where USGS 1m tiles are absent.
@@ -636,7 +675,7 @@ def main(avas, bbox, clip, geojson_dir, output_dir, upload, bucket, overwrite, d
 
     # ── Clip / elevation-only / feet mode (compute-only pipeline) ──────────
     if clip:
-        run_clip_elevation_feet(str(clip), output_dir, dry_run)
+        run_clip_elevation_feet(str(clip), output_dir, dry_run, folder=folder, workers=workers)
         return
 
     final_dir = output_dir / "OR" / OUTPUT_FOLDER_NAME

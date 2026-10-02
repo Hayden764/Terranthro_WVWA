@@ -248,6 +248,13 @@ export async function loadAvas(client, records) {
       await client.query('INSERT INTO ava_hierarchy (parent_id, child_id) VALUES ($1, $2)', [avaIds[p.slug], id]);
     }
   }
+
+  // Per-state portions (migration 028) — recompute from the new boundaries.
+  const { rows: [fn] } = await client.query(
+    `SELECT to_regprocedure('refresh_ava_state_portions()') IS NOT NULL AS exists`
+  );
+  if (fn.exists) await client.query('SELECT refresh_ava_state_portions()');
+
   // Subdivided lookup boundaries for OWB releases (migration 032).
   const { rows: [lookup] } = await client.query(
     `SELECT to_regprocedure('refresh_lookup_geometry()') IS NOT NULL AS exists`

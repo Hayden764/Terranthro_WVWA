@@ -185,11 +185,19 @@ const AVA_META = {
 // Formatters for the live mapped-acres figures from GET /api/avas/acres.
 // Established year and acreage come from the database (TTB records, via the
 // generated AVA list); AVA_META only contributes the hand-written highlights.
-const avaMeta = (ava) => ({
-  ...AVA_META[ava.slug],
-  acres: ava.acres ? `~${ava.acres.toLocaleString()}` : undefined,
-  established: ava.established ?? undefined,
-});
+// Acreage is the AVA's Oregon portion; for the AVAs that cross a state line,
+// `outOfState` names the other states and `totalAcres` is the whole AVA.
+const STATE_NAMES = { ID: 'Idaho', WA: 'Washington', CA: 'California', NV: 'Nevada' };
+const avaMeta = (ava) => {
+  const outOfState = (ava.states || []).filter((s) => s !== 'OR').map((s) => STATE_NAMES[s] || s);
+  return {
+    ...AVA_META[ava.slug],
+    acres: ava.acres ? `~${ava.acres.toLocaleString()}` : undefined,
+    established: ava.established ?? undefined,
+    outOfState,
+    totalAcres: outOfState.length && ava.totalAcres ? `~${ava.totalAcres.toLocaleString()}` : undefined,
+  };
+};
 
 const fmtAcres = (n) => (Number.isFinite(n) ? Math.round(n).toLocaleString() : null);          // 2887.07 → "2,887"
 const fmtAcresApprox = (n) => (Number.isFinite(n) ? `${(Math.floor(n / 100) * 100).toLocaleString()}+` : null); // 16622 → "16,600+"
@@ -212,11 +220,17 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, map
           <TermHelp label="AVA Snapshot" ids={AVA_TERM_IDS} style={{ marginBottom: 8 }} />
           <TerroirDataChips chips={[
             { label: 'Established', value: meta.established ? String(meta.established) : '—', tone: 'amber', glow: false },
-            { label: 'Acres', value: meta.acres || '—', tone: 'parchment', glow: false },
+            { label: meta.outOfState.length ? 'Acres in Oregon' : 'Acres', value: meta.acres || '—', tone: 'parchment', glow: false },
             { label: 'Mapped Vineyard Acres', value: fmtAcres(mappedAcres) || '—', tone: 'parchment', glow: false },
             { label: 'Wineries', value: String(inside.length), tone: 'green', glow: true },
             { label: 'Mapped', value: String(withPolygons.length), tone: 'blue', glow: true },
           ]} />
+          {meta.outOfState.length > 0 && (
+            <p style={{ fontSize: 'var(--type-ui-label-size)', color: muted, lineHeight: 1.5, margin: '8px 0 0' }}>
+              This AVA continues into {meta.outOfState.join(' and ')}{meta.totalAcres ? ` (${meta.totalAcres} ac in all)` : ''}.
+              The atlas covers the Oregon side only — every figure here is for that part.
+            </p>
+          )}
         </div>
 
         {/* Highlights */}
@@ -2214,7 +2228,7 @@ export default function ExplorerSidebar({
                   const meta = avaMeta(ava);
                   const subtitle = [
                     meta.established ? `Est. ${meta.established}` : null,
-                    meta.acres ? `${meta.acres} ac` : null,
+                    meta.acres ? `${meta.acres} ac${meta.outOfState.length ? ' in OR' : ''}` : null,
                   ].filter(Boolean).join(' · ') || 'AVA';
                   return (
                     <div key={ava.slug} style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', gap: 6 }}>

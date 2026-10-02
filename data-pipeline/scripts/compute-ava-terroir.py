@@ -13,7 +13,8 @@ writing ava_terroir_composition (migration 027):
 Sources, field choices and class rules are shared with
 compute-soil-geology-stats.py (per-vineyard), so an AVA's "Volcanic" is the same
 "Volcanic" the vineyard cards and map legend show. The sources cover Oregon
-only, so AVAs that cross the state line are summarised over their Oregon part.
+only, and each AVA is clipped to its Oregon portion (migration 028), so AVAs
+that cross the state line are summarised over their Oregon part.
 
 Prerequisite:
     - Migrations 026 and 027 applied; AVAs loaded (server/scripts/load-avas.mjs)
@@ -55,10 +56,12 @@ NOT_SURVEYED = "Not surveyed"    # SSURGO "NOTCOM" map units: survey not complet
 
 
 def fetch_avas(conn, slugs: Optional[List[str]]) -> gpd.GeoDataFrame:
-    sql = """SELECT a.id, a.slug, a.geometry AS geom
+    # Oregon portion (ava_states.geometry, migration 028), else the whole AVA.
+    sql = """SELECT a.id, a.slug, COALESCE(av.geometry, a.geometry) AS geom
              FROM avas a
-             WHERE a.id IN (SELECT av.ava_id FROM ava_states av
-                            JOIN states s ON s.id = av.state_id WHERE s.abbreviation = 'OR')"""
+             JOIN ava_states av ON av.ava_id = a.id
+             JOIN states s ON s.id = av.state_id
+             WHERE s.abbreviation = 'OR'"""
     params: list = []
     if slugs:
         sql += " AND a.slug = ANY(%s)"

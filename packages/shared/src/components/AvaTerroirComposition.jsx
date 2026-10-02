@@ -26,8 +26,6 @@ export default function AvaTerroirComposition({ slug, colors, fallbackColor, lab
   if (!data) return null;
   const colorOf = (cls) => colors?.[cls] ?? fallbackColor;
   const label = labelStyle ?? { ...TYPE.uiLabel, color: muted };
-  // Soil and bedrock maps stop at the state line.
-  const oregonOnly = data.states?.length > 1 && data.states.includes('OR');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -35,11 +33,6 @@ export default function AvaTerroirComposition({ slug, colors, fallbackColor, lab
         colorOf={colorOf} labelStyle={label} />
       <Layer title="Bedrock" classes={data.bedrock} units={data.formation} unitLabel="Main formations"
         colorOf={colorOf} labelStyle={label} />
-      {oregonOnly && (
-        <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, fontStyle: 'italic' }}>
-          Oregon portion only — soil and bedrock maps stop at the state line.
-        </div>
-      )}
     </div>
   );
 }

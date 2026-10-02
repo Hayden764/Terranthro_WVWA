@@ -182,7 +182,8 @@ async function stateAcres(req, res) {
     const { rows } = await pool.query(
       `
       WITH scope AS (
-        SELECT a.id, a.slug, a.geometry
+        -- the AVA's part inside the state (migration 028), else the whole AVA
+        SELECT a.id, a.slug, COALESCE(av.geometry, a.geometry) AS geometry
         FROM avas a
         JOIN ava_states av ON av.ava_id = a.id
         JOIN states s ON s.id = av.state_id

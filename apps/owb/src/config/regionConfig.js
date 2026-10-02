@@ -25,8 +25,8 @@ function treeOrder(avas) {
 /** Every AVA touching Oregon, in the shape the map/sidebar code expects. */
 export const REGION_AVAS = treeOrder(OREGON_AVAS).map((ava) => ({ ...ava, color: TOKENS.amber }));
 
-/** Outline the map darkens around (merged top-level AVAs). */
-export const REGION_BOUNDARY_FILE = '/data/oregon_wine_regions.geojson';
+/** Outline the map darkens around and frames: the state of Oregon. */
+export const REGION_BOUNDARY_FILE = '/data/oregon_boundary.geojson';
 
 export { OREGON_BOUNDS as REGION_BOUNDS };
 

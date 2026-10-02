@@ -2659,12 +2659,12 @@ const WVWAMap = forwardRef(function WVWAMap({
         },
       }, 'wine-region-dots'); // insert below dots so dots render on top
 
-      // ── Load the region boundary (merged top-level Oregon AVAs) ───────
+      // ── Load the region boundary (the state of Oregon) ───────────────
       const wvRes = await fetch(REGION_BOUNDARY_FILE);
       const wvData = await wvRes.json();
 
       // Build an inverted mask: world bbox with WV polygon cut out as a hole.
-      // This darkens everything outside Oregon's wine regions.
+      // This darkens everything outside Oregon (WA, ID, CA, NV and the ocean).
       const collectRingsForMask = (geojson) => {
         const rings = [];
         const add = (geom) => {
@@ -2699,13 +2699,14 @@ const WVWAMap = forwardRef(function WVWAMap({
         layout: { visibility: 'none' }, // hidden until intro flyTo completes
         paint: {
           'fill-color': '#1a1a1a',
-          'fill-opacity': 0.38,
+          // Stronger than WVWA's 0.38 so the state line reads at statewide zoom.
+          'fill-opacity': 0.6,
         },
       });
 
 
       map.addSource('wv-boundary', { type: 'geojson', data: wvData });
-      // Solid gold border around the entire WV region
+      // Solid border around the state of Oregon
       map.addLayer({
         id: 'wv-boundary-line',
         type: 'line',

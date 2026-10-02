@@ -44,11 +44,13 @@ NAME_RE = re.compile(r"prism_(\w+)_or_800m_(\d{4})(\d{2})\.tif$")
 
 def ava_masks(conn, transform, shape):
     with conn.cursor() as cur:
-        cur.execute("""SELECT a.slug, ST_AsGeoJSON(a.geometry)
+        # Oregon portion of each AVA (ava_states.geometry, migration 028), so
+        # AVAs that cross into WA/ID are averaged over their Oregon side only.
+        cur.execute("""SELECT a.slug, ST_AsGeoJSON(COALESCE(av.geometry, a.geometry))
                        FROM avas a
-                       WHERE a.id IN (SELECT av.ava_id FROM ava_states av
-                                      JOIN states s ON s.id = av.state_id
-                                      WHERE s.abbreviation = 'OR')
+                       JOIN ava_states av ON av.ava_id = a.id
+                       JOIN states s ON s.id = av.state_id
+                       WHERE s.abbreviation = 'OR'
                        ORDER BY a.slug""")
         rows = cur.fetchall()
     masks = {}

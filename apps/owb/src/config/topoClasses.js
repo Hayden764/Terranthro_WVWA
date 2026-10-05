@@ -13,12 +13,15 @@ const TOP = 100000;                    // open upper end of the last band
 const pct = (deg) => Math.round(Math.tan((deg * Math.PI) / 180) * 100);
 const fmt = (v) => Math.round(v).toLocaleString();
 
-// Bands: [lo, hi) in the layer's unit. Elevation and slope breaks match the
-// "Colour vineyards by" themes in vineyardThemes.js (plus a >1,500 ft band).
+// Bands: [lo, hi) in the layer's unit. Slope breaks match the "Colour vineyards
+// by" themes in vineyardThemes.js. Elevation keeps the Willamette Valley bands
+// below 1,500 ft (so the valley reads the same as in WVWA) and adds statewide
+// bands above it: Southern Oregon's valleys sit at 1,000–2,000 ft, the Snake
+// River Valley at 2,000–4,000 ft; 99.9% of AVA land lies below ~4,550 ft.
 const ELEVATION = {
   unit: 'ft',
-  domain: [0, 2700],
-  step: 10,
+  domain: [0, 5000],
+  step: 20,
   groups: [
     { label: 'Valley floor', bands: [{ lo: -100, hi: 200, color: '#274bb1', label: 'Under 200 ft' }] },
     { label: 'Hillside band', bands: [
@@ -29,8 +32,13 @@ const ELEVATION = {
     ] },
     { label: 'Upper slopes', bands: [
       { lo: 1000, hi: 1500, color: '#f0ec91', label: '1,000–1,500 ft' },
-      { lo: 1500, hi: TOP, color: '#c9a66b', label: 'Over 1,500 ft' },
+      { lo: 1500, hi: 2000, color: '#c9a66b', label: '1,500–2,000 ft' },
     ] },
+    { label: 'High valleys & plateaus', bands: [
+      { lo: 2000, hi: 3000, color: '#a47a4e', label: '2,000–3,000 ft' },
+      { lo: 3000, hi: 4000, color: '#7d5a3c', label: '3,000–4,000 ft' },
+    ] },
+    { label: 'Mountains', bands: [{ lo: 4000, hi: TOP, color: '#d8d2c8', label: 'Over 4,000 ft' }] },
   ],
   rangeLabel: ([lo, hi]) => `${fmt(lo)}–${fmt(hi)} ft`,
 };

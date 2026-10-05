@@ -14,13 +14,15 @@ export const TOPO_LAYER_TYPES = {
     unit: 'ft',
     colormap: 'terrain',
     description: 'Height above sea level',
-    // Baked colour range; mean/std are the valley-wide COG statistics
-    range: { min: 0, max: 2650 },
-    stats: { mean: 497.3, std: 334.5 },
+    // Statewide: 99.9% of Oregon AVA land lies below ~4,550 ft (peaks reach
+    // ~6,500). mean/std are area-weighted over every Oregon AVA's Oregon land
+    // (compute-ava-terrain.py, 2026-10-05).
+    range: { min: 0, max: 5000 },
+    stats: { mean: 1343.8, std: 996.5 },
     legend: {
       // Matches matplotlib 'terrain': blue → cyan → green → tan → grey → white
       colors: ['#333399', '#57A5CC', '#339966', '#B8A06A', '#9E9E9E', '#FFFFFF'],
-      labels: ['0ft', '530ft', '1060ft', '1590ft', '2120ft', '2650ft']
+      labels: ['0ft', '1000ft', '2000ft', '3000ft', '4000ft', '5000ft']
     }
   },
   slope: {
@@ -30,7 +32,7 @@ export const TOPO_LAYER_TYPES = {
     colormap: 'rdylgn_r',
     description: 'Steepness of terrain',
     range: { min: 0, max: 41 },
-    stats: { mean: 6.9, std: 6.6 },
+    stats: { mean: 9.6, std: 9.7 },   // statewide, as for elevation
     legend: {
       colors: ['#1A9850', '#91CF60', '#D9EF8B', '#FEE08B', '#FC8D59', '#D73027'],
       labels: ['0°', '8°', '16°', '25°', '33°', '41°+']

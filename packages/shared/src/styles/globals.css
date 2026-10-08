@@ -198,3 +198,30 @@ body {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
+
+/* Admin console light theme. The admin pages were written dark — ink as the
+   background, parchment as the text — so redefining the base tokens under
+   .admin-light turns them light without touching each style. Maps and
+   components built for light pages (.theme-native) get the original tokens
+   back. */
+.admin-light {
+  --color-ink:            #FFFFFF;
+  --color-surface:        #F4F5F8;
+  --color-surface-raised: #FFFFFF;
+  --color-border:         #D5D8E0;
+  --color-parchment:      #080A0F;
+  --color-muted:          #5A6075;
+  --color-ghost:          #8A8FA3;
+  color: var(--color-parchment);
+  color-scheme: light;
+}
+.admin-light .theme-native,
+.admin-light .maplibregl-map {
+  --color-ink:            #080A0F;
+  --color-surface:        #0F1219;
+  --color-surface-raised: #13161F;
+  --color-border:         #1A1D28;
+  --color-parchment:      #FFFFFF;
+  --color-muted:          #404558;
+  --color-ghost:          #2A2E3C;
+}

@@ -725,7 +725,7 @@ export default function EditorPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'var(--font-sans)', background: TOKENS.ink }}>
+    <div className="admin-light" style={{ display: 'flex', height: '100vh', fontFamily: 'var(--font-sans)', background: TOKENS.ink }}>
 
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
       <div style={{
@@ -1061,21 +1061,23 @@ export default function EditorPage() {
       {/* ── Map ─────────────────────────────────────────────────────────── */}
       <div ref={mapContainerRef} style={{ flex: 1, position: 'relative' }} />
 
-      {/* Split Parcel Modal */}
+      {/* Split Parcel Modal — built for light pages, so theme-native keeps its own colours */}
       {showSplitModal && selectedParcel && (
-        <SplitParcelModal
-          parcel={{ ...selectedParcel.properties, geometry: selectedParcel.geometry }}
-          blocks={[]}
-          onClose={() => setShowSplitModal(false)}
-          onApplied={() => {
-            setShowSplitModal(false);
-            // Reload parcels after split
-            fetch(`${API_BASE}/api/vineyards/parcels`, { headers: API_HEADERS })
-              .then((r) => r.json())
-              .then((data) => setParcels(data));
-            setSelectedParcel(null);
-          }}
-        />
+        <div className="theme-native">
+          <SplitParcelModal
+            parcel={{ ...selectedParcel.properties, geometry: selectedParcel.geometry }}
+            blocks={[]}
+            onClose={() => setShowSplitModal(false)}
+            onApplied={() => {
+              setShowSplitModal(false);
+              // Reload parcels after split
+              fetch(`${API_BASE}/api/vineyards/parcels`, { headers: API_HEADERS })
+                .then((r) => r.json())
+                .then((data) => setParcels(data));
+              setSelectedParcel(null);
+            }}
+          />
+        </div>
       )}
     </div>
   );

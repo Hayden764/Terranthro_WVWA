@@ -328,7 +328,7 @@ function ReleaseFigures({ releaseId }) {
 
 function Shell({ children }) {
   return (
-    <div style={{ minHeight: '100vh', background: TOKENS.ink, fontFamily: 'var(--font-sans)' }}>
+    <div className="admin-light" style={{ minHeight: '100vh', background: TOKENS.ink, fontFamily: 'var(--font-sans)' }}>
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '32px 20px' }}>{children}</div>
     </div>
   );
@@ -368,7 +368,7 @@ const adminInput = {
   width: '100%', padding: '8px 10px', borderRadius: 6, boxSizing: 'border-box',
   border: `1px solid ${alpha(TOKENS.parchment, 0.10)}`, fontSize: 'var(--type-mono-size)',
   color: TOKENS.parchment, background: alpha(TOKENS.parchment, 0.05),
-  outline: 'none', colorScheme: 'dark',
+  outline: 'none',
 };
 const pillLink = (color) => ({
   padding: '7px 16px', borderRadius: 6, background: alpha(color, 0.15), color,

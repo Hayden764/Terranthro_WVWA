@@ -383,7 +383,7 @@ export default function AdminDashboard() {
 
 function Shell({ children }) {
   return (
-    <div style={{ minHeight: '100vh', background: TOKENS.ink, fontFamily: 'var(--font-sans)' }}>
+    <div className="admin-light" style={{ minHeight: '100vh', background: TOKENS.ink, fontFamily: 'var(--font-sans)' }}>
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 20px' }}>
         {children}
       </div>

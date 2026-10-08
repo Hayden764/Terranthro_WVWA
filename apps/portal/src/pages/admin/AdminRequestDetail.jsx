@@ -351,14 +351,14 @@ function AdminEntityHistory({ entityType, entityId, currentRequestId }) {
 
   const sectionStyle = {
     marginTop: 28,
-    borderTop: '1px solid #333',
+    borderTop: `1px solid ${TOKENS.border}`,
     paddingTop: 16,
   };
   const headerStyle = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     cursor: 'pointer', userSelect: 'none',
   };
-  const titleStyle = { ...TYPE.uiLabel, fontWeight: 600, color: '#ccc' };
+  const titleStyle = { ...TYPE.uiLabel, fontWeight: 600, color: TOKENS.parchment };
   const chevron = open ? '▲' : '▼';
 
   const fmtDate = iso => {
@@ -377,7 +377,7 @@ function AdminEntityHistory({ entityType, entityId, currentRequestId }) {
     geometry_update: 'Boundary Edit',
   }[t] || t);
 
-  const statusColor = s => ({ pending: '#f0a500', approved: '#66bb6a', rejected: '#e57373' }[s] || '#aaa');
+  const statusColor = s => ({ pending: TOKENS.warning, approved: TOKENS.success, rejected: TOKENS.danger }[s] || TOKENS.muted);
 
   const renderLogEntries = entries => {
     if (!entries || entries.length === 0) return null;
@@ -391,21 +391,21 @@ function AdminEntityHistory({ entityType, entityId, currentRequestId }) {
     return Object.values(groups).map((rows, gi) => {
       const first = rows[0];
       return (
-        <div key={gi} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid #2a2a2a' }}>
-          <div style={{ fontSize: 'var(--type-ui-label-size)', color: '#888', marginBottom: 4 }}>
-            {fmtDate(first.created_at)} · <span style={{ color: '#aaa' }}>{typeLabel(first.request_type)}</span>
+        <div key={gi} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: `1px solid ${TOKENS.border}` }}>
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: TOKENS.muted, marginBottom: 4 }}>
+            {fmtDate(first.created_at)} · <span style={{ color: TOKENS.muted }}>{typeLabel(first.request_type)}</span>
             {first.changed_by_email && <span> · {first.changed_by_email}</span>}
           </div>
           {rows.map((row, ri) => (
-            <div key={ri} style={{ fontSize: 'var(--type-body-size)', color: '#bbb', paddingLeft: 8, marginTop: 2 }}>
+            <div key={ri} style={{ fontSize: 'var(--type-body-size)', color: alpha(TOKENS.parchment, 0.85), paddingLeft: 8, marginTop: 2 }}>
               {row.field_name === 'geometry'
-                ? <span style={{ color: '#90caf9' }}>Boundary geometry updated</span>
+                ? <span style={{ color: TOKENS.electricBlue }}>Boundary geometry updated</span>
                 : <>
-                    <span style={{ color: '#e0e0e0', fontWeight: 500 }}>{row.field_name}</span>
+                    <span style={{ color: TOKENS.parchment, fontWeight: 500 }}>{row.field_name}</span>
                     {': '}
-                    <span style={{ color: '#e57373' }}>{String(row.old_value ?? '—')}</span>
+                    <span style={{ color: TOKENS.danger }}>{String(row.old_value ?? '—')}</span>
                     {' → '}
-                    <span style={{ color: '#81c784' }}>{String(row.new_value ?? '—')}</span>
+                    <span style={{ color: TOKENS.success }}>{String(row.new_value ?? '—')}</span>
                   </>}
             </div>
           ))}
@@ -418,27 +418,27 @@ function AdminEntityHistory({ entityType, entityId, currentRequestId }) {
     <div style={sectionStyle}>
       <div style={headerStyle} onClick={toggle}>
         <span style={titleStyle}>Parcel Edit History</span>
-        <span style={{ fontSize: 'var(--type-ui-label-size)', color: '#666' }}>{chevron}</span>
+        <span style={{ fontSize: 'var(--type-ui-label-size)', color: TOKENS.ghost }}>{chevron}</span>
       </div>
 
       {open && (
         <div style={{ marginTop: 14 }}>
-          {loading && <p style={{ fontSize: 'var(--type-body-size)', color: '#888' }}>Loading…</p>}
-          {data?.error && <p style={{ fontSize: 'var(--type-body-size)', color: '#e57373' }}>{data.error}</p>}
+          {loading && <p style={{ fontSize: 'var(--type-body-size)', color: TOKENS.muted }}>Loading…</p>}
+          {data?.error && <p style={{ fontSize: 'var(--type-body-size)', color: TOKENS.danger }}>{data.error}</p>}
 
           {data && !data.error && (
             <>
               {/* Pending / rejected requests */}
               {data.pending && data.pending.length > 0 && (
                 <div style={{ marginBottom: 16 }}>
-                  <p style={{ ...TYPE.uiLabel, color: '#888', marginBottom: 8 }}>Open Requests</p>
+                  <p style={{ ...TYPE.uiLabel, color: TOKENS.muted, marginBottom: 8 }}>Open Requests</p>
                   {data.pending.map(r => (
                     <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 'var(--type-body-size)' }}>
                       <span style={{ color: statusColor(r.status), fontWeight: 600, minWidth: 64 }}>{r.status}</span>
-                      <span style={{ color: '#aaa' }}>{typeLabel(r.request_type)}</span>
-                      <span style={{ color: '#666' }}>{fmtDate(r.created_at)}</span>
+                      <span style={{ color: TOKENS.muted }}>{typeLabel(r.request_type)}</span>
+                      <span style={{ color: TOKENS.ghost }}>{fmtDate(r.created_at)}</span>
                       {r.id !== currentRequestId && (
-                        <Link to={`/admin/requests/${r.id}`} style={{ color: '#90caf9', fontSize: 'var(--type-ui-label-size)', marginLeft: 'auto' }}>View →</Link>
+                        <Link to={`/admin/requests/${r.id}`} style={{ color: TOKENS.electricBlue, fontSize: 'var(--type-ui-label-size)', marginLeft: 'auto' }}>View →</Link>
                       )}
                     </div>
                   ))}
@@ -448,7 +448,7 @@ function AdminEntityHistory({ entityType, entityId, currentRequestId }) {
               {/* Applied log */}
               {data.log && data.log.length > 0
                 ? renderLogEntries(data.log)
-                : <p style={{ fontSize: 'var(--type-body-size)', color: '#666', fontStyle: 'italic' }}>No applied changes recorded yet.</p>}
+                : <p style={{ fontSize: 'var(--type-body-size)', color: TOKENS.ghost, fontStyle: 'italic' }}>No applied changes recorded yet.</p>}
             </>
           )}
         </div>
@@ -508,7 +508,7 @@ function ParcelContextMap({ geometry }) {
   }, []);
 
   return (
-    <div style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+    <div style={{ borderRadius: 8, overflow: 'hidden', border: `1px solid ${alpha(TOKENS.parchment, 0.08)}` }}>
       <div ref={containerRef} style={{ height: 240 }} />
     </div>
   );
@@ -585,7 +585,7 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
   }
 
   if (!ops || ops.length === 0) {
-    return <p style={{ fontSize: 'var(--type-mono-size)', color: '#888', fontStyle: 'italic' }}>No ops in this batch.</p>;
+    return <p style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.muted, fontStyle: 'italic' }}>No ops in this batch.</p>;
   }
 
   // Geometry ops indexed within the full ops array (geometry + add both have spatial extents)
@@ -596,9 +596,9 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
 
   const toggleBtnStyle = (active) => ({
     fontSize: 'var(--type-ui-label-size)', fontWeight: 600, padding: '4px 10px', borderRadius: 5,
-    border: `1px solid ${active ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.07)'}`,
-    background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
-    color: active ? '#e0e0e0' : '#555', cursor: 'pointer',
+    border: `1px solid ${active ? alpha(TOKENS.parchment, 0.18) : alpha(TOKENS.parchment, 0.07)}`,
+    background: active ? alpha(TOKENS.parchment, 0.08) : 'transparent',
+    color: active ? TOKENS.parchment : TOKENS.ghost, cursor: 'pointer',
   });
 
   const includedCount = localOps.filter((o) => !o._excluded).length;
@@ -657,15 +657,15 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
               acreDelta = pct;
             }
 
-            const opColor = isGeom ? '#60a5fa' : isAdd ? '#4ade80' : isDel ? '#f87171' : '#a78bfa';
+            const opColor = isGeom ? TOKENS.electricBlue : isAdd ? TOKENS.success : isDel ? TOKENS.danger : TOKENS.violet;
 
             const borderColor = isExcluded
-              ? 'rgba(255,255,255,0.05)'
+              ? alpha(TOKENS.parchment, 0.05)
               : isDel ? 'rgba(239,68,68,0.30)'
               : isActiveGeom ? 'rgba(96,165,250,0.45)'
               : acreDelta != null && Math.abs(acreDelta) >= 5 ? 'rgba(234,179,8,0.30)'
               : hasEdits ? 'rgba(251,191,36,0.30)'
-              : 'rgba(255,255,255,0.07)';
+              : alpha(TOKENS.parchment, 0.07);
 
             // Merged display fields (original + admin edits)
             const displayFields = isMeta || isAdd
@@ -676,9 +676,9 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
               <div key={i} style={{ opacity: isExcluded ? 0.38 : 1, transition: 'opacity 0.15s' }}>
                 <div
                   style={{
-                    background: isExcluded ? 'rgba(0,0,0,0.10)'
+                    background: isExcluded ? alpha(TOKENS.parchment, 0.02)
                       : isDel ? 'rgba(239,68,68,0.05)'
-                      : isActiveGeom ? 'rgba(96,165,250,0.06)' : 'rgba(0,0,0,0.18)',
+                      : isActiveGeom ? 'rgba(96,165,250,0.06)' : alpha(TOKENS.parchment, 0.036),
                     borderRadius: isEditOpen ? '8px 8px 0 0' : 8,
                     border: `1px solid ${borderColor}`,
                     padding: '10px 13px',
@@ -689,18 +689,18 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                 >
                   {/* Op header */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: (isMeta || isAdd) ? 8 : 6 }}>
-                    <span style={{ ...TYPE.uiLabel, color: isExcluded ? '#444' : opColor, minWidth: 52 }}>
+                    <span style={{ ...TYPE.uiLabel, color: isExcluded ? TOKENS.ghost : opColor, minWidth: 52 }}>
                       {op.op}
                     </span>
-                    <span style={{ fontSize: 'var(--type-mono-size)', color: isExcluded ? '#555' : '#e0e0e0', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 'var(--type-mono-size)', color: isExcluded ? TOKENS.ghost : TOKENS.parchment, fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {isExcluded ? <s>{op.parcel_name || `Parcel #${op.parcel_id}`}</s> : (op.parcel_name || `Parcel #${op.parcel_id}`)}
                     </span>
-                    {op.parcel_id && <span style={{ fontSize: 'var(--type-ui-label-size)', color: '#444' }}>#{op.parcel_id}</span>}
+                    {op.parcel_id && <span style={{ fontSize: 'var(--type-ui-label-size)', color: TOKENS.ghost }}>#{op.parcel_id}</span>}
                     {hasEdits && !isExcluded && (
-                      <span style={{ fontSize: 'var(--type-ui-label-size)', fontWeight: 700, color: '#fbbf24', background: 'rgba(251,191,36,0.10)', borderRadius: 3, padding: '1px 5px' }}>EDITED</span>
+                      <span style={{ fontSize: 'var(--type-ui-label-size)', fontWeight: 700, color: TOKENS.warning, background: 'rgba(251,191,36,0.10)', borderRadius: 3, padding: '1px 5px' }}>EDITED</span>
                     )}
                     {(isGeom || isAdd) && !isExcluded && (
-                      <span style={{ fontSize: 'var(--type-ui-label-size)', color: '#666' }}>{isActiveGeom ? '◉' : '○'}</span>
+                      <span style={{ fontSize: 'var(--type-ui-label-size)', color: TOKENS.ghost }}>{isActiveGeom ? '◉' : '○'}</span>
                     )}
 
                     {/* Action buttons — stop propagation so they don't trigger map focus */}
@@ -711,9 +711,9 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                             onClick={() => setExpandedEdit(isEditOpen ? null : i)}
                             title="Edit fields"
                             style={{
-                              background: isEditOpen ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.05)',
-                              border: `1px solid ${isEditOpen ? 'rgba(251,191,36,0.3)' : 'rgba(255,255,255,0.10)'}`,
-                              borderRadius: 4, color: isEditOpen ? '#fbbf24' : '#666',
+                              background: isEditOpen ? 'rgba(251,191,36,0.15)' : alpha(TOKENS.parchment, 0.05),
+                              border: `1px solid ${isEditOpen ? 'rgba(251,191,36,0.3)' : alpha(TOKENS.parchment, 0.10)}`,
+                              borderRadius: 4, color: isEditOpen ? TOKENS.warning : TOKENS.ghost,
                               cursor: 'pointer', fontSize: 'var(--type-ui-label-size)', padding: '2px 6px',
                             }}
                           >✎</button>
@@ -723,8 +723,8 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                             onClick={() => resetOp(i)}
                             title="Reset to original"
                             style={{
-                              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)',
-                              borderRadius: 4, color: '#666', cursor: 'pointer', fontSize: 'var(--type-ui-label-size)', padding: '2px 6px',
+                              background: alpha(TOKENS.parchment, 0.04), border: `1px solid ${alpha(TOKENS.parchment, 0.10)}`,
+                              borderRadius: 4, color: TOKENS.ghost, cursor: 'pointer', fontSize: 'var(--type-ui-label-size)', padding: '2px 6px',
                             }}
                           >↺</button>
                         )}
@@ -734,7 +734,7 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                           style={{
                             background: isExcluded ? 'rgba(74,222,128,0.10)' : 'rgba(239,68,68,0.08)',
                             border: `1px solid ${isExcluded ? 'rgba(74,222,128,0.25)' : 'rgba(239,68,68,0.25)'}`,
-                            borderRadius: 4, color: isExcluded ? '#4ade80' : '#f87171',
+                            borderRadius: 4, color: isExcluded ? TOKENS.success : TOKENS.danger,
                             cursor: 'pointer', fontSize: 'var(--type-ui-label-size)', padding: '2px 6px',
                           }}
                         >{isExcluded ? '+ Include' : '✕ Skip'}</button>
@@ -746,32 +746,32 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                   {isDel && !isExcluded && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 'var(--type-body-size)' }}>
                       <span style={{ fontSize: 'var(--type-body-size)' }}>⚠</span>
-                      <span style={{ color: '#fca5a5' }}>This block will be permanently deleted from the database.</span>
+                      <span style={{ color: TOKENS.danger }}>This block will be permanently deleted from the database.</span>
                     </div>
                   )}
 
                   {/* Geometry: before/after acres */}
                   {isGeom && !isExcluded && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--type-body-size)' }}>
-                      <span style={{ color: '#888' }}>
+                      <span style={{ color: TOKENS.muted }}>
                         {op.before_acres != null
-                          ? <><span style={{ color: '#e8a020' }}>{Number(op.before_acres).toFixed(2)} ac</span> → </>
+                          ? <><span style={{ color: TOKENS.warning }}>{Number(op.before_acres).toFixed(2)} ac</span> → </>
                           : '— → '
                         }
                         {op.after_acres != null
-                          ? <span style={{ color: acreDelta != null && Math.abs(acreDelta) >= 5 ? '#eab308' : '#4ade80' }}>
+                          ? <span style={{ color: acreDelta != null && Math.abs(acreDelta) >= 5 ? TOKENS.warning : TOKENS.success }}>
                               {Number(op.after_acres).toFixed(2)} ac
                             </span>
                           : '—'
                         }
                       </span>
                       {acreDelta != null && Math.abs(acreDelta) >= 5 && (
-                        <span style={{ fontSize: 'var(--type-ui-label-size)', fontWeight: 700, color: '#eab308', background: 'rgba(234,179,8,0.10)', borderRadius: 4, padding: '1px 5px', border: '1px solid rgba(234,179,8,0.2)' }}>
+                        <span style={{ fontSize: 'var(--type-ui-label-size)', fontWeight: 700, color: TOKENS.warning, background: 'rgba(234,179,8,0.10)', borderRadius: 4, padding: '1px 5px', border: '1px solid rgba(234,179,8,0.2)' }}>
                           ⚠ {acreDelta > 0 ? '+' : ''}{Math.round(acreDelta * 10) / 10}%
                         </span>
                       )}
                       {acreDelta != null && Math.abs(acreDelta) < 5 && (
-                        <span style={{ fontSize: 'var(--type-ui-label-size)', color: '#555' }}>({acreDelta > 0 ? '+' : ''}{Math.round(acreDelta * 10) / 10}%)</span>
+                        <span style={{ fontSize: 'var(--type-ui-label-size)', color: TOKENS.ghost }}>({acreDelta > 0 ? '+' : ''}{Math.round(acreDelta * 10) / 10}%)</span>
                       )}
                     </div>
                   )}
@@ -780,7 +780,7 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                   {isAdd && !isExcluded && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {op.after_acres != null && (
-                        <div style={{ fontSize: 'var(--type-body-size)', color: '#4ade80' }}>New area: {Number(op.after_acres).toFixed(2)} ac</div>
+                        <div style={{ fontSize: 'var(--type-body-size)', color: TOKENS.success }}>New area: {Number(op.after_acres).toFixed(2)} ac</div>
                       )}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         {['vineyard_name', 'ava_name', 'nested_ava', 'varietals_list', 'source_dataset'].map((key) => {
@@ -789,10 +789,10 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                           const isEdited = key in op._editedFields;
                           return (
                             <div key={key} style={{ fontSize: 'var(--type-ui-label-size)', display: 'flex', gap: 6, alignItems: 'baseline' }}>
-                              <span style={{ ...TYPE.uiLabel, color: '#64748b', minWidth: 100, fontWeight: 600, flexShrink: 0 }}>
+                              <span style={{ ...TYPE.uiLabel, color: TOKENS.muted, minWidth: 100, fontWeight: 600, flexShrink: 0 }}>
                                 {key.replace(/_/g, ' ')}
                               </span>
-                              <span style={{ color: isEdited ? '#fbbf24' : '#4ade80' }}>{String(val)}</span>
+                              <span style={{ color: isEdited ? TOKENS.warning : TOKENS.success }}>{String(val)}</span>
                             </div>
                           );
                         })}
@@ -810,11 +810,11 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                         if (String(oldVal ?? '') === String(effectiveNew ?? '') && oldVal == null && effectiveNew == null) return null;
                         if (String(oldVal ?? '') === String(effectiveNew ?? '')) return null;
                         return (
-                          <div key={key} style={{ fontSize: 'var(--type-ui-label-size)', display: 'flex', gap: 6, alignItems: 'baseline', padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                            <span style={{ ...TYPE.uiLabel, color: '#64748b', minWidth: 100, fontWeight: 600, flexShrink: 0 }}>{key.replace(/_/g, ' ')}</span>
-                            <span style={{ color: '#e57373', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 90 }}>{String(oldVal ?? '—')}</span>
-                            <span style={{ color: '#475569' }}>→</span>
-                            <span style={{ color: isEdited ? '#fbbf24' : '#4ade80', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 90 }}>{String(effectiveNew ?? '—')}</span>
+                          <div key={key} style={{ fontSize: 'var(--type-ui-label-size)', display: 'flex', gap: 6, alignItems: 'baseline', padding: '2px 0', borderBottom: `1px solid ${alpha(TOKENS.parchment, 0.04)}` }}>
+                            <span style={{ ...TYPE.uiLabel, color: TOKENS.muted, minWidth: 100, fontWeight: 600, flexShrink: 0 }}>{key.replace(/_/g, ' ')}</span>
+                            <span style={{ color: TOKENS.danger, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 90 }}>{String(oldVal ?? '—')}</span>
+                            <span style={{ color: TOKENS.ghost }}>→</span>
+                            <span style={{ color: isEdited ? TOKENS.warning : TOKENS.success, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 90 }}>{String(effectiveNew ?? '—')}</span>
                           </div>
                         );
                       })}
@@ -825,11 +825,11 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                 {/* Inline edit panel */}
                 {isEditOpen && canEdit && !isExcluded && (
                   <div style={{
-                    background: 'rgba(0,0,0,0.35)', border: `1px solid ${borderColor}`, borderTop: 'none',
+                    background: alpha(TOKENS.parchment, 0.07), border: `1px solid ${borderColor}`, borderTop: 'none',
                     borderRadius: '0 0 8px 8px', padding: '12px 14px',
                     display: 'flex', flexDirection: 'column', gap: 8,
                   }}>
-                    <div style={{ ...TYPE.uiLabel, color: '#fbbf24', marginBottom: 2 }}>
+                    <div style={{ ...TYPE.uiLabel, color: TOKENS.warning, marginBottom: 2 }}>
                       Edit fields — overrides staged values
                     </div>
                     {EDITABLE_META_FIELDS.map((field) => {
@@ -839,9 +839,9 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                       const isEdited = edited !== undefined;
                       return (
                         <div key={field} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <label style={{ ...TYPE.uiLabel, color: isEdited ? '#fbbf24' : '#555', display: 'flex', gap: 6 }}>
+                          <label style={{ ...TYPE.uiLabel, color: isEdited ? TOKENS.warning : TOKENS.ghost, display: 'flex', gap: 6 }}>
                             {field.replace(/_/g, ' ')}
-                            {isEdited && <span style={{ color: '#fbbf24' }}>• edited</span>}
+                            {isEdited && <span style={{ color: TOKENS.warning }}>• edited</span>}
                           </label>
                           <input
                             type={field === 'acres' || field === 'winery_id' ? 'number' : 'text'}
@@ -849,9 +849,9 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                             onChange={(e) => setEditField(i, field, e.target.value)}
                             placeholder={original != null ? String(original) : '—'}
                             style={{
-                              background: isEdited ? 'rgba(251,191,36,0.06)' : 'rgba(255,255,255,0.04)',
-                              border: `1px solid ${isEdited ? 'rgba(251,191,36,0.3)' : 'rgba(255,255,255,0.10)'}`,
-                              borderRadius: 4, color: isEdited ? '#fbbf24' : '#ccc',
+                              background: isEdited ? 'rgba(251,191,36,0.06)' : alpha(TOKENS.parchment, 0.04),
+                              border: `1px solid ${isEdited ? 'rgba(251,191,36,0.3)' : alpha(TOKENS.parchment, 0.10)}`,
+                              borderRadius: 4, color: isEdited ? TOKENS.warning : TOKENS.parchment,
                               fontSize: 'var(--type-body-size)', padding: '5px 8px', outline: 'none',
                               width: '100%', boxSizing: 'border-box', fontFamily: 'inherit',
                             }}
@@ -862,14 +862,14 @@ function AdminBatchDiffSection({ ops, isPending, onOpsChange }) {
                     <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                       <button
                         onClick={() => setExpandedEdit(null)}
-                        style={{ ...outlineBtn, fontSize: 'var(--type-ui-label-size)', padding: '5px 12px', color: '#94a3b8' }}
+                        style={{ ...outlineBtn, fontSize: 'var(--type-ui-label-size)', padding: '5px 12px', color: TOKENS.muted }}
                       >
                         Done
                       </button>
                       {hasEdits && (
                         <button
                           onClick={() => resetOp(i)}
-                          style={{ ...outlineBtn, fontSize: 'var(--type-ui-label-size)', padding: '5px 12px', color: '#f87171', borderColor: 'rgba(239,68,68,0.25)' }}
+                          style={{ ...outlineBtn, fontSize: 'var(--type-ui-label-size)', padding: '5px 12px', color: TOKENS.danger, borderColor: 'rgba(239,68,68,0.25)' }}
                         >
                           Reset
                         </button>
@@ -899,7 +899,7 @@ function PayloadSection({ requestType, payload, isPending, onOpsChange }) {
         {payload.notes && (
           <div style={infoBox}>
             <SectionLabel>Owner's note</SectionLabel>
-            <p style={{ margin: '4px 0 0', fontSize: 'var(--type-mono-size)', color: '#ccc', lineHeight: 1.5 }}>{payload.notes}</p>
+            <p style={{ margin: '4px 0 0', fontSize: 'var(--type-mono-size)', color: TOKENS.parchment, lineHeight: 1.5 }}>{payload.notes}</p>
           </div>
         )}
 
@@ -917,7 +917,7 @@ function PayloadSection({ requestType, payload, isPending, onOpsChange }) {
             </div>
           </>
         ) : (
-          <p style={{ fontSize: 'var(--type-mono-size)', color: '#888', fontStyle: 'italic' }}>No geometry data attached to this request.</p>
+          <p style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.muted, fontStyle: 'italic' }}>No geometry data attached to this request.</p>
         )}
       </div>
     );
@@ -932,9 +932,9 @@ function PayloadSection({ requestType, payload, isPending, onOpsChange }) {
     <>
       <SectionLabel>Payload</SectionLabel>
       <pre style={{
-        fontSize: 'var(--type-body-size)', color: '#aaa', whiteSpace: 'pre-wrap',
-        background: 'rgba(0,0,0,0.25)', padding: '14px 16px', borderRadius: 8,
-        overflow: 'auto', maxHeight: 'none', border: '1px solid rgba(255,255,255,0.06)',
+        fontSize: 'var(--type-body-size)', color: TOKENS.muted, whiteSpace: 'pre-wrap',
+        background: alpha(TOKENS.parchment, 0.05), padding: '14px 16px', borderRadius: 8,
+        overflow: 'auto', maxHeight: 'none', border: `1px solid ${alpha(TOKENS.parchment, 0.06)}`,
         lineHeight: 1.6,
       }}>
         {JSON.stringify(payload, null, 2)}
@@ -950,7 +950,7 @@ function BlocksDiffSection({ payload }) {
   const newBlocks = payload.new_blocks || [];
 
   if (changes.length === 0 && newBlocks.length === 0) {
-    return <p style={{ fontSize: 'var(--type-mono-size)', color: '#888', fontStyle: 'italic' }}>No block data in this request.</p>;
+    return <p style={{ fontSize: 'var(--type-mono-size)', color: TOKENS.muted, fontStyle: 'italic' }}>No block data in this request.</p>;
   }
 
   return (
@@ -968,30 +968,30 @@ function BlocksDiffSection({ payload }) {
                     .map((f) => ({ field: f, label: f, old: null, new: c[f] }));
 
               return (
-                <div key={c.id} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                  <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    <span style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: '#ddd' }}>
+                <div key={c.id} style={{ background: alpha(TOKENS.parchment, 0.04), borderRadius: 8, border: `1px solid ${alpha(TOKENS.parchment, 0.06)}`, overflow: 'hidden' }}>
+                  <div style={{ padding: '10px 14px', background: alpha(TOKENS.parchment, 0.03), borderBottom: `1px solid ${alpha(TOKENS.parchment, 0.06)}` }}>
+                    <span style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: TOKENS.parchment }}>
                       {c.block_name ? `Block "${c.block_name}"` : `Block #${c.id}`}
                     </span>
-                    <span style={{ fontSize: 'var(--type-ui-label-size)', color: '#666', marginLeft: 8 }}>{fieldChanges.length} field{fieldChanges.length !== 1 ? 's' : ''} changed</span>
+                    <span style={{ fontSize: 'var(--type-ui-label-size)', color: TOKENS.ghost, marginLeft: 8 }}>{fieldChanges.length} field{fieldChanges.length !== 1 ? 's' : ''} changed</span>
                   </div>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--type-body-size)' }}>
                     <thead>
-                      <tr style={{ background: 'rgba(0,0,0,0.15)' }}>
+                      <tr style={{ background: alpha(TOKENS.parchment, 0.03) }}>
                         <th style={{ ...thStyle, width: '30%' }}>Field</th>
-                        <th style={{ ...thStyle, color: '#e8a020', width: '35%' }}>Before</th>
-                        <th style={{ ...thStyle, color: '#64b5f6', width: '35%' }}>After</th>
+                        <th style={{ ...thStyle, color: TOKENS.warning, width: '35%' }}>Before</th>
+                        <th style={{ ...thStyle, color: TOKENS.electricBlue, width: '35%' }}>After</th>
                       </tr>
                     </thead>
                     <tbody>
                       {fieldChanges.map((fc) => (
-                        <tr key={fc.field} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                          <td style={{ ...tdStyle, color: '#888', fontWeight: 500 }}>{fc.label || fc.field}</td>
-                          <td style={{ ...tdStyle, color: '#e8a020' }}>
-                            {fc.old != null ? fc.old : <em style={{ color: '#444' }}>—</em>}
+                        <tr key={fc.field} style={{ borderBottom: `1px solid ${alpha(TOKENS.parchment, 0.04)}` }}>
+                          <td style={{ ...tdStyle, color: TOKENS.muted, fontWeight: 500 }}>{fc.label || fc.field}</td>
+                          <td style={{ ...tdStyle, color: TOKENS.warning }}>
+                            {fc.old != null ? fc.old : <em style={{ color: TOKENS.ghost }}>—</em>}
                           </td>
-                          <td style={{ ...tdStyle, color: '#64b5f6', fontWeight: 600 }}>
-                            {fc.new != null ? fc.new : <em style={{ color: '#444' }}>—</em>}
+                          <td style={{ ...tdStyle, color: TOKENS.electricBlue, fontWeight: 600 }}>
+                            {fc.new != null ? fc.new : <em style={{ color: TOKENS.ghost }}>—</em>}
                           </td>
                         </tr>
                       ))}
@@ -1007,22 +1007,22 @@ function BlocksDiffSection({ payload }) {
       {newBlocks.length > 0 && (
         <div>
           <SectionLabel>New blocks to add ({newBlocks.length})</SectionLabel>
-          <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+          <div style={{ borderRadius: 8, border: `1px solid ${alpha(TOKENS.parchment, 0.06)}`, overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--type-body-size)' }}>
                 <thead>
-                  <tr style={{ background: 'rgba(0,0,0,0.25)' }}>
+                  <tr style={{ background: alpha(TOKENS.parchment, 0.05) }}>
                     {BLOCK_FIELDS.filter((f) => newBlocks.some((b) => b[f] != null)).map((f) => (
-                      <th key={f} style={{ ...thStyle, color: '#64b5f6' }}>{f}</th>
+                      <th key={f} style={{ ...thStyle, color: TOKENS.electricBlue }}>{f}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {newBlocks.map((b, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <tr key={i} style={{ borderBottom: `1px solid ${alpha(TOKENS.parchment, 0.04)}` }}>
                       {BLOCK_FIELDS.filter((f) => newBlocks.some((nb) => nb[f] != null)).map((f) => (
                         <td key={f} style={tdStyle}>
-                          {b[f] != null ? b[f] : <em style={{ color: '#444' }}>—</em>}
+                          {b[f] != null ? b[f] : <em style={{ color: TOKENS.ghost }}>—</em>}
                         </td>
                       ))}
                     </tr>
@@ -1061,7 +1061,7 @@ function GeoJsonDownload({ label, geometry }) {
 
 function Shell({ children }) {
   return (
-    <div style={{ minHeight: '100vh', background: TOKENS.ink, fontFamily: 'var(--font-sans)' }}>
+    <div className="admin-light" style={{ minHeight: '100vh', background: TOKENS.ink, fontFamily: 'var(--font-sans)' }}>
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '32px 20px' }}>
         {children}
       </div>

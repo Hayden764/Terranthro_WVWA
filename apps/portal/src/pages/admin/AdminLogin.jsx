@@ -26,7 +26,7 @@ export default function AdminLogin() {
   }
 
   return (
-    <div style={{
+    <div className="admin-light" style={{
       minHeight: '100vh', background: TOKENS.ink,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontFamily: 'var(--font-sans)',

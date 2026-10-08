@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '@terranthro/shared/styles/tokens.js';
-import { INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
+import { LIGHT_INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
 import { apiPost } from '@terranthro/shared/lib/api.js';
 
 const TAB = { MAGIC: 'magic', PASSWORD: 'password' };
@@ -54,7 +54,7 @@ export default function PortalLogin() {
   }
 
   const inputStyle = {
-    ...INPUT_STYLE,
+    ...LIGHT_INPUT_STYLE,
     marginBottom: 16,
   };
 
@@ -139,7 +139,7 @@ export default function PortalLogin() {
               placeholder="username or winery@example.com"
               autoCapitalize="none"
               autoCorrect="off"
-              className="ds-input"
+              className="ds-input ds-input-light"
               style={inputStyle}
             />
             <label style={labelStyle}>Password</label>
@@ -149,7 +149,7 @@ export default function PortalLogin() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="ds-input"
+              className="ds-input ds-input-light"
               style={inputStyle}
             />
 
@@ -200,7 +200,7 @@ export default function PortalLogin() {
                 value={mlEmail}
                 onChange={(e) => setMlEmail(e.target.value)}
                 placeholder="winery@example.com"
-                className="ds-input"
+                className="ds-input ds-input-light"
                 style={inputStyle}
               />
 

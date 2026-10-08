@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { crimson, ink, muted, parchment, border, TOKENS } from '@terranthro/shared/styles/tokens.js';
-import { INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
+import { LIGHT_INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
 import { apiJson, apiPost } from '@terranthro/shared/lib/api.js';
 
 export default function PortalProfile() {
@@ -100,21 +100,21 @@ export default function PortalProfile() {
               value={form.description}
               onChange={handleChange('description')}
               rows={5}
-              className="ds-input"
+              className="ds-input ds-input-light"
               style={inputStyle}
             />
           </Field>
 
           <Field label="Phone">
-            <input type="tel" value={form.phone} onChange={handleChange('phone')} className="ds-input" style={inputStyle} />
+            <input type="tel" value={form.phone} onChange={handleChange('phone')} className="ds-input ds-input-light" style={inputStyle} />
           </Field>
 
           <Field label="Website URL">
-            <input type="url" value={form.url} onChange={handleChange('url')} className="ds-input" style={inputStyle} />
+            <input type="url" value={form.url} onChange={handleChange('url')} className="ds-input ds-input-light" style={inputStyle} />
           </Field>
 
           <Field label="Image URL">
-            <input type="url" value={form.image_url} onChange={handleChange('image_url')} className="ds-input" style={inputStyle} />
+            <input type="url" value={form.image_url} onChange={handleChange('image_url')} className="ds-input ds-input-light" style={inputStyle} />
           </Field>
 
           {error && <p style={{ color: crimson, fontSize: 'var(--type-mono-size)', marginBottom: 12 }}>{error}</p>}
@@ -155,7 +155,7 @@ function Field({ label, children }) {
 }
 
 const inputStyle = {
-  ...INPUT_STYLE,
+  ...LIGHT_INPUT_STYLE,
   resize: 'vertical',
 };
 

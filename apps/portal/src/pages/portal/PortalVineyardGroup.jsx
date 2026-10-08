@@ -13,7 +13,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import lineSplit from '@turf/line-split';
 import { feature as turfFeature } from '@turf/helpers';
 import { border, crimson, interactive, interactiveSoft, ink, muted, parchment, TOKENS } from '@terranthro/shared/styles/tokens.js';
-import { INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
+import { LIGHT_INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
 import { apiJson, apiPost } from '@terranthro/shared/lib/api.js';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import EditableBlocksTable from '../../components/EditableBlocksTable';
@@ -280,8 +280,8 @@ export default function PortalVineyardGroup() {
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}
               autoFocus
-              className="ds-input"
-              style={{ ...INPUT_STYLE, flex: '1 1 240px', minWidth: 0 }}
+              className="ds-input ds-input-light"
+              style={{ ...LIGHT_INPUT_STYLE, flex: '1 1 240px', minWidth: 0 }}
               onKeyDown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') setRenaming(false); }}
             />
             <button onClick={submitRename} disabled={renameStatus === 'submitting'} style={smallBtnStyle}>
@@ -383,16 +383,16 @@ export default function PortalVineyardGroup() {
               placeholder="Parcel / vineyard name"
               value={pendingAdd.vineyard_name}
               onChange={(e) => setPendingAdd((p) => ({ ...p, vineyard_name: e.target.value }))}
-              className="ds-input"
-              style={{ ...INPUT_STYLE, width: '100%', boxSizing: 'border-box', padding: '8px 10px', marginBottom: 8 }}
+              className="ds-input ds-input-light"
+              style={{ ...LIGHT_INPUT_STYLE, width: '100%', boxSizing: 'border-box', padding: '8px 10px', marginBottom: 8 }}
             />
             <textarea
               placeholder="Optional: variety, location notes, etc."
               value={pendingAdd.notes}
               onChange={(e) => setPendingAdd((p) => ({ ...p, notes: e.target.value }))}
               rows={2}
-              className="ds-input"
-              style={{ ...INPUT_STYLE, width: '100%', boxSizing: 'border-box', padding: '8px 10px', resize: 'vertical', marginBottom: 10 }}
+              className="ds-input ds-input-light"
+              style={{ ...LIGHT_INPUT_STYLE, width: '100%', boxSizing: 'border-box', padding: '8px 10px', resize: 'vertical', marginBottom: 10 }}
             />
             {addSubmitStatus === 'error' && <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>}
             <div style={{ display: 'flex', gap: 8 }}>
@@ -598,8 +598,8 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
             value={removeNotes}
             onChange={(e) => onRemoveNotesChange(e.target.value)}
             rows={2}
-            className="ds-input"
-            style={{ ...INPUT_STYLE, width: '100%', boxSizing: 'border-box', padding: '8px 10px', resize: 'vertical', marginBottom: 10 }}
+            className="ds-input ds-input-light"
+            style={{ ...LIGHT_INPUT_STYLE, width: '100%', boxSizing: 'border-box', padding: '8px 10px', resize: 'vertical', marginBottom: 10 }}
           />
           {removeSubmitStatus === 'error' && <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>}
           <div style={{ display: 'flex', gap: 8 }}>
@@ -623,8 +623,8 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
             value={pendingSplit.notes}
             onChange={(e) => onSplitNotesChange(e.target.value)}
             rows={2}
-            className="ds-input"
-            style={{ ...INPUT_STYLE, width: '100%', boxSizing: 'border-box', padding: '8px 10px', resize: 'vertical', marginBottom: 10 }}
+            className="ds-input ds-input-light"
+            style={{ ...LIGHT_INPUT_STYLE, width: '100%', boxSizing: 'border-box', padding: '8px 10px', resize: 'vertical', marginBottom: 10 }}
           />
           {splitSubmitStatus === 'error' && <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>}
           <div style={{ display: 'flex', gap: 8 }}>
@@ -659,9 +659,9 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
             value={pendingGeometry.notes}
             onChange={(e) => onPendingNotesChange(e.target.value)}
             rows={2}
-            className="ds-input"
+            className="ds-input ds-input-light"
             style={{
-              ...INPUT_STYLE,
+              ...LIGHT_INPUT_STYLE,
               width: '100%', boxSizing: 'border-box', padding: '8px 10px',
               resize: 'vertical', marginBottom: 10,
             }}
@@ -769,9 +769,9 @@ function RequestButton({ vineyard, type, label }) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         rows={3}
-        className="ds-input"
+        className="ds-input ds-input-light"
         style={{
-          ...INPUT_STYLE,
+          ...LIGHT_INPUT_STYLE,
           width: '100%', padding: '8px 10px',
           resize: 'vertical', boxSizing: 'border-box',
         }}

@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import lineSplit from '@turf/line-split';
 import { feature as turfFeature } from '@turf/helpers';
 import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '@terranthro/shared/styles/tokens.js';
-import { INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
+import { LIGHT_INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
 import { apiJson, apiPost } from '@terranthro/shared/lib/api.js';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import EditableBlocksTable from '../../components/EditableBlocksTable';
@@ -327,7 +327,7 @@ export default function PortalVineyardDetail() {
                       placeholder="Parcel / vineyard name"
                       value={pendingAdd.vineyard_name}
                       onChange={(e) => setPendingAdd((p) => ({ ...p, vineyard_name: e.target.value }))}
-                      className="ds-input"
+                      className="ds-input ds-input-light"
                       style={{ ...textareaStyle, resize: 'none', marginBottom: 8 }}
                     />
                   )}
@@ -356,7 +356,7 @@ export default function PortalVineyardDetail() {
                       </label>
                     ))}
                   </div>
-                  <textarea placeholder="Optional: additional notes for the admin" value={removeNotes} onChange={(e) => setRemoveNotes(e.target.value)} rows={2} className="ds-input" style={textareaStyle} />
+                  <textarea placeholder="Optional: additional notes for the admin" value={removeNotes} onChange={(e) => setRemoveNotes(e.target.value)} rows={2} className="ds-input ds-input-light" style={textareaStyle} />
                   {removeSubmitStatus === 'error' && <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>}
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={submitRemove} disabled={removeSubmitStatus === 'submitting'} style={{ ...smallBtnStyle, background: crimson }}>
@@ -398,7 +398,7 @@ export default function PortalVineyardDetail() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '16px 0 4px' }}>
             <input
               type="text" value={renameValue} onChange={(e) => setRenameValue(e.target.value)} autoFocus
-              className="ds-input" style={{ ...INPUT_STYLE, flex: '1 1 240px', minWidth: 0 }}
+              className="ds-input ds-input-light" style={{ ...LIGHT_INPUT_STYLE, flex: '1 1 240px', minWidth: 0 }}
               onKeyDown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') setRenaming(false); }}
             />
             <button onClick={submitRename} disabled={renameStatus === 'submitting'} style={smallBtnStyle}>
@@ -483,7 +483,7 @@ function PendingCard({ title, body, extraField, notePlaceholder, noteValue, onNo
       <p style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, marginBottom: 6 }}>{title}</p>
       <p style={{ fontSize: 'var(--type-body-size)', color: muted, marginBottom: 10 }}>{body}</p>
       {extraField}
-      <textarea placeholder={notePlaceholder} value={noteValue} onChange={(e) => onNote(e.target.value)} rows={2} className="ds-input" style={textareaStyle} />
+      <textarea placeholder={notePlaceholder} value={noteValue} onChange={(e) => onNote(e.target.value)} rows={2} className="ds-input ds-input-light" style={textareaStyle} />
       {error && <p style={{ fontSize: 'var(--type-body-size)', color: crimson, marginBottom: 8 }}>Submission failed — try again.</p>}
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={onSubmit} disabled={submitting || submitDisabled} style={smallBtnStyle}>
@@ -603,7 +603,7 @@ const pendingCardStyle = {
 };
 
 const textareaStyle = {
-  ...INPUT_STYLE,
+  ...LIGHT_INPUT_STYLE,
   width: '100%',
   boxSizing: 'border-box',
   padding: '8px 10px',

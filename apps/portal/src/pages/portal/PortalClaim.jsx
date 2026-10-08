@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { border, ink, muted, parchment, TOKENS } from '@terranthro/shared/styles/tokens.js';
-import { INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
+import { LIGHT_INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
 import { apiJson, apiPost } from '@terranthro/shared/lib/api.js';
 import TerroirDataChips from '@terranthro/shared/components/TerroirDataChips.jsx';
 
@@ -85,9 +85,9 @@ export default function PortalClaim() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by vineyard or owner name…"
-            className="ds-input"
+            className="ds-input ds-input-light"
             style={{
-              ...INPUT_STYLE,
+              ...LIGHT_INPUT_STYLE,
               flex: 1,
             }}
           />
@@ -142,9 +142,9 @@ export default function PortalClaim() {
                           value={claimNotes}
                           onChange={(e) => setClaimNotes(e.target.value)}
                           rows={2}
-                          className="ds-input"
+                          className="ds-input ds-input-light"
                           style={{
-                            ...INPUT_STYLE,
+                            ...LIGHT_INPUT_STYLE,
                             padding: '6px 10px',
                             resize: 'vertical',
                             marginBottom: 6,
@@ -195,7 +195,7 @@ export default function PortalClaim() {
                   required
                   value={newForm.vineyard_name}
                   onChange={(e) => setNewForm((p) => ({ ...p, vineyard_name: e.target.value }))}
-                  className="ds-input"
+                  className="ds-input ds-input-light"
                   style={inputStyle}
                 />
               </div>
@@ -205,7 +205,7 @@ export default function PortalClaim() {
                   type="text"
                   value={newForm.ava_name}
                   onChange={(e) => setNewForm((p) => ({ ...p, ava_name: e.target.value }))}
-                  className="ds-input"
+                  className="ds-input ds-input-light"
                   style={inputStyle}
                 />
               </div>
@@ -215,7 +215,7 @@ export default function PortalClaim() {
                   value={newForm.notes}
                   onChange={(e) => setNewForm((p) => ({ ...p, notes: e.target.value }))}
                   rows={3}
-                  className="ds-input"
+                  className="ds-input ds-input-light"
                   style={inputStyle}
                 />
               </div>
@@ -241,6 +241,6 @@ const smallBtn = {
 const labelStyle = { display: 'block', fontSize: 'var(--type-body-size)', color: muted, marginBottom: 4 };
 
 const inputStyle = {
-  ...INPUT_STYLE,
+  ...LIGHT_INPUT_STYLE,
   resize: 'vertical',
 };

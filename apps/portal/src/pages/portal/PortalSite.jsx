@@ -8,7 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { border, crimson, ink, muted, parchment, TOKENS } from '@terranthro/shared/styles/tokens.js';
-import { INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
+import { LIGHT_INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
 import { apiJson } from '@terranthro/shared/lib/api.js';
 import { SITE_ACCENTS, DEFAULT_ACCENT } from '../../lib/siteTheme';
 import PortalHeader from '../../components/portal/PortalHeader';
@@ -108,7 +108,7 @@ export default function PortalSite() {
           <input
             value={slugDraft}
             onChange={(e) => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
-            className="tx-input" style={{ ...INPUT_STYLE, flex: '1 1 200px', minWidth: 160 }}
+            className="tx-input ds-input-light" style={{ ...LIGHT_INPUT_STYLE, flex: '1 1 200px', minWidth: 160 }}
             maxLength={80}
           />
           <button disabled={saving || !slugDraft || slugDraft === site.slug} onClick={() => save({ slug: slugDraft })} style={btn('primary')}>
@@ -168,7 +168,7 @@ export default function PortalSite() {
             WordPress “Custom HTML”). Or just link to the page address above.
           </p>
           <textarea readOnly value={embedSnippet(site.slug)} rows={8}
-            className="tx-input" style={{ ...INPUT_STYLE, width: '100%', fontFamily: 'var(--font-mono)', fontSize: 12, resize: 'vertical' }}
+            className="tx-input ds-input-light" style={{ ...LIGHT_INPUT_STYLE, width: '100%', fontFamily: 'var(--font-mono)', fontSize: 12, resize: 'vertical' }}
             onFocus={(e) => e.target.select()} />
           <button
             style={{ ...btn('ghost'), marginTop: 8 }}

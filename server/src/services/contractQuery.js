@@ -17,13 +17,19 @@
  * blocks under 2 ac excluded). Grouping by AVA counts a block in every AVA it
  * falls in, so nested AVAs overlap their parents.
  *
- * Grower fields (variety, clone, …) exist only for organizations that share
- * with OWB; other blocks group as "Not shared", and blocks shared but left
- * blank as "Not reported". Every result reports how many of its acres have
- * shared grower data behind them.
+ * Planting fields (variety, clone, …) come from Terranthro's research or,
+ * for grower-supplied blocks, only once the grower shares with OWB; withheld
+ * blocks group as "Not shared", blocks with nothing on file as "Not
+ * reported". Every result reports how many of its acres have planting
+ * details behind them.
  */
 
 import { toCsv } from './contractReleases.js';
+
+// A block counts toward "planting details on file" only when OWB may see its
+// planting fields and at least one of them is filled in.
+const HAS_PLANTING = `rb.grower_data AND COALESCE(rb.variety, rb.clone, rb.rootstock, rb.trellis,
+  rb.spacing, rb.fruit_sold_to, rb.year_planted::text, rb.vines::text, rb.vines_per_acre::text) IS NOT NULL`;
 
 const SIZE_ORDER = ['Under 2 ac', '2–5 ac', '5–10 ac', '10–25 ac', '25–50 ac', '50+ ac'];
 
@@ -64,13 +70,13 @@ export const DIMENSIONS = {
   soil_drainage:     { label: 'Soil drainage', group: 'Site', sql: `COALESCE(rb.soil_drainage, 'Unknown')` },
   rock_type:         { label: 'Bedrock', group: 'Site', sql: `COALESCE(rb.rock_type, 'Unknown')` },
   geology_formation: { label: 'Geologic formation', group: 'Site', sql: `COALESCE(rb.geology_formation, 'Unknown')` },
-  variety:           { label: 'Variety', group: 'Grower data', grower: true, sql: grower(`initcap(lower(trim(rb.variety)))`) },
-  clone:             { label: 'Clone', group: 'Grower data', grower: true, sql: grower(`trim(rb.clone)`) },
-  rootstock:         { label: 'Rootstock', group: 'Grower data', grower: true, sql: grower(`trim(rb.rootstock)`) },
-  trellis:           { label: 'Trellis', group: 'Grower data', grower: true, sql: grower(`initcap(lower(trim(rb.trellis)))`) },
-  planting_decade:   { label: 'Planting decade', group: 'Grower data', grower: true, numericOrder: true,
+  variety:           { label: 'Variety', group: 'Planting details', grower: true, sql: grower(`initcap(lower(trim(rb.variety)))`) },
+  clone:             { label: 'Clone', group: 'Planting details', grower: true, sql: grower(`trim(rb.clone)`) },
+  rootstock:         { label: 'Rootstock', group: 'Planting details', grower: true, sql: grower(`trim(rb.rootstock)`) },
+  trellis:           { label: 'Trellis', group: 'Planting details', grower: true, sql: grower(`initcap(lower(trim(rb.trellis)))`) },
+  planting_decade:   { label: 'Planting decade', group: 'Planting details', grower: true, numericOrder: true,
                        sql: grower(`CASE WHEN rb.year_planted IS NULL THEN NULL ELSE ((rb.year_planted / 10) * 10)::text || 's' END`) },
-  fruit_buyer:       { label: 'Fruit buyer', group: 'Grower data', grower: true, sql: grower(`trim(rb.fruit_sold_to)`) },
+  fruit_buyer:       { label: 'Fruit buyer', group: 'Planting details', grower: true, sql: grower(`trim(rb.fruit_sold_to)`) },
   name_source:       { label: 'Name confirmed by', group: 'Data quality', sql: `COALESCE(rb.name_source, 'Not yet confirmed')` },
   verification:      { label: 'Verification', group: 'Data quality', sql: `COALESCE(rb.verification, 'Unknown')` },
 };
@@ -174,7 +180,7 @@ export async function runQuery(db, releaseId, spec) {
   const totals = await db.query(
     `SELECT count(*)::int AS blocks, count(DISTINCT rb.vineyard_id)::int AS vineyards,
             COALESCE(sum(rb.acres), 0) AS acres,
-            COALESCE(sum(rb.acres) FILTER (WHERE rb.grower_data), 0) AS grower_acres
+            COALESCE(sum(rb.acres) FILTER (WHERE ${HAS_PLANTING}), 0) AS grower_acres
      FROM contract_release_blocks rb WHERE ${where}`,
     [releaseId, ...params]
   );
@@ -214,7 +220,7 @@ export async function runQuery(db, releaseId, spec) {
     `SELECT ${exprs.map((e, i) => `${e} AS g${i}`).join(', ')},
             count(*)::int AS blocks, count(DISTINCT rb.vineyard_id)::int AS vineyards,
             sum(rb.acres) AS acres,
-            COALESCE(sum(rb.acres) FILTER (WHERE rb.grower_data), 0) AS grower_acres
+            COALESCE(sum(rb.acres) FILTER (WHERE ${HAS_PLANTING}), 0) AS grower_acres
      FROM contract_release_blocks rb
      ${usesAva ? 'CROSS JOIN LATERAL unnest(rb.ava_slugs, rb.ava_names) AS av(slug, name)' : ''}
      WHERE ${where}${avaRows}
@@ -297,7 +303,7 @@ export function summaryCsvColumns(spec) {
   return [
     ...spec.group_by.map((g, i) => [`g${i}`, DIMENSIONS[g].label]),
     ['blocks', 'Blocks'], ['vineyards', 'Vineyards'], ['acres', 'Acres'],
-    ['grower_acres', 'Acres with grower data shared'],
+    ['grower_acres', 'Acres with planting details'],
   ];
 }
 
@@ -310,7 +316,7 @@ const BLOCK_CSV = [
   ['size_class', 'size_class'], ['elevation_mean_ft', 'elevation_mean_ft'],
   ['slope_mean_deg', 'slope_mean_deg'], ['aspect_dominant_deg', 'aspect_dominant_deg'],
   ['soil_series', 'soil_series'], ['soil_class', 'soil_class'], ['rock_type', 'rock_type'],
-  ['grower_data', 'grower_data_shared'], ['variety', 'variety'], ['clone', 'clone'],
+  ['grower_data', 'planting_details_available'], ['variety', 'variety'], ['clone', 'clone'],
   ['rootstock', 'rootstock'], ['year_planted', 'year_planted'], ['spacing', 'spacing'],
   ['vines_per_acre', 'vines_per_acre'], ['vines', 'vines'], ['trellis', 'trellis'],
   ['fruit_sold_to', 'fruit_buyers'], ['grower_notes', 'grower_notes'],

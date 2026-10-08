@@ -7,10 +7,11 @@
  * rest forward unchanged from the previous release. A release never changes
  * after it is built, so its stats are cached in memory.
  *
- * Grower-entered fields (variety, clone, …) are filled only for blocks whose
- * organization currently shares with OWB (migration 033); a final pass over
- * the whole release refreshes them, so a grower who accepts the terms is
- * included in the next release and one who withdraws drops out of it.
+ * Planting fields (variety, clone, …) are filled when Terranthro compiled
+ * them (the default), or — for grower-supplied blocks (migration 034) — when
+ * the organization currently shares with OWB (migration 033). A final pass
+ * over the whole release refreshes them, so a grower who accepts the terms
+ * is included in the next release and one who withdraws drops out of it.
  *
  * Acreage conventions (Exhibit A):
  *   headline acres  standing blocks, excluding isolated blocks under 2 ac
@@ -36,7 +37,7 @@ const GROWER_FIELDS = [
   ['vines_per_acre', 'vines_per_acre'], ['vines', 'vines'], ['trellis', 'trellis'],
   ['fruit_sold_to', 'fruit_sold_to'], ['grower_notes', 'notes'],
 ];
-const CARRIED_COLUMNS = [...SNAPSHOT_COLUMNS, 'organization_id', 'grower_data', ...GROWER_FIELDS.map(([c]) => c)];
+const CARRIED_COLUMNS = [...SNAPSHOT_COLUMNS, 'organization_id', 'grower_supplied', 'grower_data', ...GROWER_FIELDS.map(([c]) => c)];
 
 // Size classes in display order (keep in step with owb_size_class()).
 const SIZE_ORDER = ['Under 2 ac', '2–5 ac', '5–10 ac', '10–25 ac', '25–50 ac', '50+ ac'];
@@ -117,19 +118,22 @@ export async function buildRelease(db, { contractId, milestoneId, label, scopeAv
   await db.query(
     `UPDATE contract_release_blocks rb
      SET organization_id = v.winery_id,
+         grower_supplied = b.grower_supplied,
          grower_data = g.ok,
          ${GROWER_FIELDS.map(([rc, lc]) => `${rc} = CASE WHEN g.ok THEN b.${lc} END`).join(',\n         ')}
      FROM vineyard_blocks b
      LEFT JOIN vineyards v ON v.id = b.vineyard_id
-     CROSS JOIN LATERAL (SELECT COALESCE(organization_shares_with_owb(v.winery_id), FALSE) AS ok) g
+     CROSS JOIN LATERAL (
+       SELECT NOT b.grower_supplied OR COALESCE(organization_shares_with_owb(v.winery_id), FALSE) AS ok
+     ) g
      WHERE rb.release_id = $1 AND b.id = rb.block_id`,
     [release.id]
   );
-  // Carried blocks no longer in the live data keep their fields only while still shared.
+  // Carried blocks no longer in the live data keep grower-supplied fields only while still shared.
   await db.query(
     `UPDATE contract_release_blocks rb
      SET grower_data = FALSE, ${GROWER_FIELDS.map(([rc]) => `${rc} = NULL`).join(', ')}
-     WHERE rb.release_id = $1 AND rb.grower_data
+     WHERE rb.release_id = $1 AND rb.grower_data AND rb.grower_supplied
        AND NOT EXISTS (SELECT 1 FROM vineyard_blocks b WHERE b.id = rb.block_id)
        AND NOT COALESCE(organization_shares_with_owb(rb.organization_id), FALSE)`,
     [release.id]
@@ -189,7 +193,8 @@ export async function releaseStats(db, releaseId) {
               sum(planted_acres) FILTER (WHERE ${headline}) AS planted_acres,
               count(*) FILTER (WHERE verification = 'needs_field')::int AS needs_field,
               count(*) FILTER (WHERE name_source IS NULL)::int AS unconfirmed_names,
-              COALESCE(sum(acres) FILTER (WHERE ${headline} AND grower_data), 0) AS grower_shared_acres,
+              COALESCE(sum(acres) FILTER (WHERE ${headline} AND grower_data AND COALESCE(variety, clone, rootstock,
+                trellis, spacing, fruit_sold_to, year_planted::text) IS NOT NULL), 0) AS grower_shared_acres,
               count(DISTINCT organization_id) FILTER (WHERE grower_data)::int AS grower_shared_orgs,
               array_remove(array_agg(DISTINCT imagery_year ORDER BY imagery_year), NULL) AS imagery_years
        FROM contract_release_blocks WHERE release_id = $1`,
@@ -324,7 +329,7 @@ const BLOCK_CSV_COLUMNS = [
   ['soil_class', 'soil_class'], ['soil_drainage', 'soil_drainage'],
   ['available_water_cm', 'available_water_cm'], ['geology_formation', 'geology_formation'],
   ['rock_type', 'rock_type'],
-  ['grower_data', 'grower_data_shared'], ['variety', 'variety'], ['clone', 'clone'],
+  ['grower_data', 'planting_details_available'], ['variety', 'variety'], ['clone', 'clone'],
   ['rootstock', 'rootstock'], ['year_planted', 'year_planted'], ['rows', 'rows'],
   ['spacing', 'spacing'], ['vines_per_acre', 'vines_per_acre'], ['vines', 'vines'],
   ['trellis', 'trellis'], ['fruit_sold_to', 'fruit_buyers'], ['grower_notes', 'grower_notes'],

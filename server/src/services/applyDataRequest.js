@@ -27,6 +27,14 @@ export const IMMEDIATE_APPLY_TYPES = ['profile', 'vineyard_rename', 'vineyard_va
 export const ALLOWED_BLOCK_COLS = ['block_name', 'variety', 'clone', 'rootstock', 'trellis',
                                    'rows', 'spacing', 'vines', 'year_planted', 'notes'];
 
+// A grower editing any of these through the portal makes the block's planting
+// details grower-supplied (vineyard_blocks.grower_supplied, migration 034):
+// they then reach OWB only once the grower accepts the data terms.
+const GROWER_OWNED_COLS = ALLOWED_BLOCK_COLS.filter((c) => c !== 'block_name');
+
+// Portal submissions come from the grower; admin-entered requests do not.
+const fromGrower = (request) => (request.origin ?? 'winery') === 'winery' && !request.submitted_by_admin;
+
 export async function applyDataRequest(client, request, { adminId = null } = {}) {
   const requestId = request.id;
   const payload = request.payload;
@@ -123,8 +131,9 @@ export async function applyDataRequest(client, request, { adminId = null } = {})
         if (!change.id || !Array.isArray(change.field_changes)) continue;
         for (const fc of change.field_changes) {
           if (!ALLOWED_BLOCK_COLS.includes(fc.field)) continue;
+          const markGrower = fromGrower(request) && GROWER_OWNED_COLS.includes(fc.field);
           await client.query(
-            `UPDATE vineyard_blocks SET ${fc.field} = $1 WHERE id = $2`,
+            `UPDATE vineyard_blocks SET ${fc.field} = $1${markGrower ? ', grower_supplied = TRUE' : ''} WHERE id = $2`,
             [fc.new ?? null, change.id]
           );
           await client.query(
@@ -163,8 +172,8 @@ export async function applyDataRequest(client, request, { adminId = null } = {})
         const vals = cols.map((c) => nb[c]);
         const placeholders = cols.map((_, i) => `$${i + 2}`).join(', ');
         const { rows: inserted } = await client.query(
-          `INSERT INTO vineyard_blocks (vineyard_id, vineyard_name, ${cols.join(', ')})
-           VALUES ($1, (SELECT vineyard_name FROM vineyards WHERE id = $1), ${placeholders})
+          `INSERT INTO vineyard_blocks (vineyard_id, vineyard_name, grower_supplied, ${cols.join(', ')})
+           VALUES ($1, (SELECT vineyard_name FROM vineyards WHERE id = $1), ${fromGrower(request)}, ${placeholders})
            RETURNING id`,
           [request.target_id, ...vals]
         );

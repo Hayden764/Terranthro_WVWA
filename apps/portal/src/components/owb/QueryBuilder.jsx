@@ -158,8 +158,8 @@ function Result({ result, dims, usesGrower, loading }) {
         in {intFmt.format(totals.blocks)} blocks across {intFmt.format(totals.vineyards)} vineyards.
       </p>
       <p style={{ ...small, margin: '0 0 12px' }}>
-        Grower details are shared for {acresFmt.format(totals.grower_acres)} of these acres ({growerShare}).
-        {usesGrower && ' Blocks without them show as "Not shared" (grower has not opted in) or "Not reported" (shared, but left blank).'}
+        Planting details (variety, clone, rootstock, planting year…) are on file for {acresFmt.format(totals.grower_acres)} of these acres ({growerShare}).
+        {usesGrower && ' Blocks without them show as "Not reported" (nothing on file yet) or "Not shared" (details the grower entered and has not yet agreed to share).'}
         {result.overlapping && ' Grouping by AVA counts nested AVAs inside their parent too, so rows overlap.'}
       </p>
 
@@ -181,7 +181,7 @@ function SummaryTable({ rows, spec, dims, truncated }) {
             <th style={{ ...th, ...right }}>Blocks</th>
             <th style={{ ...th, ...right }}>Vineyards</th>
             <th style={{ ...th, ...right, minWidth: 150 }}>Acres</th>
-            <th style={{ ...th, ...right }}>Grower data</th>
+            <th style={{ ...th, ...right }}>Planting details</th>
           </tr>
         </thead>
         <tbody>

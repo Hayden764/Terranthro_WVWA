@@ -443,6 +443,7 @@ router.post('/requests', async (req, res) => {
         const record = reqRows[0];
         await applyDataRequest(client, {
           id: record.id,
+          origin: 'winery',
           request_type,
           target_id: target_id || null,
           winery_id: wineryId,

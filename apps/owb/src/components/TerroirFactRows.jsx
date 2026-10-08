@@ -13,9 +13,9 @@ export default function TerroirFactRows({ rows = [], variant = 'light' }) {
   if (!visible.length) return null;
 
   const glass = variant === 'glass';
-  const labelColor = glass ? 'rgba(232, 226, 214, 0.72)' : TOKENS.muted;
-  const valueColor = glass ? 'rgba(232, 226, 214, 0.92)' : TOKENS.ink;
-  const subColor = glass ? 'rgba(232, 226, 214, 0.5)' : TOKENS.muted;
+  const labelColor = glass ? 'rgba(255, 255, 255, 0.72)' : TOKENS.muted;
+  const valueColor = glass ? 'rgba(255, 255, 255, 0.92)' : TOKENS.ink;
+  const subColor = glass ? 'rgba(255, 255, 255, 0.5)' : TOKENS.muted;
   const divider = glass ? 'rgba(255, 255, 255, 0.07)' : 'var(--color-ghost)';
 
   return (

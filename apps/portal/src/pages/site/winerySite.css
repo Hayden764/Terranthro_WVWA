@@ -6,8 +6,8 @@
 .ws {
   --ws-ink: #1F1D1A;
   --ws-muted: #6B665E;
-  --ws-rule: #E3DCCF;
-  --ws-paper: #FBF8F3;
+  --ws-rule: #E5E5E5;
+  --ws-paper: #FFFFFF;
   --ws-card: #FFFFFF;
   font-family: var(--font-sans);
   color: var(--ws-ink);

@@ -34,7 +34,7 @@ const MAP_COLOR_FALLBACKS = {
   lineDefault: '#2E9BFF',
   lineHover: '#C87D4A',
   lineSelected: '#00C44F',
-  lightPoint: '#E8E2D6',
+  lightPoint: '#FFFFFF',
 };
 
 function resolveCssColor(varName, fallback) {

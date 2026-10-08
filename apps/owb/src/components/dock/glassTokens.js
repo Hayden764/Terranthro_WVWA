@@ -13,6 +13,6 @@ export const GLASS = {
   accent:      'var(--color-electric-blue)',
   accentDim:   'rgba(46, 155, 255, 0.18)',
   text:        'var(--color-parchment)',
-  textDim:     'rgba(232, 226, 214, 0.6)',
-  textMuted:   'rgba(232, 226, 214, 0.35)',
+  textDim:     'rgba(255, 255, 255, 0.6)',
+  textMuted:   'rgba(255, 255, 255, 0.35)',
 };

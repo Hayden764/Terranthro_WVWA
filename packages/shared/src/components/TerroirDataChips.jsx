@@ -55,7 +55,7 @@ export default function TerroirDataChips({ chips = [], variant = 'light', column
               fontWeight: 500,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: glass ? 'rgba(232, 226, 214, 0.72)' : TOKENS.ink,
+              color: glass ? 'rgba(255, 255, 255, 0.72)' : TOKENS.ink,
               marginBottom: 3,
             }}>
               {chip.label}
@@ -83,7 +83,7 @@ export default function TerroirDataChips({ chips = [], variant = 'light', column
                 fontSize: 9,
                 fontWeight: 400,
                 letterSpacing: '0.04em',
-                color: glass ? 'rgba(232, 226, 214, 0.5)' : TOKENS.muted,
+                color: glass ? 'rgba(255, 255, 255, 0.5)' : TOKENS.muted,
                 marginTop: 4,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',

@@ -43,7 +43,7 @@ import { alpha, border, crimson, ink, MAP_GLASS, mix, muted, parchment, TOKENS }
 // passed into MapLibre paint properties. These mirror the tokens.css palette.
 const HEX = {
   ink:        '#080A0F',
-  parchment:  '#E8E2D6',
+  parchment:  '#FFFFFF',
   success:    '#00C44F',
   danger:     '#E03040',
   interactive:'#2E9BFF', // = --color-interactive (MapLibre needs a literal)

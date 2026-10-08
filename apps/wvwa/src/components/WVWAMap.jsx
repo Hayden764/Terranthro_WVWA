@@ -168,7 +168,7 @@ const UI = {
 };
 
 // MapLibre paint properties require concrete color values, not CSS var() tokens.
-const MAP_PARCHMENT = '#EDE2D4';
+const MAP_PARCHMENT = '#FFFFFF';
 const MAP_AMBER = '#C28A3A';
 const toMapLibreColor = (color, fallback) => (
   typeof color === 'string' && color.startsWith('var(') ? fallback : color
@@ -186,7 +186,7 @@ export const VINEYARD_MEMBER_PALETTE = [
   '#DAA51B', '#7B2D43', '#764E9F', '#ED645A', '#CC3A8E',
 ];
 export const VINEYARD_GREY = '#ABABAB';   // named non-member
-export const VINEYARD_WHITE = '#E8E1D3';  // unnamed — "help us name it" (soft parchment)
+export const VINEYARD_WHITE = '#FFFFFF';  // unnamed — "help us name it" (plain white)
 // Member vineyard the colouring run hasn't reached yet (no vineyard_colors row).
 // Grey means "not a member", so these must not borrow it — they get a neutral
 // vine green until assign-vineyard-colors.py gives them a palette slot.
@@ -252,9 +252,9 @@ const LISTING_SYMBOLOGY_PALETTES = {
     ],
     clusterStrokeColor: 'rgba(41, 49, 42, 0.52)',
     clusterCountColor: '#1F2A22',
-    clusterCountHaloColor: 'rgba(250,247,242,0.72)',
+    clusterCountHaloColor: 'rgba(255,255,255,0.72)',
     markerFillColor: '#304437',
-    markerStrokeColor: 'rgba(250,247,242,0.82)',
+    markerStrokeColor: 'rgba(255,255,255,0.82)',
     markerTextColor: '#F5EFE3',
     markerTextHaloColor: 'rgba(16,22,18,0.42)',
     focusAccentColor: '#6FB78D',
@@ -284,9 +284,9 @@ const LISTING_SYMBOLOGY_PALETTES = {
     ],
     clusterStrokeColor: 'rgba(74, 52, 30, 0.55)',
     clusterCountColor: '#3B2613',
-    clusterCountHaloColor: 'rgba(246,235,214,0.76)',
+    clusterCountHaloColor: 'rgba(255,255,255,0.76)',
     markerFillColor: '#6A4C2D',
-    markerStrokeColor: 'rgba(245,229,203,0.86)',
+    markerStrokeColor: 'rgba(255,255,255,0.86)',
     markerTextColor: '#FFF6E8',
     markerTextHaloColor: 'rgba(40,26,14,0.44)',
     focusAccentColor: '#B88A4A',
@@ -2723,7 +2723,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         type: 'line',
         source: 'wv-boundary',
         paint: {
-          'line-color': '#EDE2D4',
+          'line-color': '#FFFFFF',
           'line-width': 2.5,
           'line-opacity': 1.0,
         },
@@ -3220,7 +3220,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             type: 'line',
             source: `ava-${ava.slug}`,
             paint: {
-              'line-color': '#EDE2D4',
+              'line-color': '#FFFFFF',
               'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 3.5, 2.5],
               'line-opacity': 1.0,
             },
@@ -3426,7 +3426,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             map.setPaintProperty(`ava-${ava.slug}-fill`, 'fill-opacity', 0);
           }
           if (map.getLayer(`ava-${ava.slug}-line`)) {
-            map.setPaintProperty(`ava-${ava.slug}-line`, 'line-color',   '#EDE2D4');
+            map.setPaintProperty(`ava-${ava.slug}-line`, 'line-color',   '#FFFFFF');
             map.setPaintProperty(`ava-${ava.slug}-line`, 'line-opacity', isSelected ? 1.0 : 0);
             map.setPaintProperty(`ava-${ava.slug}-line`, 'line-width',   isSelected ? 3.5 : 2.5);
           }

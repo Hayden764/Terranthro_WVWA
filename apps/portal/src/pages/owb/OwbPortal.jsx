@@ -90,7 +90,7 @@ export default function OwbPortal() {
         {!timeline && !error && <p style={{ color: muted }}>Loading…</p>}
         {timeline?.empty && <p style={{ color: muted }}>No contract is set up yet.</p>}
         {timeline && !timeline.empty && (
-          tab === 'timeline' ? <TimelineTab data={timeline} onChanged={load} /> : <DataTab data={timeline} />
+          tab === 'timeline' ? <TimelineTab data={timeline} /> : <DataTab data={timeline} />
         )}
       </div>
     </div>

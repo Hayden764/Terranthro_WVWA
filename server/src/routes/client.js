@@ -1,18 +1,13 @@
 /**
  * Client portal routes — the shared login a client (OWB) uses to follow its
- * contract, accept delivered milestones and approve invoices.
+ * contract's progress and pull data for its reports.
  *
  * POST /api/client/login          — { username, password } → sets client_token cookie
  * POST /api/client/logout
  * GET  /api/client/me             — current client + whether the password must change
  * POST /api/client/set-password   — { currentPassword, password }
  * GET  /api/client/contracts      — the client's contracts
- * GET  /api/client/contracts/:id  — full timeline (milestones, invoices, files, updates)
- * GET  /api/client/files/:id      — download a file attached to one of the client's contracts
- *
- * POST /api/client/milestones/:id/accept           — { name }
- * POST /api/client/milestones/:id/request-changes  — { name, reason }
- * POST /api/client/invoices/:id/approve            — { name }
+ * GET  /api/client/contracts/:id  — timeline: each line's status, target date, invoice sent / paid
  *
  * GET  /api/client/contracts/:id/releases   — published data releases
  * GET  /api/client/releases/:rid/stats      — report figures for a release
@@ -28,9 +23,8 @@ import { pool } from '../db/pool.js';
 import {
   CLIENT_COOKIE, clientCookieOptions, requireClientAuth, signClientToken,
 } from '../middleware/clientAuth.js';
-import { loadContractTimeline, todayIso } from '../services/contractTimeline.js';
+import { loadContractTimeline } from '../services/contractTimeline.js';
 import { logAuthEvent } from '../services/authActivity.js';
-import { sendClientActionEmail } from '../services/email.js';
 import {
   avaContext, avaContextCsv, listReleases, releaseBlocksCsv, releaseStats, statsTableCsv,
 } from '../services/contractReleases.js';
@@ -265,210 +259,5 @@ router.get('/ava-context', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
-// ─── Client actions ──────────────────────────────────────────────
-// The login is shared, so every action carries the name of whoever took it.
-
-function actorName(req, res) {
-  const name = typeof req.body.name === 'string' ? req.body.name.trim().slice(0, 120) : '';
-  if (!name) {
-    res.status(400).json({ error: 'Please enter your name' });
-    return null;
-  }
-  return name;
-}
-
-/**
- * Lock one of this client's milestones for an action. Returns the row, or
- * sends a 404 and returns null.
- */
-async function lockMilestone(db, req, res) {
-  const id = parseInt(req.params.id, 10);
-  const { rows: [m] } = await db.query(
-    `SELECT m.id, m.contract_id, m.number, m.title, m.status, m.base_amount + m.additional_amount AS amount,
-            c.contractor_email
-     FROM contract_milestones m JOIN contracts c ON c.id = m.contract_id
-     WHERE m.id = $1 AND c.client_account_id = $2
-     FOR UPDATE OF m`,
-    [Number.isInteger(id) ? id : 0, req.clientAccount.clientId]
-  );
-  if (!m) res.status(404).json({ error: 'Milestone not found' });
-  return m || null;
-}
-
-const milestoneLabel = (m) => (m.number == null ? m.title : `Milestone ${m.number}`);
-
-/** Email Terranthro about a client action; a failed email never undoes the action. */
-async function notifyContractor(to, email) {
-  if (!to) return;
-  try {
-    await sendClientActionEmail({ to, ...email });
-  } catch (err) {
-    console.error('Client action email failed:', err);
-  }
-}
-
-/** Run `fn` in a transaction; `fn` returns an email to send after commit, or null. */
-async function inTransaction(res, label, fn) {
-  const db = await pool.connect();
-  try {
-    await db.query('BEGIN');
-    const after = await fn(db);
-    if (res.headersSent) {
-      await db.query('ROLLBACK');
-      return;
-    }
-    await db.query('COMMIT');
-    res.json({ success: true });
-    if (after) await notifyContractor(after.to, after.email);
-  } catch (err) {
-    await db.query('ROLLBACK').catch(() => {});
-    console.error(`Client ${label} error:`, err);
-    if (!res.headersSent) res.status(500).json({ error: 'Server error' });
-  } finally {
-    db.release();
-  }
-}
-
-/** POST /api/client/milestones/:id/accept — { name } */
-router.post('/milestones/:id/accept', (req, res) => {
-  const name = actorName(req, res);
-  if (!name) return;
-  inTransaction(res, 'accept', async (db) => {
-    const m = await lockMilestone(db, req, res);
-    if (!m) return null;
-    if (m.status !== 'delivered') {
-      res.status(409).json({ error: 'Only a delivered milestone can be accepted' });
-      return null;
-    }
-    const today = todayIso();
-    await db.query(
-      `UPDATE contract_milestones
-       SET status = 'accepted', accepted_at = $2, acceptance = 'explicit', accepted_by = $3, updated_at = NOW()
-       WHERE id = $1`,
-      [m.id, today, name]
-    );
-    await db.query(
-      `INSERT INTO contract_updates (contract_id, milestone_id, body, posted_on) VALUES ($1, $2, $3, $4)`,
-      [m.contract_id, m.id, `${milestoneLabel(m)} accepted by ${name} (OWB): ${m.title}`, today]
-    );
-    return {
-      to: m.contractor_email,
-      email: {
-        subject: `OWB accepted ${milestoneLabel(m)}: ${m.title}`,
-        summary: `${name} accepted ${milestoneLabel(m)} (${m.title}) in the OWB Portal. It is ready to invoice ($${Number(m.amount).toLocaleString()}).`,
-      },
-    };
-  });
-});
-
-/** POST /api/client/milestones/:id/request-changes — { name, reason } */
-router.post('/milestones/:id/request-changes', (req, res) => {
-  const name = actorName(req, res);
-  if (!name) return;
-  const reason = typeof req.body.reason === 'string' ? req.body.reason.trim() : '';
-  if (reason.length < 10) {
-    return res.status(400).json({ error: 'Please describe what needs to change' });
-  }
-  inTransaction(res, 'request-changes', async (db) => {
-    const m = await lockMilestone(db, req, res);
-    if (!m) return null;
-    if (m.status !== 'delivered') {
-      res.status(409).json({ error: 'Changes can only be requested on a delivered milestone' });
-      return null;
-    }
-    const today = todayIso();
-    await db.query(
-      `UPDATE contract_milestones
-       SET status = 'revising', rejected_at = $2, rejected_by = $3, rejection_note = $4, updated_at = NOW()
-       WHERE id = $1`,
-      [m.id, today, name, reason]
-    );
-    await db.query(
-      `INSERT INTO contract_updates (contract_id, milestone_id, body, posted_on) VALUES ($1, $2, $3, $4)`,
-      [m.contract_id, m.id, `${name} (OWB) requested changes to ${milestoneLabel(m)}:\n${reason}`, today]
-    );
-    return {
-      to: m.contractor_email,
-      email: {
-        subject: `OWB requested changes to ${milestoneLabel(m)}: ${m.title}`,
-        summary: `${name} requested changes to ${milestoneLabel(m)} (${m.title}) in the OWB Portal. Under the contract, revisions are due within 15 business days.`,
-        note: reason,
-      },
-    };
-  });
-});
-
-/** POST /api/client/invoices/:id/approve — { name } */
-router.post('/invoices/:id/approve', (req, res) => {
-  const name = actorName(req, res);
-  if (!name) return;
-  inTransaction(res, 'invoice approve', async (db) => {
-    const id = parseInt(req.params.id, 10);
-    const { rows: [inv] } = await db.query(
-      `SELECT i.id, i.contract_id, i.milestone_id, i.invoice_number, i.amount, i.approved_on, i.paid_on,
-              c.contractor_email
-       FROM contract_invoices i JOIN contracts c ON c.id = i.contract_id
-       WHERE i.id = $1 AND c.client_account_id = $2
-       FOR UPDATE OF i`,
-      [Number.isInteger(id) ? id : 0, req.clientAccount.clientId]
-    );
-    if (!inv) {
-      res.status(404).json({ error: 'Invoice not found' });
-      return null;
-    }
-    if (inv.approved_on || inv.paid_on) {
-      res.status(409).json({ error: 'This invoice is already approved' });
-      return null;
-    }
-    const today = todayIso();
-    await db.query(
-      `UPDATE contract_invoices SET approved_on = $2, approved_by = $3 WHERE id = $1`,
-      [inv.id, today, name]
-    );
-    await db.query(
-      `INSERT INTO contract_updates (contract_id, milestone_id, body, posted_on) VALUES ($1, $2, $3, $4)`,
-      [inv.contract_id, inv.milestone_id, `Invoice ${inv.invoice_number} approved for payment by ${name} (OWB)`, today]
-    );
-    return {
-      to: inv.contractor_email,
-      email: {
-        subject: `OWB approved invoice ${inv.invoice_number} for payment`,
-        summary: `${name} approved invoice ${inv.invoice_number} ($${Number(inv.amount).toLocaleString()}) for payment in the OWB Portal.`,
-      },
-    };
-  });
-});
-
-router.get('/files/:id', async (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid file id' });
-  try {
-    const { rows: [file] } = await pool.query(
-      `SELECT f.filename, f.content_type, f.data
-       FROM contract_files f JOIN contracts c ON c.id = f.contract_id
-       WHERE f.id = $1 AND c.client_account_id = $2`,
-      [id, req.clientAccount.clientId]
-    );
-    if (!file) return res.status(404).json({ error: 'File not found' });
-    sendFile(res, file, req.query.download === '1');
-  } catch (err) {
-    console.error('Client file download error:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-/** Stream a contract_files row; inline by default so PDFs open in the browser. */
-export function sendFile(res, file, asAttachment = false) {
-  const safeName = file.filename.replace(/["\\\r\n]/g, '_');
-  res.set({
-    'Content-Type': file.content_type,
-    'Content-Length': file.data.length,
-    'Content-Disposition': `${asAttachment ? 'attachment' : 'inline'}; filename="${safeName}"`,
-    'Cache-Control': 'private, no-store',
-    'X-Content-Type-Options': 'nosniff',
-  });
-  res.send(file.data);
-}
 
 export default router;

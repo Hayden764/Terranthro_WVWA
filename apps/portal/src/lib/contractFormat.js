@@ -17,53 +17,33 @@ export function fmtDate(d, opts = { month: 'short', day: 'numeric', year: 'numer
 
 export const lineLabel = (m) => (m.number == null ? 'Hosting' : `M${m.number}`);
 
-// Work status, in the client's words.
 export const STATUS = {
   not_started: { label: 'Not started', color: UNSTARTED },
   in_progress: { label: 'In progress', color: TOKENS.electricBlue },
-  delivered:   { label: 'In OWB review', color: TOKENS.amber },
-  revising:    { label: 'Revising', color: TOKENS.crimson },
-  accepted:    { label: 'Accepted', color: TOKENS.vividGreen },
+  complete:    { label: 'Complete', color: TOKENS.vividGreen },
 };
 
-/**
- * One stage per line, combining work and billing — drives the contract value
- * bar and its legend. Ordered from furthest along to least.
- */
-export const STAGES = [
-  { key: 'paid',        label: 'Paid',              color: TOKENS.vividGreen },
-  { key: 'invoiced',    label: 'Invoiced',          color: TOKENS.violet },
-  { key: 'accepted',    label: 'Accepted, to invoice', color: TOKENS.electricBlue },
-  { key: 'review',      label: 'In OWB review',     color: TOKENS.amber },
-  { key: 'in_progress', label: 'In progress',       color: TOKENS.muted },
-  { key: 'not_started', label: 'Not started',       color: UNSTARTED },
-];
+/** The target date, or the event the line is due on as the contract words it. */
+export const targetText = (m) => (m.target_date ? fmtDate(m.target_date) : m.due_label);
 
-export function stageOf(m) {
-  if (m.billing === 'paid') return 'paid';
-  if (m.billing === 'invoiced' || m.billing === 'overdue') return 'invoiced';
-  if (m.status === 'accepted') return 'accepted';
-  if (m.status === 'delivered') return 'review';
-  if (m.status === 'in_progress' || m.status === 'revising') return 'in_progress';
-  return 'not_started';
-}
-
-/** Short billing line for a schedule row, or null when nothing is billed yet. */
-export function billingText(m) {
-  const open = m.invoices.find((i) => !i.paid_on);
-  if (m.billing === 'paid') {
-    const last = m.invoices[m.invoices.length - 1];
-    return { text: `Paid ${fmtDate(last.paid_on, { month: 'short', day: 'numeric' })}`, color: TOKENS.vividGreen };
-  }
-  if (m.billing === 'overdue') return { text: `Invoice past due (${fmtDate(open.due_on, { month: 'short', day: 'numeric' })})`, color: TOKENS.crimson };
-  if (m.billing === 'invoiced') {
-    const step = open.approved_on ? 'Approved for payment' : 'Invoiced';
-    return { text: `${step} · due ${fmtDate(open.due_on, { month: 'short', day: 'numeric' })}`, color: TOKENS.violet };
-  }
-  if (m.billing === 'ready_to_invoice') return { text: 'Invoice coming', color: TOKENS.electricBlue };
+/** Where the line's invoice stands, or null before one is sent. */
+export function invoiceText(m) {
+  if (m.invoice_paid_on) return { text: `Paid ${fmtDate(m.invoice_paid_on)}`, color: TOKENS.vividGreen };
+  if (m.invoice_sent_on) return { text: `Invoice sent ${fmtDate(m.invoice_sent_on)}`, color: TOKENS.violet };
   return null;
 }
 
-export const fileSize = (bytes) => (
-  bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`
-);
+/** One stage per line, combining work and billing; ordered furthest along first. */
+export const STAGES = [
+  { key: 'paid',        label: 'Paid',        color: TOKENS.vividGreen },
+  { key: 'invoiced',    label: 'Invoiced',    color: TOKENS.violet },
+  { key: 'complete',    label: 'Complete',    color: TOKENS.amber },
+  { key: 'in_progress', label: 'In progress', color: TOKENS.electricBlue },
+  { key: 'not_started', label: 'Not started', color: UNSTARTED },
+];
+
+export function stageOf(m) {
+  if (m.invoice_paid_on) return 'paid';
+  if (m.invoice_sent_on) return 'invoiced';
+  return m.status;
+}

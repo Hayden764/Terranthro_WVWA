@@ -95,7 +95,7 @@ function winklerRegion(gdd) {
   return 'Too hot';
 }
 
-function buildVintages(rows) {
+export function buildVintages(rows) {
   // byYear[year][month] = { tmean, tmin, tmax, ppt } in °F / inches
   const byYear = {};
   for (const r of rows) {

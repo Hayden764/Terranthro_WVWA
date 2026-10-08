@@ -13,6 +13,11 @@
  * POST /api/client/milestones/:id/accept           — { name }
  * POST /api/client/milestones/:id/request-changes  — { name, reason }
  * POST /api/client/invoices/:id/approve            — { name }
+ *
+ * GET  /api/client/contracts/:id/releases   — published data releases
+ * GET  /api/client/releases/:rid/stats      — report figures for a release
+ * GET  /api/client/releases/:rid/csv/:table — by-ava | by-county | by-size-class | change | blocks
+ * GET  /api/client/ava-context[?format=csv] — statewide AVA climate, terrain, soils
  */
 import express from 'express';
 import bcrypt from 'bcryptjs';
@@ -24,6 +29,9 @@ import {
 import { loadContractTimeline, todayIso } from '../services/contractTimeline.js';
 import { logAuthEvent } from '../services/authActivity.js';
 import { sendClientActionEmail } from '../services/email.js';
+import {
+  avaContext, avaContextCsv, listReleases, releaseBlocksCsv, releaseStats, statsTableCsv,
+} from '../services/contractReleases.js';
 
 const router = express.Router();
 
@@ -152,6 +160,83 @@ router.get('/contracts/:id', async (req, res) => {
     res.json(await loadContractTimeline(pool, id));
   } catch (err) {
     console.error('Client contract timeline error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ─── Data tab ────────────────────────────────────────────────────
+
+/** Send CSV text as a download; the BOM makes Excel read it as UTF-8. */
+export function sendCsv(res, filename, csv) {
+  res.set({
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': `attachment; filename="${filename.replace(/["\\\r\n]/g, '_')}"`,
+    'Cache-Control': 'private, no-store',
+  });
+  res.send(`﻿${csv}`);
+}
+
+/** A published release on one of this client's contracts, or null. */
+async function clientRelease(req) {
+  const rid = parseInt(req.params.rid, 10);
+  if (!Number.isInteger(rid)) return null;
+  const { rows: [r] } = await pool.query(
+    `SELECT r.id, r.label FROM contract_releases r JOIN contracts c ON c.id = r.contract_id
+     WHERE r.id = $1 AND c.client_account_id = $2 AND r.published_at IS NOT NULL`,
+    [rid, req.clientAccount.clientId]
+  );
+  return r || null;
+}
+
+router.get('/contracts/:id/releases', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  try {
+    const { rowCount } = await pool.query(
+      `SELECT 1 FROM contracts WHERE id = $1 AND client_account_id = $2`,
+      [Number.isInteger(id) ? id : 0, req.clientAccount.clientId]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'Contract not found' });
+    res.json(await listReleases(pool, id, { publishedOnly: true }));
+  } catch (err) {
+    console.error('Client releases error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get('/releases/:rid/stats', async (req, res) => {
+  try {
+    const release = await clientRelease(req);
+    if (!release) return res.status(404).json({ error: 'Release not found' });
+    res.json(await releaseStats(pool, release.id));
+  } catch (err) {
+    console.error('Client release stats error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get('/releases/:rid/csv/:table', async (req, res) => {
+  try {
+    const release = await clientRelease(req);
+    if (!release) return res.status(404).json({ error: 'Release not found' });
+    const { table } = req.params;
+    const csv = table === 'blocks'
+      ? await releaseBlocksCsv(pool, release.id)
+      : statsTableCsv(await releaseStats(pool, release.id), table);
+    if (csv == null) return res.status(404).json({ error: 'Unknown table' });
+    sendCsv(res, `owb-release-${release.id}-${table}.csv`, csv);
+  } catch (err) {
+    console.error('Client release CSV error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get('/ava-context', async (req, res) => {
+  try {
+    const rows = await avaContext(pool);
+    if (req.query.format === 'csv') return sendCsv(res, 'oregon-ava-context.csv', avaContextCsv(rows));
+    res.json(rows);
+  } catch (err) {
+    console.error('Client AVA context error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

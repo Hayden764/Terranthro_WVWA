@@ -5,6 +5,9 @@
  *
  * Marking a milestone delivered offers to email the client the delivery
  * notice; nothing else emails them.
+ *
+ * Data releases freeze the OWB dataset (blocks with owb_dataset = true) for
+ * the client's Data tab: build a draft, check its figures, then publish.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -97,6 +100,9 @@ export default function AdminContract() {
           act={act}
         />
       ))}
+
+      <h2 style={sectionTitle}>Data releases</h2>
+      <ReleasesEditor contractId={contract.id} milestones={milestones} act={act} />
 
       <h2 style={sectionTitle}>Activity feed</h2>
       <UpdatesEditor contractId={contract.id} milestones={milestones} updates={updates} act={act} />
@@ -386,6 +392,154 @@ function InvoiceEditor({ m, contractId, act }) {
         </form>
       )}
     </>
+  );
+}
+
+function ReleasesEditor({ contractId, milestones, act }) {
+  const [info, setInfo] = useState(null);
+  const [label, setLabel] = useState('');
+  const [milestoneId, setMilestoneId] = useState('');
+  const [scope, setScope] = useState([]);
+  const [outside, setOutside] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [building, setBuilding] = useState(false);
+  const [viewing, setViewing] = useState(null);
+
+  const reload = useCallback(async () => {
+    try {
+      setInfo(await apiJson(`/api/admin/contracts/${contractId}/releases`));
+    } catch (err) {
+      alert(err.message);
+    }
+  }, [contractId]);
+  useEffect(() => { reload(); }, [reload]);
+
+  // Every release action also refreshes the contract (the feed gets a line on publish).
+  const run = async (fn) => {
+    const ok = await act(fn);
+    await reload();
+    return ok;
+  };
+
+  async function build(e) {
+    e.preventDefault();
+    setBuilding(true);
+    const ok = await run(() => apiPost(`/api/admin/contracts/${contractId}/releases`, {
+      label, milestone_id: milestoneId || null, scope_avas: scope, scope_outside_avas: outside, notes,
+    }));
+    setBuilding(false);
+    if (ok) {
+      setLabel(''); setMilestoneId(''); setScope([]); setOutside(false); setNotes('');
+    }
+  }
+
+  if (!info) return <div style={cardStyle}><p style={{ color: TOKENS.muted, margin: 0 }}>Loading…</p></div>;
+  const liveTotal = info.live_total;
+  const toggle = (slug) => setScope((sc) => (sc.includes(slug) ? sc.filter((x) => x !== slug) : [...sc, slug]));
+  const text = { fontSize: 'var(--type-body-size)', color: TOKENS.parchment };
+
+  return (
+    <div style={cardStyle}>
+      <p style={{ ...text, margin: '0 0 6px' }}>
+        Live OWB dataset: <strong>{liveTotal.blocks.toLocaleString()} blocks, {Math.round(liveTotal.acres).toLocaleString()} ac</strong>
+        {liveTotal.blocks === 0 && <span style={{ color: TOKENS.muted }}> — set owb_dataset = true on blocks delineated under the contract.</span>}
+      </p>
+      {info.live_by_ava.length > 0 && (
+        <p style={{ ...adminLabel, lineHeight: 1.6 }}>
+          {info.live_by_ava.map((r) => `${r.name} ${r.blocks} (${Math.round(r.acres)} ac)`).join(' · ')}
+        </p>
+      )}
+
+      {info.releases.map((r) => (
+        <div key={r.id} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: '8px 0', borderTop: `1px solid ${alpha(TOKENS.parchment, 0.06)}`, ...text }}>
+          <strong style={{ flex: '1 1 220px' }}>
+            {r.label}
+            <span style={{ color: TOKENS.muted, fontWeight: 400 }}>
+              {r.milestone_number != null && ` · M${r.milestone_number}`} · {r.block_count?.toLocaleString()} blocks · {Math.round(r.acres).toLocaleString()} ac
+            </span>
+          </strong>
+          <span style={{ color: r.published_at ? TOKENS.success : TOKENS.warning, fontSize: 'var(--type-mono-size)' }}>
+            {r.published_at ? `published ${fmtDate(r.published_at.slice(0, 10))}` : 'draft'}
+          </span>
+          <button style={outlineBtn} onClick={() => setViewing(viewing === r.id ? null : r.id)}>
+            {viewing === r.id ? 'Hide figures' : 'Figures'}
+          </button>
+          {r.published_at ? (
+            <button style={outlineBtn} onClick={() => confirm(`Unpublish "${r.label}"? OWB will stop seeing it.`)
+              && run(() => apiPost(`/api/admin/contracts/releases/${r.id}/unpublish`, {}))}>Unpublish</button>
+          ) : (
+            <>
+              <button style={primaryBtn} onClick={() => confirm(`Publish "${r.label}" to OWB? Its figures become part of the record.`)
+                && run(() => apiPost(`/api/admin/contracts/releases/${r.id}/publish`, {}))}>Publish</button>
+              <button aria-label={`Delete ${r.label}`} style={xBtn} onClick={() => confirm(`Delete draft "${r.label}"?`)
+                && run(() => apiDelete(`/api/admin/contracts/releases/${r.id}`))}>×</button>
+            </>
+          )}
+          {viewing === r.id && <ReleaseFigures releaseId={r.id} />}
+        </div>
+      ))}
+
+      <form onSubmit={build} style={{ borderTop: `1px solid ${alpha(TOKENS.parchment, 0.06)}`, marginTop: 6, paddingTop: 6 }}>
+        <h3 style={subTitle}>New release</h3>
+        <div style={grid}>
+          <Field label="Label (shown to OWB)">
+            <input required value={label} onChange={(e) => setLabel(e.target.value)} style={adminInput}
+              placeholder="Willamette Valley sub-AVAs, 2024" />
+          </Field>
+          <Field label="Milestone">
+            <select value={milestoneId} onChange={(e) => setMilestoneId(e.target.value)} style={adminInput}>
+              <option value="">—</option>
+              {milestones.filter((m) => m.kind === 'milestone').map((m) => (
+                <option key={m.id} value={m.id}>{lineLabel(m)} {m.title}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        <span style={{ ...adminLabel, marginTop: 10 }}>
+          Copy fresh from the live data — blocks in these AVAs (everything else carries forward from the last release)
+        </span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '2px 12px' }}>
+          {info.avas.map((a) => (
+            <label key={a.slug} style={{ ...text, display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input type="checkbox" checked={scope.includes(a.slug)} onChange={() => toggle(a.slug)} /> {a.name}
+            </label>
+          ))}
+          <label style={{ ...text, display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input type="checkbox" checked={outside} onChange={(e) => setOutside(e.target.checked)} /> Outside any AVA
+          </label>
+        </div>
+        <Field label="Notes for OWB (optional)">
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} style={{ ...adminInput, resize: 'vertical' }} />
+        </Field>
+        <button type="submit" style={{ ...primaryBtn, marginTop: 10 }} disabled={building}>
+          {building ? 'Building…' : 'Build draft release'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function ReleaseFigures({ releaseId }) {
+  const [stats, setStats] = useState(null);
+  useEffect(() => {
+    apiJson(`/api/admin/contracts/releases/${releaseId}/stats`).then(setStats).catch((err) => alert(err.message));
+  }, [releaseId]);
+  if (!stats) return <p style={{ flexBasis: '100%', color: TOKENS.muted, margin: 0 }}>Loading…</p>;
+  const s = stats.summary;
+  const csv = (t) => apiUrl(`/api/admin/contracts/releases/${releaseId}/csv/${t}`);
+  return (
+    <div style={{ flexBasis: '100%', fontSize: 'var(--type-mono-size)', color: alpha(TOKENS.parchment, 0.8), lineHeight: 1.7 }}>
+      Headline {s.headline_acres?.toLocaleString()} ac in {s.headline_blocks} blocks · {s.vineyards} vineyards ·
+      removed {s.removed_acres} ac · isolated &lt;2 ac excluded {s.small_isolated_acres} ac ({s.small_isolated_blocks}) ·
+      {' '}{s.unconfirmed_names} unconfirmed names · {s.needs_field} need field check
+      <br />
+      Counties: {stats.by_county.map((c) => `${c.county} ${Math.round(c.acres)}`).join(', ') || '—'}
+      <br />
+      CSV:{' '}
+      {['by-ava', 'by-county', 'by-size-class', 'change', 'blocks'].map((t) => (
+        <a key={t} href={csv(t)} style={{ color: TOKENS.electricBlue, marginRight: 10 }}>{t}</a>
+      ))}
+    </div>
   );
 }
 

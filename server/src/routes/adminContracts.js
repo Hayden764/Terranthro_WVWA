@@ -19,6 +19,13 @@
  * POST   /:id/updates                         — { body, milestone_id?, posted_on? }
  * DELETE /updates/:uid
  * PATCH  /clients/:cid                        — { notify_emails }
+ *
+ * GET    /:id/releases                        — releases (drafts too) + the live OWB dataset by AVA
+ * POST   /:id/releases                        — { milestone_id?, label, scope_avas, scope_outside_avas, notes? }
+ * POST   /releases/:rid/publish | /unpublish
+ * DELETE /releases/:rid                       — drafts only
+ * GET    /releases/:rid/stats
+ * GET    /releases/:rid/csv/:table            — by-ava | by-county | by-size-class | change | blocks
  */
 import express from 'express';
 import { pool } from '../db/pool.js';
@@ -27,7 +34,10 @@ import {
   addBusinessDays, addDays, loadContractTimeline, todayIso,
 } from '../services/contractTimeline.js';
 import { sendMilestoneDeliveredEmail } from '../services/email.js';
-import { sendFile } from './client.js';
+import { sendCsv, sendFile } from './client.js';
+import {
+  buildRelease, forgetRelease, listReleases, releaseBlocksCsv, releaseStats, statsTableCsv,
+} from '../services/contractReleases.js';
 
 const router = express.Router();
 router.use(requireAdminAuth);
@@ -402,6 +412,111 @@ router.post('/:id(\\d+)/updates', handle(async (req, res) => {
 router.delete('/updates/:uid', handle(async (req, res) => {
   await pool.query(`DELETE FROM contract_updates WHERE id = $1`, [intParam(req.params.uid)]);
   res.json({ success: true });
+}));
+
+// ─── Data releases ───────────────────────────────────────────────
+
+router.get('/:id(\\d+)/releases', handle(async (req, res) => {
+  const contractId = intParam(req.params.id);
+  const [releases, live, avas, total] = await Promise.all([
+    listReleases(pool, contractId, { publishedOnly: false }),
+    // What a new release would copy: live OWB blocks per AVA.
+    pool.query(
+      `SELECT COALESCE(a.slug, '') AS slug, COALESCE(a.name, 'Outside any AVA') AS name,
+              count(*)::int AS blocks, round(sum(b.acres)::numeric, 1)::float AS acres
+       FROM vineyard_blocks b
+       CROSS JOIN LATERAL (SELECT ST_PointOnSurface(b.geometry) AS pt) p
+       LEFT JOIN ava_subdivided s ON ST_Intersects(s.geometry, p.pt)
+       LEFT JOIN avas a ON a.id = s.ava_id
+       WHERE b.owb_dataset AND b.geometry IS NOT NULL
+       GROUP BY 1, 2 ORDER BY 2`
+    ),
+    pool.query(`SELECT slug, name FROM avas WHERE removed IS NULL ORDER BY name`),
+    pool.query(
+      `SELECT count(*)::int AS blocks, COALESCE(round(sum(acres)::numeric, 1), 0)::float AS acres
+       FROM vineyard_blocks WHERE owb_dataset AND geometry IS NOT NULL`
+    ),
+  ]);
+  // A block counts once in the total but in every AVA it falls in below it.
+  res.json({ releases, live_total: total.rows[0], live_by_ava: live.rows, avas: avas.rows });
+}));
+
+router.post('/:id(\\d+)/releases', handle(async (req, res) => {
+  const contractId = intParam(req.params.id);
+  const label = String(req.body.label || '').trim().slice(0, 200);
+  const scopeAvas = Array.isArray(req.body.scope_avas)
+    ? [...new Set(req.body.scope_avas.map(String).filter((s) => /^[a-z0-9-]+$/.test(s)))]
+    : [];
+  const scopeOutsideAvas = Boolean(req.body.scope_outside_avas);
+  const milestoneId = req.body.milestone_id ? intParam(req.body.milestone_id) : null;
+
+  if (!label) return res.status(400).json({ error: 'A label is required' });
+  if (!scopeAvas.length && !scopeOutsideAvas) {
+    return res.status(400).json({ error: 'Choose at least one AVA, or blocks outside any AVA' });
+  }
+  if (!(await milestoneInContract(milestoneId, contractId))) {
+    return res.status(400).json({ error: 'Milestone is not on this contract' });
+  }
+
+  const db = await pool.connect();
+  try {
+    await db.query('BEGIN');
+    const release = await buildRelease(db, {
+      contractId, milestoneId, label, scopeAvas, scopeOutsideAvas,
+      notes: String(req.body.notes || '').trim() || null,
+    });
+    await db.query('COMMIT');
+    res.status(201).json(release);
+  } catch (err) {
+    await db.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    db.release();
+  }
+}));
+
+router.post('/releases/:rid/:action(publish|unpublish)', handle(async (req, res) => {
+  const rid = intParam(req.params.rid);
+  const { rows: [r] } = await pool.query(
+    `UPDATE contract_releases SET published_at = ${req.params.action === 'publish' ? 'COALESCE(published_at, NOW())' : 'NULL'}
+     WHERE id = $1 RETURNING id, contract_id, milestone_id, label, published_at`,
+    [rid]
+  );
+  if (!r) return res.status(404).json({ error: 'Release not found' });
+  if (req.params.action === 'publish') {
+    await pool.query(
+      `INSERT INTO contract_updates (contract_id, milestone_id, body)
+       SELECT $1, $2, $3
+       WHERE NOT EXISTS (SELECT 1 FROM contract_updates WHERE contract_id = $1 AND body = $3)`,
+      [r.contract_id, r.milestone_id, `Data release published: ${r.label}`]
+    );
+  }
+  res.json(r);
+}));
+
+router.delete('/releases/:rid', handle(async (req, res) => {
+  const rid = intParam(req.params.rid);
+  const { rowCount } = await pool.query(
+    `DELETE FROM contract_releases WHERE id = $1 AND published_at IS NULL`,
+    [rid]
+  );
+  if (!rowCount) return res.status(409).json({ error: 'Only an unpublished release can be deleted' });
+  forgetRelease(rid);
+  res.json({ success: true });
+}));
+
+router.get('/releases/:rid/stats', handle(async (req, res) => {
+  res.json(await releaseStats(pool, intParam(req.params.rid)));
+}));
+
+router.get('/releases/:rid/csv/:table', handle(async (req, res) => {
+  const rid = intParam(req.params.rid);
+  const { table } = req.params;
+  const csv = table === 'blocks'
+    ? await releaseBlocksCsv(pool, rid)
+    : statsTableCsv(await releaseStats(pool, rid), table);
+  if (csv == null) return res.status(404).json({ error: 'Unknown table' });
+  sendCsv(res, `owb-release-${rid}-${table}.csv`, csv);
 }));
 
 // ─── Client account ──────────────────────────────────────────────

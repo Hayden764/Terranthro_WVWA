@@ -18,6 +18,8 @@
  * GET  /api/client/releases/:rid/stats      — report figures for a release
  * GET  /api/client/releases/:rid/csv/:table — by-ava | by-county | by-size-class | change | blocks
  * GET  /api/client/ava-context[?format=csv] — statewide AVA climate, terrain, soils
+ * GET  /api/client/releases/:rid/query/schema — query builder fields + values
+ * GET  /api/client/releases/:rid/query?q=<spec>[&format=csv] — run a query
  */
 import express from 'express';
 import bcrypt from 'bcryptjs';
@@ -32,6 +34,7 @@ import { sendClientActionEmail } from '../services/email.js';
 import {
   avaContext, avaContextCsv, listReleases, releaseBlocksCsv, releaseStats, statsTableCsv,
 } from '../services/contractReleases.js';
+import { handleQuery, querySchema } from '../services/contractQuery.js';
 
 const router = express.Router();
 
@@ -227,6 +230,28 @@ router.get('/releases/:rid/csv/:table', async (req, res) => {
   } catch (err) {
     console.error('Client release CSV error:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get('/releases/:rid/query/schema', async (req, res) => {
+  try {
+    const release = await clientRelease(req);
+    if (!release) return res.status(404).json({ error: 'Release not found' });
+    res.json(await querySchema(pool, release.id));
+  } catch (err) {
+    console.error('Client query schema error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get('/releases/:rid/query', async (req, res) => {
+  try {
+    const release = await clientRelease(req);
+    if (!release) return res.status(404).json({ error: 'Release not found' });
+    await handleQuery(pool, release.id, req, res, sendCsv);
+  } catch (err) {
+    console.error('Client query error:', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Server error' });
   }
 });
 

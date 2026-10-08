@@ -26,6 +26,7 @@
  * DELETE /releases/:rid                       — drafts only
  * GET    /releases/:rid/stats
  * GET    /releases/:rid/csv/:table            — by-ava | by-county | by-size-class | change | blocks
+ * GET    /releases/:rid/query/schema | /releases/:rid/query?q=<spec>  — the query builder
  */
 import express from 'express';
 import { pool } from '../db/pool.js';
@@ -38,6 +39,7 @@ import { sendCsv, sendFile } from './client.js';
 import {
   buildRelease, forgetRelease, listReleases, releaseBlocksCsv, releaseStats, statsTableCsv,
 } from '../services/contractReleases.js';
+import { forgetQuerySchema, handleQuery, querySchema } from '../services/contractQuery.js';
 
 const router = express.Router();
 router.use(requireAdminAuth);
@@ -502,11 +504,20 @@ router.delete('/releases/:rid', handle(async (req, res) => {
   );
   if (!rowCount) return res.status(409).json({ error: 'Only an unpublished release can be deleted' });
   forgetRelease(rid);
+  forgetQuerySchema(rid);
   res.json({ success: true });
 }));
 
 router.get('/releases/:rid/stats', handle(async (req, res) => {
   res.json(await releaseStats(pool, intParam(req.params.rid)));
+}));
+
+router.get('/releases/:rid/query/schema', handle(async (req, res) => {
+  res.json(await querySchema(pool, intParam(req.params.rid)));
+}));
+
+router.get('/releases/:rid/query', handle(async (req, res) => {
+  await handleQuery(pool, intParam(req.params.rid), req, res, sendCsv);
 }));
 
 router.get('/releases/:rid/csv/:table', handle(async (req, res) => {

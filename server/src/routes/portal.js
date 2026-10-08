@@ -7,6 +7,9 @@
  * GET  /api/portal/requests               — list own requests
  * GET  /api/portal/vineyards              — vineyards linked to this winery
  * GET  /api/portal/vineyards/available     — unlinked vineyards for claiming
+ * GET  /api/portal/data-terms              — OWB data-sharing terms + this org's status
+ * POST /api/portal/data-terms/accept       — { version, name } share grower data with OWB
+ * POST /api/portal/data-terms/withdraw     — stop sharing (future releases only)
  *
  * Post-018 model: one `vineyards` row per vineyard entity; polygons live in
  * `vineyard_blocks` (vineyard_id FK). geometry_update / vineyard_split
@@ -643,6 +646,78 @@ router.patch('/site', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   } finally {
     client.release();
+  }
+});
+
+// ─── Sharing grower data with OWB (migration 033) ────────────────
+
+/** Latest published terms, and whether this organization shares now. */
+async function dataTermsStatus(wineryId) {
+  const [{ rows: [terms] }, { rows: [consent] }] = await Promise.all([
+    pool.query(
+      `SELECT version, title, body, published_at FROM data_terms
+       WHERE published_at IS NOT NULL ORDER BY published_at DESC LIMIT 1`
+    ),
+    pool.query(
+      `SELECT c.terms_version, c.accepted_at, c.accepted_by_name
+       FROM organization_data_consents c JOIN data_terms t ON t.version = c.terms_version
+       WHERE c.organization_id = $1 AND c.withdrawn_at IS NULL AND t.published_at IS NOT NULL
+       ORDER BY c.accepted_at DESC LIMIT 1`,
+      [wineryId]
+    ),
+  ]);
+  return {
+    terms: terms || null,
+    sharing: Boolean(consent),
+    consent: consent || null,
+    // Accepted an older version than the one now published: ask again.
+    needs_acceptance: Boolean(terms) && consent?.terms_version !== terms.version,
+  };
+}
+
+router.get('/data-terms', async (req, res) => {
+  try {
+    res.json(await dataTermsStatus(req.portalAccount.wineryId));
+  } catch (err) {
+    console.error('Portal data-terms error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.post('/data-terms/accept', async (req, res) => {
+  const { wineryId, accountId } = req.portalAccount;
+  const version = String(req.body.version || '');
+  const name = String(req.body.name || '').trim().slice(0, 120);
+  if (!name) return res.status(400).json({ error: 'Please enter your name' });
+  try {
+    const { rowCount } = await pool.query(
+      `SELECT 1 FROM data_terms WHERE version = $1 AND published_at IS NOT NULL`, [version]
+    );
+    if (!rowCount) return res.status(400).json({ error: 'These terms are no longer current — reload and try again' });
+    await pool.query(
+      `INSERT INTO organization_data_consents (organization_id, terms_version, accepted_by_account_id, accepted_by_name)
+       VALUES ($1, $2, $3, $4)`,
+      [wineryId, version, accountId, name]
+    );
+    res.json(await dataTermsStatus(wineryId));
+  } catch (err) {
+    console.error('Portal data-terms accept error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.post('/data-terms/withdraw', async (req, res) => {
+  const { wineryId } = req.portalAccount;
+  try {
+    await pool.query(
+      `UPDATE organization_data_consents SET withdrawn_at = NOW()
+       WHERE organization_id = $1 AND withdrawn_at IS NULL`,
+      [wineryId]
+    );
+    res.json(await dataTermsStatus(wineryId));
+  } catch (err) {
+    console.error('Portal data-terms withdraw error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

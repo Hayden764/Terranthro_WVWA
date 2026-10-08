@@ -4,6 +4,7 @@ import { alpha, border, ink, muted, parchment, electricBlue, TOKENS } from '@ter
 import { btn } from '@terranthro/shared/styles/patterns.js';
 import { apiJson } from '@terranthro/shared/lib/api.js';
 import PortalHeader from '../../components/portal/PortalHeader';
+import { DataSharingPrompt } from '../../components/portal/DataSharing';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import TerroirDataChips from '@terranthro/shared/components/TerroirDataChips.jsx';
 
@@ -49,6 +50,8 @@ export default function PortalDashboard() {
     <PageShell>
       {/* Header bar with profile menu */}
       <PortalHeader title={profile?.title} />
+
+      <DataSharingPrompt />
 
       {/* Quick stats */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 32, flexWrap: 'wrap' }}>

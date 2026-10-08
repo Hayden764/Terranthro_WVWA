@@ -5,11 +5,16 @@
  * the dataset tied to a delivered milestone, so a figure OWB cites never
  * moves. Statewide AVA context (climate normals, terrain, soils) is shown
  * from day one, before any vineyard data is delivered.
+ *
+ * Two views: Overview (headline figures, report tables, AVA context) and the
+ * Query builder (QueryBuilder.jsx). ?view, ?release and ?q are in the URL.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { alpha, crimson, ink, muted, TOKENS } from '@terranthro/shared/styles/tokens.js';
 import { apiJson, apiUrl } from '@terranthro/shared/lib/api.js';
 import { fmtDate } from '../../lib/contractFormat';
+import QueryBuilder from './QueryBuilder';
 
 const line = alpha(TOKENS.ink, 0.15);
 const card = { border: `1px solid ${line}`, borderRadius: 10, padding: '18px 18px', marginBottom: 20 };
@@ -22,55 +27,101 @@ const n = (v) => (v == null ? '—' : intFmt.format(v));
 
 export default function DataTab({ data }) {
   const contractId = data.contract.id;
+  const [params, setParams] = useSearchParams();
   const [releases, setReleases] = useState(null);
-  const [releaseId, setReleaseId] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    apiJson(`/api/client/contracts/${contractId}/releases`)
-      .then((rs) => {
-        setReleases(rs);
-        if (rs.length) setReleaseId(rs[0].id);
-      })
-      .catch((err) => setError(err.message));
+    apiJson(`/api/client/contracts/${contractId}/releases`).then(setReleases).catch((err) => setError(err.message));
   }, [contractId]);
 
-  const release = releases?.find((r) => r.id === releaseId);
+  // View, release and query live in the URL so a link reopens the same result.
+  const view = params.get('view') === 'query' ? 'query' : 'overview';
+  const release = releases?.find((r) => r.id === Number(params.get('release'))) || releases?.[0];
+  const initialSpec = useMemo(() => {
+    try {
+      return JSON.parse(params.get('q') || 'null');
+    } catch {
+      return null;
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const setParam = (patch) => setParams((p) => {
+    const next = new URLSearchParams(p);
+    for (const [k, v] of Object.entries(patch)) if (v == null) next.delete(k); else next.set(k, v);
+    return next;
+  }, { replace: true });
   const nextDelivery = data.milestones.find((m) => m.number === 2);
 
   return (
     <>
       {error && <p style={{ color: crimson }}>{error}</p>}
 
-      <section style={card}>
-        <SectionHead title="Vineyard data">
-          {releases?.length > 1 && (
-            <label style={{ ...small, display: 'flex', gap: 8, alignItems: 'center' }}>
-              Release
-              <select value={releaseId ?? ''} onChange={(e) => setReleaseId(Number(e.target.value))} style={selectStyle}>
-                {releases.map((r) => (
-                  <option key={r.id} value={r.id}>{r.label} · {fmtDate(r.published_at)}</option>
-                ))}
-              </select>
-            </label>
-          )}
-        </SectionHead>
-
-        {!releases && !error && <p style={small}>Loading…</p>}
-        {releases?.length === 0 && (
-          <p style={{ margin: 0, lineHeight: 1.55, maxWidth: 680 }}>
-            No vineyard data has been released yet. The first release comes with{' '}
-            <strong>Milestone 2: Willamette Valley sub-AVAs</strong>
-            {nextDelivery?.due_label && <> (target {nextDelivery.due_label})</>}. Each release is a frozen copy
-            of the dataset as delivered, so the figures you cite from it will not change; corrections arrive
-            as a new release.
-          </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+        <div role="tablist" style={{ display: 'flex', gap: 4, background: alpha(TOKENS.ink, 0.06), padding: 3, borderRadius: 8 }}>
+          {[['overview', 'Overview'], ['query', 'Query builder']].map(([key, label]) => (
+            <button key={key} role="tab" aria-selected={view === key} onClick={() => setParam({ view: key === 'overview' ? null : key })}
+              style={{
+                border: 'none', borderRadius: 6, padding: '6px 14px', font: 'inherit', fontSize: 'var(--type-body-size)', cursor: 'pointer',
+                background: view === key ? 'var(--color-parchment)' : 'transparent', color: view === key ? ink : muted,
+                fontWeight: view === key ? 600 : 400, boxShadow: view === key ? `0 1px 3px ${alpha(TOKENS.ink, 0.15)}` : 'none',
+              }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {releases?.length > 0 && (
+          <label style={{ ...small, display: 'flex', gap: 8, alignItems: 'center' }}>
+            Release
+            <select value={release.id} onChange={(e) => setParam({ release: e.target.value })} style={selectStyle}>
+              {releases.map((r) => (
+                <option key={r.id} value={r.id}>{r.label} · {fmtDate(r.published_at)}</option>
+              ))}
+            </select>
+          </label>
         )}
-        {release && <ReleaseView release={release} />}
-      </section>
+      </div>
 
-      <AvaContext />
+      {!releases && !error && <p style={small}>Loading…</p>}
+
+      {view === 'overview' && (
+        <>
+          <section style={card}>
+            <SectionHead title="Vineyard data" />
+            {releases?.length === 0 && <NoReleaseYet nextDelivery={nextDelivery} />}
+            {release && <ReleaseView release={release} />}
+          </section>
+          <AvaContext />
+        </>
+      )}
+
+      {view === 'query' && releases && (
+        <section style={card}>
+          <SectionHead title="Query builder" />
+          {release ? (
+            <QueryBuilder
+              key={release.id}
+              releaseId={release.id}
+              initialSpec={initialSpec}
+              onSpecChange={(spec) => setParam({ q: JSON.stringify(spec) })}
+            />
+          ) : (
+            <NoReleaseYet nextDelivery={nextDelivery} />
+          )}
+        </section>
+      )}
     </>
+  );
+}
+
+function NoReleaseYet({ nextDelivery }) {
+  return (
+    <p style={{ margin: 0, lineHeight: 1.55, maxWidth: 680 }}>
+      No vineyard data has been released yet. The first release comes with{' '}
+      <strong>Milestone 2: Willamette Valley sub-AVAs</strong>
+      {nextDelivery?.due_label && <> (target {nextDelivery.due_label})</>}. Each release is a frozen copy
+      of the dataset as delivered, so the figures you cite from it will not change; corrections arrive
+      as a new release.
+    </p>
   );
 }
 

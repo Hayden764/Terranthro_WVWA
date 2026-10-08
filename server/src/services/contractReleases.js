@@ -7,6 +7,11 @@
  * rest forward unchanged from the previous release. A release never changes
  * after it is built, so its stats are cached in memory.
  *
+ * Grower-entered fields (variety, clone, …) are filled only for blocks whose
+ * organization currently shares with OWB (migration 033); a final pass over
+ * the whole release refreshes them, so a grower who accepts the terms is
+ * included in the next release and one who withdraws drops out of it.
+ *
  * Acreage conventions (Exhibit A):
  *   headline acres  standing blocks, excluding isolated blocks under 2 ac
  *   AVA totals      a block counts toward every AVA it falls in, so nested
@@ -23,6 +28,15 @@ const SNAPSHOT_COLUMNS = [
   'soil_series', 'soil_class', 'soil_drainage', 'available_water_cm', 'soil_units',
   'geology_formation', 'rock_type', 'geometry',
 ];
+
+// Grower-entered fields, consent-gated (migration 033): [release column, live column].
+const GROWER_FIELDS = [
+  ['variety', 'variety'], ['clone', 'clone'], ['rootstock', 'rootstock'],
+  ['year_planted', 'year_planted'], ['rows', 'rows'], ['spacing', 'spacing'],
+  ['vines_per_acre', 'vines_per_acre'], ['vines', 'vines'], ['trellis', 'trellis'],
+  ['fruit_sold_to', 'fruit_sold_to'], ['grower_notes', 'notes'],
+];
+const CARRIED_COLUMNS = [...SNAPSHOT_COLUMNS, 'organization_id', 'grower_data', ...GROWER_FIELDS.map(([c]) => c)];
 
 // Size classes in display order (keep in step with owb_size_class()).
 const SIZE_ORDER = ['Under 2 ac', '2–5 ac', '5–10 ac', '10–25 ac', '25–50 ac', '50+ ac'];
@@ -87,8 +101,8 @@ export async function buildRelease(db, { contractId, milestoneId, label, scopeAv
   // 2. Everything else carried forward from the previous release.
   if (prev) {
     await db.query(
-      `INSERT INTO contract_release_blocks (release_id, ${SNAPSHOT_COLUMNS.join(', ')})
-       SELECT $1, ${SNAPSHOT_COLUMNS.map((c) => `rb.${c}`).join(', ')}
+      `INSERT INTO contract_release_blocks (release_id, ${CARRIED_COLUMNS.join(', ')})
+       SELECT $1, ${CARRIED_COLUMNS.map((c) => `rb.${c}`).join(', ')}
        FROM contract_release_blocks rb
        WHERE rb.release_id = $2
          AND NOT (rb.ava_slugs && $3::text[])
@@ -98,6 +112,28 @@ export async function buildRelease(db, { contractId, milestoneId, label, scopeAv
       [release.id, prev.id, scopeAvas, scopeOutsideAvas]
     );
   }
+
+  // 3. Grower fields from the live blocks, for organizations sharing with OWB now.
+  await db.query(
+    `UPDATE contract_release_blocks rb
+     SET organization_id = v.winery_id,
+         grower_data = g.ok,
+         ${GROWER_FIELDS.map(([rc, lc]) => `${rc} = CASE WHEN g.ok THEN b.${lc} END`).join(',\n         ')}
+     FROM vineyard_blocks b
+     LEFT JOIN vineyards v ON v.id = b.vineyard_id
+     CROSS JOIN LATERAL (SELECT COALESCE(organization_shares_with_owb(v.winery_id), FALSE) AS ok) g
+     WHERE rb.release_id = $1 AND b.id = rb.block_id`,
+    [release.id]
+  );
+  // Carried blocks no longer in the live data keep their fields only while still shared.
+  await db.query(
+    `UPDATE contract_release_blocks rb
+     SET grower_data = FALSE, ${GROWER_FIELDS.map(([rc]) => `${rc} = NULL`).join(', ')}
+     WHERE rb.release_id = $1 AND rb.grower_data
+       AND NOT EXISTS (SELECT 1 FROM vineyard_blocks b WHERE b.id = rb.block_id)
+       AND NOT COALESCE(organization_shares_with_owb(rb.organization_id), FALSE)`,
+    [release.id]
+  );
 
   const { rows: [built] } = await db.query(
     `UPDATE contract_releases r
@@ -153,6 +189,8 @@ export async function releaseStats(db, releaseId) {
               sum(planted_acres) FILTER (WHERE ${headline}) AS planted_acres,
               count(*) FILTER (WHERE verification = 'needs_field')::int AS needs_field,
               count(*) FILTER (WHERE name_source IS NULL)::int AS unconfirmed_names,
+              COALESCE(sum(acres) FILTER (WHERE ${headline} AND grower_data), 0) AS grower_shared_acres,
+              count(DISTINCT organization_id) FILTER (WHERE grower_data)::int AS grower_shared_orgs,
               array_remove(array_agg(DISTINCT imagery_year ORDER BY imagery_year), NULL) AS imagery_years
        FROM contract_release_blocks WHERE release_id = $1`,
       [id]
@@ -194,6 +232,7 @@ export async function releaseStats(db, releaseId) {
       small_isolated_acres: num(s.small_isolated_acres),
       removed_acres: num(s.removed_acres),
       planted_acres: num(s.planted_acres),
+      grower_shared_acres: num(s.grower_shared_acres),
     },
     by_ava: byAva.rows.map((r) => ({ ...r, acres: num(r.acres) })),
     by_county: byCounty.rows.map((r) => ({ ...r, acres: num(r.acres) })),
@@ -284,7 +323,12 @@ const BLOCK_CSV_COLUMNS = [
   ['aspect_dominant_deg', 'aspect_dominant_deg'], ['soil_series', 'soil_series'],
   ['soil_class', 'soil_class'], ['soil_drainage', 'soil_drainage'],
   ['available_water_cm', 'available_water_cm'], ['geology_formation', 'geology_formation'],
-  ['rock_type', 'rock_type'], ['lat', 'centroid_lat'], ['lon', 'centroid_lon'],
+  ['rock_type', 'rock_type'],
+  ['grower_data', 'grower_data_shared'], ['variety', 'variety'], ['clone', 'clone'],
+  ['rootstock', 'rootstock'], ['year_planted', 'year_planted'], ['rows', 'rows'],
+  ['spacing', 'spacing'], ['vines_per_acre', 'vines_per_acre'], ['vines', 'vines'],
+  ['trellis', 'trellis'], ['fruit_sold_to', 'fruit_buyers'], ['grower_notes', 'grower_notes'],
+  ['lat', 'centroid_lat'], ['lon', 'centroid_lon'],
 ];
 
 /** Every block in a release, one row each (no geometry — that is the GeoPackage). */

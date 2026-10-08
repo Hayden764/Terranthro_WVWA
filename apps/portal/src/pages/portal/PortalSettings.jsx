@@ -3,6 +3,7 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { border, crimson, ink, muted, parchment, TOKENS } from '@terranthro/shared/styles/tokens.js';
 import { INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
 import { apiJson, apiPost } from '@terranthro/shared/lib/api.js';
+import { DataSharingSection } from '../../components/portal/DataSharing';
 
 /**
  * PortalSettings — account-level settings, reached from the profile menu.
@@ -67,6 +68,8 @@ export default function PortalSettings() {
 
       <hr style={{ margin: '36px 0', border: 'none', borderTop: `1px solid ${border}` }} />
       <EmailSection currentEmail={profile.contact_email} />
+
+      <DataSharingSection />
     </Shell>
   );
 }

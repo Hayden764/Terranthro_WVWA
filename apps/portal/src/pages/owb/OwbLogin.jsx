@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '@terranthro/shared/styles/tokens.js';
-import { INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
+import { LIGHT_INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
 import { apiJson, apiPost } from '@terranthro/shared/lib/api.js';
 
 /** Sign-in for the OWB Portal — one shared login for the Oregon Wine Board. */
@@ -67,8 +67,8 @@ export default function OwbLogin() {
             autoCorrect="off"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="ds-input"
-            style={{ ...INPUT_STYLE, marginBottom: 16 }}
+            className="ds-input ds-input-light"
+            style={{ ...LIGHT_INPUT_STYLE, marginBottom: 16 }}
           />
           <label style={labelStyle} htmlFor="owb-password">Password</label>
           <input
@@ -78,8 +78,8 @@ export default function OwbLogin() {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="ds-input"
-            style={{ ...INPUT_STYLE, marginBottom: 16 }}
+            className="ds-input ds-input-light"
+            style={{ ...LIGHT_INPUT_STYLE, marginBottom: 16 }}
           />
 
           {error && (

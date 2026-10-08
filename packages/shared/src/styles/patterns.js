@@ -74,5 +74,15 @@ export const INPUT_STYLE = {
   transition: 'border-color 0.2s ease',
 };
 
+// INPUT_STYLE on a light page: white field, ink text, a visible border.
+export const LIGHT_INPUT_STYLE = {
+  ...INPUT_STYLE,
+  fontSize: 14,
+  fontWeight: 400,
+  color: TOKENS.ink,
+  background: TOKENS.parchment,
+  border: `1px solid ${alpha(TOKENS.ink, 0.3)}`,
+};
+
 // Retained for legacy callers; spec-aligned focus uses border-color only via .ds-input.
 export const INPUT_FOCUS_RING = `0 0 0 2px ${alpha(TOKENS.electricBlue, 0.2)}`;

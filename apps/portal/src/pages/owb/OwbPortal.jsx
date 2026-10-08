@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { alpha, border, crimson, ink, muted, parchment, TOKENS } from '@terranthro/shared/styles/tokens.js';
-import { INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
+import { LIGHT_INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
 import { apiJson, apiPost } from '@terranthro/shared/lib/api.js';
 import TimelineTab from '../../components/owb/TimelineTab';
 import DataTab from '../../components/owb/DataTab';
@@ -120,7 +120,7 @@ function ChangePassword({ onDone }) {
     }
   }
 
-  const field = { ...INPUT_STYLE, flex: '1 1 180px', width: 'auto' };
+  const field = { ...LIGHT_INPUT_STYLE, flex: '1 1 180px', width: 'auto' };
   return (
     <form onSubmit={submit} style={{
       border: `1px solid ${alpha(TOKENS.amber, 0.5)}`, background: alpha(TOKENS.amber, 0.08),
@@ -132,11 +132,11 @@ function ChangePassword({ onDone }) {
       </p>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <input type="password" required placeholder="Temporary password" autoComplete="current-password"
-          value={current} onChange={(e) => setCurrent(e.target.value)} className="ds-input" style={field} />
+          value={current} onChange={(e) => setCurrent(e.target.value)} className="ds-input ds-input-light" style={field} />
         <input type="password" required minLength={10} placeholder="New password" autoComplete="new-password"
-          value={next} onChange={(e) => setNext(e.target.value)} className="ds-input" style={field} />
+          value={next} onChange={(e) => setNext(e.target.value)} className="ds-input ds-input-light" style={field} />
         <input type="password" required minLength={10} placeholder="Confirm new password" autoComplete="new-password"
-          value={confirm} onChange={(e) => setConfirm(e.target.value)} className="ds-input" style={field} />
+          value={confirm} onChange={(e) => setConfirm(e.target.value)} className="ds-input ds-input-light" style={field} />
         <button type="submit" disabled={saving} style={btn('primary')}>{saving ? 'Saving…' : 'Save'}</button>
       </div>
       {error && <p style={{ color: crimson, fontSize: 'var(--type-mono-size)', margin: '10px 0 0' }}>{error}</p>}

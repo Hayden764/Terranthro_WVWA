@@ -73,6 +73,7 @@ export default function AdminContract() {
       </div>
 
       <h2 style={sectionTitle}>Schedule</h2>
+      <Unpaid milestones={milestones} />
       <div style={{ ...cardStyle, padding: 0 }}>
         {milestones.map((m) => <MilestoneRow key={m.id} m={m} act={act} />)}
       </div>
@@ -83,7 +84,28 @@ export default function AdminContract() {
   );
 }
 
+/** Invoices sent and not yet paid, oldest first. */
+function Unpaid({ milestones }) {
+  const unpaid = milestones.filter((m) => invoiceState(m) === 'sent')
+    .sort((a, b) => a.invoice_sent_on.localeCompare(b.invoice_sent_on));
+  return (
+    <p style={{
+      ...cardStyle, margin: '0 0 10px', fontSize: 'var(--type-body-size)',
+      color: unpaid.length ? TOKENS.amber : TOKENS.muted,
+      ...(unpaid.length && { border: `1px solid ${alpha(TOKENS.amber, 0.4)}` }),
+    }}>
+      {unpaid.length
+        ? <>Awaiting payment: {unpaid.map((m) => `${lineLabel(m)} ${money(m.amount)} (sent ${fmtDate(m.invoice_sent_on)})`).join(' · ')}</>
+        : 'No unpaid invoices.'}
+    </p>
+  );
+}
+
 // ─── Schedule line ───────────────────────────────────────────────
+
+const INVOICE = { none: 'Not invoiced', sent: 'Sent, unpaid', paid: 'Paid' };
+const invoiceState = (m) => (m.invoice_paid_on ? 'paid' : m.invoice_sent_on ? 'sent' : 'none');
+const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
 
 function MilestoneRow({ m, act }) {
   const [saved, setSaved] = useState(false);
@@ -95,13 +117,25 @@ function MilestoneRow({ m, act }) {
     }
   }
 
+  // Picking an invoice state fills in today's date for any step not dated yet.
+  const invoice = invoiceState(m);
+  function setInvoice(next) {
+    if (next === 'none') {
+      if (confirm(`Clear the invoice dates for ${lineLabel(m)}?`)) save({ invoice_sent_on: null, invoice_paid_on: null });
+    } else if (next === 'sent') {
+      save({ invoice_sent_on: m.invoice_sent_on || today(), invoice_paid_on: null });
+    } else {
+      save({ invoice_sent_on: m.invoice_sent_on || today(), invoice_paid_on: m.invoice_paid_on || today() });
+    }
+  }
+
   return (
     <div style={{
       display: 'flex', flexWrap: 'wrap', gap: '6px 12px', alignItems: 'flex-end', padding: '10px 14px',
       borderTop: `1px solid ${alpha(TOKENS.parchment, 0.06)}`,
     }}>
-      <span style={{ flex: '1 1 300px', minWidth: 0, display: 'flex', gap: 12, alignSelf: 'center' }}>
-        <span style={{ minWidth: 56, color: TOKENS.muted, fontWeight: 600, fontSize: 'var(--type-mono-size)' }}>{lineLabel(m)}</span>
+      <span style={{ flex: '1 1 220px', minWidth: 0, display: 'flex', gap: 12, alignSelf: 'center' }}>
+        <span style={{ minWidth: 48, color: TOKENS.muted, fontWeight: 600, fontSize: 'var(--type-mono-size)' }}>{lineLabel(m)}</span>
         <span style={{ minWidth: 0 }}>
         <span style={{ display: 'block', fontSize: 'var(--type-body-size)', color: TOKENS.parchment }}>{m.title}</span>
         <span style={{ display: 'block', fontSize: 'var(--type-mono-size)', color: TOKENS.muted }}>
@@ -117,13 +151,23 @@ function MilestoneRow({ m, act }) {
         </select>
       </label>
       <label style={control}>
-        <span style={adminLabel}>Invoice sent</span>
-        <input type="date" value={m.invoice_sent_on || ''}
+        <span style={adminLabel}>Invoice</span>
+        <select value={invoice} onChange={(e) => setInvoice(e.target.value)} style={{
+          ...adminInput,
+          ...(invoice === 'sent' && { borderColor: TOKENS.amber, color: TOKENS.amber }),
+          ...(invoice === 'paid' && { color: TOKENS.success }),
+        }}>
+          {Object.entries(INVOICE).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+        </select>
+      </label>
+      <label style={control}>
+        <span style={adminLabel}>Sent on</span>
+        <input type="date" value={m.invoice_sent_on || ''} disabled={invoice === 'none'}
           onChange={(e) => save({ invoice_sent_on: e.target.value })} style={adminInput} />
       </label>
       <label style={control}>
-        <span style={adminLabel}>Paid</span>
-        <input type="date" value={m.invoice_paid_on || ''} disabled={!m.invoice_sent_on && !m.invoice_paid_on}
+        <span style={adminLabel}>Paid on</span>
+        <input type="date" value={m.invoice_paid_on || ''} disabled={invoice !== 'paid'}
           onChange={(e) => save({ invoice_paid_on: e.target.value })} style={adminInput} />
       </label>
     </div>
@@ -285,7 +329,7 @@ function ReleaseFigures({ releaseId }) {
 function Shell({ children }) {
   return (
     <div style={{ minHeight: '100vh', background: TOKENS.ink, fontFamily: 'var(--font-sans)' }}>
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 20px' }}>{children}</div>
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '32px 20px' }}>{children}</div>
     </div>
   );
 }
@@ -299,7 +343,7 @@ function Field({ label, children }) {
   );
 }
 
-const control = { flex: '0 0 140px' };
+const control = { flex: '0 0 130px' };
 const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0 12px' };
 const sectionTitle = { fontSize: 'var(--type-body-size)', textTransform: 'uppercase', letterSpacing: '0.12em', color: TOKENS.muted, margin: '24px 0 10px' };
 const subTitle = { fontSize: 'var(--type-ui-label-size)', textTransform: 'uppercase', letterSpacing: '0.12em', color: TOKENS.muted, margin: '18px 0 6px' };

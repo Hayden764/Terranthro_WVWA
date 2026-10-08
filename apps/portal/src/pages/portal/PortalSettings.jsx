@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { border, crimson, ink, muted, parchment, TOKENS } from '@terranthro/shared/styles/tokens.js';
-import { INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
+import { LIGHT_INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
 import { apiJson, apiPost } from '@terranthro/shared/lib/api.js';
 import { DataSharingSection } from '../../components/portal/DataSharing';
 
@@ -131,7 +131,7 @@ function UsernameSection({ currentUsername, onSaved }) {
               placeholder="e.g. bethel-heights"
               autoCapitalize="none"
               autoCorrect="off"
-              className="ds-input"
+              className="ds-input ds-input-light"
               style={inputStyle}
             />
           </Field>
@@ -213,7 +213,7 @@ function PasswordSection({ hasPassword, onSaved }) {
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="••••••••"
-                className="ds-input"
+                className="ds-input ds-input-light"
                 style={inputStyle}
               />
             </Field>
@@ -225,7 +225,7 @@ function PasswordSection({ hasPassword, onSaved }) {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Min. 8 characters"
-              className="ds-input"
+              className="ds-input ds-input-light"
               style={inputStyle}
             />
           </Field>
@@ -236,7 +236,7 @@ function PasswordSection({ hasPassword, onSaved }) {
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               placeholder="••••••••"
-              className="ds-input"
+              className="ds-input ds-input-light"
               style={inputStyle}
             />
           </Field>
@@ -319,7 +319,7 @@ function EmailSection({ currentEmail }) {
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
               placeholder="your.new@email.com"
-              className="ds-input"
+              className="ds-input ds-input-light"
               style={inputStyle}
             />
           </Field>
@@ -363,7 +363,7 @@ function Field({ label, children }) {
 }
 
 const inputStyle = {
-  ...INPUT_STYLE,
+  ...LIGHT_INPUT_STYLE,
   resize: 'vertical',
 };
 

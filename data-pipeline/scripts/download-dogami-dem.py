@@ -40,6 +40,7 @@ Usage:
 """
 
 import os
+import shutil
 import sys
 import json
 import time
@@ -575,6 +576,8 @@ def run_clip_elevation_feet(clip_geojson: str, output_dir, dry_run: bool,
         raise RuntimeError("final clip warp failed")
     ds = None
 
+    # Only now that the clipped raster is complete are the chunks disposable.
+    shutil.rmtree(tmp, ignore_errors=True)
     mb = final_elev.stat().st_size / 1_048_576
     click.echo(f"\n✓ DOGAMI elevation (feet) complete: {final_elev} ({mb:.1f} MB, 3 m, UTM 10N)")
 

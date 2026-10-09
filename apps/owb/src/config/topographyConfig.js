@@ -1,11 +1,12 @@
 
 // Value tiles on R2 (topo-<layer>.pmtiles, Terrarium raster-dem) built by
-// data-pipeline/scripts/build-topo-value-tiles.py from the 3m DOGAMI COGs; the
+// data-pipeline/scripts/build-topo-value-tiles.py --sources statewide from the
+// 3m DOGAMI rasters of every Oregon region; the
 // map colours them in the browser (see topoClasses.js). `range`/`stats`/`legend`
 // below describe the underlying data and feed the older panels.
 export const TOPO_TILES_BASE_URL =
   import.meta.env.VITE_TOPO_TILES_BASE_URL
-  || 'https://pub-9686f7c1467c4989896000832d9500b0.r2.dev/topography-tiles/OR/willamette_valley';
+  || 'https://pub-9686f7c1467c4989896000832d9500b0.r2.dev/topography-tiles/OR/statewide';
 
 export const TOPO_LAYER_TYPES = {
   elevation: {
@@ -58,7 +59,7 @@ export { REGION_AVAS } from './regionConfig';
 
 /**
  * Returns true if topo data is available.
- * The valley-wide tiles cover every AVA, so topo is always available.
+ * The statewide tiles cover every Oregon AVA, so topo is always available.
  */
 export const hasTopographyData = () => true;
 

@@ -364,6 +364,57 @@ router.get('/:slug/terroir', async (req, res) => {
 });
 
 /**
+ * GET /api/avas/:slug/terrain
+ *
+ * Terrain of the AVA's Oregon land from DOGAMI 3 m lidar (migration 029):
+ *   summary    elevation min/max/mean (ft), slope mean/max (°), dominant aspect (°)
+ *   elevation  100 ft bins   { lo, hi, pct, acres }
+ *   slope      1° bins (last bin 45°+)
+ *   aspect     8 compass sectors (N = -22.5..22.5) plus flat land (lo = hi = -1)
+ */
+router.get('/:slug/terrain', async (req, res) => {
+  const { slug } = req.params;
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    return res.status(400).json({ error: 'Invalid AVA slug' });
+  }
+
+  try {
+    const [{ rows: bins }, { rows: [summary] }] = await Promise.all([
+      pool.query(
+        `SELECT d.layer, d.bin_lo::float AS lo, d.bin_hi::float AS hi, d.pct::float AS pct, d.acres::float AS acres
+         FROM ava_terrain_distribution d
+         JOIN avas a ON a.id = d.ava_id
+         WHERE a.slug = $1
+         ORDER BY d.layer, d.bin_lo`,
+        [slug]
+      ),
+      pool.query(
+        `SELECT t.elevation_min_ft::float AS elevation_min_ft, t.elevation_max_ft::float AS elevation_max_ft,
+                t.elevation_mean_ft::float AS elevation_mean_ft, t.slope_mean_deg::float AS slope_mean_deg,
+                t.slope_max_deg::float AS slope_max_deg, t.aspect_dominant_deg::float AS aspect_dominant_deg,
+                t.data_source
+         FROM ava_topo_stats t
+         JOIN avas a ON a.id = t.ava_id
+         WHERE a.slug = $1`,
+        [slug]
+      ),
+    ]);
+    if (bins.length === 0) {
+      return res.status(404).json({ error: `No terrain data for AVA: ${slug}` });
+    }
+
+    const out = { slug, summary: summary || null, elevation: [], slope: [], aspect: [] };
+    for (const b of bins) out[b.layer]?.push({ lo: b.lo, hi: b.hi, pct: b.pct, acres: b.acres });
+    // Changes only when the pipeline re-runs.
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.json(out);
+  } catch (err) {
+    console.error('GET /api/avas/:slug/terrain error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/avas/:slug/children
  *
  * Returns all direct child AVAs (sub-AVAs) of the given AVA.

@@ -3,13 +3,14 @@ import { alpha, border, crimson, interactive, interactiveSoft, ink, muted, parch
 import { REGION_AVAS, TOPO_LAYER_TYPES } from '../config/topographyConfig';
 import { EARTH_LAYER_TYPES, TERROIR_CLASS_COLORS, earthLegendGroups } from '../config/earthLayersConfig';
 import AvaTerroirComposition from '@terranthro/shared/components/AvaTerroirComposition.jsx';
+import AvaTerrain from '@terranthro/shared/components/AvaTerrain.jsx';
 import { VINEYARD_THEMES, NO_DATA_COLOR, vineyardThemeLegend } from '../config/vineyardThemes';
 import SearchBar from './SearchBar';
 import { LISTING_FILTER_MODES } from './WVWAMap';
 import { CLIMATE_MAP_LAYERS, VINTAGE_FIRST_YEAR, VINTAGE_LAST_YEAR, climateLegendGroups, isClimateMapLayer, isVintageLayer, CLIMATE_MAP_GROUPS } from '../config/climateMapConfig';
 import LegendFilter from './LegendFilter';
 import TopoRangeControl from './TopoRangeControl';
-import { topoLegendGroups } from '../config/topoClasses';
+import { TOPO_CLASSES, topoLegendGroups } from '../config/topoClasses';
 import TerroirDataChips from '@terranthro/shared/components/TerroirDataChips.jsx';
 import TerroirFactRows from './TerroirFactRows';
 import { terroirFactRows } from '../lib/terroirFacts';
@@ -244,6 +245,9 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, map
         {/* Soil + bedrock make-up (ava_terroir_composition) */}
         <AvaTerroirComposition slug={ava.slug} colors={TERROIR_CLASS_COLORS}
           fallbackColor={NO_DATA_COLOR} labelStyle={T.sectionLabel} />
+
+        {/* Elevation / slope / aspect make-up (ava_terrain_distribution) */}
+        <AvaTerrain slug={ava.slug} classes={TOPO_CLASSES} labelStyle={T.sectionLabel} />
 
         {/* Vintage climate (PRISM monthly, 1991 onward) */}
         <div>

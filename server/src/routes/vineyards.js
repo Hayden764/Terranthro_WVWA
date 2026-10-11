@@ -58,9 +58,20 @@ router.get('/tiles/:z/:x/:y', async (req, res) => {
          SELECT ST_TileEnvelope($1, $2, $3) AS env3857,
                 ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS env4326
        ),
+       -- Below z10 a block can be smaller than a screen pixel and would be
+       -- dropped from the tile. Pad those to a one-pixel square on their
+       -- centroid so every vineyard still shows in the statewide view.
+       px AS (
+         SELECT CASE WHEN $1 < 10 THEN 40075016.68 / (2 ^ $1) / 512 ELSE 0 END AS size
+       ),
        features AS (
          SELECT
-           ST_AsMVTGeom(ST_Transform(b.geometry, 3857), bounds.env3857, 4096, 64, true) AS geom,
+           ST_AsMVTGeom(
+             CASE WHEN GREATEST(ST_XMax(g.geom3857) - ST_XMin(g.geom3857),
+                                ST_YMax(g.geom3857) - ST_YMin(g.geom3857)) < px.size
+                  THEN ST_Expand(ST_Centroid(g.geom3857), px.size / 2)
+                  ELSE g.geom3857 END,
+             bounds.env3857, 4096, 64, true) AS geom,
            b.vineyard_id,
            b.id AS block_id,
            b.block_name,
@@ -94,6 +105,8 @@ router.get('/tiles/:z/:x/:y', async (req, res) => {
            ON vc.vineyard_key = LOWER(TRIM(v.vineyard_name))
            AND v.winery_id IN ${membersOf('$4')}
          CROSS JOIN bounds
+         CROSS JOIN px
+         CROSS JOIN LATERAL (SELECT ST_Transform(b.geometry, 3857) AS geom3857) g
          WHERE b.geometry IS NOT NULL
            AND b.geometry && bounds.env4326
        )

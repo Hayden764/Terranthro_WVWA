@@ -672,19 +672,19 @@ function setListingSoftFocus(map, isSoftFocused) {
   }
 }
 
-// ── Vineyard glow ─────────────────────────────────────────────────────────
-// At the valley-wide opening zoom a vineyard is smaller than a pixel, so the
-// fills alone are invisible. An amber heatmap of vineyard centroids sits under
-// the fills for the overview (z7–11) and fades out as the fills take over.
-// `k` scales it so soft focus / filters can hush the glow.
-const vineyardGlowHeatOpacity = (k = 1) => [
+// ── Vineyard overview stroke ──────────────────────────────────────────────
+// At the statewide opening zoom a block is about a pixel across, so its fill
+// alone is too faint to see. A stroke in the fill colour thickens every block
+// into a readable speck (the tile route pads sub-pixel blocks to a pixel) and
+// fades out as the fills take over. `k` lets soft focus / filters hush it.
+const vineyardOverviewLineOpacity = (k = 1) => [
   'interpolate', ['linear'], ['zoom'],
-  7, 0.9 * k, 9.5, 0.8 * k, 11, 0.25 * k, 11.8, 0,
+  5, 0.95 * k, 9.5, 0.9 * k, 11, 0.4 * k, 11.8, 0,
 ];
 
-function setVineyardGlowStrength(map, k) {
-  if (map.getLayer('vineyards-glow-heat')) {
-    map.setPaintProperty('vineyards-glow-heat', 'heatmap-opacity', vineyardGlowHeatOpacity(k));
+function setVineyardOverviewStrength(map, k) {
+  if (map.getLayer('vineyards-overview-line')) {
+    map.setPaintProperty('vineyards-overview-line', 'line-opacity', vineyardOverviewLineOpacity(k));
   }
 }
 
@@ -705,8 +705,8 @@ function setVineyardOutlineOpacity(map, opacity) {
 }
 
 function setVineyardReferenceSoftFocus(map, isSoftFocused) {
-  // A selected winery is its own highlight; the valley-wide glow would compete.
-  setVineyardGlowStrength(map, isSoftFocused ? 0.12 : 1);
+  // A selected winery is its own highlight; the statewide specks would compete.
+  setVineyardOverviewStrength(map, isSoftFocused ? 0.12 : 1);
   // Identity-color fill: keep the palette clearly visible when bright. With one
   // winery selected the neighbours drop to a whisper — still readable as "there
   // is a vineyard here", but with no hue left to compete with the selection.
@@ -795,7 +795,7 @@ function runWhenStyleReady(map, fn) {
  * first so this can layer cleanly on top of either visual state.
  */
 function applyVineyardFilterDim(map) {
-  setVineyardGlowStrength(map, 0.2);
+  setVineyardOverviewStrength(map, 0.2);
   setReferenceFillOpacity(map, 0.12);
   setVineyardOutlineOpacity(map, 0.25);
   if (map.getLayer('vineyards-reference-line'))          map.setPaintProperty('vineyards-reference-line', 'line-opacity', 0.18);
@@ -827,14 +827,10 @@ function applyVineyardEmphasis(map, { scope, filtersActive }) {
   }
 }
 
-// `glowVisible` defaults to `isVisible`; the glow also hides under a data layer
-// (soils, climate, topography), where its amber haze reads as data.
-function setVineyardVisualizationVisibility(map, isVisible, glowVisible = isVisible) {
+function setVineyardVisualizationVisibility(map, isVisible) {
   const visibility = isVisible ? 'visible' : 'none';
-  if (map.getLayer('vineyards-glow-heat')) {
-    map.setLayoutProperty('vineyards-glow-heat', 'visibility', glowVisible ? 'visible' : 'none');
-  }
   const vineyardLayerIds = [
+    'vineyards-overview-line',
     'vineyards-reference-fill',
     'vineyards-reference-line',
     'vineyards-reference-passive-fill',
@@ -2205,17 +2201,6 @@ const WVWAMap = forwardRef(function WVWAMap({
     if (!selectedListing) setVineyardFocusMode(false);
   }, [selectedListing]);
 
-  // Vineyard glow hides under any data layer (soils, climate, topography) —
-  // its amber haze reads as data there. Own effect, without the
-  // isStyleLoaded() guard below: switching a layer on starts a tile load, so
-  // that guard would skip exactly the update this needs.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapLoaded || !map.getLayer('vineyards-glow-heat')) return;
-    const vineyardsVisible = listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized;
-    map.setLayoutProperty('vineyards-glow-heat', 'visibility', vineyardsVisible && !activeLayer ? 'visible' : 'none');
-  }, [mapLoaded, activeLayer, listingFilterMode]);
-
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
@@ -2228,7 +2213,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       markersVisible && listingFilterMode !== LISTING_FILTER_MODES.noWineriesVisualized,
     );
     const vineyardsVisible = listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized;
-    setVineyardVisualizationVisibility(map, vineyardsVisible, vineyardsVisible && !activeLayer);
+    setVineyardVisualizationVisibility(map, vineyardsVisible);
     // Vineyard/listing soft-focus is owned by the vineyardScope authority effect below.
   }, [selectedListing, mapLoaded, introComplete, markersVisible, listingFilterMode, activeLayer]);
 
@@ -2457,8 +2442,10 @@ const WVWAMap = forwardRef(function WVWAMap({
         try { map.setPaintProperty(id, 'fill-color', expression); } catch { /* style reloading */ }
       }
     }
-    if (map.getLayer('vineyards-outline-line')) {
-      try { map.setPaintProperty('vineyards-outline-line', 'line-color', expression); } catch { /* style reloading */ }
+    for (const id of ['vineyards-outline-line', 'vineyards-overview-line']) {
+      if (map.getLayer(id)) {
+        try { map.setPaintProperty(id, 'line-color', expression); } catch { /* style reloading */ }
+      }
     }
 
     // In a data theme the fills can match the raster underneath (elevation uses
@@ -2790,7 +2777,8 @@ const WVWAMap = forwardRef(function WVWAMap({
         map.addSource('vineyards-reference', {
           type: 'vector',
           tiles: [VINEYARD_TILES_URL],
-          minzoom: 8,
+          // From the statewide opening view: vineyards show at every zoom
+          minzoom: 5,
           maxzoom: 14,
           // No promoteId: ST_AsMVT already stamps each feature's id with
           // vineyard_id (its feature_id_name), so every block of a vineyard
@@ -2799,46 +2787,25 @@ const WVWAMap = forwardRef(function WVWAMap({
           // `vineyard_id` property and blank out the id instead.
         });
 
-        // Vineyard glow (see vineyardGlowHeatOpacity): heatmap of vineyard
-        // centroids for the overview.
-        // Centroids load in the background; the heatmap fills in when ready.
-        map.addSource('vineyards-glow', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: [] },
-        });
-        fetch(`${API_BASE}/api/vineyards/centroids`, { headers: API_HEADERS })
-          .then((r) => (r.ok ? r.json() : null))
-          .then((fc) => { if (fc) map.getSource('vineyards-glow')?.setData(fc); })
-          .catch((err) => console.warn('Vineyard glow centroids failed to load:', err));
-        map.addLayer({
-          id: 'vineyards-glow-heat',
-          type: 'heatmap',
-          source: 'vineyards-glow',
-          maxzoom: 12,
-          paint: {
-            // Median vineyard is ~7 ac; big estates glow brighter, but a small
-            // one still registers on its own.
-            'heatmap-weight': ['interpolate', ['linear'], ['get', 'acres'], 0, 0.3, 10, 0.55, 40, 1],
-            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 7, 0.6, 11, 1.4],
-            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 7, 9, 9, 16, 11, 28],
-            'heatmap-color': [
-              'interpolate', ['linear'], ['heatmap-density'],
-              0, 'rgba(255,190,100,0)',
-              0.1, 'rgba(255,170,80,0.3)',
-              0.35, 'rgba(255,170,75,0.6)',
-              0.7, 'rgba(255,196,115,0.82)',
-              1, 'rgba(255,224,170,0.92)',
-            ],
-            'heatmap-opacity': vineyardGlowHeatOpacity(),
-          },
-        });
-
         map.addLayer({
           id: 'vineyards-reference-fill',
           type: 'fill',
           source: 'vineyards-reference',
           'source-layer': 'vineyard_blocks',
           paint: { 'fill-color': buildVineyardFillColorExpression(), 'fill-opacity': 0.82 },
+        });
+        // Overview stroke (see vineyardOverviewLineOpacity)
+        map.addLayer({
+          id: 'vineyards-overview-line',
+          type: 'line',
+          source: 'vineyards-reference',
+          'source-layer': 'vineyard_blocks',
+          maxzoom: 12,
+          paint: {
+            'line-color': buildVineyardFillColorExpression(),
+            'line-width': ['interpolate', ['linear'], ['zoom'], 5, 2.6, 8, 2.2, 10, 1.4, 11, 0.8],
+            'line-opacity': vineyardOverviewLineOpacity(),
+          },
         });
         // Outline-only mode (see setReferenceFillOpacity): borders in the fill colour
         map.addLayer({

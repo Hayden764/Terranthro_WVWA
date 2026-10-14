@@ -85,6 +85,7 @@ ogr2ogr \
     LEFT JOIN wineries w ON v.winery_id = w.id
     LEFT JOIN vineyard_colors vc
       ON vc.vineyard_key = LOWER(TRIM(v.vineyard_name))
+      AND vc.scope = 'wvwa'
       AND v.winery_id IN (SELECT oa.organization_id FROM organization_associations oa JOIN associations a ON a.id = oa.association_id WHERE a.slug = 'wvwa')
     WHERE b.geometry IS NOT NULL
   "

@@ -369,6 +369,137 @@ router.get('/query', async (req, res) => {
   }
 });
 
+// Listing categories the statewide map leaves out: it shows wineries and
+// growers only, not the restaurants and lodging in the WVWA listing feed.
+const NON_WINE_CATEGORIES = new Set(['restaurant', 'hotel']);
+
+const TASTING_ROOMS_SQL = `
+  COALESCE((
+    SELECT json_agg(json_build_object(
+             'id',         t.id,
+             'name',       t.name,
+             'is_primary', t.is_primary,
+             'lng',        ST_X(t.location),
+             'lat',        ST_Y(t.location)
+           ) ORDER BY t.is_primary DESC, t.id)
+    FROM tasting_rooms t WHERE t.organization_id = w.id
+  ), '[]'::json)`;
+
+function categoryOf(row) {
+  return classifyListingCategory({
+    recid: row.recid,
+    title: row.title,
+    description: row.description,
+    category: row.category,
+  });
+}
+
+/**
+ * GET /api/wineries/organizations
+ *
+ * Every wine organization of the association (?association=all: statewide),
+ * keyed by organization id — including growers with no WVWA listing, which
+ * have no recid. Each carries its tasting rooms (migration 036; a winery can
+ * pour in several places). Restaurants and lodging are left out, and so is
+ * listing copy (description, photo, phone, website).
+ */
+router.get('/organizations', async (req, res) => {
+  try {
+    const association = await resolveAssociation(req);
+    if (!association) return badAssociation(res);
+
+    const { rows } = await pool.query(
+      `
+      SELECT
+        w.id,
+        w.recid,
+        w.title,
+        w.description,
+        w.category,
+        (SELECT COUNT(*) FROM vineyards v WHERE v.winery_id = w.id) AS vineyard_count,
+        ${TASTING_ROOMS_SQL} AS tasting_rooms
+      FROM wineries w
+      WHERE w.id IN ${membersOf('$1')}
+      ORDER BY w.title
+      `,
+      [association]
+    );
+
+    const organizations = rows
+      .map((row) => ({ ...row, category: categoryOf(row) }))
+      .filter((row) => !NON_WINE_CATEGORIES.has(row.category))
+      .map((row) => ({
+        id:             row.id,
+        recid:          row.recid,
+        title:          row.title,
+        category:       row.category,
+        vineyard_count: Number(row.vineyard_count),
+        tasting_rooms:  row.tasting_rooms,
+      }));
+
+    res.json({ organizations });
+  } catch (err) {
+    console.error('GET /api/wineries/organizations error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/wineries/organizations/:id
+ *
+ * One organization by id: its tasting rooms, its vineyards (names only — the
+ * map already holds the geometry) and the blocks it buys fruit from.
+ */
+router.get('/organizations/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ error: 'Invalid organization id' });
+
+  try {
+    const { rows } = await pool.query(
+      `
+      SELECT
+        w.id,
+        w.recid,
+        w.title,
+        w.description,
+        w.category,
+        ${TASTING_ROOMS_SQL} AS tasting_rooms,
+        COALESCE((
+          SELECT json_agg(json_build_object(
+                   'id',            v.id,
+                   'vineyard_name', v.vineyard_name,
+                   'nested_ava',    v.nested_ava,
+                   'acres',         v.acres
+                 ) ORDER BY v.vineyard_name)
+          FROM vineyards v WHERE v.winery_id = w.id
+        ), '[]'::json) AS vineyards
+      FROM wineries w
+      WHERE w.id = $1
+         OR w.id = (SELECT kept_id FROM organization_merges WHERE merged_id = $1)
+      `,
+      [id]
+    );
+
+    const row = rows[0];
+    if (!row || NON_WINE_CATEGORIES.has(categoryOf(row))) {
+      return res.status(404).json({ error: `Organization not found: ${id}` });
+    }
+
+    res.json({
+      id:            row.id,
+      recid:         row.recid,
+      title:         row.title,
+      category:      categoryOf(row),
+      tasting_rooms: row.tasting_rooms,
+      vineyards:     row.vineyards,
+      sourced_from:  await loadSourcedFrom(row.id),
+    });
+  } catch (err) {
+    console.error('GET /api/wineries/organizations/:id error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 /**
  * GET /api/wineries/:recid
  *
@@ -405,7 +536,10 @@ router.get('/:recid', async (req, res) => {
         ) FILTER (WHERE v.id IS NOT NULL) AS parcels
       FROM wineries w
       LEFT JOIN vineyards v ON v.winery_id = w.id
+      -- A listing merged into another organization (migration 036) resolves
+      -- to the organization it was folded into.
       WHERE w.recid = $1
+         OR w.id = (SELECT kept_id FROM organization_merges WHERE merged_recid = $1)
       GROUP BY w.id
       `,
       [recid]

@@ -103,6 +103,7 @@ router.get('/tiles/:z/:x/:y', async (req, res) => {
          LEFT JOIN vineyard_block_topo_stats bt ON bt.block_id = b.id
          LEFT JOIN vineyard_colors vc
            ON vc.vineyard_key = LOWER(TRIM(v.vineyard_name))
+           AND vc.scope = $4  -- each association has its own colouring (036)
            AND v.winery_id IN ${membersOf('$4')}
          CROSS JOIN bounds
          CROSS JOIN px
@@ -262,6 +263,7 @@ router.get('/parcels', async (req, res) => {
       LEFT JOIN wineries w ON vp.winery_id = w.id
       LEFT JOIN vineyard_colors vc
         ON vc.vineyard_key = LOWER(TRIM(vp.vineyard_name))
+        AND vc.scope = ${assocParam}  -- each association has its own colouring (036)
         AND vp.winery_id IN ${membersOf(assocParam)}
       WHERE ${bboxCondition}
         ${avaCondition}

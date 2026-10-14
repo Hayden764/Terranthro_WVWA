@@ -7,6 +7,11 @@ two spatially adjacent member vineyards share a color — the "map coloring"
 problem, solved with a greedy graph-coloring so the result is deterministic and
 legible.
 
+Each run writes one scope (migration 036): the association slug the colouring
+is for. --scope wvwa (default) colours WVWA-member vineyards for the WVWA map;
+--scope all colours every vineyard with an owner on record for the statewide
+OWB map. The API joins the scope that matches the request's ?association=.
+
 Only member vineyards are colored: on the map, non-members render grey and
 unnamed parcels render white, so neither needs a palette slot. A member vineyard
 therefore only has to differ from its adjacent *member* vineyards; grey/white
@@ -29,7 +34,8 @@ expression (WVWAMap.jsx). This script only assigns integer slots, so recolouring
 the map is a frontend-only change as long as the slot count stays the same.
 
 Usage:
-  python3 assign-vineyard-colors.py                 # compute + write
+  python3 assign-vineyard-colors.py                 # compute + write (wvwa)
+  python3 assign-vineyard-colors.py --scope all     # statewide OWB colouring
   python3 assign-vineyard-colors.py --dry-run       # compute + report, no write
   python3 assign-vineyard-colors.py --palette-size 12 --tolerance 100
 """
@@ -47,7 +53,10 @@ import psycopg2.extras
 # ── Config ──────────────────────────────────────────────────────────────────
 # Projected CRS for metric buffering/centroids (Willamette Valley → UTM 10N).
 PROJECTED_CRS = 32610
-DEFAULT_PALETTE_SIZE = 11      # colorblind-safe hues defined on the frontend
+# Palette slots per scope — must match the palette arrays in each app's
+# WVWAMap.jsx (WVWA: 11 hues, no blues; OWB: 15, blues allowed because its
+# highlight is a stripe pattern, not a blue outline).
+SCOPE_PALETTE_SIZE = {"wvwa": 11, "all": 15}
 DEFAULT_TOLERANCE_M = 75.0     # gap up to this counts as "adjacent"
 DEFAULT_MAX_DELAUNAY_M = 3000.0  # cap on non-touching Delaunay edges
 
@@ -80,14 +89,15 @@ def get_conn():
     )
 
 
-def fetch_vineyards(conn):
+def fetch_vineyards(conn, scope):
     """
     Return a GeoDataFrame with one dissolved geometry per normalized MEMBER
     vineyard name. Requires geopandas/shapely (imported lazily so --help works
     without them).
 
-    Only WVWA-member-linked parcels are included — non-members render grey on the
-    map and don't participate in the color graph.
+    Only parcels owned by a member of the scope's association are included
+    (scope 'all': any owner) — the rest render grey on the map and don't
+    participate in the color graph.
     """
     import geopandas as gpd
     from shapely import wkt  # noqa: F401  (ensures shapely is present)
@@ -101,10 +111,13 @@ def fetch_vineyards(conn):
         WHERE vp.vineyard_name IS NOT NULL
           AND TRIM(vp.vineyard_name) <> ''
           AND vp.geometry IS NOT NULL
-          AND w.id IN (SELECT oa.organization_id FROM organization_associations oa JOIN associations a ON a.id = oa.association_id WHERE a.slug = 'wvwa')
+          AND (%(scope)s = 'all' OR w.id IN (
+                SELECT oa.organization_id FROM organization_associations oa
+                JOIN associations a ON a.id = oa.association_id
+                WHERE a.slug = %(scope)s))
     """
     with conn.cursor() as cur:
-        cur.execute(sql)
+        cur.execute(sql, {"scope": scope})
         rows = cur.fetchall()
 
     if not rows:
@@ -208,9 +221,10 @@ def greedy_color(adj, palette_size):
     return color, forced_clashes
 
 
-def write_colors(conn, gdf_m, color, adj, palette_size):
+def write_colors(conn, scope, gdf_m, color, adj, palette_size):
     rows = [
         (
+            scope,
             gdf_m.iloc[i]["vineyard_key"],
             int(color[i]),
             len(adj[i]),
@@ -219,13 +233,14 @@ def write_colors(conn, gdf_m, color, adj, palette_size):
         for i in range(len(gdf_m))
     ]
     with conn.cursor() as cur:
-        # Replace the full assignment so removed vineyards don't linger.
-        cur.execute("TRUNCATE vineyard_colors")
+        # Replace this scope's assignment so removed vineyards don't linger;
+        # other scopes are untouched.
+        cur.execute("DELETE FROM vineyard_colors WHERE scope = %s", (scope,))
         psycopg2.extras.execute_values(
             cur,
             """
             INSERT INTO vineyard_colors
-                (vineyard_key, color_index, neighbor_count, palette_size)
+                (scope, vineyard_key, color_index, neighbor_count, palette_size)
             VALUES %s
             """,
             rows,
@@ -237,8 +252,11 @@ def write_colors(conn, gdf_m, color, adj, palette_size):
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--palette-size", type=int, default=DEFAULT_PALETTE_SIZE,
-                        help=f"number of palette slots (default {DEFAULT_PALETTE_SIZE})")
+    parser.add_argument("--scope", choices=sorted(SCOPE_PALETTE_SIZE), default="wvwa",
+                        help="association slug to colour for: wvwa (members) or all (statewide)")
+    parser.add_argument("--palette-size", type=int, default=None,
+                        help="number of palette slots (default: the scope's palette, "
+                             + ", ".join(f"{k}={v}" for k, v in SCOPE_PALETTE_SIZE.items()) + ")")
     parser.add_argument("--tolerance", type=float, default=DEFAULT_TOLERANCE_M,
                         help=f"gap in metres counted as adjacent (default {DEFAULT_TOLERANCE_M})")
     parser.add_argument("--max-delaunay", type=float, default=DEFAULT_MAX_DELAUNAY_M,
@@ -246,6 +264,8 @@ def main():
     parser.add_argument("--dry-run", action="store_true",
                         help="compute and report, but do not write to the database")
     args = parser.parse_args()
+    if args.palette_size is None:
+        args.palette_size = SCOPE_PALETTE_SIZE[args.scope]
 
     if args.palette_size < 2:
         print("palette-size must be >= 2", file=sys.stderr)
@@ -257,8 +277,8 @@ def main():
         print(f"DB connection failed: {e}", file=sys.stderr)
         sys.exit(1)
 
-    print("Fetching + dissolving member vineyards by name...")
-    gdf_m = fetch_vineyards(conn)
+    print(f"Fetching + dissolving '{args.scope}' vineyards by name...")
+    gdf_m = fetch_vineyards(conn, args.scope)
     n = len(gdf_m)
     if n == 0:
         print("No named member vineyards found — nothing to color.")
@@ -292,8 +312,8 @@ def main():
         print("Dry run — not writing to database.")
         return
 
-    written = write_colors(conn, gdf_m, color, adj, args.palette_size)
-    print(f"Wrote {written} rows to vineyard_colors.")
+    written = write_colors(conn, args.scope, gdf_m, color, adj, args.palette_size)
+    print(f"Wrote {written} '{args.scope}' rows to vineyard_colors.")
 
 
 if __name__ == "__main__":

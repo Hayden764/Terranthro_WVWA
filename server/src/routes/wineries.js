@@ -66,6 +66,22 @@ async function loadLocalWineriesFallback({ bbox, hasParcels, category }) {
   };
 }
 
+// Listing categories the statewide map leaves out: it shows wineries and
+// growers only, not the restaurants and lodging in the WVWA listing feed.
+const NON_WINE_CATEGORIES = new Set(['restaurant', 'hotel']);
+
+const TASTING_ROOMS_SQL = `
+  COALESCE((
+    SELECT json_agg(json_build_object(
+             'id',         t.id,
+             'name',       t.name,
+             'is_primary', t.is_primary,
+             'lng',        ST_X(t.location),
+             'lat',        ST_Y(t.location)
+           ) ORDER BY t.is_primary DESC, t.id)
+    FROM tasting_rooms t WHERE t.organization_id = w.id
+  ), '[]'::json)`;
+
 /**
  * GET /api/wineries
  *
@@ -111,7 +127,8 @@ router.get('/', async (req, res) => {
         w.category,
         ST_AsGeoJSON(w.location)::json AS geometry,
         -- kept as parcel_count for API/fallback-file compatibility; counts vineyards post-018
-        (SELECT COUNT(*) FROM vineyards v WHERE v.winery_id = w.id) AS parcel_count
+        (SELECT COUNT(*) FROM vineyards v WHERE v.winery_id = w.id) AS parcel_count,
+        ${TASTING_ROOMS_SQL} AS tasting_rooms
       FROM wineries w
       WHERE ${bboxCondition}
         AND ${memberCondition}
@@ -148,6 +165,9 @@ router.get('/', async (req, res) => {
           image_url:    row.image_url,
           category:     row.category,
           parcel_count: Number(row.parcel_count),
+          // Where it pours (migration 036); empty for restaurants and lodging,
+          // which the map places at the listing point (geometry).
+          tasting_rooms: row.tasting_rooms,
         },
         geometry: row.geometry,
       })),
@@ -368,22 +388,6 @@ router.get('/query', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// Listing categories the statewide map leaves out: it shows wineries and
-// growers only, not the restaurants and lodging in the WVWA listing feed.
-const NON_WINE_CATEGORIES = new Set(['restaurant', 'hotel']);
-
-const TASTING_ROOMS_SQL = `
-  COALESCE((
-    SELECT json_agg(json_build_object(
-             'id',         t.id,
-             'name',       t.name,
-             'is_primary', t.is_primary,
-             'lng',        ST_X(t.location),
-             'lat',        ST_Y(t.location)
-           ) ORDER BY t.is_primary DESC, t.id)
-    FROM tasting_rooms t WHERE t.organization_id = w.id
-  ), '[]'::json)`;
 
 function categoryOf(row) {
   return classifyListingCategory({

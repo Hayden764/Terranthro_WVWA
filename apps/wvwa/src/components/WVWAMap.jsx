@@ -346,8 +346,15 @@ function removeListingsBaseLayersAndSource(map) {
   if (map.getSource('listings')) map.removeSource('listings');
 }
 
+// True once the style document has loaded, which is all addSource/addLayer
+// need. map.isStyleLoaded() also waits on every source's tiles, and with
+// streaming satellite/terrain tiles it can stay false indefinitely.
+function isStyleReady(map) {
+  return !!map?.style?._loaded;
+}
+
 function addListingsSourceAndBaseLayers(map, geojsonData, preset, isVisible) {
-  if (!map || !map.getStyle?.() || !map.isStyleLoaded?.()) return false;
+  if (!map || !isStyleReady(map)) return false;
   const config = getListingSymbologyConfig(preset);
   map.addSource('listings', {
     type: 'geojson',
@@ -426,6 +433,17 @@ function applyListingFocusAccent(map, preset) {
 // Willamette Valley approximate bounding box
 // WV_BOUNDS is imported from '../config/flyTo'
 
+// One point per tasting room (migration 036) — a winery can pour in several
+// places (Stoller: the estate and a Newberg wine bar), and every point carries
+// the listing's id so selecting it lights all of them.
+function listingRoomFeatures(listing, properties) {
+  return (listing.rooms || []).map((room) => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [room.lng, room.lat] },
+    properties: { ...properties, room: room.name || '' },
+  }));
+}
+
 // Build a GeoJSON FeatureCollection for the listings source, filtered to
 // winery records with optional vineyard polygon and AVA restrictions.
 function buildListingsGeoJSON(listings, listingFilterMode, vineyardRecidSet, insideIds = null) {
@@ -440,21 +458,17 @@ function buildListingsGeoJSON(listings, listingFilterMode, vineyardRecidSet, ins
       if (insideIds && !insideIds.includes(l.id)) return false;
       return true;
     })
-    .map(listing => ({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [listing.lng, listing.lat] },
-      properties: {
-        id:       listing.id,
-        num:      listing.num,
-        title:    listing.title,
-        desc:     listing.desc,
-        phone:    listing.phone,
-        url:      listing.url,
-        image_url: listing.image_url,
-        category: listing.category,
-        color:    LISTING_CATEGORIES[listing.category].color,
-        catLabel: LISTING_CATEGORIES[listing.category].label,
-      },
+    .flatMap(listing => listingRoomFeatures(listing, {
+      id:       listing.id,
+      num:      listing.num,
+      title:    listing.title,
+      desc:     listing.desc,
+      phone:    listing.phone,
+      url:      listing.url,
+      image_url: listing.image_url,
+      category: listing.category,
+      color:    LISTING_CATEGORIES[listing.category].color,
+      catLabel: LISTING_CATEGORIES[listing.category].label,
     }));
   return { type: 'FeatureCollection', features };
 }
@@ -2326,18 +2340,27 @@ const WVWAMap = forwardRef(function WVWAMap({
         const loaded = fc.features
           // Guard: only point listings with coordinates (non-member orgs have no location).
           .filter(f => f?.geometry?.coordinates?.length === 2)
-          .map((f, i) => ({
-            id:        f.properties.recid,
-            num:       i + 1,
-            title:     f.properties.title,
-            desc:      f.properties.description || '',
-            phone:     f.properties.phone || '',
-            url:       f.properties.url || '',
-            image_url: f.properties.image_url || '',
-            lng:       f.geometry.coordinates[0],
-            lat:       f.geometry.coordinates[1],
-            category:  f.properties.category || 'winery',
-          }));
+          .map((f, i) => {
+            const [lng, lat] = f.geometry.coordinates;
+            // Tasting rooms where it pours; listings without one (restaurants,
+            // lodging) sit at their listing point.
+            const rooms = Array.isArray(f.properties.tasting_rooms) && f.properties.tasting_rooms.length
+              ? f.properties.tasting_rooms
+              : [{ name: null, lng, lat }];
+            return {
+              id:        f.properties.recid,
+              num:       i + 1,
+              title:     f.properties.title,
+              desc:      f.properties.description || '',
+              phone:     f.properties.phone || '',
+              url:       f.properties.url || '',
+              image_url: f.properties.image_url || '',
+              lng,
+              lat,
+              rooms,
+              category:  f.properties.category || 'winery',
+            };
+          });
         setListings(loaded);
       })
       .catch(err => console.error('WVWAMap: failed to load wineries from API', err));
@@ -2372,11 +2395,7 @@ const WVWAMap = forwardRef(function WVWAMap({
     const presetColor = getListingSymbologyConfig(listingSymbologyPreset).markerFillColor;
     src.setData({
       type: 'FeatureCollection',
-      features: [{
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [hoveredListing.lng, hoveredListing.lat] },
-        properties: { color: presetColor, num: String(hoveredListing.num) },
-      }],
+      features: listingRoomFeatures(hoveredListing, { color: presetColor, num: String(hoveredListing.num) }),
     });
   }, [hoveredListing, mapLoaded, listingSymbologyPreset]);
 
@@ -2393,11 +2412,7 @@ const WVWAMap = forwardRef(function WVWAMap({
     const cat = LISTING_CATEGORIES[selectedListing.category];
     src.setData({
       type: 'FeatureCollection',
-      features: [{
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [selectedListing.lng, selectedListing.lat] },
-        properties: { color: cat.color, num: String(selectedListing.num) },
-      }],
+      features: listingRoomFeatures(selectedListing, { color: cat.color, num: String(selectedListing.num) }),
     });
   }, [selectedListing, mapLoaded]);
 
@@ -3367,7 +3382,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         setSelectedListingRef.current?.(listing);
         const vineyardFeatures = VINEYARD_BY_RECID[listing.id] ?? [];
         if (!flyToVineyardBounds(map, vineyardFeatures)) {
-          map.flyTo({ center: [listing.lng, listing.lat], zoom: 14, curve: 1.4, speed: 0.55, essential: true });
+          map.flyTo({ center: e.features[0].geometry.coordinates, zoom: 14, curve: 1.4, speed: 0.55, essential: true });
         }
       });
 
@@ -3459,9 +3474,9 @@ const WVWAMap = forwardRef(function WVWAMap({
         };
         const pointInPolygon = (lng, lat) => rings.some(ring => pointInRing(lng, lat, ring));
 
-        // Members whose TASTING ROOM point falls inside the AVA (client-side).
+        // Members with a TASTING ROOM inside the AVA (client-side).
         const pointIds = listingsRef.current
-          .filter(l => pointInPolygon(l.lng, l.lat))
+          .filter(l => (l.rooms || []).some(room => pointInPolygon(room.lng, room.lat)))
           .map(l => l.id);
 
         // Apply an insideIds set to both the map source and the panel state.
@@ -3577,8 +3592,16 @@ const WVWAMap = forwardRef(function WVWAMap({
       insideIdsRef.current,
     );
 
+    // Adding a source only needs the style document loaded (isStyleReady).
+    // Waiting on map.loaded()/isStyleLoaded() as before could stall forever
+    // while satellite/terrain tiles stream, leaving the markers never added.
+    let cancelled = false;
     const rebuildListingsLayers = () => {
-      if (!map || !map.getStyle?.() || !map.isStyleLoaded?.() || !map.loaded?.()) return;
+      if (cancelled || !map) return;
+      if (!isStyleReady(map)) {
+        map.once('styledata', rebuildListingsLayers);
+        return;
+      }
 
       try {
         removeListingsBaseLayersAndSource(map);
@@ -3594,17 +3617,11 @@ const WVWAMap = forwardRef(function WVWAMap({
       }
     };
 
-    if (!map.getStyle?.() || !map.isStyleLoaded?.() || !map.loaded?.()) {
-      const onStyleData = () => {
-        if (!map.getStyle?.() || !map.isStyleLoaded?.() || !map.loaded?.()) return;
-        rebuildListingsLayers();
-        map.off('styledata', onStyleData);
-      };
-      map.on('styledata', onStyleData);
-      return () => map.off('styledata', onStyleData);
-    }
-
     rebuildListingsLayers();
+    return () => {
+      cancelled = true;
+      map.off('styledata', rebuildListingsLayers);
+    };
   }, [
     listingSymbologyPreset,
     mapLoaded,

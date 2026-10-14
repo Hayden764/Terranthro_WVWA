@@ -348,8 +348,15 @@ function removeListingsBaseLayersAndSource(map) {
   if (map.getSource('listings')) map.removeSource('listings');
 }
 
+// True once the style document has loaded, which is all addSource/addLayer
+// need. map.isStyleLoaded() also waits on every source's tiles, and with
+// streaming satellite/terrain tiles it can stay false indefinitely.
+function isStyleReady(map) {
+  return !!map?.style?._loaded;
+}
+
 function addListingsSourceAndBaseLayers(map, geojsonData, preset, isVisible) {
-  if (!map || !map.getStyle?.() || !map.isStyleLoaded?.()) return false;
+  if (!map || !isStyleReady(map)) return false;
   const config = getListingSymbologyConfig(preset);
   map.addSource('listings', {
     type: 'geojson',
@@ -3524,8 +3531,16 @@ const WVWAMap = forwardRef(function WVWAMap({
       insideIdsRef.current,
     );
 
+    // Adding a source only needs the style document loaded (isStyleReady).
+    // Waiting on map.loaded()/isStyleLoaded() as before could stall forever
+    // while satellite/terrain tiles stream, leaving the markers never added.
+    let cancelled = false;
     const rebuildListingsLayers = () => {
-      if (!map || !map.getStyle?.() || !map.isStyleLoaded?.() || !map.loaded?.()) return;
+      if (cancelled || !map) return;
+      if (!isStyleReady(map)) {
+        map.once('styledata', rebuildListingsLayers);
+        return;
+      }
 
       try {
         removeListingsBaseLayersAndSource(map);
@@ -3541,17 +3556,11 @@ const WVWAMap = forwardRef(function WVWAMap({
       }
     };
 
-    if (!map.getStyle?.() || !map.isStyleLoaded?.() || !map.loaded?.()) {
-      const onStyleData = () => {
-        if (!map.getStyle?.() || !map.isStyleLoaded?.() || !map.loaded?.()) return;
-        rebuildListingsLayers();
-        map.off('styledata', onStyleData);
-      };
-      map.on('styledata', onStyleData);
-      return () => map.off('styledata', onStyleData);
-    }
-
     rebuildListingsLayers();
+    return () => {
+      cancelled = true;
+      map.off('styledata', rebuildListingsLayers);
+    };
   }, [
     listingSymbologyPreset,
     mapLoaded,

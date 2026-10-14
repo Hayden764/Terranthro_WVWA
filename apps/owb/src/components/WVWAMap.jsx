@@ -75,11 +75,12 @@ const MAP_STYLE = MAPTILER_KEY
   : FALLBACK_STYLE;
 
 // ── Vineyard parcel data (fetched at map load, indexed here at runtime) ──
-// Keyed by winery_recid (integer) → array of GeoJSON Feature objects
-// so a single winery can map to multiple parcels.
-// Populated from /api/vineyards/parcels?dataset=adelsheim during map load.
-let VINEYARD_BY_RECID = {};
-let LINKED_VINEYARD_BY_RECID = {};
+// Keyed by winery_id (organization id) → array of GeoJSON Feature objects
+// so a single organization can map to multiple parcels. Statewide, growers
+// have no WVWA recid, so everything here keys on the organization id.
+// Populated from /api/vineyards/parcels during map load.
+let VINEYARD_BY_ORG = {};
+let LINKED_VINEYARD_BY_ORG = {};
 let VINEYARD_FEATURES_BY_NAME = {}; // keyed by normalized vineyard_name → [feature, ...]
 let VINEYARD_ALL_BY_NAME = {};      // keyed by normalized vineyard_name → [feature, ...] (all datasets)
 
@@ -133,7 +134,6 @@ const UI = {
   valueText: alpha(TOKENS.parchment, 0.85),
   titleText: alpha(TOKENS.parchment, 0.95),
   bodyText: alpha(TOKENS.parchment, 0.6),
-  phoneText: alpha(TOKENS.parchment, 0.7),
   sectionLabel: alpha(TOKENS.parchment, 0.35),
   vineyardAccent: TOKENS.vividGreen,
   vineyardAccentSoft: alpha(TOKENS.vividGreen, 0.12),
@@ -176,33 +176,47 @@ const toMapLibreColor = (color, fallback) => (
 );
 
 // ── Vineyard identity colors ────────────────────────────────────────────────
-// Statewide (OWB): every organization counts equally, so there is no member
-// palette — any vineyard with an owner on record (is_member with
-// ?association=all) gets one vine green; named vineyards with no owner are
-// grey, unnamed parcels white.
+// Statewide (OWB): every vineyard with an owner on record gets one of these 15
+// palette slots, assigned by geographic graph-colouring in the data pipeline
+// (assign-vineyard-colors.py --scope all) so no two neighbouring vineyards
+// share a slot. The `color_index` property (0..14) carries the slot; -1 means
+// "no slot". Named vineyards with no owner are grey, unnamed parcels white.
+// Blues are in the palette because the highlight is a stripe pattern, not a
+// blue outline. The WVWA map has its own, member-only colouring (scope wvwa).
 // audit-ignore-start map-chrome-atmosphere
+export const VINEYARD_PALETTE = [
+  '#E58606', '#5D69B1', '#52BCA3', '#99C945', '#CC61B0',
+  '#24796C', '#DAA51B', '#2F8AC4', '#764E9F', '#ED645A',
+  '#CC3A8E', '#8B5E3C', '#7B2D43', '#1D3F8F', '#3FC1D0',
+];
+// Owned vineyard the colouring run hasn't reached yet (no 'all' row).
 export const VINEYARD_OWNED = '#7FAE4E';
 export const VINEYARD_GREY = '#ABABAB';   // named, no owner on record
 export const VINEYARD_WHITE = '#FFFFFF';  // unnamed — "help us name it" (plain white)
-// Outlines. Blue (the site-wide --color-interactive; MapLibre needs a literal)
-// marks the ONE owned vineyard being hovered or selected — none of the fills
-// above are blue, so it always reads. White traces the rest: all of a winery's
-// vineyards on its page, and hovered vineyards with no owner (not clickable).
-export const VINEYARD_HIGHLIGHT = '#2E9BFF';
+// Highlight: white diagonal stripes (with a thin dark edge so they read on
+// white vineyards too) plus a white outline mark the vineyard being hovered or
+// opened. White also traces all of a winery's vineyards on its page.
+export const VINEYARD_STRIPE = '#FFFFFF';
+export const VINEYARD_STRIPE_EDGE = 'rgba(20, 20, 20, 0.55)';
 export const VINEYARD_OUTLINE_WHITE = '#FFFFFF';
 // audit-ignore-end
 
 /**
  * MapLibre fill-color expression for the vineyard reference layer:
- *   owner on record (is_member with ?association=all) → vine green
- *   else, empty/absent name                            → white (unnamed)
- *   else                                               → grey (named, no owner)
+ *   color_index >= 0              → palette slot
+ *   else, empty/absent name       → white (unnamed)
+ *   else, owner on record         → vine green (awaiting a palette slot)
+ *   else                          → grey (named, no owner)
  */
 function buildVineyardFillColorExpression() {
+  const match = ['match', ['get', 'color_index']];
+  VINEYARD_PALETTE.forEach((hex, i) => { match.push(i, hex); });
+  match.push(VINEYARD_GREY); // out-of-range index falls back to grey
   return [
     'case',
-    ['boolean', ['get', 'is_member'], false], VINEYARD_OWNED,
+    ['>=', ['coalesce', ['get', 'color_index'], -1], 0], match,
     ['==', ['coalesce', ['get', 'vineyard_name'], ''], ''], VINEYARD_WHITE,
+    ['boolean', ['get', 'is_member'], false], VINEYARD_OWNED,
     VINEYARD_GREY,
   ];
 }
@@ -414,6 +428,17 @@ function applyListingFocusAccent(map, preset) {
 // Willamette Valley approximate bounding box
 // WV_BOUNDS is imported from '../config/flyTo'
 
+// One point per tasting room (migration 036) — a winery can pour in several
+// places, and every point carries the organization's id so selecting it
+// lights all of them. Organizations with no tasting room have no point.
+function listingRoomFeatures(listing, properties) {
+  return (listing.rooms || []).map((room) => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [room.lng, room.lat] },
+    properties: { ...properties, room: room.name || '' },
+  }));
+}
+
 // Build a GeoJSON FeatureCollection for the listings source, filtered to
 // winery records with optional vineyard polygon and AVA restrictions.
 function buildListingsGeoJSON(listings, listingFilterMode, vineyardRecidSet, insideIds = null) {
@@ -428,21 +453,13 @@ function buildListingsGeoJSON(listings, listingFilterMode, vineyardRecidSet, ins
       if (insideIds && !insideIds.includes(l.id)) return false;
       return true;
     })
-    .map(listing => ({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [listing.lng, listing.lat] },
-      properties: {
-        id:       listing.id,
-        num:      listing.num,
-        title:    listing.title,
-        desc:     listing.desc,
-        phone:    listing.phone,
-        url:      listing.url,
-        image_url: listing.image_url,
-        category: listing.category,
-        color:    LISTING_CATEGORIES[listing.category].color,
-        catLabel: LISTING_CATEGORIES[listing.category].label,
-      },
+    .flatMap(listing => listingRoomFeatures(listing, {
+      id:       listing.id,
+      num:      listing.num,
+      title:    listing.title,
+      category: listing.category,
+      color:    LISTING_CATEGORIES[listing.category].color,
+      catLabel: LISTING_CATEGORIES[listing.category].label,
     }));
   return { type: 'FeatureCollection', features };
 }
@@ -455,12 +472,14 @@ const LISTING_LAYER_ORDER = [
   'vineyards-reference-line',
   'vineyards-linked-fill',
   'vineyards-linked-line',
+  'vineyards-reference-hover-stripes',
   'vineyards-reference-hover-line',
   'vineyards-passive-hover-line',
   'vineyards-selected-fill',
   'vineyards-selected-line',
   'vineyards-hovered-fill',
   'vineyards-hovered-line',
+  'vineyards-focused-stripes',
   'vineyards-focused-line',
   'listings-clusters',
   'listings-cluster-count',
@@ -504,6 +523,7 @@ const DEV_LAYER_DEFAULTS = {
 };
 
 const VINEYARD_HATCH_PATTERN_ID = 'vineyard-diagonal-hatch';
+const VINEYARD_STRIPE_PATTERN_ID = 'vineyard-highlight-stripes';
 
 // ── World wine region callout data (shown on rotating globe entrance) ────────
 // offset: [x, y] in ems — diagonal values spread labels apart vertically.
@@ -558,6 +578,44 @@ function ensureVineyardHatchPattern(map) {
 
   const image = ctx.getImageData(0, 0, size, size);
   map.addImage(VINEYARD_HATCH_PATTERN_ID, image, { pixelRatio: 2 });
+}
+
+// Highlight pattern: bold white diagonal stripes, each with a thin dark edge.
+// The tile is drawn at 2x and wraps seamlessly (stripes cross the corners).
+function ensureVineyardStripePattern(map) {
+  if (map.hasImage(VINEYARD_STRIPE_PATTERN_ID)) return;
+
+  const size = 16;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, size, size);
+  const stripe = (width, color) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    for (const offset of [-size, 0, size]) {
+      ctx.moveTo(offset, size);
+      ctx.lineTo(offset + size, 0);
+    }
+    ctx.stroke();
+  };
+  stripe(6, VINEYARD_STRIPE_EDGE);
+  stripe(4, VINEYARD_STRIPE);
+
+  const image = ctx.getImageData(0, 0, size, size);
+  map.addImage(VINEYARD_STRIPE_PATTERN_ID, image, { pixelRatio: 2 });
+}
+
+function addStripeLayer(map, { id, source }) {
+  ensureVineyardStripePattern(map);
+  map.addLayer({
+    id, type: 'fill', source,
+    paint: { 'fill-pattern': VINEYARD_STRIPE_PATTERN_ID, 'fill-opacity': 0.9 },
+  });
 }
 
 /** Re-raise all listing (+ vineyard-selected) layers to the top of the map stack. */
@@ -838,12 +896,14 @@ function setVineyardVisualizationVisibility(map, isVisible) {
     'vineyards-reference-passive-line',
     'vineyards-linked-fill',
     'vineyards-linked-line',
+    'vineyards-reference-hover-stripes',
     'vineyards-reference-hover-line',
     'vineyards-passive-hover-line',
     'vineyards-selected-fill',
     'vineyards-selected-line',
     'vineyards-hovered-fill',
     'vineyards-hovered-line',
+    'vineyards-focused-stripes',
     'vineyards-focused-line',
   ];
   for (const layerId of vineyardLayerIds) {
@@ -1105,17 +1165,6 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
 
   return (
     <div>
-      {/* Hero image */}
-      {listing.image_url && (
-        <div style={{ height: 140, overflow: 'hidden', flexShrink: 0 }}>
-          <img
-            src={listing.image_url}
-            alt={listing.title}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-            onError={e => { e.currentTarget.parentElement.style.display = 'none'; }}
-          />
-        </div>
-      )}
       <div style={{ padding: '14px 16px 18px' }}>
         {/* Number + title */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
@@ -1130,24 +1179,6 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
             {listing.title}
           </div>
         </div>
-
-        {listing.desc && (
-          <p style={{ fontSize: 'var(--type-body-size)', color: UI.bodyText, lineHeight: 1.6, margin: '0 0 12px 0' }}>
-            {listing.desc.slice(0, 300)}{listing.desc.length > 300 ? '…' : ''}
-          </p>
-        )}
-
-        {listing.phone && (
-          <a href={`tel:${listing.phone}`} className="tx-link" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--type-body-size)', color: UI.phoneText, textDecoration: 'none', marginBottom: 10 }}>
-            📞 {listing.phone}
-          </a>
-        )}
-
-        {listing.url && (
-          <a href={listing.url} target="_blank" rel="noopener noreferrer" className="tx-box" style={{ display: 'block', padding: '7px 14px', border: '1px solid transparent', background: cat.color, color: UI.white, borderRadius: 8, fontSize: 'var(--type-body-size)', fontWeight: 600, textDecoration: 'none', textAlign: 'center', marginTop: 4 }}>
-            Visit Website ↗
-          </a>
-        )}
 
         {/* ── Vineyard parcels ─────────────────────────────────────── */}
         {vineyards && vineyards.length > 0 && (
@@ -1902,14 +1933,14 @@ const WVWAMap = forwardRef(function WVWAMap({
 
       // Eagerly populate the vineyard source so it is ready before moveend fires,
       // regardless of when React's useEffect runs.
-      const vineyardFeatures = VINEYARD_BY_RECID[listing.id] ?? [];
+      const vineyardFeatures = VINEYARD_BY_ORG[listing.id] ?? [];
       const vineyardsSrc = map.getSource('vineyards-selected');
       if (vineyardsSrc) {
         vineyardsSrc.setData({ type: 'FeatureCollection', features: vineyardFeatures });
         normalizeOverlayAndLabelOrder(map, basemapLabelLayerIdsRef.current);
       }
 
-      if (!flyToVineyardBounds(map, vineyardFeatures)) {
+      if (!flyToVineyardBounds(map, vineyardFeatures) && listing.lng != null) {
         flyToCoords(map, { lng: listing.lng, lat: listing.lat });
       }
       map.once('moveend', () => {
@@ -1956,7 +1987,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       const features = VINEYARD_ALL_BY_NAME[key] ?? [];
       // Linked = parcels with a winery association → green selected style
       // Unlinked = reference-only parcels → white passive-hover outline
-      const isLinked = features.some(f => f?.properties?.winery_recid != null);
+      const isLinked = features.some(f => f?.properties?.winery_id != null);
 
       if (isLinked) {
         const src = map.getSource('vineyards-selected');
@@ -2274,43 +2305,34 @@ const WVWAMap = forwardRef(function WVWAMap({
 
   // Fetch wineries from API on mount
   useEffect(() => {
-    fetch(`${API_BASE}/api/wineries?association=${ASSOCIATION}`, { headers: API_HEADERS })
+    // Every wine organization statewide, keyed by organization id, with its
+    // tasting rooms (one map point each). Growers with no tasting room have no
+    // point; their vineyards are how you reach them.
+    fetch(`${API_BASE}/api/wineries/organizations?association=${ASSOCIATION}`, { headers: API_HEADERS })
       .then(async (r) => {
-        const text = await r.text();
-        let parsed;
-        try {
-          parsed = text ? JSON.parse(text) : null;
-        } catch {
-          parsed = null;
+        if (!r.ok) throw new Error(`Organizations API request failed (${r.status})`);
+        const parsed = await r.json();
+        if (!Array.isArray(parsed?.organizations)) {
+          throw new Error('Organizations API returned an unexpected response shape');
         }
-
-        if (!r.ok) {
-          const serverMsg = parsed?.error || parsed?.message || text || `HTTP ${r.status}`;
-          throw new Error(`Wineries API request failed (${r.status}): ${serverMsg}`);
-        }
-
-        if (!parsed || !Array.isArray(parsed.features)) {
-          throw new Error('Wineries API returned an unexpected response shape');
-        }
-
-        return parsed;
+        return parsed.organizations;
       })
-      .then(fc => {
-        const loaded = fc.features
-          // Guard: only point listings with coordinates (non-member orgs have no location).
-          .filter(f => f?.geometry?.coordinates?.length === 2)
-          .map((f, i) => ({
-            id:        f.properties.recid,
-            num:       i + 1,
-            title:     f.properties.title,
-            desc:      f.properties.description || '',
-            phone:     f.properties.phone || '',
-            url:       f.properties.url || '',
-            image_url: f.properties.image_url || '',
-            lng:       f.geometry.coordinates[0],
-            lat:       f.geometry.coordinates[1],
-            category:  f.properties.category || 'winery',
-          }));
+      .then(orgs => {
+        const loaded = orgs.map((o, i) => {
+          const rooms = Array.isArray(o.tasting_rooms) ? o.tasting_rooms : [];
+          const primary = rooms[0] || null;
+          return {
+            id:       o.id,
+            num:      i + 1,
+            title:    o.title,
+            rooms,
+            lng:      primary ? primary.lng : null,
+            lat:      primary ? primary.lat : null,
+            // Statewide every organization is a wine organization (winery or
+            // grower); restaurants and lodging are left out server-side.
+            category: 'winery',
+          };
+        });
         setListings(loaded);
       })
       .catch(err => console.error('WVWAMap: failed to load wineries from API', err));
@@ -2345,11 +2367,7 @@ const WVWAMap = forwardRef(function WVWAMap({
     const presetColor = getListingSymbologyConfig(listingSymbologyPreset).markerFillColor;
     src.setData({
       type: 'FeatureCollection',
-      features: [{
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [hoveredListing.lng, hoveredListing.lat] },
-        properties: { color: presetColor, num: String(hoveredListing.num) },
-      }],
+      features: listingRoomFeatures(hoveredListing, { color: presetColor, num: String(hoveredListing.num) }),
     });
   }, [hoveredListing, mapLoaded, listingSymbologyPreset]);
 
@@ -2366,11 +2384,7 @@ const WVWAMap = forwardRef(function WVWAMap({
     const cat = LISTING_CATEGORIES[selectedListing.category];
     src.setData({
       type: 'FeatureCollection',
-      features: [{
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [selectedListing.lng, selectedListing.lat] },
-        properties: { color: cat.color, num: String(selectedListing.num) },
-      }],
+      features: listingRoomFeatures(selectedListing, { color: cat.color, num: String(selectedListing.num) }),
     });
   }, [selectedListing, mapLoaded]);
 
@@ -2388,7 +2402,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       return;
     }
 
-    const features = VINEYARD_BY_RECID[selectedListing.id] ?? [];
+    const features = VINEYARD_BY_ORG[selectedListing.id] ?? [];
     setSelectedVineyards(features);
     src.setData({ type: 'FeatureCollection', features });
 
@@ -2719,13 +2733,13 @@ const WVWAMap = forwardRef(function WVWAMap({
         const vineyardFeatures = (parcelLookupGeoJSON.features || [])
           .filter((f) => f?.properties?.is_member === true);
 
-        VINEYARD_BY_RECID = {};
+        VINEYARD_BY_ORG = {};
         VINEYARD_ALL_BY_NAME = {};
         for (const feature of parcelLookupGeoJSON.features || []) {
-          const recid = feature?.properties?.winery_recid;
-          if (recid != null) {
-            if (!VINEYARD_BY_RECID[recid]) VINEYARD_BY_RECID[recid] = [];
-            VINEYARD_BY_RECID[recid].push(feature);
+          const orgId = feature?.properties?.winery_id;
+          if (orgId != null) {
+            if (!VINEYARD_BY_ORG[orgId]) VINEYARD_BY_ORG[orgId] = [];
+            VINEYARD_BY_ORG[orgId].push(feature);
           }
           const vname = (feature?.properties?.vineyard_name || '').trim().toLowerCase();
           if (vname) {
@@ -2734,7 +2748,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           }
         }
         setVineyardRecidSet(new Map(
-          Object.entries(VINEYARD_BY_RECID)
+          Object.entries(VINEYARD_BY_ORG)
             .map(([id, features]) => {
               const numId = Number(id);
               if (!Number.isFinite(numId)) return null;
@@ -2749,12 +2763,12 @@ const WVWAMap = forwardRef(function WVWAMap({
             .filter(Boolean)
         ));
 
-        LINKED_VINEYARD_BY_RECID = {};
+        LINKED_VINEYARD_BY_ORG = {};
         for (const feature of vineyardFeatures) {
-          const recid = feature?.properties?.winery_recid;
-          if (recid != null) {
-            if (!LINKED_VINEYARD_BY_RECID[recid]) LINKED_VINEYARD_BY_RECID[recid] = [];
-            LINKED_VINEYARD_BY_RECID[recid].push(feature);
+          const orgId = feature?.properties?.winery_id;
+          if (orgId != null) {
+            if (!LINKED_VINEYARD_BY_ORG[orgId]) LINKED_VINEYARD_BY_ORG[orgId] = [];
+            LINKED_VINEYARD_BY_ORG[orgId].push(feature);
           }
         }
 
@@ -2908,7 +2922,8 @@ const WVWAMap = forwardRef(function WVWAMap({
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         });
-        addOutlineLayer(map, { id: 'vineyards-reference-hover-line', source: 'vineyards-reference-hover', color: VINEYARD_HIGHLIGHT, width: 2.8 });
+        addStripeLayer(map, { id: 'vineyards-reference-hover-stripes', source: 'vineyards-reference-hover' });
+        addOutlineLayer(map, { id: 'vineyards-reference-hover-line', source: 'vineyards-reference-hover', color: VINEYARD_OUTLINE_WHITE, width: 2.8 });
         map.addSource('vineyards-passive-hover', {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
@@ -2928,12 +2943,12 @@ const WVWAMap = forwardRef(function WVWAMap({
           }
           const hoveredFeature = e.features[0];
           const hoveredProps = hoveredFeature?.properties || {};
-          const wineryRecid = hoveredProps.winery_recid != null
-            ? Number(hoveredProps.winery_recid)
+          const wineryOrgId = hoveredProps.winery_id != null
+            ? Number(hoveredProps.winery_id)
             : null;
           const normalizedName = normalizeVineyardName(getVineyardNameFromProperties(hoveredProps));
-          const linkedListing = wineryRecid != null
-            ? (listingsRef.current.find((l) => l.id === wineryRecid) || null)
+          const linkedListing = wineryOrgId != null
+            ? (listingsRef.current.find((l) => l.id === wineryOrgId) || null)
             : null;
           // Always highlight all parcels in the same vineyard-name group
           const groupFeatures = normalizedName && VINEYARD_FEATURES_BY_NAME[normalizedName]
@@ -2968,11 +2983,11 @@ const WVWAMap = forwardRef(function WVWAMap({
           if (vineyardPopupRef.current) { vineyardPopupRef.current.remove(); vineyardPopupRef.current = null; }
           const clickedFeature = e.features[0];
           const clickedProps = clickedFeature?.properties || {};
-          const wineryRecid = clickedProps.winery_recid != null
-            ? Number(clickedProps.winery_recid)
+          const wineryOrgId = clickedProps.winery_id != null
+            ? Number(clickedProps.winery_id)
             : null;
-          if (wineryRecid == null) return;
-          const linkedListing = listingsRef.current.find((l) => l.id === wineryRecid) || null;
+          if (wineryOrgId == null) return;
+          const linkedListing = listingsRef.current.find((l) => l.id === wineryOrgId) || null;
           const vineyardName = getVineyardNameFromProperties(clickedProps) || null;
 
           // Touch: first tap only previews. Outline the vineyard and name it in
@@ -3131,24 +3146,17 @@ const WVWAMap = forwardRef(function WVWAMap({
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         });
-        map.addLayer({
-          id: 'vineyards-hovered-fill',
-          type: 'fill',
-          source: 'vineyards-hovered',
-          paint: {
-            'fill-color': VINEYARD_HIGHLIGHT,
-            'fill-opacity': 0.12,
-          },
-        });
-        addOutlineLayer(map, { id: 'vineyards-hovered-line', source: 'vineyards-hovered', color: VINEYARD_HIGHLIGHT, width: 3 });
+        addStripeLayer(map, { id: 'vineyards-hovered-fill', source: 'vineyards-hovered' });
+        addOutlineLayer(map, { id: 'vineyards-hovered-line', source: 'vineyards-hovered', color: VINEYARD_OUTLINE_WHITE, width: 3 });
 
         // The one vineyard opened on the winery page (expanded card or a map
-        // click) — stays blue after the pointer leaves its card.
+        // click) — stays striped after the pointer leaves its card.
         map.addSource('vineyards-focused', {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         });
-        addOutlineLayer(map, { id: 'vineyards-focused-line', source: 'vineyards-focused', color: VINEYARD_HIGHLIGHT, width: 3 });
+        addStripeLayer(map, { id: 'vineyards-focused-stripes', source: 'vineyards-focused' });
+        addOutlineLayer(map, { id: 'vineyards-focused-line', source: 'vineyards-focused', color: VINEYARD_OUTLINE_WHITE, width: 3 });
 
       } catch (e) {
         console.warn('WVWAMap: failed to load Adelsheim vineyard polygons', e);
@@ -3321,9 +3329,9 @@ const WVWAMap = forwardRef(function WVWAMap({
         const listing = listingsRef.current.find(l => l.id === props.id);
         if (!listing) return;
         setSelectedListingRef.current?.(listing);
-        const vineyardFeatures = VINEYARD_BY_RECID[listing.id] ?? [];
+        const vineyardFeatures = VINEYARD_BY_ORG[listing.id] ?? [];
         if (!flyToVineyardBounds(map, vineyardFeatures)) {
-          map.flyTo({ center: [listing.lng, listing.lat], zoom: 14, curve: 1.4, speed: 0.55, essential: true });
+          map.flyTo({ center: e.features[0].geometry.coordinates, zoom: 14, curve: 1.4, speed: 0.55, essential: true });
         }
       });
 
@@ -3415,9 +3423,9 @@ const WVWAMap = forwardRef(function WVWAMap({
         };
         const pointInPolygon = (lng, lat) => rings.some(ring => pointInRing(lng, lat, ring));
 
-        // Members whose TASTING ROOM point falls inside the AVA (client-side).
+        // Organizations with a TASTING ROOM inside the AVA (client-side).
         const pointIds = listingsRef.current
-          .filter(l => pointInPolygon(l.lng, l.lat))
+          .filter(l => (l.rooms || []).some(room => pointInPolygon(room.lng, room.lat)))
           .map(l => l.id);
 
         // Apply an insideIds set to both the map source and the panel state.
@@ -3438,8 +3446,8 @@ const WVWAMap = forwardRef(function WVWAMap({
           .then(data => {
             // Ignore a stale response if the selection changed while fetching.
             if (selectedAvaRef.current !== memberSlug) return;
-            const recids = Array.isArray(data?.recids) ? data.recids : [];
-            applyInsideIds(Array.from(new Set([...pointIds, ...recids])));
+            const ownerIds = Array.isArray(data?.ids) ? data.ids : [];
+            applyInsideIds(Array.from(new Set([...pointIds, ...ownerIds])));
           })
           .catch(err => {
             // Fall back to the point-inside set (current behavior) on error.
@@ -3577,8 +3585,8 @@ const WVWAMap = forwardRef(function WVWAMap({
     setSelectedListingBoth(listing);
     const map = mapRef.current;
     if (map) {
-      const vineyardFeatures = VINEYARD_BY_RECID[listing.id] ?? [];
-      if (!flyToVineyardBounds(map, vineyardFeatures)) {
+      const vineyardFeatures = VINEYARD_BY_ORG[listing.id] ?? [];
+      if (!flyToVineyardBounds(map, vineyardFeatures) && listing.lng != null) {
         flyToCoords(map, { lng: listing.lng, lat: listing.lat });
       }
     }
@@ -3587,7 +3595,7 @@ const WVWAMap = forwardRef(function WVWAMap({
   const handleHoverListing = useCallback((listing) => {
     setHoveredListing(listing); // null to clear
     setHoveredVineyardOrganization(null);
-    onVineyardHover(listing ? (VINEYARD_BY_RECID[listing.id] || []) : null);
+    onVineyardHover(listing ? (VINEYARD_BY_ORG[listing.id] || []) : null);
   }, [onVineyardHover]);
 
   // Keep setHoveredListingRef in sync so the map's [] closure can call it
@@ -3650,12 +3658,14 @@ const WVWAMap = forwardRef(function WVWAMap({
     applyVineyardEmphasis(map, { scope: vineyardScope, filtersActive });
 
     const vineyardHighlightLayerIds = [
+      'vineyards-reference-hover-stripes',
       'vineyards-reference-hover-line',
       'vineyards-passive-hover-line',
       'vineyards-selected-fill',
       'vineyards-selected-line',
       'vineyards-hovered-fill',
       'vineyards-hovered-line',
+      'vineyards-focused-stripes',
       'vineyards-focused-line',
     ];
     for (const layerId of vineyardHighlightLayerIds) {
@@ -3687,11 +3697,11 @@ const WVWAMap = forwardRef(function WVWAMap({
   const handleResetView = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (selectedListing?.lat != null && selectedListing?.lng != null) {
-      const vineyardFeatures = VINEYARD_BY_RECID[selectedListing.id] ?? [];
-      if (!flyToVineyardBounds(map, vineyardFeatures)) {
-        flyToCoords(map, { lng: selectedListing.lng, lat: selectedListing.lat });
-      }
+    const vineyardFeatures = selectedListing ? (VINEYARD_BY_ORG[selectedListing.id] ?? []) : [];
+    if (selectedListing && flyToVineyardBounds(map, vineyardFeatures)) {
+      // framed on the organization's vineyards
+    } else if (selectedListing?.lat != null && selectedListing?.lng != null) {
+      flyToCoords(map, { lng: selectedListing.lng, lat: selectedListing.lat });
     } else if (selectedAva) {
       flyToAva(map, selectedAva);
     } else {

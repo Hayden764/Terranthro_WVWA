@@ -167,7 +167,9 @@ export default function SearchBar({ mapRef, onSelectAva, inline = false, onOpenF
     }
 
     if (result.type === 'winery') {
-      mapRef.current?.selectListingById(result.id);
+      // Statewide listings are keyed by organization id (growers have no
+      // recid); result.id is a WVWA recid and would open the wrong listing.
+      if (result.org_id != null) mapRef.current?.selectListingById(result.org_id);
       return;
     }
 

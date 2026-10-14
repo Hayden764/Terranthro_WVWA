@@ -518,19 +518,25 @@ router.get('/:slug/members', async (req, res) => {
 
     const { rows } = await pool.query(
       `
-      SELECT DISTINCT w.recid
+      SELECT DISTINCT w.id, w.recid
       FROM avas a
       JOIN vineyards v ON v.geometry && a.geometry
                       AND ST_Contains(a.geometry, ST_PointOnSurface(v.geometry))
       JOIN wineries w ON w.id = v.winery_id
       WHERE a.slug = $1
         AND w.id IN ${membersOf('$2')}
-      ORDER BY w.recid
+      ORDER BY w.id
       `,
       [slug, association]
     );
 
-    res.json({ slug, recids: rows.map((r) => r.recid) });
+    // recids for the WVWA listing map; ids (organization ids) for the OWB
+    // map, whose growers have no recid.
+    res.json({
+      slug,
+      recids: rows.map((r) => r.recid).filter((r) => r != null),
+      ids: rows.map((r) => r.id),
+    });
   } catch (err) {
     console.error('GET /api/avas/:slug/members error:', err);
     res.status(500).json({ error: 'Internal server error' });

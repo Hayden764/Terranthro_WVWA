@@ -8,7 +8,7 @@ import { topoRangeLabel } from '../config/topoClasses';
 import { legendGroupsFor } from '../lib/legendGroups';
 import { describeLegendSelection } from '../lib/legendSelection';
 import { useVintagePlayback } from './climate/VintageYearControls';
-import { VINEYARD_OWNED, VINEYARD_GREY, VINEYARD_WHITE, VINEYARD_HIGHLIGHT, VINEYARD_OUTLINE_WHITE } from './WVWAMap';
+import { VINEYARD_PALETTE, VINEYARD_GREY, VINEYARD_WHITE, VINEYARD_STRIPE, VINEYARD_STRIPE_EDGE, VINEYARD_OUTLINE_WHITE } from './WVWAMap';
 import LegendFilter from './LegendFilter';
 
 /**
@@ -272,7 +272,7 @@ function VineyardLegend({ themeId, values, outline, scope }) {
   if (themeId === 'ownership') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <LegendRow swatch={<Swatch color={VINEYARD_OWNED} outline={outline} />}>Owner on record</LegendRow>
+        <LegendRow swatch={<span style={{ display: 'flex', gap: 1 }}>{VINEYARD_PALETTE.slice(0, 3).map((c) => <Swatch key={c} color={c} outline={outline} narrow />)}</span>}>Owner on record <span style={{ color: muted }}>· one colour each</span></LegendRow>
         <LegendRow swatch={<Swatch color={VINEYARD_GREY} outline={outline} />}>Named, owner unknown</LegendRow>
         <LegendRow swatch={<Swatch color={VINEYARD_WHITE} outline={outline} />}>Unnamed <span style={{ color: muted }}>· help us name it</span></LegendRow>
         <HighlightRows scope={scope} />
@@ -301,11 +301,11 @@ function VineyardLegend({ themeId, values, outline, scope }) {
   );
 }
 
-// The two line colours that mean "this one", whatever the fill theme
+// The marks that mean "this one", whatever the fill theme
 function HighlightRows({ scope }) {
   return (
     <>
-      <LegendRow swatch={<LineSwatch color={VINEYARD_HIGHLIGHT} />}>Hovered or open vineyard</LegendRow>
+      <LegendRow swatch={<StripeSwatch />}>Hovered or open vineyard</LegendRow>
       {scope === 'winery' && <LegendRow swatch={<LineSwatch color={VINEYARD_OUTLINE_WHITE} edge />}>This winery&rsquo;s vineyards</LegendRow>}
     </>
   );
@@ -313,7 +313,7 @@ function HighlightRows({ scope }) {
 
 function ThemeSwatches({ themeId, values, outline }) {
   let colors;
-  if (themeId === 'ownership') colors = [VINEYARD_OWNED, VINEYARD_GREY];
+  if (themeId === 'ownership') colors = [VINEYARD_PALETTE[0], VINEYARD_PALETTE[1], VINEYARD_GREY];
   else if (themeId === 'none') colors = [VINEYARD_THEMES.none.paint];
   else colors = vineyardThemeLegend(themeId, values).items.slice(0, 3).map((it) => it.color);
   return (
@@ -472,6 +472,17 @@ function Swatch({ color, outline, narrow = false }) {
       width: narrow ? 7 : 12, height: 12, borderRadius: narrow ? 2 : 3, flexShrink: 0, boxSizing: 'border-box',
       background: outline ? 'transparent' : color,
       border: outline ? `2px solid ${color}` : `1px solid ${alpha(TOKENS.ink, 0.12)}`,
+    }} />
+  );
+}
+
+// Diagonal white stripes with a dark edge — the map's highlight pattern
+function StripeSwatch() {
+  return (
+    <span style={{
+      width: 12, height: 12, flexShrink: 0, borderRadius: 3, boxSizing: 'border-box',
+      border: `2px solid ${VINEYARD_OUTLINE_WHITE}`, boxShadow: `0 0 0 1px ${alpha(TOKENS.ink, 0.25)}`,
+      background: `repeating-linear-gradient(-45deg, ${VINEYARD_STRIPE_EDGE} 0 1px, ${VINEYARD_STRIPE} 1px 3px, ${VINEYARD_STRIPE_EDGE} 3px 4px, transparent 4px 6px)`,
     }} />
   );
 }

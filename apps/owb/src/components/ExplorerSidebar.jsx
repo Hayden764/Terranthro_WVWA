@@ -17,6 +17,10 @@ import { terroirFactRows } from '../lib/terroirFacts';
 import ClimateVintages from './climate/ClimateVintages';
 import { useVintagePlayback } from './climate/VintageYearControls';
 import { apiJson } from '@terranthro/shared/lib/api.js';
+
+const API_KEY_HEADERS = import.meta.env.VITE_INTERNAL_API_KEY
+  ? { 'x-api-key': import.meta.env.VITE_INTERNAL_API_KEY }
+  : {};
 import { TERM_GROUPS, TERROIR_TERM_IDS, VINTAGE_TERM_IDS, AVA_TERM_IDS, CLIMATE_LAYER_TERM_IDS, TOPO_LAYER_TERM_IDS, EARTH_LAYER_TERM_IDS } from '../config/wineTerms';
 import TermHelp, { TermItem } from './TermHelp';
 
@@ -368,9 +372,9 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
     let cancelled = false;
     setSourcedFrom([]);
     if (!listing?.id) return;
-    fetch(`/api/public/wineries/${listing.id}/sourced-from`)
-      .then(r => r.ok ? r.json() : [])
-      .then(data => { if (!cancelled && Array.isArray(data)) setSourcedFrom(data); })
+    // listing.id is the organization id (statewide map) — growers have no recid.
+    apiJson(`/api/wineries/organizations/${listing.id}`, { headers: API_KEY_HEADERS })
+      .then(data => { if (!cancelled && Array.isArray(data?.sourced_from)) setSourcedFrom(data.sourced_from); })
       .catch(() => { /* ignore */ });
     return () => { cancelled = true; };
   }, [listing?.id]);
@@ -461,38 +465,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
         )}
       </div>
 
-      {/* Hero image */}
-      {listing.image_url && (
-        <div style={{ height: 120, overflow: 'hidden', flexShrink: 0 }}>
-          <img src={listing.image_url} alt={listing.title}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-            onError={e => { e.currentTarget.parentElement.style.display = 'none'; }}
-          />
-        </div>
-      )}
-
       <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-        {listing.desc && (
-          <p style={{ fontSize: 'var(--type-mono-size)', color: muted, lineHeight: 1.65, margin: 0 }}>
-            {listing.desc.slice(0, 280)}{listing.desc.length > 280 ? '…' : ''}
-          </p>
-        )}
-
-        {/* Contact / links */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {listing.phone && (
-            <a href={`tel:${listing.phone}`} className="tx-link" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--type-mono-size)', color: ink, textDecoration: 'none' }}>
-              <span>📞</span> {listing.phone}
-            </a>
-          )}
-          {listing.url && (
-            <a href={listing.url} target="_blank" rel="noopener noreferrer"
-              className="tx-box" style={{ display: 'block', padding: '8px 14px', background: crimson, color: parchment, border: '1px solid transparent', borderRadius: 8, fontSize: 'var(--type-mono-size)', fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>
-              Visit Website ↗
-            </a>
-          )}
-        </div>
 
         {/* Vineyards */}
         {vineyardGroups.length > 0 && (
@@ -1372,7 +1345,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
     if (!filterActive) return null;
     const map = new Map();
     for (const w of vineyardFilterResult.wineries) {
-      if (w.recid != null) map.set(w.recid, w);
+      if (w.id != null) map.set(w.id, w);  // listings are keyed by organization id
     }
     return map;
   }, [filterActive, vineyardFilterResult]);

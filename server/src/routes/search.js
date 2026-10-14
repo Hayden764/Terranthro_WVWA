@@ -42,13 +42,15 @@ router.get('/', async (req, res) => {
         `
         SELECT
           w.recid       AS id,
+          w.id          AS org_id,
           w.title       AS label,
           w.category    AS category,
           ST_X(w.location::geometry) AS lng,
           ST_Y(w.location::geometry) AS lat
         FROM wineries w
         WHERE w.id IN ${membersOf('$5')}
-          AND w.location IS NOT NULL
+          -- The statewide map lists every organization, located or not.
+          AND (w.location IS NOT NULL OR $5 = 'all')
           AND w.title ILIKE $1
         ORDER BY
           CASE WHEN LOWER(w.title) = LOWER($2) THEN 0
@@ -81,7 +83,7 @@ router.get('/', async (req, res) => {
       ),
     ]);
 
-    const wineries = wineryRows.rows.map((r) => {
+    const wineries = wineryRows.rows.flatMap((r) => {
       const category = classifyListingCategory({
         recid: r.id,
         title: r.label,
@@ -89,9 +91,13 @@ router.get('/', async (req, res) => {
         category: r.category,
       });
 
+      // The statewide map shows wineries and growers, not restaurants/lodging.
+      if (association === 'all' && (category === 'restaurant' || category === 'hotel')) return [];
+
       return ({
       type:     'winery',
       id:       r.id,
+      org_id:   r.org_id,
       label:    r.label,
       sublabel: category === 'winery' ? 'Winery' : category,
       category,

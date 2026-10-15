@@ -1834,7 +1834,11 @@ export default function ExplorerSidebar({
 
   const isOnHome = currentView === 'home';
   const wineryCount = listings.filter(l => l.category === 'winery').length;
-  const mappedCount = vineyardRecidSet ? vineyardRecidSet.size : 0;
+  // Wineries that own a vineyard polygon — only listed organizations count, so
+  // hotels/restaurants that own vineyards (AtTheJoy, The Ground) don't inflate it.
+  const mappedCount = vineyardRecidSet
+    ? listings.filter(l => l.category === 'winery' && vineyardRecidSet.has(l.id)).length
+    : 0;
   const viewTitle = currentView === 'ava-list' ? 'Nested AVAs'
     : currentView === 'winery-list' ? 'Wineries'
     : currentView === 'ava-detail' ? (detailAva?.name ?? '')

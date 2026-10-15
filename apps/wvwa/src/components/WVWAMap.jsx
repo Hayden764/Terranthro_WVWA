@@ -309,7 +309,12 @@ function isStyleReady(map) {
   return !!map?.style?._loaded;
 }
 
-function addListingsSourceAndBaseLayers(map, geojsonData, preset, isVisible) {
+// Tasting-room dots start hidden; the map key's "Tasting rooms" switch shows
+// them. Hidden by filter, not visibility, because several effects own the
+// marker layers' visibility (intro, filters, dev toggles).
+const TASTING_ROOMS_HIDDEN_FILTER = ['literal', false];
+
+function addListingsSourceAndBaseLayers(map, geojsonData, preset, isVisible, showTastingRooms = false) {
   if (!map || !isStyleReady(map)) return false;
   const config = getListingSymbologyConfig(preset);
   map.addSource('listings', {
@@ -321,6 +326,7 @@ function addListingsSourceAndBaseLayers(map, geojsonData, preset, isVisible) {
     id: 'listings-unclustered',
     type: 'circle',
     source: 'listings',
+    ...(showTastingRooms ? {} : { filter: TASTING_ROOMS_HIDDEN_FILTER }),
     layout: { visibility: isVisible ? 'visible' : 'none' },
     paint: {
       'circle-color': config.markerFillColor,
@@ -1661,6 +1667,7 @@ const WVWAMap = forwardRef(function WVWAMap({
   onListingFilterModeChange,
   vineyardTheme = 'ownership',
   vineyardOutline = false,
+  showTastingRooms = false,
   onVineyardThemeValuesChange,
   listingSymbologyPreset: listingSymbologyPresetProp,
   onListingSymbologyPresetChange,
@@ -1746,6 +1753,9 @@ const WVWAMap = forwardRef(function WVWAMap({
 
   const rotationAnimRef        = useRef(null);
   const listingsRef           = useRef([]);
+  // Read by the map's load handler, which closes over its first render
+  const showTastingRoomsRef = useRef(showTastingRooms);
+  showTastingRoomsRef.current = showTastingRooms;
   const missingParcelTopoStatsIdsRef = useRef(new Set());
   const selectedListingRef    = useRef(null);
   const setSelectedListingRef = useRef(null); // stable ref to the setter
@@ -3153,6 +3163,7 @@ const WVWAMap = forwardRef(function WVWAMap({
         buildListingsGeoJSON(listingsRef.current, listingFilterModeRef.current, vineyardRecidSetRef.current),
         DEFAULT_LISTING_SYMBOLOGY,
         false,
+        showTastingRoomsRef.current,
       );
 
       // ── Selected listing highlight layers ─────────────────────────
@@ -3464,7 +3475,7 @@ const WVWAMap = forwardRef(function WVWAMap({
 
       try {
         removeListingsBaseLayersAndSource(map);
-        const didAdd = addListingsSourceAndBaseLayers(map, data, listingSymbologyPreset, shouldShowWineries);
+        const didAdd = addListingsSourceAndBaseLayers(map, data, listingSymbologyPreset, shouldShowWineries, showTastingRooms);
         if (!didAdd) return;
         applyListingFocusAccent(map, listingSymbologyPreset);
         setListingSoftFocus(map, !!selectedListing);
@@ -3483,6 +3494,7 @@ const WVWAMap = forwardRef(function WVWAMap({
     };
   }, [
     listingSymbologyPreset,
+    showTastingRooms,
     mapLoaded,
     introComplete,
     markersVisible,

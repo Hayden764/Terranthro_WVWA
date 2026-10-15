@@ -66,6 +66,8 @@ export default function MapKey({
   onVineyardThemeChange,
   vineyardOutline = false,
   onVineyardOutlineChange,
+  showTastingRooms = false,
+  onShowTastingRoomsChange,
   vineyardThemeValues,
   vineyardScope = 'all',
   activeLayer,
@@ -196,6 +198,20 @@ export default function MapKey({
         <div style={{ marginTop: 10 }}>
           <VineyardLegend themeId={vineyardTheme} values={vineyardThemeValues} outline={vineyardOutline} scope={vineyardScope} />
         </div>
+      </Section>
+
+      {/* ── Tasting rooms ──────────────────────────────────────────── */}
+      <Section label="Tasting rooms">
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', minHeight: isMobile ? 36 : 24 }}>
+          <input
+            type="checkbox"
+            checked={showTastingRooms}
+            onChange={(e) => onShowTastingRoomsChange?.(e.target.checked)}
+            style={{ accentColor: interactive, width: 16, height: 16, margin: 0, cursor: 'pointer' }}
+          />
+          <span style={{ ...T.body, color: ink }}>Show tasting rooms</span>
+          <span style={T.small}>· where wineries pour</span>
+        </label>
       </Section>
 
       {/* ── Background layer ──────────────────────────────────────── */}

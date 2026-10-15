@@ -244,15 +244,6 @@ const LISTING_SYMBOLOGY_OPTIONS = [];
 // audit-ignore-start centralized-listing-symbology
 const LISTING_SYMBOLOGY_PALETTES = {
   [LISTING_SYMBOLOGY_PRESETS.estateMinimal]: {
-    clusterCircleColor: [
-      'step', ['get', 'point_count'],
-      'rgba(234, 236, 233, 0.82)', 10,
-      'rgba(218, 223, 217, 0.84)', 30,
-      'rgba(196, 204, 198, 0.88)',
-    ],
-    clusterStrokeColor: 'rgba(41, 49, 42, 0.52)',
-    clusterCountColor: '#1F2A22',
-    clusterCountHaloColor: 'rgba(255,255,255,0.72)',
     markerFillColor: '#304437',
     markerStrokeColor: 'rgba(255,255,255,0.82)',
     markerTextColor: '#F5EFE3',
@@ -260,15 +251,6 @@ const LISTING_SYMBOLOGY_PALETTES = {
     focusAccentColor: '#6FB78D',
   },
   [LISTING_SYMBOLOGY_PRESETS.topoModern]: {
-    clusterCircleColor: [
-      'step', ['get', 'point_count'],
-      'rgba(226, 238, 244, 0.82)', 10,
-      'rgba(204, 227, 236, 0.84)', 30,
-      'rgba(177, 210, 224, 0.88)',
-    ],
-    clusterStrokeColor: 'rgba(44, 72, 88, 0.46)',
-    clusterCountColor: '#203744',
-    clusterCountHaloColor: 'rgba(239,247,250,0.78)',
     markerFillColor: '#255A73',
     markerStrokeColor: 'rgba(235,246,252,0.86)',
     markerTextColor: '#EDF8FF',
@@ -276,15 +258,6 @@ const LISTING_SYMBOLOGY_PALETTES = {
     focusAccentColor: '#38BDF8',
   },
   [LISTING_SYMBOLOGY_PRESETS.heritagePremium]: {
-    clusterCircleColor: [
-      'step', ['get', 'point_count'],
-      'rgba(228, 213, 188, 0.82)', 10,
-      'rgba(214, 193, 161, 0.84)', 30,
-      'rgba(190, 163, 124, 0.88)',
-    ],
-    clusterStrokeColor: 'rgba(74, 52, 30, 0.55)',
-    clusterCountColor: '#3B2613',
-    clusterCountHaloColor: 'rgba(255,255,255,0.76)',
     markerFillColor: '#6A4C2D',
     markerStrokeColor: 'rgba(255,255,255,0.86)',
     markerTextColor: '#FFF6E8',
@@ -295,32 +268,17 @@ const LISTING_SYMBOLOGY_PALETTES = {
 
 const LISTING_SYMBOLOGY_CONFIG = {
   [LISTING_SYMBOLOGY_PRESETS.estateMinimal]: {
-    clusterMaxZoom: 11,
-    clusterRadius: 34,
-    clusterMinPoints: 3,
     ...LISTING_SYMBOLOGY_PALETTES[LISTING_SYMBOLOGY_PRESETS.estateMinimal],
-    clusterCircleRadius: ['step', ['get', 'point_count'], 14, 10, 19, 30, 24],
-    clusterStrokeWidth: 1.3,
     markerRadius: ['interpolate', ['linear'], ['zoom'], 10, 5.8, 14, 8.4],
     markerStrokeWidth: 1.6,
   },
   [LISTING_SYMBOLOGY_PRESETS.topoModern]: {
-    clusterMaxZoom: 12,
-    clusterRadius: 31,
-    clusterMinPoints: 3,
     ...LISTING_SYMBOLOGY_PALETTES[LISTING_SYMBOLOGY_PRESETS.topoModern],
-    clusterCircleRadius: ['step', ['get', 'point_count'], 13, 10, 18, 30, 23],
-    clusterStrokeWidth: 1.4,
     markerRadius: ['interpolate', ['linear'], ['zoom'], 10, 5.7, 14, 8.2],
     markerStrokeWidth: 1.6,
   },
   [LISTING_SYMBOLOGY_PRESETS.heritagePremium]: {
-    clusterMaxZoom: 12,
-    clusterRadius: 37,
-    clusterMinPoints: 2,
     ...LISTING_SYMBOLOGY_PALETTES[LISTING_SYMBOLOGY_PRESETS.heritagePremium],
-    clusterCircleRadius: ['step', ['get', 'point_count'], 15, 10, 20, 30, 25],
-    clusterStrokeWidth: 1.45,
     markerRadius: ['interpolate', ['linear'], ['zoom'], 10, 6.2, 14, 8.9],
     markerStrokeWidth: 1.7,
   },
@@ -329,8 +287,6 @@ const LISTING_SYMBOLOGY_CONFIG = {
 
 const DEFAULT_LISTING_SYMBOLOGY = LISTING_SYMBOLOGY_PRESETS.topoModern;
 const LISTING_BASE_LAYER_IDS = [
-  'listings-clusters',
-  'listings-cluster-count',
   'listings-unclustered',
 ];
 
@@ -359,56 +315,19 @@ function addListingsSourceAndBaseLayers(map, geojsonData, preset, isVisible) {
   map.addSource('listings', {
     type: 'geojson',
     data: geojsonData,
-    cluster: true,
-    clusterMaxZoom: config.clusterMaxZoom,
-    clusterRadius: config.clusterRadius,
-    clusterMinPoints: config.clusterMinPoints,
-  });
-
-  map.addLayer({
-    id: 'listings-clusters',
-    type: 'circle',
-    source: 'listings',
-    filter: ['has', 'point_count'],
-    layout: { visibility: isVisible ? 'visible' : 'none' },
-    paint: {
-      'circle-color': config.clusterCircleColor,
-      'circle-radius': config.clusterCircleRadius,
-      'circle-stroke-width': config.clusterStrokeWidth,
-      'circle-stroke-color': config.clusterStrokeColor,
-      'circle-opacity': 1,
-    },
-  });
-
-  map.addLayer({
-    id: 'listings-cluster-count',
-    type: 'symbol',
-    source: 'listings',
-    filter: ['has', 'point_count'],
-    layout: {
-      visibility: isVisible ? 'visible' : 'none',
-      'text-field': '{point_count_abbreviated}',
-      'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
-      'text-size': 11,
-    },
-    paint: {
-      'text-color': config.clusterCountColor,
-      'text-halo-color': config.clusterCountHaloColor,
-      'text-halo-width': 0.45,
-    },
   });
 
   map.addLayer({
     id: 'listings-unclustered',
     type: 'circle',
     source: 'listings',
-    filter: ['!', ['has', 'point_count']],
     layout: { visibility: isVisible ? 'visible' : 'none' },
     paint: {
       'circle-color': config.markerFillColor,
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3.5, 14, 5.5],
       'circle-stroke-width': 1.5,
-      'circle-stroke-color': UI.white,
+      // MapLibre needs a literal colour, not a CSS var() token
+      'circle-stroke-color': config.markerStrokeColor,
       'circle-opacity': 0.2,
       'circle-stroke-opacity': 0.85,
     },
@@ -488,8 +407,6 @@ const LISTING_LAYER_ORDER = [
   'vineyards-hovered-fill',
   'vineyards-hovered-line',
   'vineyards-focused-line',
-  'listings-clusters',
-  'listings-cluster-count',
   'listings-unclustered',
   'listings-hovered-glow',
   'listings-hovered-dot',
@@ -498,16 +415,12 @@ const LISTING_LAYER_ORDER = [
 ];
 
 const LISTING_LAYERS_HIDDEN_IN_VINEYARD_FOCUS = [
-  'listings-clusters',
-  'listings-cluster-count',
   'listings-unclustered',
   'listings-hovered-glow',
   'listings-hovered-dot',
 ];
 
 const LISTING_MARKER_LAYERS = [
-  'listings-clusters',
-  'listings-cluster-count',
   'listings-unclustered',
   'listings-hovered-glow',
   'listings-hovered-dot',
@@ -657,8 +570,6 @@ function setListingVisualizationVisibility(map, isVisible) {
 }
 
 function setListingSoftFocus(map, isSoftFocused) {
-  const clusterOpacity = isSoftFocused ? 0.3 : 1;
-  const clusterCountOpacity = isSoftFocused ? 0.35 : 1;
   const unclusteredOpacity = isSoftFocused ? 0.24 : 0.92;
   const unclusteredStrokeOpacity = isSoftFocused ? 0.3 : 0.55;
   const unclusteredNumOpacity = isSoftFocused ? 0.32 : 1;
@@ -670,12 +581,6 @@ function setListingSoftFocus(map, isSoftFocused) {
   const hoveredDotRadius = ['interpolate', ['linear'], ['zoom'], 9, 4, 14, 6];
   const hoveredDotStrokeWidth = 1;
 
-  if (map.getLayer('listings-clusters')) {
-    map.setPaintProperty('listings-clusters', 'circle-opacity', clusterOpacity);
-  }
-  if (map.getLayer('listings-cluster-count')) {
-    map.setPaintProperty('listings-cluster-count', 'text-opacity', clusterCountOpacity);
-  }
   if (map.getLayer('listings-unclustered')) {
     map.setPaintProperty('listings-unclustered', 'circle-opacity', unclusteredOpacity);
     map.setPaintProperty('listings-unclustered', 'circle-stroke-opacity', unclusteredStrokeOpacity);
@@ -698,19 +603,19 @@ function setListingSoftFocus(map, isSoftFocused) {
   }
 }
 
-// ── Vineyard glow ─────────────────────────────────────────────────────────
-// At the valley-wide opening zoom a vineyard is smaller than a pixel, so the
-// fills alone are invisible. An amber heatmap of vineyard centroids sits under
-// the fills for the overview (z7–11) and fades out as the fills take over.
-// `k` scales it so soft focus / filters can hush the glow.
-const vineyardGlowHeatOpacity = (k = 1) => [
+// ── Vineyard overview stroke ──────────────────────────────────────────────
+// At the valley-wide opening zoom a block is about a pixel across, so its fill
+// alone is too faint to see. A stroke in the fill colour thickens every block
+// into a readable speck (the tile route pads sub-pixel blocks to a pixel) and
+// fades out as the fills take over. `k` lets soft focus / filters hush it.
+const vineyardOverviewLineOpacity = (k = 1) => [
   'interpolate', ['linear'], ['zoom'],
-  7, 0.9 * k, 9.5, 0.8 * k, 11, 0.25 * k, 11.8, 0,
+  5, 0.95 * k, 9.5, 0.9 * k, 11, 0.4 * k, 11.8, 0,
 ];
 
-function setVineyardGlowStrength(map, k) {
-  if (map.getLayer('vineyards-glow-heat')) {
-    map.setPaintProperty('vineyards-glow-heat', 'heatmap-opacity', vineyardGlowHeatOpacity(k));
+function setVineyardOverviewStrength(map, k) {
+  if (map.getLayer('vineyards-overview-line')) {
+    map.setPaintProperty('vineyards-overview-line', 'line-opacity', vineyardOverviewLineOpacity(k));
   }
 }
 
@@ -731,8 +636,8 @@ function setVineyardOutlineOpacity(map, opacity) {
 }
 
 function setVineyardReferenceSoftFocus(map, isSoftFocused) {
-  // A selected winery is its own highlight; the valley-wide glow would compete.
-  setVineyardGlowStrength(map, isSoftFocused ? 0.12 : 1);
+  // A selected winery is its own highlight; the valley-wide specks would compete.
+  setVineyardOverviewStrength(map, isSoftFocused ? 0.12 : 1);
   // Identity-color fill: keep the palette clearly visible when bright. With one
   // winery selected the neighbours drop to a whisper — still readable as "there
   // is a vineyard here", but with no hue left to compete with the selection.
@@ -821,7 +726,7 @@ function runWhenStyleReady(map, fn) {
  * first so this can layer cleanly on top of either visual state.
  */
 function applyVineyardFilterDim(map) {
-  setVineyardGlowStrength(map, 0.2);
+  setVineyardOverviewStrength(map, 0.2);
   setReferenceFillOpacity(map, 0.12);
   setVineyardOutlineOpacity(map, 0.25);
   if (map.getLayer('vineyards-reference-line'))          map.setPaintProperty('vineyards-reference-line', 'line-opacity', 0.18);
@@ -853,14 +758,10 @@ function applyVineyardEmphasis(map, { scope, filtersActive }) {
   }
 }
 
-// `glowVisible` defaults to `isVisible`; the glow also hides under a data layer
-// (soils, climate, topography), where its amber haze reads as data.
-function setVineyardVisualizationVisibility(map, isVisible, glowVisible = isVisible) {
+function setVineyardVisualizationVisibility(map, isVisible) {
   const visibility = isVisible ? 'visible' : 'none';
-  if (map.getLayer('vineyards-glow-heat')) {
-    map.setLayoutProperty('vineyards-glow-heat', 'visibility', glowVisible ? 'visible' : 'none');
-  }
   const vineyardLayerIds = [
+    'vineyards-overview-line',
     'vineyards-reference-fill',
     'vineyards-reference-line',
     'vineyards-reference-passive-fill',
@@ -2231,17 +2132,6 @@ const WVWAMap = forwardRef(function WVWAMap({
     if (!selectedListing) setVineyardFocusMode(false);
   }, [selectedListing]);
 
-  // Vineyard glow hides under any data layer (soils, climate, topography) —
-  // its amber haze reads as data there. Own effect, without the
-  // isStyleLoaded() guard below: switching a layer on starts a tile load, so
-  // that guard would skip exactly the update this needs.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapLoaded || !map.getLayer('vineyards-glow-heat')) return;
-    const vineyardsVisible = listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized;
-    map.setLayoutProperty('vineyards-glow-heat', 'visibility', vineyardsVisible && !activeLayer ? 'visible' : 'none');
-  }, [mapLoaded, activeLayer, listingFilterMode]);
-
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
@@ -2254,7 +2144,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       markersVisible && listingFilterMode !== LISTING_FILTER_MODES.noWineriesVisualized,
     );
     const vineyardsVisible = listingFilterMode !== LISTING_FILTER_MODES.noVineyardsVisualized;
-    setVineyardVisualizationVisibility(map, vineyardsVisible, vineyardsVisible && !activeLayer);
+    setVineyardVisualizationVisibility(map, vineyardsVisible);
     // Vineyard/listing soft-focus is owned by the vineyardScope authority effect below.
   }, [selectedListing, mapLoaded, introComplete, markersVisible, listingFilterMode, activeLayer]);
 
@@ -2304,7 +2194,7 @@ const WVWAMap = forwardRef(function WVWAMap({
   // Keep listingsRef in sync so map event handler closures can access current listings
   useEffect(() => {
     listingsRef.current = listings;
-    // If the map and listings source are ready, refresh the cluster source
+    // If the map and listings source are ready, refresh the listings source
     const map = mapRef.current;
     if (map && mapLoaded && map.getSource('listings')) {
       map.getSource('listings').setData(
@@ -2484,8 +2374,10 @@ const WVWAMap = forwardRef(function WVWAMap({
         try { map.setPaintProperty(id, 'fill-color', expression); } catch { /* style reloading */ }
       }
     }
-    if (map.getLayer('vineyards-outline-line')) {
-      try { map.setPaintProperty('vineyards-outline-line', 'line-color', expression); } catch { /* style reloading */ }
+    for (const id of ['vineyards-outline-line', 'vineyards-overview-line']) {
+      if (map.getLayer(id)) {
+        try { map.setPaintProperty(id, 'line-color', expression); } catch { /* style reloading */ }
+      }
     }
 
     // In a data theme the fills can match the raster underneath (elevation uses
@@ -2816,7 +2708,8 @@ const WVWAMap = forwardRef(function WVWAMap({
         map.addSource('vineyards-reference', {
           type: 'vector',
           tiles: [VINEYARD_TILES_URL],
-          minzoom: 8,
+          // From the valley-wide opening view: vineyards show at every zoom
+          minzoom: 5,
           maxzoom: 14,
           // No promoteId: ST_AsMVT already stamps each feature's id with
           // vineyard_id (its feature_id_name), so every block of a vineyard
@@ -2825,46 +2718,25 @@ const WVWAMap = forwardRef(function WVWAMap({
           // `vineyard_id` property and blank out the id instead.
         });
 
-        // Vineyard glow (see vineyardGlowHeatOpacity): heatmap of vineyard
-        // centroids for the overview.
-        // Centroids load in the background; the heatmap fills in when ready.
-        map.addSource('vineyards-glow', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: [] },
-        });
-        fetch(`${API_BASE}/api/vineyards/centroids`, { headers: API_HEADERS })
-          .then((r) => (r.ok ? r.json() : null))
-          .then((fc) => { if (fc) map.getSource('vineyards-glow')?.setData(fc); })
-          .catch((err) => console.warn('Vineyard glow centroids failed to load:', err));
-        map.addLayer({
-          id: 'vineyards-glow-heat',
-          type: 'heatmap',
-          source: 'vineyards-glow',
-          maxzoom: 12,
-          paint: {
-            // Median vineyard is ~7 ac; big estates glow brighter, but a small
-            // one still registers on its own.
-            'heatmap-weight': ['interpolate', ['linear'], ['get', 'acres'], 0, 0.3, 10, 0.55, 40, 1],
-            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 7, 0.6, 11, 1.4],
-            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 7, 9, 9, 16, 11, 28],
-            'heatmap-color': [
-              'interpolate', ['linear'], ['heatmap-density'],
-              0, 'rgba(255,190,100,0)',
-              0.1, 'rgba(255,170,80,0.3)',
-              0.35, 'rgba(255,170,75,0.6)',
-              0.7, 'rgba(255,196,115,0.82)',
-              1, 'rgba(255,224,170,0.92)',
-            ],
-            'heatmap-opacity': vineyardGlowHeatOpacity(),
-          },
-        });
-
         map.addLayer({
           id: 'vineyards-reference-fill',
           type: 'fill',
           source: 'vineyards-reference',
           'source-layer': 'vineyard_blocks',
           paint: { 'fill-color': buildVineyardFillColorExpression(), 'fill-opacity': 0.82 },
+        });
+        // Overview stroke (see vineyardOverviewLineOpacity)
+        map.addLayer({
+          id: 'vineyards-overview-line',
+          type: 'line',
+          source: 'vineyards-reference',
+          'source-layer': 'vineyard_blocks',
+          maxzoom: 12,
+          paint: {
+            'line-color': buildVineyardFillColorExpression(),
+            'line-width': ['interpolate', ['linear'], ['zoom'], 5, 2.6, 8, 2.2, 10, 1.4, 11, 0.8],
+            'line-opacity': vineyardOverviewLineOpacity(),
+          },
         });
         // Outline-only mode (see setReferenceFillOpacity): borders in the fill colour
         map.addLayer({
@@ -3275,7 +3147,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       });
       // audit-ignore-end
 
-      // ── GeoJSON source for clustered markers ─────────────────────────
+      // ── GeoJSON source for listing markers ───────────────────────────
       addListingsSourceAndBaseLayers(
         map,
         buildListingsGeoJSON(listingsRef.current, listingFilterModeRef.current, vineyardRecidSetRef.current),
@@ -3284,7 +3156,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       );
 
       // ── Selected listing highlight layers ─────────────────────────
-      // A separate single-feature source so we never re-filter the cluster source.
+      // A separate source so we never re-filter the listings source.
       map.addSource('selected-listing', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
@@ -3362,18 +3234,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       // all sources/layers have been added.
       normalizeOverlayAndLabelOrder(map, basemapLabelLayerIdsRef.current);
 
-      // ── Cluster click → zoom in ───────────────────────────────────
-      map.on('click', 'listings-clusters', (e) => {
-        const features = map.queryRenderedFeatures(e.point, { layers: ['listings-clusters'] });
-        if (!features.length) return;
-        const clusterId = features[0].properties.cluster_id;
-        map.getSource('listings').getClusterExpansionZoom(clusterId, (err, zoom) => {
-          if (err) return;
-          map.flyTo({ center: features[0].geometry.coordinates, zoom, curve: 1.4, speed: 0.55, essential: true });
-        });
-      });
-
-      // ── Unclustered dot click → right-side detail panel ──────────
+      // ── Dot click → right-side detail panel ──────────
       map.on('click', 'listings-unclustered', (e) => {
         if (!e.features?.length) return;
         const props = e.features[0].properties;
@@ -3387,8 +3248,6 @@ const WVWAMap = forwardRef(function WVWAMap({
       });
 
       // Cursor changes + map-dot hover highlight
-      map.on('mouseenter', 'listings-clusters',    () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', 'listings-clusters',    () => { map.getCanvas().style.cursor = ''; });
       map.on('mouseenter', 'listings-unclustered', (e) => {
         map.getCanvas().style.cursor = 'pointer';
         if (!e.features?.length) return;
@@ -3568,7 +3427,7 @@ const WVWAMap = forwardRef(function WVWAMap({
 
   // ── Re-feed the GeoJSON source whenever listing filter or AVA changes ────
   // Updating source data (not just layer filters) is the only way to make
-  // the cluster engine re-cluster with the correct subset of points.
+  // the map redraw the correct subset of points.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;

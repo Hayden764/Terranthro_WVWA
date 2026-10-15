@@ -246,15 +246,6 @@ const LISTING_SYMBOLOGY_OPTIONS = [];
 // audit-ignore-start centralized-listing-symbology
 const LISTING_SYMBOLOGY_PALETTES = {
   [LISTING_SYMBOLOGY_PRESETS.estateMinimal]: {
-    clusterCircleColor: [
-      'step', ['get', 'point_count'],
-      'rgba(234, 236, 233, 0.82)', 10,
-      'rgba(218, 223, 217, 0.84)', 30,
-      'rgba(196, 204, 198, 0.88)',
-    ],
-    clusterStrokeColor: 'rgba(41, 49, 42, 0.52)',
-    clusterCountColor: '#1F2A22',
-    clusterCountHaloColor: 'rgba(255,255,255,0.72)',
     markerFillColor: '#304437',
     markerStrokeColor: 'rgba(255,255,255,0.82)',
     markerTextColor: '#F5EFE3',
@@ -262,15 +253,6 @@ const LISTING_SYMBOLOGY_PALETTES = {
     focusAccentColor: '#6FB78D',
   },
   [LISTING_SYMBOLOGY_PRESETS.topoModern]: {
-    clusterCircleColor: [
-      'step', ['get', 'point_count'],
-      'rgba(226, 238, 244, 0.82)', 10,
-      'rgba(204, 227, 236, 0.84)', 30,
-      'rgba(177, 210, 224, 0.88)',
-    ],
-    clusterStrokeColor: 'rgba(44, 72, 88, 0.46)',
-    clusterCountColor: '#203744',
-    clusterCountHaloColor: 'rgba(239,247,250,0.78)',
     markerFillColor: '#255A73',
     markerStrokeColor: 'rgba(235,246,252,0.86)',
     markerTextColor: '#EDF8FF',
@@ -278,15 +260,6 @@ const LISTING_SYMBOLOGY_PALETTES = {
     focusAccentColor: '#38BDF8',
   },
   [LISTING_SYMBOLOGY_PRESETS.heritagePremium]: {
-    clusterCircleColor: [
-      'step', ['get', 'point_count'],
-      'rgba(228, 213, 188, 0.82)', 10,
-      'rgba(214, 193, 161, 0.84)', 30,
-      'rgba(190, 163, 124, 0.88)',
-    ],
-    clusterStrokeColor: 'rgba(74, 52, 30, 0.55)',
-    clusterCountColor: '#3B2613',
-    clusterCountHaloColor: 'rgba(255,255,255,0.76)',
     markerFillColor: '#6A4C2D',
     markerStrokeColor: 'rgba(255,255,255,0.86)',
     markerTextColor: '#FFF6E8',
@@ -297,32 +270,17 @@ const LISTING_SYMBOLOGY_PALETTES = {
 
 const LISTING_SYMBOLOGY_CONFIG = {
   [LISTING_SYMBOLOGY_PRESETS.estateMinimal]: {
-    clusterMaxZoom: 11,
-    clusterRadius: 34,
-    clusterMinPoints: 3,
     ...LISTING_SYMBOLOGY_PALETTES[LISTING_SYMBOLOGY_PRESETS.estateMinimal],
-    clusterCircleRadius: ['step', ['get', 'point_count'], 14, 10, 19, 30, 24],
-    clusterStrokeWidth: 1.3,
     markerRadius: ['interpolate', ['linear'], ['zoom'], 10, 5.8, 14, 8.4],
     markerStrokeWidth: 1.6,
   },
   [LISTING_SYMBOLOGY_PRESETS.topoModern]: {
-    clusterMaxZoom: 12,
-    clusterRadius: 31,
-    clusterMinPoints: 3,
     ...LISTING_SYMBOLOGY_PALETTES[LISTING_SYMBOLOGY_PRESETS.topoModern],
-    clusterCircleRadius: ['step', ['get', 'point_count'], 13, 10, 18, 30, 23],
-    clusterStrokeWidth: 1.4,
     markerRadius: ['interpolate', ['linear'], ['zoom'], 10, 5.7, 14, 8.2],
     markerStrokeWidth: 1.6,
   },
   [LISTING_SYMBOLOGY_PRESETS.heritagePremium]: {
-    clusterMaxZoom: 12,
-    clusterRadius: 37,
-    clusterMinPoints: 2,
     ...LISTING_SYMBOLOGY_PALETTES[LISTING_SYMBOLOGY_PRESETS.heritagePremium],
-    clusterCircleRadius: ['step', ['get', 'point_count'], 15, 10, 20, 30, 25],
-    clusterStrokeWidth: 1.45,
     markerRadius: ['interpolate', ['linear'], ['zoom'], 10, 6.2, 14, 8.9],
     markerStrokeWidth: 1.7,
   },
@@ -331,8 +289,6 @@ const LISTING_SYMBOLOGY_CONFIG = {
 
 const DEFAULT_LISTING_SYMBOLOGY = LISTING_SYMBOLOGY_PRESETS.topoModern;
 const LISTING_BASE_LAYER_IDS = [
-  'listings-clusters',
-  'listings-cluster-count',
   'listings-unclustered',
 ];
 
@@ -361,56 +317,19 @@ function addListingsSourceAndBaseLayers(map, geojsonData, preset, isVisible) {
   map.addSource('listings', {
     type: 'geojson',
     data: geojsonData,
-    cluster: true,
-    clusterMaxZoom: config.clusterMaxZoom,
-    clusterRadius: config.clusterRadius,
-    clusterMinPoints: config.clusterMinPoints,
-  });
-
-  map.addLayer({
-    id: 'listings-clusters',
-    type: 'circle',
-    source: 'listings',
-    filter: ['has', 'point_count'],
-    layout: { visibility: isVisible ? 'visible' : 'none' },
-    paint: {
-      'circle-color': config.clusterCircleColor,
-      'circle-radius': config.clusterCircleRadius,
-      'circle-stroke-width': config.clusterStrokeWidth,
-      'circle-stroke-color': config.clusterStrokeColor,
-      'circle-opacity': 1,
-    },
-  });
-
-  map.addLayer({
-    id: 'listings-cluster-count',
-    type: 'symbol',
-    source: 'listings',
-    filter: ['has', 'point_count'],
-    layout: {
-      visibility: isVisible ? 'visible' : 'none',
-      'text-field': '{point_count_abbreviated}',
-      'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
-      'text-size': 11,
-    },
-    paint: {
-      'text-color': config.clusterCountColor,
-      'text-halo-color': config.clusterCountHaloColor,
-      'text-halo-width': 0.45,
-    },
   });
 
   map.addLayer({
     id: 'listings-unclustered',
     type: 'circle',
     source: 'listings',
-    filter: ['!', ['has', 'point_count']],
     layout: { visibility: isVisible ? 'visible' : 'none' },
     paint: {
       'circle-color': config.markerFillColor,
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3.5, 14, 5.5],
       'circle-stroke-width': 1.5,
-      'circle-stroke-color': UI.white,
+      // MapLibre needs a literal colour, not a CSS var() token
+      'circle-stroke-color': config.markerStrokeColor,
       'circle-opacity': 0.2,
       'circle-stroke-opacity': 0.85,
     },
@@ -488,8 +407,6 @@ const LISTING_LAYER_ORDER = [
   'vineyards-hovered-line',
   'vineyards-focused-stripes',
   'vineyards-focused-line',
-  'listings-clusters',
-  'listings-cluster-count',
   'listings-unclustered',
   'listings-hovered-glow',
   'listings-hovered-dot',
@@ -498,16 +415,12 @@ const LISTING_LAYER_ORDER = [
 ];
 
 const LISTING_LAYERS_HIDDEN_IN_VINEYARD_FOCUS = [
-  'listings-clusters',
-  'listings-cluster-count',
   'listings-unclustered',
   'listings-hovered-glow',
   'listings-hovered-dot',
 ];
 
 const LISTING_MARKER_LAYERS = [
-  'listings-clusters',
-  'listings-cluster-count',
   'listings-unclustered',
   'listings-hovered-glow',
   'listings-hovered-dot',
@@ -696,8 +609,6 @@ function setListingVisualizationVisibility(map, isVisible) {
 }
 
 function setListingSoftFocus(map, isSoftFocused) {
-  const clusterOpacity = isSoftFocused ? 0.3 : 1;
-  const clusterCountOpacity = isSoftFocused ? 0.35 : 1;
   const unclusteredOpacity = isSoftFocused ? 0.24 : 0.92;
   const unclusteredStrokeOpacity = isSoftFocused ? 0.3 : 0.55;
   const unclusteredNumOpacity = isSoftFocused ? 0.32 : 1;
@@ -709,12 +620,6 @@ function setListingSoftFocus(map, isSoftFocused) {
   const hoveredDotRadius = ['interpolate', ['linear'], ['zoom'], 9, 4, 14, 6];
   const hoveredDotStrokeWidth = 1;
 
-  if (map.getLayer('listings-clusters')) {
-    map.setPaintProperty('listings-clusters', 'circle-opacity', clusterOpacity);
-  }
-  if (map.getLayer('listings-cluster-count')) {
-    map.setPaintProperty('listings-cluster-count', 'text-opacity', clusterCountOpacity);
-  }
   if (map.getLayer('listings-unclustered')) {
     map.setPaintProperty('listings-unclustered', 'circle-opacity', unclusteredOpacity);
     map.setPaintProperty('listings-unclustered', 'circle-stroke-opacity', unclusteredStrokeOpacity);
@@ -2301,7 +2206,7 @@ const WVWAMap = forwardRef(function WVWAMap({
   // Keep listingsRef in sync so map event handler closures can access current listings
   useEffect(() => {
     listingsRef.current = listings;
-    // If the map and listings source are ready, refresh the cluster source
+    // If the map and listings source are ready, refresh the listings source
     const map = mapRef.current;
     if (map && mapLoaded && map.getSource('listings')) {
       map.getSource('listings').setData(
@@ -3231,7 +3136,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       });
       // audit-ignore-end
 
-      // ── GeoJSON source for clustered markers ─────────────────────────
+      // ── GeoJSON source for listing markers ───────────────────────────
       addListingsSourceAndBaseLayers(
         map,
         buildListingsGeoJSON(listingsRef.current, listingFilterModeRef.current, vineyardRecidSetRef.current),
@@ -3240,7 +3145,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       );
 
       // ── Selected listing highlight layers ─────────────────────────
-      // A separate single-feature source so we never re-filter the cluster source.
+      // A separate source so we never re-filter the listings source.
       map.addSource('selected-listing', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
@@ -3318,18 +3223,7 @@ const WVWAMap = forwardRef(function WVWAMap({
       // all sources/layers have been added.
       normalizeOverlayAndLabelOrder(map, basemapLabelLayerIdsRef.current);
 
-      // ── Cluster click → zoom in ───────────────────────────────────
-      map.on('click', 'listings-clusters', (e) => {
-        const features = map.queryRenderedFeatures(e.point, { layers: ['listings-clusters'] });
-        if (!features.length) return;
-        const clusterId = features[0].properties.cluster_id;
-        map.getSource('listings').getClusterExpansionZoom(clusterId, (err, zoom) => {
-          if (err) return;
-          map.flyTo({ center: features[0].geometry.coordinates, zoom, curve: 1.4, speed: 0.55, essential: true });
-        });
-      });
-
-      // ── Unclustered dot click → right-side detail panel ──────────
+      // ── Dot click → right-side detail panel ──────────
       map.on('click', 'listings-unclustered', (e) => {
         if (!e.features?.length) return;
         const props = e.features[0].properties;
@@ -3343,8 +3237,6 @@ const WVWAMap = forwardRef(function WVWAMap({
       });
 
       // Cursor changes + map-dot hover highlight
-      map.on('mouseenter', 'listings-clusters',    () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', 'listings-clusters',    () => { map.getCanvas().style.cursor = ''; });
       map.on('mouseenter', 'listings-unclustered', (e) => {
         map.getCanvas().style.cursor = 'pointer';
         if (!e.features?.length) return;
@@ -3507,7 +3399,7 @@ const WVWAMap = forwardRef(function WVWAMap({
 
   // ── Re-feed the GeoJSON source whenever listing filter or AVA changes ────
   // Updating source data (not just layer filters) is the only way to make
-  // the cluster engine re-cluster with the correct subset of points.
+  // the map redraw the correct subset of points.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;

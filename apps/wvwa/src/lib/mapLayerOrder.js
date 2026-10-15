@@ -11,7 +11,6 @@
 
 // Bottom-most vineyard layer first: overlays go under whichever exists.
 export const VINEYARD_BASE_LAYER_IDS = [
-  'vineyards-glow-heat',
   'vineyards-reference-fill',
   'vineyards-reference-passive-fill',
   'vineyards-linked-fill',

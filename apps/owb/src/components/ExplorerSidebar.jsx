@@ -206,7 +206,6 @@ const avaMeta = (ava) => {
 
 const fmtAcres = (n) => (Number.isFinite(n) ? Math.round(n).toLocaleString() : null);          // 2887.07 → "2,887"
 const fmtAcresApprox = (n) => (Number.isFinite(n) ? `${(Math.floor(n / 100) * 100).toLocaleString()}+` : null); // 16622 → "16,600+"
-const fmtAcresCompact = (n) => (Number.isFinite(n) ? `${(n / 1000).toFixed(1)}k+` : null);      // 16622 → "16.6k+"
 
 function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, mappedAcres, climateYear, onClimateYearChange, vintageMapActive, onShowVintageMap, onListingClick, onListingHover }) {
   const meta = avaMeta(ava);
@@ -2025,7 +2024,7 @@ export default function ExplorerSidebar({
                   <div style={{ ...T.sectionLabel, marginTop: 3, fontWeight: 600 }}>Mapped</div>
                 </div>
                 <div style={{ background: parchment, borderRadius: 8, padding: '9px 12px', border: `1px solid ${border}` }}>
-                  <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: ink, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{fmtAcresCompact(acresData?.total) || '—'}</div>
+                  <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: ink, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{fmtAcres(acresData?.total) || '—'}</div>
                   <div style={{ ...T.sectionLabel, marginTop: 3, fontWeight: 600 }}>Mapped Vineyard Acres</div>
                 </div>
               </div>

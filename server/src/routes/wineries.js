@@ -405,7 +405,9 @@ function categoryOf(row) {
  * keyed by organization id — including growers with no WVWA listing, which
  * have no recid. Each carries its tasting rooms (migration 036; a winery can
  * pour in several places). Restaurants and lodging are left out, and so is
- * listing copy (description, photo, phone, website).
+ * listing copy (description, photo, phone, website). Restaurants and lodging
+ * that own vineyards (AtTheJoy) stay, keeping their category, so their
+ * vineyards still open an owner; clients leave them out of winery counts.
  */
 router.get('/organizations', async (req, res) => {
   try {
@@ -431,7 +433,7 @@ router.get('/organizations', async (req, res) => {
 
     const organizations = rows
       .map((row) => ({ ...row, category: categoryOf(row) }))
-      .filter((row) => !NON_WINE_CATEGORIES.has(row.category))
+      .filter((row) => !NON_WINE_CATEGORIES.has(row.category) || Number(row.vineyard_count) > 0)
       .map((row) => ({
         id:             row.id,
         recid:          row.recid,
@@ -485,7 +487,7 @@ router.get('/organizations/:id', async (req, res) => {
     );
 
     const row = rows[0];
-    if (!row || NON_WINE_CATEGORIES.has(categoryOf(row))) {
+    if (!row || (NON_WINE_CATEGORIES.has(categoryOf(row)) && row.vineyards.length === 0)) {
       return res.status(404).json({ error: `Organization not found: ${id}` });
     }
 

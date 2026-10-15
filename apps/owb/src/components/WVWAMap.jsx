@@ -2251,8 +2251,10 @@ const WVWAMap = forwardRef(function WVWAMap({
             lng:      primary ? primary.lng : null,
             lat:      primary ? primary.lat : null,
             // Statewide every organization is a wine organization (winery or
-            // grower); restaurants and lodging are left out server-side.
-            category: 'winery',
+            // grower), except lodging/restaurants that own vineyards: they
+            // keep their category, so they open from their vineyards but stay
+            // out of the winery points, list and counts.
+            category: o.category === 'hotel' || o.category === 'restaurant' ? o.category : 'winery',
           };
         });
         setListings(loaded);

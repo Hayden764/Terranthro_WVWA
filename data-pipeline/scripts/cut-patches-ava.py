@@ -180,7 +180,7 @@ def main(tiles_dir, avas_file, labels, out_dir, patch_size, stride, erosion_m,
             img = src.read()
         tile_dir = out_dir / "patches" / Path(tname).stem
         tile_dir.mkdir(parents=True, exist_ok=True)
-        for ava in {i[0] for i in items}:
+        for ava in sorted({i[0] for i in items}):   # sorted: set order varies between runs
             ava_geom, blocks = label_map[ava]
             mask = np.full(shape, IGNORE, dtype=np.uint8)
             burn([ava_geom.intersection(tb)], tf, shape, 0, out=mask)

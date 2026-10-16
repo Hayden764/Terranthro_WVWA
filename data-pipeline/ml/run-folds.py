@@ -17,6 +17,9 @@ a crash or a stop picks up where it left off.
 Output per job:  <out>/<job>/{train.log, predict.log, score.log, predictions/, score/}
 Checkpoints:     ml/checkpoints/<job>/
 Summary:         <out>/results.csv and <out>/results.md   (also via --summarize)
+With --sync-to DIR, each finished job (results + checkpoints) and the summary
+are copied to DIR right away — e.g. a persistent Lambda filesystem, so nothing
+is lost if the instance goes away mid-run.
 
 Usage (on the GPU machine, from data-pipeline/)
 -----
@@ -129,6 +132,11 @@ def run_job(job, gpu, args, workers):
               "--out-dir", str(out / "score")], out / "score.log", env)
     if not args.keep_predictions:
         shutil.rmtree(pred_dir, ignore_errors=True)
+    if args.sync_to:
+        dest = Path(args.sync_to)
+        shutil.copytree(out, dest / "runs" / job["name"], dirs_exist_ok=True)
+        if job["kind"] == "train":
+            shutil.copytree(ckpt_dir, dest / "checkpoints" / job["name"], dirs_exist_ok=True)
 
 
 def summarize(out_root: Path):
@@ -196,6 +204,8 @@ def main():
     ap.add_argument("--smoke", action="store_true", help="3 batches, 1 epoch, 1 tile per job")
     ap.add_argument("--keep-predictions", action="store_true",
                     help="Keep probability maps (uint8, ~10 MB/tile) after scoring")
+    ap.add_argument("--sync-to", default=None,
+                    help="Copy each finished job's results + checkpoints here (persistent storage)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--summarize", action="store_true")
     args = ap.parse_args()
@@ -268,6 +278,11 @@ def main():
     for n in failed:
         print(f"  {n}: {status[n]['state']}")
     summarize(out_root)
+    if args.sync_to:
+        for name in ("results.csv", "results.md", "status.json"):
+            if (out_root / name).exists():
+                (Path(args.sync_to) / "runs").mkdir(parents=True, exist_ok=True)
+                shutil.copy2(out_root / name, Path(args.sync_to) / "runs" / name)
 
 
 if __name__ == "__main__":

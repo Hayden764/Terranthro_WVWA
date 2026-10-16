@@ -38,6 +38,8 @@ Usage
 import argparse
 import importlib.util
 import json
+import os
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import geopandas as gpd
@@ -64,6 +66,55 @@ def edges(mask: np.ndarray) -> np.ndarray:
     return mask & ~ndimage.binary_erosion(mask, border_value=1)
 
 
+_W = {}   # per-process state for score_tile, set by _init_worker
+
+
+def _init_worker(ava, truth, threshold, min_area, closing):
+    _W.update(ava=ava, truth=truth, sindex=gpd.GeoSeries(truth).sindex,
+              threshold=threshold, min_area=min_area, closing=closing)
+
+
+def score_tile(path):
+    """Pixel and edge counts plus cleaned predicted shapes for one tile."""
+    ava, truth = _W["ava"], _W["truth"]
+    with rasterio.open(path) as src:
+        raw, tf, shp = src.read(1), src.transform, (src.height, src.width)
+        tb = box(*src.bounds)
+    if not ava.intersects(tb):
+        return None
+    prob = raw / 255.0 if raw.dtype == np.uint8 else raw
+    pred = prob >= _W["threshold"]
+
+    inside = rasterio.features.rasterize([(mapping(ava.intersection(tb)), 1)],
+                                         out_shape=shp, transform=tf, dtype=np.uint8).astype(bool)
+    tile_truth = [truth[i] for i in _W["sindex"].query(tb, predicate="intersects")]
+    true = np.zeros(shp, dtype=bool)
+    if tile_truth:
+        true = rasterio.features.rasterize([(mapping(t), 1) for t in tile_truth],
+                                           out_shape=shp, transform=tf, dtype=np.uint8).astype(bool)
+
+    # ── Pixels ──
+    counts = {"tp": int((pred & true & inside).sum()),
+              "fp": int((pred & ~true & inside).sum()),
+              "fn": int((~pred & true & inside).sum())}
+
+    # ── Edges ──
+    px = abs(tf.a)
+    pe, te = edges(pred) & inside, edges(true) & inside
+    dist_to_true = ndimage.distance_transform_edt(~edges(true)) * px
+    dist_to_pred = ndimage.distance_transform_edt(~edges(pred)) * px
+    for d in EDGE_TOLERANCES_M:
+        counts[(d, "pred_hit")] = int((dist_to_true[pe] <= d).sum())
+        counts[(d, "pred_n")] = int(pe.sum())
+        counts[(d, "true_hit")] = int((dist_to_pred[te] <= d).sum())
+        counts[(d, "true_n")] = int(te.sum())
+
+    # ── Shapes, using the production clean-up ──
+    cleaned = vectorize.postprocess_mask(pred.astype(np.uint8), tf, _W["min_area"], _W["closing"])
+    polys = [shape(geom) for geom, v in shapes(cleaned, transform=tf) if v == 1]
+    return tb, counts, polys
+
+
 def main():
     ap = argparse.ArgumentParser(description="Score predictions over one whole AVA")
     ap.add_argument("--pred-dir", required=True, help="predict.py output (*_prob.tif)")
@@ -78,6 +129,8 @@ def main():
                     help="A traced block counts as found if this share of it is predicted")
     ap.add_argument("--fa-frac", type=float, default=0.2,
                     help="A predicted shape is a false alarm if less than this share is vineyard")
+    ap.add_argument("--workers", type=int, default=min(16, os.cpu_count() or 1),
+                    help="Tiles scored in parallel")
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -92,50 +145,24 @@ def main():
     g = gpd.read_file(args.labels)
     g = g[g.geometry.notna()].to_crs(crs)
     truth = [b for b in (x.buffer(0).intersection(ava) for x in g.geometry) if b.area > 1]
-    truth_sindex = gpd.GeoSeries(truth, crs=crs).sindex
 
     tp = fp = fn = 0
     edge = {d: {"pred_hit": 0, "pred_n": 0, "true_hit": 0, "true_n": 0} for d in EDGE_TOLERANCES_M}
     pred_polys = []
     tile_boxes = []
 
-    for path in tqdm(probs, desc="score", unit="tile"):
-        with rasterio.open(path) as src:
-            raw, tf, shp = src.read(1), src.transform, (src.height, src.width)
-            tb = box(*src.bounds)
-        if not ava.intersects(tb):
-            continue
-        tile_boxes.append(tb)
-        prob = raw / 255.0 if raw.dtype == np.uint8 else raw
-        pred = prob >= args.threshold
-
-        inside = rasterio.features.rasterize([(mapping(ava.intersection(tb)), 1)],
-                                             out_shape=shp, transform=tf, dtype=np.uint8).astype(bool)
-        tile_truth = [truth[i] for i in truth_sindex.query(tb, predicate="intersects")]
-        true = np.zeros(shp, dtype=bool)
-        if tile_truth:
-            true = rasterio.features.rasterize([(mapping(t), 1) for t in tile_truth],
-                                               out_shape=shp, transform=tf, dtype=np.uint8).astype(bool)
-
-        # ── Pixels ──
-        tp += int((pred & true & inside).sum())
-        fp += int((pred & ~true & inside).sum())
-        fn += int((~pred & true & inside).sum())
-
-        # ── Edges ──
-        px = abs(tf.a)
-        pe, te = edges(pred) & inside, edges(true) & inside
-        dist_to_true = ndimage.distance_transform_edt(~edges(true)) * px
-        dist_to_pred = ndimage.distance_transform_edt(~edges(pred)) * px
-        for d in EDGE_TOLERANCES_M:
-            edge[d]["pred_hit"] += int((dist_to_true[pe] <= d).sum())
-            edge[d]["pred_n"] += int(pe.sum())
-            edge[d]["true_hit"] += int((dist_to_pred[te] <= d).sum())
-            edge[d]["true_n"] += int(te.sum())
-
-        # ── Shapes, using the production clean-up ──
-        cleaned = vectorize.postprocess_mask(pred.astype(np.uint8), tf, args.min_area, args.closing)
-        pred_polys += [shape(geom) for geom, v in shapes(cleaned, transform=tf) if v == 1]
+    init = (ava, truth, args.threshold, args.min_area, args.closing)
+    with ProcessPoolExecutor(args.workers, initializer=_init_worker, initargs=init) as pool:
+        for res in tqdm(pool.map(score_tile, probs), total=len(probs), desc="score", unit="tile"):
+            if res is None:
+                continue
+            tb, c, polys = res
+            tile_boxes.append(tb)
+            tp, fp, fn = tp + c["tp"], fp + c["fp"], fn + c["fn"]
+            for d in EDGE_TOLERANCES_M:
+                for k in edge[d]:
+                    edge[d][k] += c[(d, k)]
+            pred_polys += polys
 
     # Block-level scores cover only the area that has predictions, so a
     # partial run (e.g. a quick test on a few tiles) isn't counted as misses

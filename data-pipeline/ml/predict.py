@@ -28,6 +28,15 @@ Usage
       --out-dir   data/predictions/2022/ \\
       --threshold 0.5
 
+  # Only the tiles inside one AVA, probabilities stored compactly as uint8
+  .venv/bin/python ml/predict.py \\
+      --ckpt     ml/checkpoints/<run>/<best>.ckpt \\
+      --stats    ml/checkpoints/<run>/stats.json \\
+      --osip-dir data/osip-2022-gold6/ \\
+      --out-dir  data/predictions/<run>/van_duzer/ \\
+      --avas     data/training/gold6-avas.geojson --ava "Van Duzer Corridor" \\
+      --prob-dtype uint8
+
   # Single tile
   .venv/bin/python ml/predict.py \\
       --ckpt     ml/checkpoints/unet-resnet34-epepoch=02-iouval_iou=0.773.ckpt \\
@@ -163,6 +172,11 @@ def main():
                         help="If set, also write a binary mask at this threshold (e.g. 0.5)")
     parser.add_argument("--batch-size", type=int,       default=64,
                         help="Number of patches per GPU batch  [default: 64]")
+    parser.add_argument("--avas",       default=None,   help="AVA outlines GeoJSON (with --ava)")
+    parser.add_argument("--ava",        default=None,
+                        help="Only predict tiles that intersect this AVA (name column of --avas)")
+    parser.add_argument("--prob-dtype", choices=["float32", "uint8"], default="float32",
+                        help="uint8 stores probability × 255 — ~4x smaller on disk")
     parser.add_argument("--stride",     type=int,       default=STRIDE,
                         help="Sliding window stride in pixels  [default: 128 = 50%% overlap]")
     args = parser.parse_args()
@@ -198,6 +212,16 @@ def main():
     else:
         tiles = sorted(osip_dir.glob("osip*.tif"))
         tiles = [t for t in tiles if not t.name.startswith("._")]
+    if args.ava:
+        import geopandas as gpd
+        from shapely.geometry import box
+        if not args.avas:
+            parser.error("--ava needs --avas")
+        with rasterio.open(tiles[0]) as src:
+            tile_crs = src.crs
+        avas = gpd.read_file(args.avas).to_crs(tile_crs).set_index("name")
+        ava_geom = avas.loc[args.ava].geometry
+        tiles = [t for t in tiles if ava_geom.intersects(box(*rasterio.open(t).bounds))]
 
     print(f"Tiles to process    : {len(tiles)}")
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -213,7 +237,10 @@ def main():
             img, profile = tile_to_tensor(tile_path, stats)
             prob         = sliding_window_predict(model, img, device, batch_size=args.batch_size, stride=args.stride)
 
-            save_geotiff(prob, profile, prob_path, dtype="float32")
+            if args.prob_dtype == "uint8":
+                save_geotiff(np.round(prob * 255), profile, prob_path, dtype="uint8")
+            else:
+                save_geotiff(prob, profile, prob_path, dtype="float32")
 
             if args.threshold is not None:
                 mask_path = out_dir / f"{tile_path.stem}_mask.tif"

@@ -26,12 +26,7 @@ rsync -a --relative --exclude='._*' --exclude='__pycache__' \
 
 echo "2/2  Labels, AVA outlines, baseline model"
 rsync -a --relative --partial --exclude='._*' \
-  data/BlocksUpdated/Edited_Eola.gpkg \
-  data/BlocksUpdated/Edited_Mac.gpkg \
-  data/BlocksUpdated/Edit_Mount_Pisgah.gpkg \
-  data/BlocksUpdated/Clipped_vanduzer.gpkg \
-  data/BlocksUpdated/Lower_long_tom_edited.gpkg \
-  data/BlocksUpdated/clipped_tualatinHills.gpkg \
+  data/BlocksDB-2026-10-16 \
   data/training/gold6-avas.geojson \
   data/patches-osip-2022/stats.json \
   "ml/checkpoints/unet-resnet34-epepoch=02-iouval_iou=0.773.ckpt" \

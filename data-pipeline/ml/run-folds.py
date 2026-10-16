@@ -46,13 +46,17 @@ from pathlib import Path
 ML = Path(__file__).resolve().parent
 ROOT = ML.parent
 
+# Hand-traced blocks snapshotted from the production database by
+# scripts/export-db-labels.py; regions.geojson is the graded area per AVA
+# (AVA outline minus loose tax-lot polygons)
+LABEL_DIR = "data/BlocksDB-2026-10-16"
 LABELS = {
-    "Eola-Amity Hills": "data/BlocksUpdated/Edited_Eola.gpkg",
-    "McMinnville": "data/BlocksUpdated/Edited_Mac.gpkg",
-    "Mt. Pisgah Polk County Oregon": "data/BlocksUpdated/Edit_Mount_Pisgah.gpkg",
-    "Van Duzer Corridor": "data/BlocksUpdated/Clipped_vanduzer.gpkg",
-    "Lower Long Tom": "data/BlocksUpdated/Lower_long_tom_edited.gpkg",
-    "Tualatin Hills": "data/BlocksUpdated/clipped_tualatinHills.gpkg",
+    "Eola-Amity Hills": f"{LABEL_DIR}/eola-amity-hills.gpkg",
+    "McMinnville": f"{LABEL_DIR}/mcminnville.gpkg",
+    "Mt. Pisgah Polk County Oregon": f"{LABEL_DIR}/mt-pisgah.gpkg",
+    "Van Duzer Corridor": f"{LABEL_DIR}/van-duzer-corridor.gpkg",
+    "Lower Long Tom": f"{LABEL_DIR}/lower-long-tom.gpkg",
+    "Tualatin Hills": f"{LABEL_DIR}/tualatin-hills.gpkg",
 }
 BASELINE_CKPT = "ml/checkpoints/unet-resnet34-epepoch=02-iouval_iou=0.773.ckpt"
 BASELINE_STATS = "data/patches-osip-2022/stats.json"
@@ -191,9 +195,9 @@ def detect_gpus():
 
 def main():
     ap = argparse.ArgumentParser(description="Run the model v2 comparison on all GPUs")
-    ap.add_argument("--patches", default="data/patches-gold6-2022")
+    ap.add_argument("--patches", default="data/patches-gold6-db-2022")
     ap.add_argument("--tiles", default="data/osip-2022-gold6")
-    ap.add_argument("--avas", default="data/training/gold6-avas.geojson")
+    ap.add_argument("--avas", default=f"{LABEL_DIR}/regions.geojson")
     ap.add_argument("--out", default="data/model-v2-runs")
     ap.add_argument("--gpus", default=None,
                     help="Comma-separated GPU ids  [default: every GPU nvidia-smi lists]")

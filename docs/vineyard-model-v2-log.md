@@ -117,6 +117,54 @@ Candidate settings:
 | B | general-purpose starting point | final layers only | 50 | 10 |
 | C | general-purpose starting point | all layers, unlocked gradually from round 5 to 20 | 60 | 15 |
 
+## 2026-10-16 — First full run on Lambda (rehearsal)
+
+Ran on an 8-GPU Lambda machine (8× A100 40 GB). Photos were downloaded and
+training squares re-cut on the machine itself rather than uploaded; a
+300-square spot check showed them pixel-for-pixel identical to the Mac's.
+The current model and candidate A finished on all six AVAs; B finished one
+before the run was stopped (see next entry).
+
+| AVA | Overlap: current → A | Edges within 1 m: current → A | Missed blocks: current → A | False alarms: current → A |
+|---|---|---|---|---|
+| Mt. Pisgah | 0.715 → 0.932 | 0.236 → 0.516 | 11 → 1 | 31 → 11 |
+| Eola-Amity Hills | 0.739 → 0.900 | 0.234 → 0.606 | 107 → 53 | 268 → 73 |
+| Lower Long Tom | 0.633 → 0.870 | 0.123 → 0.393 | 13 → 3 | 112 → 33 |
+| McMinnville | 0.731 → 0.788 | 0.204 → 0.444 | 10 → 4 | 68 → 62 |
+| Van Duzer | 0.593 → 0.753 | 0.072 → 0.253 | 24 → 1 | 227 → 106 |
+| Tualatin Hills | 0.457 → 0.511 | 0.063 → 0.141 | 35 → 10 | 463 → 434 |
+
+Even the simplest new candidate missed far fewer blocks (72 vs 200 of
+1,798), drew edges about 2.5× more accurately, and produced 40 % fewer false
+alarms. Tualatin Hills remains hard: hundreds of false-alarm shapes in its
+large area of non-vineyard farmland and forest.
+
+## 2026-10-16 — Labels switched to the database; run stopped
+
+Comparing the training outlines with the production database showed two
+AVAs had drifted. The database holds the latest QGIS edits:
+
+- **McMinnville:** the database has 41 ha of vineyard missing from the
+  training file. 34 ha of candidate A's McMinnville "false alarms" were
+  these vineyards — the model was right and was marked down.
+- **Tualatin Hills:** four vineyards (and one in McMinnville) are stored in
+  the database as whole county tax lots rather than traced canopy.
+
+Decision: **the database is the source of truth.** Labels are now a dated
+snapshot of the database's traced blocks (2026-10-16, 1,824 blocks). The
+five tax-lot polygons are left out of the labels and their areas are marked
+"don't grade", like outside the AVA line. Those five vineyards should be
+re-traced in the database separately.
+
+The run was stopped so the full comparison can be redone on the corrected
+labels. The results above are kept as a rehearsal; they show the method
+works, but the final numbers will come from the rerun.
+
+**Paused until the week of 2026-10-19.** To resume: start an 8-GPU instance
+with the `ModelTrainingOutput` filesystem attached, run `lambda-prep.sh`
+(downloads the photos and cuts the new training squares, ~1 hour), the smoke
+test, then the full run.
+
 ---
 
 ## Appendix — technical details
@@ -128,11 +176,22 @@ Tiles in `data-pipeline/data/osip-2022-gold6/`. `download-osip.py` was fixed
 to select tiles by true geometry rather than bounding box (1,803 → 1,078
 tiles).
 
-**Labels.** `data-pipeline/data/BlocksUpdated/`: `Edited_Eola.gpkg`,
-`Edited_Mac.gpkg`, `Edit_Mount_Pisgah.gpkg`, `Clipped_vanduzer.gpkg`,
-`Lower_long_tom_edited.gpkg`, `clipped_tualatinHills.gpkg`. Clipped to the
-AVA outline at cut time. No inward erosion (tracing was done on OSIP
-itself, so no basemap misalignment).
+**Labels.** Since 2026-10-16: `data-pipeline/data/BlocksDB-2026-10-16/`,
+exported read-only from production `vineyard_blocks` by
+`scripts/export-db-labels.py` — one `.gpkg` per AVA (every source except
+`tax-lot`) plus `regions.geojson`, the graded area per AVA (official outline
+minus tax-lot polygons: ids 7813, 7955, 9330, 9347 in Tualatin Hills, 9574 in
+McMinnville). `regions.geojson` is passed as `--avas` to the cutter, predictor
+and scorer. Clipped to the graded area at cut time; no inward erosion
+(tracing was done on OSIP itself). The rehearsal run used the June files in
+`data/BlocksUpdated/` (`Edited_Eola.gpkg`, `Edited_Mac.gpkg`,
+`Edit_Mount_Pisgah.gpkg`, `Clipped_vanduzer.gpkg`,
+`Lower_long_tom_edited.gpkg`, `clipped_tualatinHills.gpkg`).
+
+**Lambda filesystem (`ModelTrainingOutput`).** `data-pipeline/` (code,
+labels, 0.773 model), `rehearsal-old-labels/` (rehearsal results,
+checkpoints, `results.md`), and `data-pipeline/data/patches-gold6-2022.tar`
+(the rehearsal's training squares, built from the old labels — obsolete).
 
 **Patches.** `scripts/cut-patches-ava.py` → `data-pipeline/data/patches-gold6-2022/`.
 One `.npz` per patch (`img` uint8 4×256×256 RGBN, `mask` uint8 0/1/255),

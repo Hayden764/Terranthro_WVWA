@@ -88,6 +88,35 @@ What gets measured:
 - **Missed blocks** and **false alarms** (shapes drawn where there is no
   vineyard). These two are the best guide to how much QGIS clean-up is left.
 
+## 2026-10-15 — Scoring tool and run plan
+
+**Scoring tool built.** For one AVA it compares the model's map with the hand
+tracing, inside the AVA line only, and reports overlap, edge accuracy at
+1 m and 3 m, missed blocks and false alarms. It also saves the missed blocks
+and false alarms as map layers to open in QGIS. A one-tile trial with the
+current model on Mt. Pisgah showed edges matching within 3 m 72 % of the
+time but within 1 m only 39 % — the loose-edge problem this retraining is
+meant to fix.
+
+**Keeping the test honest.** The hidden AVA plays no part in training at all,
+not even in choosing which saved version of the model to keep. That choice
+is made on a separate 10 % of photo tiles from the training AVAs.
+
+**Running on an 8-GPU machine.** The 18 training runs are independent, so each
+GPU runs one at a time from a shared queue: first the current model is
+graded on all six AVAs, then candidate A on all six, then B, then C. This
+costs the same GPU-hours as one GPU but finishes in about a day instead of
+two to three. Re-running the same command after an interruption skips
+anything already finished.
+
+Candidate settings:
+
+| | Starts from | Learning | Max rounds (epochs) | Stops early after no gain for |
+|---|---|---|---|---|
+| A | current model | final layers only, slow | 20 | 5 |
+| B | general-purpose starting point | final layers only | 50 | 10 |
+| C | general-purpose starting point | all layers, unlocked gradually from round 5 to 20 | 60 | 15 |
+
 ---
 
 ## Appendix — technical details
@@ -114,7 +143,23 @@ AVA. "Hard negative" = mean NDVI ≥ 0.35. Patches must be ≥50 % inside the
 AVA. `manifest.json` tags each patch with its AVA; `ava_stats.json` holds
 per-AVA channel sums so normalisation is computed from training AVAs only.
 
-**Training.** `ml/train.py --ava-patches-dir … --val-ava "<AVA>" --run-name …`.
+**Training.** `ml/train.py --ava-patches-dir … --holdout-ava "<AVA>" --run-name …`.
 U-Net ResNet34, 5 channels (RGBN + NDVI computed in the loader), Dice + Focal
 loss, both ignoring mask value 255. AVA-balanced sampling by default.
-Normalisation stats for each run are written to `ml/checkpoints/<run>/stats.json`.
+Checkpoint selection on 10 % of training-AVA tiles (`--val-tile-frac`, fixed
+seed, ~6,200 patches). Normalisation stats from the training AVAs, written to
+`ml/checkpoints/<run>/stats.json`; candidate A uses the 0.773 model's own
+`data/patches-osip-2022/stats.json` (`--stats`).
+
+**Scoring.** `ml/score-ava.py` on `predict.py --avas … --ava … --prob-dtype uint8`
+output. Threshold 0.5; block-level scores after the production clean-up
+(fill holes, 3 m closing, 1,000 m² minimum). A traced block is "missed" if
+under 50 % of it is predicted; a predicted shape is a "false alarm" if under
+20 % of it is traced vineyard.
+
+**Runs.** `ml/run-folds.py` — job queue over all GPUs (`nvidia-smi`), one job
+per GPU, resumable (skips jobs with `score/score.json`). Output in
+`data/model-v2-runs/<job>/`, summary in `results.csv` / `results.md`.
+`--smoke` runs every step with 3 batches and 1 tile. On macOS, dataloader
+workers leave `torch_shm_manager` daemons that stop `train.py` exiting, so
+local CPU runs use `--num-workers 0`.

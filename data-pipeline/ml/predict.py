@@ -177,6 +177,8 @@ def main():
                         help="Only predict tiles that intersect this AVA (name column of --avas)")
     parser.add_argument("--prob-dtype", choices=["float32", "uint8"], default="float32",
                         help="uint8 stores probability × 255 — ~4x smaller on disk")
+    parser.add_argument("--max-tiles",  type=int,       default=None,
+                        help="Only the first N tiles (smoke tests)")
     parser.add_argument("--stride",     type=int,       default=STRIDE,
                         help="Sliding window stride in pixels  [default: 128 = 50%% overlap]")
     args = parser.parse_args()
@@ -223,6 +225,8 @@ def main():
         ava_geom = avas.loc[args.ava].geometry
         tiles = [t for t in tiles if ava_geom.intersects(box(*rasterio.open(t).bounds))]
 
+    if args.max_tiles:
+        tiles = tiles[:args.max_tiles]
     print(f"Tiles to process    : {len(tiles)}")
     out_dir.mkdir(parents=True, exist_ok=True)
 

@@ -202,32 +202,47 @@ class AvaPatchDataset(VineyardDataset):
 
 class AvaDataModule(L.LightningDataModule):
     """
-    Leave-AVA-out split over a cut-patches-ava.py directory.  Normalisation
-    stats come from the training AVAs only.  With balance_avas, each AVA is
-    drawn equally often per epoch regardless of how many patches it has.
+    Leave-AVA-out training over a cut-patches-ava.py directory.
+
+    Held-out AVAs are never loaded — they are graded afterwards with
+    score-ava.py.  Checkpoint selection uses a validation set of whole tiles
+    (val_tile_frac) drawn from the training AVAs, so the held-out AVA has no
+    say in which checkpoint is kept.  Normalisation stats come from the
+    training AVAs only, unless *stats* is passed (e.g. the 0.773 model's own).
+    With balance_avas, each training AVA is drawn equally often per epoch.
     """
 
-    def __init__(self, patches_dir: Path, val_avas, batch_size: int = 16,
-                 num_workers: int = 0, balance_avas: bool = True):
+    def __init__(self, patches_dir: Path, holdout_avas, batch_size: int = 16,
+                 num_workers: int = 0, balance_avas: bool = True,
+                 val_tile_frac: float = 0.1, stats: Optional[dict] = None, seed: int = 42):
         super().__init__()
-        self.patches_dir  = Path(patches_dir)
-        self.val_avas     = set(val_avas)
-        self.batch_size   = batch_size
-        self.num_workers  = num_workers
-        self.balance_avas = balance_avas
+        self.patches_dir   = Path(patches_dir)
+        self.holdout_avas  = set(holdout_avas)
+        self.batch_size    = batch_size
+        self.num_workers   = num_workers
+        self.balance_avas  = balance_avas
+        self.val_tile_frac = val_tile_frac
+        self.fixed_stats   = stats
+        self.seed          = seed
 
     def setup(self, stage: Optional[str] = None):
         manifest = json.loads((self.patches_dir / "manifest.json").read_text())
         ava_stats = json.loads((self.patches_dir / "ava_stats.json").read_text())
         all_avas = sorted({m["ava"] for m in manifest})
-        unknown = self.val_avas - set(all_avas)
+        unknown = self.holdout_avas - set(all_avas)
         if unknown:
-            raise ValueError(f"Unknown val AVA(s) {unknown}; have {all_avas}")
-        self.train_avas = [a for a in all_avas if a not in self.val_avas]
-        self.stats = stats_from_avas(ava_stats, self.train_avas)
+            raise ValueError(f"Unknown holdout AVA(s) {unknown}; have {all_avas}")
+        self.train_avas = [a for a in all_avas if a not in self.holdout_avas]
+        self.stats = self.fixed_stats or stats_from_avas(ava_stats, self.train_avas)
 
-        train = [m for m in manifest if m["ava"] in self.train_avas]
-        val   = [m for m in manifest if m["ava"] in self.val_avas]
+        # Validation = whole tiles from the training AVAs (same tiles every run)
+        rng = np.random.default_rng(self.seed)
+        pool = [m for m in manifest if m["ava"] in self.train_avas]
+        tiles = sorted({m["tile"] for m in pool})
+        val_tiles = set(rng.choice(tiles, size=max(1, int(len(tiles) * self.val_tile_frac)),
+                                   replace=False).tolist())
+        train = [m for m in pool if m["tile"] not in val_tiles]
+        val   = [m for m in pool if m["tile"] in val_tiles]
         self.train_ds = AvaPatchDataset(self.patches_dir, [m["file"] for m in train],
                                         self.stats, augment=True)
         self.val_ds   = AvaPatchDataset(self.patches_dir, [m["file"] for m in val],

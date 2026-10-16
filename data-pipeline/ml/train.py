@@ -313,8 +313,16 @@ def main():
                         help="Patches directory  [default: ml/../data/patches]")
     parser.add_argument("--ava-patches-dir", type=str, default=None,
                         help="cut-patches-ava.py output; split by AVA instead of train/val dirs")
-    parser.add_argument("--val-ava", action="append", default=[],
-                        help="AVA held out for validation (repeatable; needs --ava-patches-dir)")
+    parser.add_argument("--holdout-ava", action="append", default=[],
+                        help="AVA kept out of training entirely, for score-ava.py "
+                             "(repeatable; needs --ava-patches-dir)")
+    parser.add_argument("--val-tile-frac", type=float, default=0.1,
+                        help="Share of training-AVA tiles used to pick the best checkpoint")
+    parser.add_argument("--stats", type=str, default=None,
+                        help="Use this stats.json instead of the training AVAs' "
+                             "(for fine-tuning a model trained with other stats)")
+    parser.add_argument("--limit-batches", type=float, default=None,
+                        help="Cap train/val batches per epoch (smoke tests)")
     parser.add_argument("--no-balance", action="store_true",
                         help="Sample AVAs in proportion to patch count instead of equally")
     parser.add_argument("--run-name", type=str, default=None,
@@ -355,20 +363,22 @@ def main():
 
     # ── Data module ───────────────────────────────────────────────────────────
     if args.ava_patches_dir:
-        if not args.val_ava:
-            parser.error("--ava-patches-dir needs at least one --val-ava")
+        if not args.holdout_ava:
+            parser.error("--ava-patches-dir needs at least one --holdout-ava")
         dm = AvaDataModule(
             patches_dir=Path(args.ava_patches_dir),
-            val_avas=args.val_ava,
+            holdout_avas=args.holdout_ava,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
             balance_avas=not args.no_balance,
+            val_tile_frac=args.val_tile_frac,
+            stats=json.loads(Path(args.stats).read_text()) if args.stats else None,
         )
         dm.setup()
         # predict.py needs the normalisation the model was trained with
         (ckpt_dir / "stats.json").write_text(json.dumps(dm.stats, indent=2))
         print(f"  Train AVAs : {', '.join(dm.train_avas)}")
-        print(f"  Val AVAs   : {', '.join(sorted(dm.val_avas))}")
+        print(f"  Held out   : {', '.join(sorted(dm.holdout_avas))}")
     else:
         dm = VineyardDataModule(
             patches_dir=patches_dir,
@@ -436,6 +446,11 @@ def main():
         enable_progress_bar=True,
         deterministic=False,
         gradient_clip_val=1.0,
+        # Lightning reads a float as a fraction and an int as a batch count
+        limit_train_batches=None if args.limit_batches is None else
+            (int(args.limit_batches) if args.limit_batches >= 1 else args.limit_batches),
+        limit_val_batches=None if args.limit_batches is None else
+            (int(args.limit_batches) if args.limit_batches >= 1 else args.limit_batches),
     )
 
     # ── Train ─────────────────────────────────────────────────────────────────
@@ -454,7 +469,7 @@ def main():
     print(f"  Training complete.")
     print(f"  Best val IoU  : {best_score:.4f}")
     print(f"  Checkpoint    : {best_ckpt}")
-    print(f"  Training log  : {log_dir}/vineyard_unet/")
+    print(f"  Training log  : {log_dir}/{args.run_name or 'vineyard_unet'}/")
     print(f"{'='*60}\n")
     print("Next step — run inference:")
     print("  .venv/bin/python ml/predict.py --ckpt", best_ckpt)

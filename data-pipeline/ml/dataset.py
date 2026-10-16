@@ -142,6 +142,115 @@ class VineyardDataset(Dataset):
         return img_t, mask_t
 
 
+IGNORE = 255
+
+
+def stats_from_avas(ava_stats: dict, avas) -> dict:
+    """Pool cut-patches-ava.py per-AVA channel sums into mean/std for *avas*."""
+    n = sum(ava_stats["avas"][a]["n"] for a in avas)
+    s = sum(np.array(ava_stats["avas"][a]["sum"]) for a in avas)
+    sq = sum(np.array(ava_stats["avas"][a]["sumsq"]) for a in avas)
+    mean = s / n
+    return {"channels": ava_stats["channels"], "mean": mean.tolist(),
+            "std": np.sqrt(sq / n - mean ** 2).tolist()}
+
+
+class AvaPatchDataset(VineyardDataset):
+    """
+    Patches from cut-patches-ava.py: one .npz per patch holding a uint8
+    (4, H, W) RGBN image and a mask with 0 / 1 / 255 (255 = outside the AVA,
+    ignored by loss and metrics).
+    NDVI is computed here, so the model still sees the same 5 channels.
+    """
+
+    def __init__(self, patches_dir: Path, files, stats: dict, augment: bool = False):
+        # Same augmentation and normalisation as VineyardDataset; files come from the manifest
+        self.root     = patches_dir
+        self.augment  = augment
+        self.mean = np.array(stats["mean"], dtype=np.float32).reshape(5, 1, 1)
+        self.std  = np.array(stats["std"],  dtype=np.float32).reshape(5, 1, 1)
+        self.files = list(files)
+        self.geo_aug = A.Compose([
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.RandomRotate90(p=0.5),
+        ])
+        self.rgb_aug = A.Compose([
+            A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.03, p=0.4),
+        ])
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        fname = self.files[idx]
+        with np.load(self.root / fname) as z:
+            raw  = z["img"].astype(np.float32)   # (4, H, W) 0-255
+            mask = z["mask"]
+        r, nir = raw[0], raw[3]
+        ndvi = (nir - r) / (nir + r + 1e-6)
+        img = np.concatenate([raw / 255.0, ndvi[None]], axis=0)
+
+        if self.augment:
+            img_hwc = img.transpose(1, 2, 0)
+            out = self.geo_aug(image=img_hwc, mask=mask)
+            img_hwc, mask = out["image"], out["mask"]
+            rgb = self.rgb_aug(image=np.ascontiguousarray(img_hwc[:, :, :3]))["image"]
+            img = np.concatenate([rgb, img_hwc[:, :, 3:]], axis=2).transpose(2, 0, 1)
+
+        img = (img - self.mean) / self.std
+        return (torch.from_numpy(np.ascontiguousarray(img)).float(),
+                torch.from_numpy(np.ascontiguousarray(mask).astype(np.float32)))
+
+
+class AvaDataModule(L.LightningDataModule):
+    """
+    Leave-AVA-out split over a cut-patches-ava.py directory.  Normalisation
+    stats come from the training AVAs only.  With balance_avas, each AVA is
+    drawn equally often per epoch regardless of how many patches it has.
+    """
+
+    def __init__(self, patches_dir: Path, val_avas, batch_size: int = 16,
+                 num_workers: int = 0, balance_avas: bool = True):
+        super().__init__()
+        self.patches_dir  = Path(patches_dir)
+        self.val_avas     = set(val_avas)
+        self.batch_size   = batch_size
+        self.num_workers  = num_workers
+        self.balance_avas = balance_avas
+
+    def setup(self, stage: Optional[str] = None):
+        manifest = json.loads((self.patches_dir / "manifest.json").read_text())
+        ava_stats = json.loads((self.patches_dir / "ava_stats.json").read_text())
+        all_avas = sorted({m["ava"] for m in manifest})
+        unknown = self.val_avas - set(all_avas)
+        if unknown:
+            raise ValueError(f"Unknown val AVA(s) {unknown}; have {all_avas}")
+        self.train_avas = [a for a in all_avas if a not in self.val_avas]
+        self.stats = stats_from_avas(ava_stats, self.train_avas)
+
+        train = [m for m in manifest if m["ava"] in self.train_avas]
+        val   = [m for m in manifest if m["ava"] in self.val_avas]
+        self.train_ds = AvaPatchDataset(self.patches_dir, [m["file"] for m in train],
+                                        self.stats, augment=True)
+        self.val_ds   = AvaPatchDataset(self.patches_dir, [m["file"] for m in val],
+                                        self.stats, augment=False)
+        counts = {a: sum(m["ava"] == a for m in train) for a in self.train_avas}
+        self.train_weights = [1.0 / counts[m["ava"]] for m in train]
+
+    def train_dataloader(self) -> DataLoader:
+        sampler = None
+        if self.balance_avas:
+            sampler = torch.utils.data.WeightedRandomSampler(
+                self.train_weights, num_samples=len(self.train_weights), replacement=True)
+        return DataLoader(self.train_ds, batch_size=self.batch_size,
+                          shuffle=sampler is None, sampler=sampler,
+                          num_workers=self.num_workers, pin_memory=True, drop_last=True,
+                          persistent_workers=(self.num_workers > 0))
+
+    def val_dataloader(self) -> DataLoader:
+        return DataLoader(self.val_ds, batch_size=self.batch_size, shuffle=False,
+                          num_workers=self.num_workers, pin_memory=True,
+                          persistent_workers=(self.num_workers > 0))
+
+
 class VineyardDataModule(L.LightningDataModule):
     """
     Lightning DataModule — wraps train + val datasets and creates

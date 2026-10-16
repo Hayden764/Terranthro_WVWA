@@ -44,6 +44,7 @@ from pathlib import Path
 import click
 import geopandas as gpd
 import requests
+from shapely.geometry import box
 from tqdm import tqdm
 
 # ---------------------------------------------------------------------------
@@ -90,7 +91,8 @@ def filter_to_intersecting(tiles, blocks_file: Path):
     gdf    = gpd.read_file(blocks_file)
     gdf    = gdf[gdf.geometry.notna()].to_crs(epsg=OUTPUT_CRS)
     sindex = gdf.sindex
-    return [t for t in tiles if list(sindex.intersection(t))]
+    # predicate= tests the real geometry, not just each polygon's bounding box
+    return [t for t in tiles if len(sindex.query(box(*t), predicate="intersects"))]
 
 
 # ---------------------------------------------------------------------------

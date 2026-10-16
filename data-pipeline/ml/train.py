@@ -102,6 +102,7 @@ Usage
 """
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -118,7 +119,7 @@ from lightning.pytorch.callbacks import (
 )
 from lightning.pytorch.loggers import CSVLogger
 
-from dataset import VineyardDataModule
+from dataset import IGNORE, AvaDataModule, VineyardDataModule
 
 
 # ---------------------------------------------------------------------------
@@ -169,11 +170,13 @@ class VineyardSegModel(L.LightningModule):
             activation=None,
         )
 
-        self.dice_loss  = smp.losses.DiceLoss(mode="binary", from_logits=True)
-        self.focal_loss = smp.losses.FocalLoss(mode="binary")
+        # Mask value 255 marks pixels outside the labelled AVA — excluded from
+        # loss and metrics.  Older 0/1 patch sets never contain it.
+        self.dice_loss  = smp.losses.DiceLoss(mode="binary", from_logits=True, ignore_index=IGNORE)
+        self.focal_loss = smp.losses.FocalLoss(mode="binary", ignore_index=IGNORE)
 
-        self.val_iou  = torchmetrics.JaccardIndex(task="binary", threshold=0.5)
-        self.val_dice = torchmetrics.F1Score(task="binary", threshold=0.5)
+        self.val_iou  = torchmetrics.JaccardIndex(task="binary", threshold=0.5, ignore_index=IGNORE)
+        self.val_dice = torchmetrics.F1Score(task="binary", threshold=0.5, ignore_index=IGNORE)
 
         # Freeze all encoder params at init; unfrozen gradually in training
         for p in self.model.encoder.parameters():
@@ -308,6 +311,14 @@ def main():
     # ── Data ─────────────────────────────────────────────────────────────────
     parser.add_argument("--patches-dir", type=str, default=None,
                         help="Patches directory  [default: ml/../data/patches]")
+    parser.add_argument("--ava-patches-dir", type=str, default=None,
+                        help="cut-patches-ava.py output; split by AVA instead of train/val dirs")
+    parser.add_argument("--val-ava", action="append", default=[],
+                        help="AVA held out for validation (repeatable; needs --ava-patches-dir)")
+    parser.add_argument("--no-balance", action="store_true",
+                        help="Sample AVAs in proportion to patch count instead of equally")
+    parser.add_argument("--run-name", type=str, default=None,
+                        help="Checkpoint/log subfolder, e.g. holdout-vanduzer")
     parser.add_argument("--batch-size",  type=int, default=32)
     parser.add_argument("--num-workers", type=int, default=4,
                         help="DataLoader workers  [default: 4; set 0 on macOS]")
@@ -337,17 +348,35 @@ def main():
     stats_path  = patches_dir / "stats.json"
     ckpt_dir    = ml_dir / "checkpoints"
     log_dir     = ml_dir / "logs"
-    ckpt_dir.mkdir(exist_ok=True)
+    if args.run_name:
+        ckpt_dir = ckpt_dir / args.run_name
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
     log_dir.mkdir(exist_ok=True)
 
     # ── Data module ───────────────────────────────────────────────────────────
-    dm = VineyardDataModule(
-        patches_dir=patches_dir,
-        stats_path=stats_path,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-    )
-    dm.setup()
+    if args.ava_patches_dir:
+        if not args.val_ava:
+            parser.error("--ava-patches-dir needs at least one --val-ava")
+        dm = AvaDataModule(
+            patches_dir=Path(args.ava_patches_dir),
+            val_avas=args.val_ava,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            balance_avas=not args.no_balance,
+        )
+        dm.setup()
+        # predict.py needs the normalisation the model was trained with
+        (ckpt_dir / "stats.json").write_text(json.dumps(dm.stats, indent=2))
+        print(f"  Train AVAs : {', '.join(dm.train_avas)}")
+        print(f"  Val AVAs   : {', '.join(sorted(dm.val_avas))}")
+    else:
+        dm = VineyardDataModule(
+            patches_dir=patches_dir,
+            stats_path=stats_path,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+        )
+        dm.setup()
 
     enc_lr = args.encoder_lr
     us, ui = args.unfreeze_start, args.unfreeze_interval
@@ -402,7 +431,7 @@ def main():
         accelerator="auto",
         devices=1,
         callbacks=callbacks,
-        logger=CSVLogger(str(log_dir), name="vineyard_unet"),
+        logger=CSVLogger(str(log_dir), name=args.run_name or "vineyard_unet"),
         log_every_n_steps=10,
         enable_progress_bar=True,
         deterministic=False,

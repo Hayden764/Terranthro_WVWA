@@ -165,6 +165,50 @@ with the `ModelTrainingOutput` filesystem attached, run `lambda-prep.sh`
 (downloads the photos and cuts the new training squares, ~1 hour), the smoke
 test, then the full run.
 
+## 2026-10-26 — Ready to rerun: labels re-checked, training squares re-cut
+
+**Decisions.**
+- **All three candidates stay in, including C.** The aim is the best model
+  we can make, so the riskier fully-adjustable candidate still gets its
+  chance. It is only kept if it actually wins.
+- **Tualatin Hills false alarms are accepted for now.** Most are blueberry
+  fields, which look a lot like vineyard rows from the air.
+- **The five tax-lot vineyards stay ungraded** for this run.
+
+**Labels re-checked.** A fresh export of the database matched the
+2026-10-16 snapshot exactly: same 1,824 blocks, no shape changes. The
+rerun uses that snapshot.
+
+**Training squares re-cut from the database labels:** 73,178 squares,
+compared with 73,678 from the old labels.
+
+| AVA | Vineyard squares (old → new) | Non-vineyard squares |
+|---|---|---|
+| Eola-Amity Hills | 13,775 → 13,847 | 20,770 |
+| Van Duzer Corridor | 4,440 → 4,514 | 6,771 |
+| Tualatin Hills | 4,162 → 3,457 | 5,185 |
+| McMinnville | 2,849 → 3,162 | 4,743 |
+| Lower Long Tom | 2,265 → 2,267 | 3,400 |
+| Mt. Pisgah | 1,981 → 2,025 | 3,037 |
+
+McMinnville gained squares from the 41 ha of vineyard that had been missing.
+Tualatin lost squares because its four tax-lot polygons are no longer
+graded. The old-label squares were deleted from the Mac.
+
+**Idea checked: an elevation floor.** Could we throw out anything predicted
+below about 200 ft? Using each traced block's elevation:
+
+| Cut-off | Traced vineyard averaging below the line |
+|---|---|
+| 150 ft | none, in any of the six AVAs |
+| 200 ft | 105 ha in Van Duzer (21 % of its vineyard), 11 ha in Tualatin, under 1 ha elsewhere |
+| 250 ft | 268 ha in Van Duzer, 101 ha in Eola-Amity, 67 ha in Tualatin, 27 ha in McMinnville |
+
+So 200 ft would delete real vineyard. 150 ft is safe in these six AVAs, but
+it is not yet known how many false alarms it would remove. Shelved for now.
+It can be tested against the rerun's false-alarm map layers later, without
+retraining.
+
 ---
 
 ## Appendix — technical details
@@ -193,7 +237,9 @@ labels, 0.773 model), `rehearsal-old-labels/` (rehearsal results,
 checkpoints, `results.md`), and `data-pipeline/data/patches-gold6-2022.tar`
 (the rehearsal's training squares, built from the old labels — obsolete).
 
-**Patches.** `scripts/cut-patches-ava.py` → `data-pipeline/data/patches-gold6-2022/`.
+**Patches.** `scripts/cut-patches-ava.py` → `data-pipeline/data/patches-gold6-db-2022/`
+(cut 2026-10-26 from `BlocksDB-2026-10-16`; the old-label `patches-gold6-2022/`
+was deleted).
 One `.npz` per patch (`img` uint8 4×256×256 RGBN, `mask` uint8 0/1/255),
 grouped in one folder per tile (exFAT slows badly with tens of thousands of
 files in one folder). Positives: ≥5 % vineyard of in-AVA pixels, stride 128.

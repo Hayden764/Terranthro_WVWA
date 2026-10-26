@@ -46,7 +46,7 @@ Usage
         --label "Eola-Amity Hills=data/BlocksUpdated/Edited_Eola.gpkg" \\
         --label "McMinnville=data/BlocksUpdated/Edited_Mac.gpkg" \\
         ... \\
-        --out data/patches-gold6-2022 --dry-run
+        --out data/patches-gold6-db-2022 --dry-run
 """
 
 import json

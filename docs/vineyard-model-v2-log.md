@@ -209,6 +209,34 @@ it is not yet known how many false alarms it would remove. Shelved for now.
 It can be tested against the rerun's false-alarm map layers later, without
 retraining.
 
+## 2026-10-26 — Switched to the simplified comparison
+
+The full comparison (every AVA taking a turn as the test, 18 training runs
+on an 8-GPU machine) was estimated at about $550–600. That is too much for
+this stage, so we are running the simplified version first proposed on
+2026-10-15:
+
+1. **Two AVAs are hidden together:** Van Duzer Corridor (hilly, windy) and
+   Lower Long Tom (flat valley floor), covering both kinds of landscape.
+2. **A, B and C are each trained once** on the other four AVAs (Eola-Amity,
+   McMinnville, Mt. Pisgah, Tualatin Hills). C stays in: the aim is the best
+   model we can make.
+3. **All three, plus the current model, are graded** on Van Duzer and Lower
+   Long Tom, and the best one wins.
+4. **The winner is trained once on all six AVAs.** This is the new
+   production model.
+
+That is 4 training runs instead of 18, small enough for a single GPU
+(1× A100 40 GB, $1.99/hr). The estimate is roughly $50–80 and 1.5–2 days,
+to be firmed up from the rehearsal's job timings once the machine is
+running.
+
+**What we give up:** per-AVA scores for every AVA, and a winner chosen on
+two test AVAs rather than six. The rehearsal already scored candidate A in
+all six AVAs (on the old labels), which gives a reasonable picture in the
+meantime. Testing the winner on every AVA can be added later if needed for
+the write-up; it is skipped for now.
+
 ---
 
 ## Appendix — technical details
@@ -263,8 +291,14 @@ under 50 % of it is predicted; a predicted shape is a "false alarm" if under
 20 % of it is traced vineyard.
 
 **Runs.** `ml/run-folds.py` — job queue over all GPUs (`nvidia-smi`), one job
-per GPU, resumable (skips jobs with `score/score.json`). Output in
-`data/model-v2-runs/<job>/`, summary in `results.csv` / `results.md`.
+per GPU, resumable (skips jobs whose scores are all written). `--plan pair`
+(default since 2026-10-26): jobs `baseline-pair`, `A-pair`, `B-pair`, `C-pair`,
+each holding out Van Duzer Corridor + Lower Long Tom (`train.py --holdout-ava`
+twice) and scored on each. `--plan six`: the original leave-one-AVA-out.
+`--final A|B|C`: trains that candidate on all six (`train.py --no-holdout`),
+writes `final.json` with the best checkpoint. Output in
+`data/model-v2-runs/<job>/` (`train.log`, plus `<ava>/score/` per graded AVA),
+summary in `results.csv` / `results.md`.
 `--smoke` runs every step with 3 batches and 1 tile. On macOS, dataloader
 workers leave `torch_shm_manager` daemons that stop `train.py` exiting, so
 local CPU runs use `--num-workers 0`.

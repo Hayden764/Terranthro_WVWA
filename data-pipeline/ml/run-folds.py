@@ -2,19 +2,31 @@
 run-folds.py — Run the model v2 comparison across every GPU on the machine
 ===========================================================================
 
-Builds the full job list and keeps every GPU busy with one job at a time:
+Builds the job list and keeps every GPU busy with one job at a time.
+Candidates: A = 0.773 model, decoder retrained (encoder frozen), own stats;
+B = fresh model, encoder frozen; C = fresh model, encoder gradually unfrozen.
+
+--plan pair (default, the simplified comparison) — Van Duzer Corridor and
+Lower Long Tom are both held out of training and graded:
+
+  baseline-pair         the current 0.773 model, predicted + scored on both
+  A-pair, B-pair, C-pair  trained once on the other four AVAs, scored on both
+
+--plan six (full leave-one-AVA-out) — every AVA takes a turn as the test:
 
   baseline-<ava>        the current 0.773 model, predicted + scored on each AVA
-  A-holdout-<ava>       0.773 model, decoder retrained (encoder frozen), own stats
-  B-holdout-<ava>       fresh model, encoder frozen
-  C-holdout-<ava>       fresh model, encoder gradually unfrozen
+  {A,B,C}-holdout-<ava> trained with that AVA held out, scored on it
 
-Each training job trains with that AVA held out, predicts the held-out AVA
-with its best checkpoint, and scores it with score-ava.py.  Jobs whose
-score.json already exists are skipped, so re-running the same command after
-a crash or a stop picks up where it left off.
+--final A|B|C trains that candidate on all six AVAs (the production model;
+nothing is left to score it on) instead of running a comparison.
 
-Output per job:  <out>/<job>/{train.log, predict.log, score.log, predictions/, score/}
+Each training job predicts its held-out AVA(s) with its best checkpoint and
+scores them with score-ava.py.  Finished jobs (every score.json present, or a
+final job's checkpoint) are skipped, so re-running the same command after a
+crash or a stop picks up where it left off.
+
+Output per job:  <out>/<job>/train.log
+                 <out>/<job>/<ava>/{predict.log, score.log, predictions/, score/}
 Checkpoints:     ml/checkpoints/<job>/
 Summary:         <out>/results.csv and <out>/results.md   (also via --summarize)
 With --sync-to DIR, each finished job (results + checkpoints) and the summary
@@ -27,6 +39,8 @@ Usage (on the GPU machine, from data-pipeline/)
   .venv/bin/python ml/run-folds.py --smoke            # 3-batch, 1-tile run of everything
   .venv/bin/python ml/run-folds.py                    # the real thing, all GPUs
   .venv/bin/python ml/run-folds.py --only '^A-'       # just candidate A
+  .venv/bin/python ml/run-folds.py --plan six         # full leave-one-AVA-out
+  .venv/bin/python ml/run-folds.py --final B          # winner, trained on all six
   .venv/bin/python ml/run-folds.py --summarize        # rebuild the results table
 """
 
@@ -60,6 +74,7 @@ LABELS = {
 }
 BASELINE_CKPT = "ml/checkpoints/unet-resnet34-epepoch=02-iouval_iou=0.773.ckpt"
 BASELINE_STATS = "data/patches-osip-2022/stats.json"
+PAIR = ["Van Duzer Corridor", "Lower Long Tom"]   # hilly + windy, flat valley floor
 NEVER = "100000"   # an unfreeze epoch that never arrives = encoder stays frozen
 
 # Training settings per candidate (extra train.py arguments)
@@ -76,12 +91,27 @@ def slug(ava: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", ava.lower().replace("polk county oregon", "")).strip("-")
 
 
-def build_jobs():
-    jobs = [{"name": f"baseline-{slug(a)}", "ava": a, "kind": "baseline"} for a in LABELS]
+def build_jobs(plan, final=None):
+    """Each job: held-out AVAs (left out of training) = the AVAs it is scored on."""
+    if final:
+        return [{"name": f"final-{final}", "avas": [], "kind": "train", "cand": final}]
+    if plan == "pair":
+        jobs = [{"name": "baseline-pair", "avas": PAIR, "kind": "baseline"}]
+        jobs += [{"name": f"{c}-pair", "avas": PAIR, "kind": "train", "cand": c}
+                 for c in CANDIDATES]
+        return jobs
+    jobs = [{"name": f"baseline-{slug(a)}", "avas": [a], "kind": "baseline"} for a in LABELS]
     for cand in CANDIDATES:
-        jobs += [{"name": f"{cand}-holdout-{slug(a)}", "ava": a, "kind": "train", "cand": cand}
+        jobs += [{"name": f"{cand}-holdout-{slug(a)}", "avas": [a], "kind": "train", "cand": cand}
                  for a in LABELS]
     return jobs
+
+
+def is_done(job, out_root: Path) -> bool:
+    out = out_root / job["name"]
+    if not job["avas"]:
+        return (out / "final.json").exists()
+    return all((out / slug(a) / "score" / "score.json").exists() for a in job["avas"])
 
 
 def best_checkpoint(ckpt_dir: Path) -> Path:
@@ -116,26 +146,34 @@ def run_job(job, gpu, args, workers):
     else:
         ckpt_dir = ML / "checkpoints" / job["name"]
         shutil.rmtree(ckpt_dir, ignore_errors=True)   # never pick up a stale run's checkpoint
-        train = [py, "ml/train.py", "--ava-patches-dir", args.patches,
-                 "--holdout-ava", job["ava"], "--run-name", job["name"],
+        holdout = [x for a in job["avas"] for x in ("--holdout-ava", a)] or ["--no-holdout"]
+        train = [py, "ml/train.py", "--ava-patches-dir", args.patches, *holdout,
+                 "--run-name", job["name"],
                  "--batch-size", str(args.batch_size), "--num-workers", str(workers),
                  *CANDIDATES[job["cand"]]]
         if args.smoke:
             train += ["--limit-batches", "3", "--epochs", "1"]
         run_step(train, out / "train.log", env)
         ckpt, stats = best_checkpoint(ckpt_dir), ckpt_dir / "stats.json"
+        if not job["avas"]:
+            (out / "final.json").write_text(json.dumps(
+                {"candidate": job["cand"], "ckpt": str(ckpt.relative_to(ROOT)),
+                 "stats": str(stats.relative_to(ROOT))}, indent=2))
 
-    pred_dir = out / "predictions"
-    shutil.rmtree(pred_dir, ignore_errors=True)
-    run_step([py, "ml/predict.py", "--ckpt", str(ckpt), "--stats", str(stats),
-              "--osip-dir", args.tiles, "--out-dir", str(pred_dir),
-              "--avas", args.avas, "--ava", job["ava"], "--prob-dtype", "uint8",
-              *smoke_predict], out / "predict.log", env)
-    run_step([py, "ml/score-ava.py", "--pred-dir", str(pred_dir), "--avas", args.avas,
-              "--ava", job["ava"], "--labels", LABELS[job["ava"]],
-              "--out-dir", str(out / "score")], out / "score.log", env)
-    if not args.keep_predictions:
+    for ava in job["avas"]:
+        ava_out = out / slug(ava)
+        ava_out.mkdir(exist_ok=True)
+        pred_dir = ava_out / "predictions"
         shutil.rmtree(pred_dir, ignore_errors=True)
+        run_step([py, "ml/predict.py", "--ckpt", str(ckpt), "--stats", str(stats),
+                  "--osip-dir", args.tiles, "--out-dir", str(pred_dir),
+                  "--avas", args.avas, "--ava", ava, "--prob-dtype", "uint8",
+                  *smoke_predict], ava_out / "predict.log", env)
+        run_step([py, "ml/score-ava.py", "--pred-dir", str(pred_dir), "--avas", args.avas,
+                  "--ava", ava, "--labels", LABELS[ava],
+                  "--out-dir", str(ava_out / "score")], ava_out / "score.log", env)
+        if not args.keep_predictions:
+            shutil.rmtree(pred_dir, ignore_errors=True)
     if args.sync_to:
         dest = Path(args.sync_to)
         shutil.copytree(out, dest / "runs" / job["name"], dirs_exist_ok=True)
@@ -145,9 +183,9 @@ def run_job(job, gpu, args, workers):
 
 def summarize(out_root: Path):
     rows = []
-    for score in sorted(out_root.glob("*/score/score.json")):
+    for score in sorted(out_root.glob("*/*/score/score.json")):
         r = json.loads(score.read_text())
-        name = score.parent.parent.name
+        name = score.parent.parent.parent.name
         rows.append({
             "job": name, "candidate": name.split("-")[0], "ava": r["ava"],
             "coverage": r["ava_coverage"], "iou": r["pixels"]["iou"],
@@ -199,6 +237,11 @@ def main():
     ap.add_argument("--tiles", default="data/osip-2022-gold6")
     ap.add_argument("--avas", default=f"{LABEL_DIR}/regions.geojson")
     ap.add_argument("--out", default="data/model-v2-runs")
+    ap.add_argument("--plan", choices=["pair", "six"], default="pair",
+                    help="pair: hold out Van Duzer + Lower Long Tom together; "
+                         "six: full leave-one-AVA-out")
+    ap.add_argument("--final", choices=list(CANDIDATES), default=None,
+                    help="Train this candidate on all six AVAs instead of comparing")
     ap.add_argument("--gpus", default=None,
                     help="Comma-separated GPU ids  [default: every GPU nvidia-smi lists]")
     ap.add_argument("--cpu-slots", type=int, default=1,
@@ -219,10 +262,10 @@ def main():
         summarize(out_root)
         return
 
-    jobs = build_jobs()
+    jobs = build_jobs(args.plan, args.final)
     if args.only:
         jobs = [j for j in jobs if re.search(args.only, j["name"])]
-    todo = [j for j in jobs if not (out_root / j["name"] / "score" / "score.json").exists()]
+    todo = [j for j in jobs if not is_done(j, out_root)]
 
     gpus = [int(g) for g in args.gpus.split(",")] if args.gpus else detect_gpus()
     slots = gpus or [None] * args.cpu_slots

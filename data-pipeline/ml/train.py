@@ -316,6 +316,9 @@ def main():
     parser.add_argument("--holdout-ava", action="append", default=[],
                         help="AVA kept out of training entirely, for score-ava.py "
                              "(repeatable; needs --ava-patches-dir)")
+    parser.add_argument("--no-holdout", action="store_true",
+                        help="Train on every AVA in --ava-patches-dir (the final model; "
+                             "nothing is left to score it on)")
     parser.add_argument("--val-tile-frac", type=float, default=0.1,
                         help="Share of training-AVA tiles used to pick the best checkpoint")
     parser.add_argument("--stats", type=str, default=None,
@@ -363,8 +366,10 @@ def main():
 
     # ── Data module ───────────────────────────────────────────────────────────
     if args.ava_patches_dir:
-        if not args.holdout_ava:
-            parser.error("--ava-patches-dir needs at least one --holdout-ava")
+        if not args.holdout_ava and not args.no_holdout:
+            parser.error("--ava-patches-dir needs at least one --holdout-ava (or --no-holdout)")
+        if args.holdout_ava and args.no_holdout:
+            parser.error("--no-holdout and --holdout-ava are mutually exclusive")
         dm = AvaDataModule(
             patches_dir=Path(args.ava_patches_dir),
             holdout_avas=args.holdout_ava,
@@ -378,7 +383,7 @@ def main():
         # predict.py needs the normalisation the model was trained with
         (ckpt_dir / "stats.json").write_text(json.dumps(dm.stats, indent=2))
         print(f"  Train AVAs : {', '.join(dm.train_avas)}")
-        print(f"  Held out   : {', '.join(sorted(dm.holdout_avas))}")
+        print(f"  Held out   : {', '.join(sorted(dm.holdout_avas)) or 'none'}")
     else:
         dm = VineyardDataModule(
             patches_dir=patches_dir,

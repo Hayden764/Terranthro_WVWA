@@ -62,3 +62,5 @@ echo
 echo "Ready. Next:"
 echo "  cd $WORK"
 echo "  python3 ml/run-folds.py --smoke --out data/model-v2-smoke"
+echo "  python3 ml/run-folds.py --sync-to $FS   # simplified comparison (pair plan)"
+echo "  python3 ml/run-folds.py --final <A|B|C> --sync-to $FS   # winner on all six"

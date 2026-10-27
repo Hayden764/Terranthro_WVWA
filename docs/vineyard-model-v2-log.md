@@ -237,6 +237,44 @@ all six AVAs (on the old labels), which gives a reasonable picture in the
 meantime. Testing the winner on every AVA can be added later if needed for
 the write-up; it is skipped for now.
 
+## 2026-10-26 — Simplified comparison results: C wins
+
+Ran on a single A100 (Lambda, new filesystem `TrainingRun2`). Photos
+downloaded and squares cut on the instance (73,178, identical to the Mac's),
+GPU smoke test passed, then the four jobs ran back to back: 5:48–8:57 pm
+PDT. Much faster than estimated: A and B took 32 minutes each, C 114
+minutes. Total instance time about 4.2 hours, roughly $9.
+
+Graded on Van Duzer Corridor and Lower Long Tom, which no candidate saw in
+training:
+
+| | Overlap (IoU) | Edges within 1 m | Edges within 3 m | Missed blocks | False alarms |
+|---|---|---|---|---|---|
+| Current model | 0.614 | 0.092 | 0.264 | 41 / 329 (67.5 ha) | 334 |
+| A — touch-up | 0.822 | 0.315 | 0.554 | 4 / 329 (0.2 ha) | 120 |
+| B — fresh, cautious | 0.815 | 0.334 | 0.577 | 4 / 329 (0.7 ha) | 139 |
+| **C — fresh, fully adjustable** | **0.845** | **0.407** | **0.662** | 8 / 329 (8.6 ha) | **110** |
+
+(Averages of the two AVAs; block counts and false alarms are totals.)
+
+| | Van Duzer: IoU / edges 1 m / false alarms | Lower Long Tom: IoU / edges 1 m / false alarms |
+|---|---|---|
+| Current model | 0.595 / 0.062 / 222 | 0.633 / 0.123 / 112 |
+| A | 0.785 / 0.278 / 82 | 0.858 / 0.351 / 38 |
+| B | 0.789 / 0.313 / 86 | 0.841 / 0.354 / 53 |
+| C | 0.803 / 0.365 / 84 | 0.887 / 0.450 / 26 |
+
+**C is best on overlap, edges and false alarms in both AVAs.** Its edges are
+about 30 % more accurate than A's at 1 m, and over four times the current
+model's. Unlike last time, gradually unlocking the general visual
+knowledge helped instead of causing forgetting: this time the labels are
+exact, the unlocking is slow, and checkpoints are chosen on held-back
+tiles.
+
+**One weakness:** C missed 8 blocks to A's 4. Most of that is 3 blocks
+(8.3 ha) in Van Duzer. These are saved as a map layer in
+`runs/C-pair/van-duzer-corridor/score/` for a look in QGIS.
+
 ---
 
 ## Appendix — technical details

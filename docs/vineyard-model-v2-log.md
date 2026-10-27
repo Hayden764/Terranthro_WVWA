@@ -355,6 +355,38 @@ edges.
 finishes, using the final model and the 2022 photos. Results are copied
 to `TrainingRun2/valley-2022/` as each batch finishes.
 
+## 2026-10-27 — Whole-valley run finished
+
+The run started at 10:22 pm PDT on 10-26 and finished at 3:20 am PDT, about
+5 hours and roughly $10. A supervisor was watching it but never had to
+restart anything.
+- All 8,339 tiles were predicted, and every download succeeded.
+- Each batch of 300 tiles took about 10 minutes to download and 7–8 to
+  predict. Downloading was the slow step.
+
+**Result.** The run produced `valley-vineyards-2022.gpkg`: 9,909 outlines
+covering 18,538 ha. Of those, 9,864 outlines (18,525 ha) are inside the
+Willamette Valley AVA. A copy is at
+`data-pipeline/data/valley/valley-vineyards-2022.gpkg`, and another is in
+`TrainingRun2/valley-2022/`.
+
+| Outline size | Outlines | Hectares |
+|---|---|---|
+| 0.1–0.5 ha | 5,083 | 1,167 |
+| 0.5–2 ha | 2,556 | 2,641 |
+| 2–10 ha | 1,911 | 8,857 |
+| over 10 ha | 359 | 5,874 |
+
+**Not yet checked.** 18,538 ha is more than the valley's reported vineyard
+acreage, and the tiles that were already fully traced were left out of the
+run. So a large share of these outlines are probably other crops that look
+like vineyard rows, such as blueberries, hazelnuts, nurseries and Christmas
+trees. The run also included tiles that were only partly traced, so some
+outlines repeat blocks already in the database. Next steps:
+- remove outlines that overlap known blocks
+- look at a sample of the remaining outlines by size band before anything
+  goes into the database
+
 ---
 
 ## Appendix — technical details

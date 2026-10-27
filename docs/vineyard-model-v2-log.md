@@ -275,6 +275,50 @@ tiles.
 (8.3 ha) in Van Duzer. These are saved as a map layer in
 `runs/C-pair/van-duzer-corridor/score/` for a look in QGIS.
 
+## 2026-10-26 — Final model training; whole-valley run scoped
+
+**Final model.** C is being trained on all six AVAs (66,028 squares),
+started 9:03 pm PDT. This is the production candidate. There is no AVA left
+to test it on, so its quality is taken from the comparison above.
+
+**Do 2024 photos work? Not yet.** C (the version that never saw Van Duzer)
+was run on Van Duzer's 2024 photos and graded against the same tracing:
+
+| Van Duzer | Overlap (IoU) | Edges within 1 m | Missed blocks | False alarms |
+|---|---|---|---|---|
+| 2022 photos | 0.803 | 0.365 | 3 (8.3 ha) | 84 (83 ha) |
+| 2024 photos | 0.318 | 0.060 | 11 (43.9 ha) | 881 (858 ha) |
+
+858 ha of false alarms is more than all of Van Duzer's traced vineyard
+(494 ha), so this is not new plantings. The 2024 photos are processed very
+differently: red, green and blue are about 40 levels brighter on average
+(124 → 164 out of 255) and near-infrared slightly darker. The model has
+only seen 2022's look. Using 2024 would need either colour-matching the
+2024 photos to 2022, or adding 2024 photos to training. **The valley run
+uses 2022.**
+
+**Whole Willamette Valley, scoped.** The AVA covers 13,946 km², which is
+9,980 photo tiles. Three filters were tested:
+
+| Filter | Tiles removed | Known vineyard lost |
+|---|---|---|
+| Lowest ground above 1,500 ft (the highest valley vineyard block reaches 1,336 ft) | 37 | none |
+| Already hand-traced (6 training AVAs + Chehalem, Dundee, Yamhill-Carlton) | 998 | — |
+| Built-up: ≥ 30 % of the tile in lots under 1 acre (county parcel data) | 611 | 1 block, 0.6 ha |
+
+That leaves **8,339 tiles**, 306 of them already downloaded. About 520 GB to
+download, more than the instance's ~370 GB free, so it must run in batches
+(download, predict, delete). Elevation removes little because the AVA
+boundary already follows the foothills.
+
+Estimate on the same 1× A100: downloading takes 3–4.5 hours at the state
+server's good speed (up to ~22 hours at its worst), predicting about 4.6
+hours, and the two can overlap. Roughly 6–24 hours, **$12–50**.
+
+Needed before running: a batch script (download → predict → delete), and
+joining polygons across tile edges. The current vectorizer works tile by
+tile, so a vineyard crossing a tile edge would come out in two pieces.
+
 ---
 
 ## Appendix — technical details

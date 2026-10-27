@@ -319,6 +319,42 @@ Needed before running: a batch script (download → predict → delete), and
 joining polygons across tile edges. The current vectorizer works tile by
 tile, so a vineyard crossing a tile edge would come out in two pieces.
 
+## 2026-10-26 — Whole-valley run built, tested and queued
+
+**Built.**
+- `scripts/valley-tiles.py` picks the tiles: the 8,339 from the scoping
+  above. It records each tile's measurements, so the cut-offs can be changed
+  later without recomputing.
+- `ml/predict-valley.py` works through them in batches of 300. It downloads
+  the next batch while the GPU predicts the current one, and deletes each
+  photo once it has been predicted, so at most about 60 GB of photos are on
+  disk at a time. It then turns the predictions into outlines with the
+  production clean-up and joins outlines across tile edges. If stopped, it
+  carries on where it left off, retrying any tiles whose download failed.
+
+**A bug found and fixed in testing.** The clean-up step that smooths
+outlines (a 3 m "closing") treated everything beyond a tile's edge as
+non-vineyard. It shaved about 3 m off every shape where it met the edge,
+so the two halves of a vineyard crossing the edge never touched and could
+not be joined. The valley run now extends each tile's map slightly past its
+edges before cleaning up, then trims back. The existing per-tile vectorizer
+and the scorer still have this small gap at tile seams. It makes little
+difference to the scores, but production outlines have been ~3 m short
+wherever they cross a tile edge.
+
+**Tested** on a 2 × 2 square of tiles near the middle of the valley, using
+C from the comparison: 66 known vineyard blocks, 16 of them crossing tile
+edges.
+- 60 of the 66 known blocks were found.
+- All 16 edge-crossing blocks came out as a single outline each.
+- 2 of the 33 outlines are not on a known block, so either new vineyard or
+  false alarms.
+- Re-running the same command skipped the finished tiles.
+
+**Queued.** The valley run starts automatically when the final C training
+finishes, using the final model and the 2022 photos. Results are copied
+to `TrainingRun2/valley-2022/` as each batch finishes.
+
 ---
 
 ## Appendix — technical details

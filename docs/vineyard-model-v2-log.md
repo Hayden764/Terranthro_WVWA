@@ -389,6 +389,59 @@ outlines repeat blocks already in the database. Next steps:
 
 ---
 
+## 2026-10-29 — Cleaned outlines turned into a naming layer
+
+Hayden deleted the non-vineyards from `data/valley/valley-vineyards-2022.gpkg`
+in QGIS (9,909 → 6,846 outlines). `data-pipeline/scripts/prepare-valley-blocks.py`
+turns what's left into `data/Vineyards_W_Names/willamette_valley_2022-blocks-owners.gpkg`.
+Its fields match the west AVAs' `*-blocks-owners` files, so it can be loaded the same way later.
+
+- **Overlap with the database:** 801 outlines (1,945 ha) were at least 50 % inside existing
+  `vineyard_blocks`, almost all 80 %+ (median 97 %). These were dropped to layer `dropped_overlap`.
+  8 more were partly inside: the database part was cut off and the rest kept.
+  6,045 blocks remain, with no overlap left.
+- **AVA:** 5,865 are only in the Willamette Valley AVA; 164 sit in sub-AVAs (mostly edge tiles); 16 are outside it.
+- **Naming help:** 35 blocks lie within 30 m of a database vineyard, and their names were pre-filled from it.
+  301 have a winery, tasting-room or TTB-permit hint. 469 owner groups were formed.
+- **Gap:** the parcel file has owner names for only 1,291 blocks. Marion (3,045
+  blocks), Clackamas and Washington have no `ownername`, and Yamhill almost none.
+- Re-running the script keeps names typed into the output (matched by `src_fid`).
+  Outlines deleted from the output also stay deleted. A run takes about 9 minutes.
+
+## 2026-11-02 — Chehalem Mountains, Dundee Hills and Yamhill-Carlton finished and scored
+
+The whole-valley run skipped most of these three AVAs because they were counted
+as already traced, so only about a third of each had run. This pass ran all 468
+tiles touching them on a 1× A10 (no filesystem, since TrainingRun2's Arizona
+region had no instances free). 0 downloads failed. Instance about 1¼ hours,
+under $2; prediction took about 2.6 s a tile, against about 1.5 on the A100.
+
+**Their blocks are not gold labels.** All of them carry `source_dataset = 'tax-lot'`
+in the database, but at a median of about 1 ha they are the cleaned-up outlines
+left out of training, not whole county lots. They are the comparison here, so
+block counts are a fair test of the final model, which never trained on them.
+Pixel and edge scores are held back by the looser outlines.
+
+| AVA | IoU | Recall | Edge F1 @1 m | Edge F1 @3 m | Missed blocks | Unmatched outlines | Traced vs predicted |
+|---|---|---|---|---|---|---|---|
+| Chehalem Mountains | 0.787 | 0.951 | 0.363 | 0.643 | 60 of 990 (16 ha) | 280 of 913 (188 ha) | 1,168 vs 1,349 ha |
+| Dundee Hills | 0.902 | 0.938 | 0.429 | 0.802 | 56 of 734 (30 ha) | 31 of 445 (12 ha) | 967 vs 953 ha |
+| Yamhill-Carlton | 0.841 | 0.903 | 0.481 | 0.789 | 57 of 859 (83 ha) | 76 of 635 (52 ha) | 1,161 vs 1,135 ha |
+
+**Output.** `scripts/sub-ava-review.py` writes
+`data/valley/sub-ava-vineyards-2022.gpkg`: 1,892 outlines, 3,820 ha, kept apart
+from the hand-cleaned valley layer. Each is marked by `status` (share inside
+`vineyard_blocks`), `first_run` (centre in a tile the valley run already did) and
+`ava`. 232 outlines (130 ha) are `new` and not `first_run`, so they have not been
+looked at yet: 156 in Chehalem (88 ha), 25 in Dundee (10 ha), 39 in Yamhill-Carlton
+(26 ha), 12 outside the three (7 ha). Most are small (177 under 0.5 ha); 17 are
+2–10 ha. Whether they are missing vineyards or false alarms is not yet checked.
+`first_run` outlines may repeat ones already deleted in the valley clean-up.
+
+Maps and scores are in `data/sub-ava-2022/` on the Mac (510 MB, checksums verified).
+The labels are in `data/BlocksDB-unseen-2026-11-02/`. Rerun with
+`scripts/run-sub-avas.sh`.
+
 ## Appendix — technical details
 
 **Imagery.** OSIP 2022 `_SL` ImageServer, 4-band RGBN, 0.3048 m, EPSG:32610,

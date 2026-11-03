@@ -16,11 +16,17 @@ out of the labels and cut out of the graded area — the cutter and scorer
 treat them like outside-the-AVA: ignored.  Use regions.geojson wherever the
 pipeline takes --avas.
 
+--unseen exports the three AVAs left out of training instead.  All their blocks
+carry source 'tax-lot' but are cleaned-up outlines (median ~1 ha), not whole
+lots, so they are kept as labels: fit for block counts, too loose for edge scores.
+
 Read-only against the database (DATABASE_URL in server/.env).
 
 Usage
 -----
   .venv/bin/python scripts/export-db-labels.py --out data/BlocksDB-2026-10-16
+  .venv/bin/python scripts/export-db-labels.py --unseen --avas data/ava/oregon_avas.geojson \\
+      --out data/BlocksDB-unseen-2026-11-02     # the traced AVAs the model never trained on
 """
 
 import json
@@ -39,6 +45,11 @@ AVAS = {
     "Lower Long Tom": "lower-long-tom",
     "Tualatin Hills": "tualatin-hills",
 }
+UNSEEN = {
+    "Chehalem Mountains": "chehalem-mountains",
+    "Dundee Hills": "dundee-hills",
+    "Yamhill-Carlton": "yamhill-carlton",
+}
 LOOSE_SOURCES = {"tax-lot"}
 
 
@@ -48,7 +59,8 @@ LOOSE_SOURCES = {"tax-lot"}
               show_default=True, type=click.Path(exists=True))
 @click.option("--env", "env_file", default="../server/.env", show_default=True,
               type=click.Path(exists=True))
-def main(out_dir, avas_file, env_file):
+@click.option("--unseen", is_flag=True, help="Export the AVAs the model never trained on")
+def main(out_dir, avas_file, env_file, unseen):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     url = next(l.split("=", 1)[1].strip().strip('"')
@@ -63,11 +75,11 @@ def main(out_dir, avas_file, env_file):
     avas = gpd.read_file(avas_file).to_crs(blocks.crs).set_index("name")
     regions = []
     summary = {}
-    for name, slug in AVAS.items():
+    for name, slug in (UNSEEN if unseen else AVAS).items():
         ava = avas.loc[name].geometry
         here = blocks[blocks.intersects(ava)]
-        traced = here[~here.source_dataset.isin(LOOSE_SOURCES)]
-        loose = here[here.source_dataset.isin(LOOSE_SOURCES)]
+        is_loose = here.source_dataset.isin(set() if unseen else LOOSE_SOURCES)
+        traced, loose = here[~is_loose], here[is_loose]
         traced.to_file(out_dir / f"{slug}.gpkg", driver="GPKG")
         region = ava.difference(unary_union(loose.geometry)) if len(loose) else ava
         regions.append({"name": name, "geometry": region})

@@ -138,7 +138,7 @@ def downloader(batches, q, args, out):
 # ── Merge ─────────────────────────────────────────────────────────────────────
 
 def merge(out, year, min_area, simplify, valley, sync_to):
-    parts = [gpd.read_file(p) for p in sorted((out / "shapes").glob("*.gpkg"))]
+    parts = [gpd.read_file(p) for p in sorted((out / "shapes").glob("[!.]*.gpkg"))]
     parts = [p for p in parts if len(p)]
     if not parts:
         print("No shapes to merge.")
@@ -209,7 +209,7 @@ def main():
     grid = gpd.read_file(args.tiles)
     grid = grid[grid.keep] if not args.only else grid[grid.tile.isin(args.only.split(","))]
     finished = set()
-    for m in (out / "done").glob("*.json"):
+    for m in (out / "done").glob("[!.]*.json"):
         finished |= set(json.loads(m.read_text())["tiles_ok"])
     todo = [(r.tile, tuple(r.geometry.bounds)) for r in grid.itertuples() if r.tile not in finished]
     todo.sort()

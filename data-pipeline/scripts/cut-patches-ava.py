@@ -37,6 +37,9 @@ Two ways to get the photos
                     a per-region probability that hits --neg-ratio on
                     average.  Resumable: a tile whose patches/<tile>/_meta.json
                     exists is skipped.  --dry-run needs no downloads.
+                    To use many CPUs: --plan-only once, then one process per
+                    --shard K/N (each with its own --download-dir), then
+                    --finish-only to write manifest.json + ava_stats.json.
 
 Mask values
 -----------
@@ -300,9 +303,14 @@ def report(counts, n_neg_by_region, P):
               help="Negative patches with mean NDVI above this are tagged hard_negative")
 @click.option("--seed", type=int, default=42, show_default=True)
 @click.option("--dry-run", is_flag=True)
+@click.option("--shard", default=None, help="--stream: cut only every Nth tile, e.g. 3/8 (0-based)")
+@click.option("--plan-only", is_flag=True, help="--stream: write plan.json and stop")
+@click.option("--finish-only", is_flag=True,
+              help="--stream: only gather the tiles' _meta.json into manifest.json")
 def main(tiles_dir, stream_year, valley, download_dir, keep_photos, batch, dl_workers, avas_file,
          labels, label_all, hard_neg, fa_min_pct, out_dir, patch_size, stride, erosion_m,
-         min_inside, min_pos_pct, neg_ratio, hard_ndvi, seed, dry_run):
+         min_inside, min_pos_pct, neg_ratio, hard_ndvi, seed, dry_run, shard, plan_only,
+         finish_only):
     if (tiles_dir is None) == (stream_year is None):
         sys.exit("Give exactly one of --tiles-dir or --stream YEAR")
     out_dir = Path(out_dir)
@@ -311,12 +319,15 @@ def main(tiles_dir, stream_year, valley, download_dir, keep_photos, batch, dl_wo
     if tiles_dir:
         run_local(Path(tiles_dir), avas_file, labels, label_all, hard_neg, erosion_m, out_dir,
                   args, neg_ratio, hard_ndvi, seed, dry_run)
+    elif finish_only:
+        names = gpd.read_file(avas_file)["name"].tolist()
+        finish(out_dir, names)
     else:
-        if not dry_run and not download_dir:
+        if not (dry_run or plan_only) and not download_dir:
             sys.exit("--stream needs --download-dir")
         run_stream(stream_year, Path(valley), download_dir, keep_photos, batch, dl_workers,
                    avas_file, labels, label_all, hard_neg, erosion_m, out_dir, args, neg_ratio,
-                   hard_ndvi, seed, dry_run)
+                   hard_ndvi, seed, dry_run, shard, plan_only)
 
 
 def run_local(tiles_dir, avas_file, labels, label_all, hard_neg, erosion_m, out_dir, args,
@@ -362,7 +373,8 @@ def run_local(tiles_dir, avas_file, labels, label_all, hard_neg, erosion_m, out_
 
 
 def run_stream(year, valley, download_dir, keep_photos, batch, dl_workers, avas_file, labels,
-               label_all, hard_neg, erosion_m, out_dir, args, neg_ratio, hard_ndvi, seed, dry_run):
+               label_all, hard_neg, erosion_m, out_dir, args, neg_ratio, hard_ndvi, seed, dry_run,
+               shard=None, plan_only=False):
     spec = importlib.util.spec_from_file_location("download_osip", HERE / "download-osip.py")
     dl = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(dl)
@@ -383,6 +395,8 @@ def run_stream(year, valley, download_dir, keep_photos, batch, dl_workers, avas_
     plan_path = out_dir / "plan.json"
     if plan_path.exists():
         plan = json.loads(plan_path.read_text())
+    elif shard:
+        sys.exit(f"No {plan_path} — run --plan-only first so every shard samples the same way")
     else:
         counts = {a: {"pos": 0, "neg": 0, "fa": 0} for a in lab.regions}
         for t in tqdm(tiles, desc="plan"):
@@ -400,9 +414,16 @@ def run_stream(year, valley, download_dir, keep_photos, batch, dl_workers, avas_
     if dry_run:
         click.echo("[DRY RUN] nothing downloaded or written.")
         return
+    if plan_only:
+        click.echo(f"Plan → {plan_path}")
+        return
 
     def tname(t):
         return f"osip{year}_{int(t[0])}_{int(t[1])}.tif"
+    if shard:
+        k, n = map(int, shard.split("/"))
+        tiles = tiles[k::n]
+        click.echo(f"Shard {k}/{n}: {len(tiles):,} tiles")
     todo = [t for t in tiles if not (out_dir / "patches" / Path(tname(t)).stem / "_meta.json").exists()]
     click.echo(f"{len(tiles) - len(todo):,} tiles already cut, {len(todo):,} to go")
     photo_dir = Path(download_dir)
@@ -453,9 +474,11 @@ def run_stream(year, valley, download_dir, keep_photos, batch, dl_workers, avas_
                 Path(got[t]).unlink(missing_ok=True)
     bar.close()
     if failed:
-        (out_dir / "failed_tiles.txt").write_text("\n".join(failed))
+        name = f"failed_tiles{'-' + shard.replace('/', 'of') if shard else ''}.txt"
+        (out_dir / name).write_text("\n".join(failed))
         click.echo(f"{len(failed)} tiles failed to download — rerun to retry them")
-    finish(out_dir, list(lab.regions))
+    if not shard:
+        finish(out_dir, list(lab.regions))
 
 
 if __name__ == "__main__":

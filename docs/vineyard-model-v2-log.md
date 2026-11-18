@@ -507,6 +507,44 @@ and Yamhill-Carlton are now included.
   0.5 is meant for the valley regions.
 - Smoke test of one epoch with both options on CPU: ran clean.
 
+**Lambda run set up** (`run-folds.py --plan valley`). Held out and graded: Van Duzer, Lower
+Long Tom and the test area, all against the new labels.
+- `C-pair-rescore`: the October C-pair checkpoint. It never saw any of the three regions.
+  It is on TrainingRun2 only, and the job is skipped if the filesystem doesn't have it.
+- `final-C-test-area`: the production model, on the test area only.
+- `V-valley`: C's recipe with `--sensor-aug --balance-alpha 0.5`.
+- `W-valley`: the same without `--sensor-aug`, to show what it costs on 2022.
+
+Scripts:
+- `scripts/lambda-push-valley.sh` sends code, labels, `plan.json` and final-C by tar over ssh.
+- `scripts/lambda-prep-valley.sh` installs dependencies, downloads the graded regions'
+  2022 photos and cuts the patches in 8 parallel shards (`--shard K/N`, then
+  `--finish-only`).
+- `scripts/lambda-run-valley.sh` runs prep and then all jobs unattended. It syncs to
+  `<fs>/model-v3/`, its own folder so the v2 results stay as they are.
+- The cutting plan is made on the Mac (`--plan-only`, about 1.5 h of CPU) and shipped, so
+  the GPU instance doesn't pay for it.
+
+Local end-to-end smoke test of the whole flow at miniature scale: 0.64 km² each of
+Eola-Amity, Van Duzer, Lower Long Tom and the test area; plan, 2 shards, finish, graded
+photos, `run-folds --plan valley --smoke`.
+
+**Whole-valley cutting plan** (`data/patches-valley-2022/plan.json`, made on the Mac): 9,868
+of the 9,980 OSIP tiles touch a region. **268,863 patches, about 88 GB**:
+- 98,000 positive
+- 128,000 random negative
+- 43,000 false-alarm windows, 15,658 of them in Marion
+
+The three graded regions take 27,000, which leaves about 242,000 to train on, 3.7× the
+six-AVA set. In the county regions, false-alarm windows outnumber vineyard windows
+(Marion 15,658 against 8,253). That is deliberate weight on the farm confusion, but if V/W
+lose recall on the graded regions, this is the first thing to turn down (`--fa-min-pct`, or
+sample the false alarms).
+
+Estimate on 1× A100 40 GB ($1.99/h): cutting 2–3 h; each model about 11 min/epoch, so
+roughly 5–6 h if it stops near epoch 30 as final-C did; grading under 1 h. About 14–16 h,
+**about $30–35** for both V and W.
+
 ## Appendix — technical details
 
 **Imagery.** OSIP 2022 `_SL` ImageServer, 4-band RGBN, 0.3048 m, EPSG:32610,

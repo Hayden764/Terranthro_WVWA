@@ -20,6 +20,21 @@ Lower Long Tom are both held out of training and graded:
 --final A|B|C trains that candidate on all six AVAs (the production model;
 nothing is left to score it on) instead of running a comparison.
 
+--plan valley (the whole-valley retrain, 2026-11-18) — trained on the database
+blocks + hand-traced staging blocks over the whole valley
+(scripts/build-valley-labels.py), with Van Duzer Corridor, Lower Long Tom and
+the Mt Angel-Monitor test area held out and graded:
+
+  C-pair-rescore        the existing C-pair checkpoint, graded on all three
+                        against the new labels (it never saw any of them)
+  final-C-test-area     the production model, graded on the test area only
+                        (it trained on the other two)
+  V-valley              C's recipe on the valley + --sensor-aug + --balance-alpha 0.5
+  W-valley              the same without --sensor-aug, to see what it costs on 2022
+
+The patches come from cut-patches-ava.py --stream and the graded tiles from
+download-osip.py (see scripts/lambda-prep-valley.sh).
+
 Each training job predicts its held-out AVA(s) with its best checkpoint and
 scores them with score-ava.py.  Finished jobs (every score.json present, or a
 final job's checkpoint) are skipped, so re-running the same command after a
@@ -75,6 +90,14 @@ LABELS = {
 BASELINE_CKPT = "ml/checkpoints/unet-resnet34-epepoch=02-iouval_iou=0.773.ckpt"
 BASELINE_STATS = "data/patches-osip-2022/stats.json"
 PAIR = ["Van Duzer Corridor", "Lower Long Tom"]   # hilly + windy, flat valley floor
+VALLEY_DIR = "data/labels-valley-2022-2026-11-18"
+VALLEY_HOLD = PAIR + ["Test - Mt Angel-Monitor"]
+VALLEY_DEFAULTS = {"patches": "data/patches-valley-2022", "tiles": "data/osip-2022-holdout",
+                   "avas": f"{VALLEY_DIR}/regions.geojson", "labels_all": f"{VALLEY_DIR}/blocks.gpkg",
+                   "out": "data/model-v3-runs"}
+GOLD6_DEFAULTS = {"patches": "data/patches-gold6-db-2022", "tiles": "data/osip-2022-gold6",
+                  "avas": f"{LABEL_DIR}/regions.geojson", "labels_all": None,
+                  "out": "data/model-v2-runs"}
 NEVER = "100000"   # an unfreeze epoch that never arrives = encoder stays frozen
 
 # Training settings per candidate (extra train.py arguments)
@@ -85,6 +108,9 @@ CANDIDATES = {
     "C": ["--unfreeze-start", "5", "--unfreeze-interval", "5", "--lr", "1e-4",
           "--epochs", "60", "--patience", "15"],
 }
+_C = CANDIDATES["C"]
+CANDIDATES["V"] = _C + ["--sensor-aug", "--balance-alpha", "0.5"]
+CANDIDATES["W"] = _C + ["--balance-alpha", "0.5"]
 
 
 def slug(ava: str) -> str:
@@ -95,13 +121,22 @@ def build_jobs(plan, final=None):
     """Each job: held-out AVAs (left out of training) = the AVAs it is scored on."""
     if final:
         return [{"name": f"final-{final}", "avas": [], "kind": "train", "cand": final}]
+    if plan == "valley":
+        return [
+            {"name": "C-pair-rescore", "avas": VALLEY_HOLD, "kind": "existing",
+             "ckpt_dir": "ml/checkpoints/C-pair"},
+            {"name": "final-C-test-area", "avas": VALLEY_HOLD[2:], "kind": "existing",
+             "ckpt_dir": "ml/checkpoints/final-C"},
+            {"name": "V-valley", "avas": VALLEY_HOLD, "kind": "train", "cand": "V"},
+            {"name": "W-valley", "avas": VALLEY_HOLD, "kind": "train", "cand": "W"},
+        ]
     if plan == "pair":
         jobs = [{"name": "baseline-pair", "avas": PAIR, "kind": "baseline"}]
         jobs += [{"name": f"{c}-pair", "avas": PAIR, "kind": "train", "cand": c}
-                 for c in CANDIDATES]
+                 for c in "ABC"]
         return jobs
     jobs = [{"name": f"baseline-{slug(a)}", "avas": [a], "kind": "baseline"} for a in LABELS]
-    for cand in CANDIDATES:
+    for cand in "ABC":
         jobs += [{"name": f"{cand}-holdout-{slug(a)}", "avas": [a], "kind": "train", "cand": cand}
                  for a in LABELS]
     return jobs
@@ -143,6 +178,9 @@ def run_job(job, gpu, args, workers):
 
     if job["kind"] == "baseline":
         ckpt, stats = ROOT / BASELINE_CKPT, ROOT / BASELINE_STATS
+    elif job["kind"] == "existing":
+        ckpt_dir = ROOT / job["ckpt_dir"]
+        ckpt, stats = best_checkpoint(ckpt_dir), ckpt_dir / "stats.json"
     else:
         ckpt_dir = ML / "checkpoints" / job["name"]
         shutil.rmtree(ckpt_dir, ignore_errors=True)   # never pick up a stale run's checkpoint
@@ -170,7 +208,7 @@ def run_job(job, gpu, args, workers):
                   "--avas", args.avas, "--ava", ava, "--prob-dtype", "uint8",
                   *smoke_predict], ava_out / "predict.log", env)
         run_step([py, "ml/score-ava.py", "--pred-dir", str(pred_dir), "--avas", args.avas,
-                  "--ava", ava, "--labels", LABELS[ava],
+                  "--ava", ava, "--labels", args.labels_all or LABELS[ava],
                   "--out-dir", str(ava_out / "score")], ava_out / "score.log", env)
         if not args.keep_predictions:
             shutil.rmtree(pred_dir, ignore_errors=True)
@@ -233,13 +271,15 @@ def detect_gpus():
 
 def main():
     ap = argparse.ArgumentParser(description="Run the model v2 comparison on all GPUs")
-    ap.add_argument("--patches", default="data/patches-gold6-db-2022")
-    ap.add_argument("--tiles", default="data/osip-2022-gold6")
-    ap.add_argument("--avas", default=f"{LABEL_DIR}/regions.geojson")
-    ap.add_argument("--out", default="data/model-v2-runs")
-    ap.add_argument("--plan", choices=["pair", "six"], default="pair",
+    ap.add_argument("--patches", default=None, help="[default: per plan]")
+    ap.add_argument("--tiles", default=None, help="[default: per plan]")
+    ap.add_argument("--avas", default=None, help="[default: per plan]")
+    ap.add_argument("--labels-all", default=None,
+                    help="One label file for every graded region  [default: per plan]")
+    ap.add_argument("--out", default=None, help="[default: per plan]")
+    ap.add_argument("--plan", choices=["pair", "six", "valley"], default="pair",
                     help="pair: hold out Van Duzer + Lower Long Tom together; "
-                         "six: full leave-one-AVA-out")
+                         "six: full leave-one-AVA-out; valley: whole-valley retrain")
     ap.add_argument("--final", choices=list(CANDIDATES), default=None,
                     help="Train this candidate on all six AVAs instead of comparing")
     ap.add_argument("--gpus", default=None,
@@ -256,6 +296,9 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--summarize", action="store_true")
     args = ap.parse_args()
+    for k, v in (VALLEY_DEFAULTS if args.plan == "valley" else GOLD6_DEFAULTS).items():
+        if getattr(args, k) is None:
+            setattr(args, k, v)
 
     out_root = ROOT / args.out
     if args.summarize:
@@ -263,6 +306,9 @@ def main():
         return
 
     jobs = build_jobs(args.plan, args.final)
+    for j in [j for j in jobs if j["kind"] == "existing" and not (ROOT / j["ckpt_dir"]).is_dir()]:
+        print(f"Skipping {j['name']}: no checkpoint at {j['ckpt_dir']}")
+        jobs.remove(j)
     if args.only:
         jobs = [j for j in jobs if re.search(args.only, j["name"])]
     todo = [j for j in jobs if not is_done(j, out_root)]

@@ -328,6 +328,12 @@ def main():
                         help="Cap train/val batches per epoch (smoke tests)")
     parser.add_argument("--no-balance", action="store_true",
                         help="Sample AVAs in proportion to patch count instead of equally")
+    parser.add_argument("--balance-alpha", type=float, default=0.0,
+                        help="Region share of an epoch ∝ patches**alpha (0 = equal, 1 = none; "
+                             "0.5 for the whole-valley regions)")
+    parser.add_argument("--sensor-aug", action="store_true",
+                        help="Randomly shift band gains/offsets (incl. NIR) before NDVI, so the "
+                             "model copes with other photo years")
     parser.add_argument("--run-name", type=str, default=None,
                         help="Checkpoint/log subfolder, e.g. holdout-vanduzer")
     parser.add_argument("--batch-size",  type=int, default=32)
@@ -378,12 +384,15 @@ def main():
             balance_avas=not args.no_balance,
             val_tile_frac=args.val_tile_frac,
             stats=json.loads(Path(args.stats).read_text()) if args.stats else None,
+            balance_alpha=args.balance_alpha,
+            sensor_aug=args.sensor_aug,
         )
         dm.setup()
         # predict.py needs the normalisation the model was trained with
         (ckpt_dir / "stats.json").write_text(json.dumps(dm.stats, indent=2))
         print(f"  Train AVAs : {', '.join(dm.train_avas)}")
         print(f"  Held out   : {', '.join(sorted(dm.holdout_avas)) or 'none'}")
+        print(f"  Balance α  : {args.balance_alpha}   sensor aug: {'on' if args.sensor_aug else 'off'}")
     else:
         dm = VineyardDataModule(
             patches_dir=patches_dir,

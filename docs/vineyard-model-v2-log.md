@@ -442,6 +442,71 @@ Maps and scores are in `data/sub-ava-2022/` on the Mac (510 MB, checksums verifi
 The labels are in `data/BlocksDB-unseen-2026-11-02/`. Rerun with
 `scripts/run-sub-avas.sh`.
 
+## 2026-11-18 — Whole-valley retrain on 2022 prepared
+
+**Decisions (Hayden).** Retrain on 2022 photos only, using the database blocks plus the
+hand-traced `staging_blocks`, which now cover the whole valley. The point is to see how
+much the extra tracing helps, especially at telling vineyards from other crops. 2024 is
+*not* added to training: blocks pulled or planted since 2022 would be wrong labels on 2024
+photos, and comparing years is how pulled and planted blocks will be found. 2024 is
+handled by colour-matching it to 2022 before prediction. Chehalem Mountains, Dundee Hills
+and Yamhill-Carlton are now included.
+
+**Labels:** `scripts/build-valley-labels.py` → `data/labels-valley-2022-2026-11-18/`
+(read-only on the database; QGIS's GeoPackages are read from temporary copies).
+- 4,527 database blocks + 1,515 staging blocks = 9,181 ha. The 5 whole-lot 'tax-lot' blocks
+  in the six original AVAs stay ignored, as before. 5 invalid staging shapes were repaired.
+  Staging and database overlap by only 2.6 ha.
+- **A traced block is always vineyard, even inside an ignored area; only the ground around
+  it is ignored.** Hayden spotted half of a block next to Amaterra (staging 441) inside a
+  skipped built-up tile. A full check found 51 blocks partly or fully ignored:
+  - 5 in skipped tiles
+  - 19 under possible-vineyard outlines he has since traced (1042 at 5.7 ha and 836 at
+    2.5 ha were wholly ignored)
+  - 27 real blocks, about 45 ha, under the 5 whole tax lots: Loeza, Patton Valley,
+    Cancilla, Roshni and Bednarik. This one goes back to the six-AVA runs, which ignored
+    these blocks too.
+  Rebuilt the same day. Tualatin Hills now has 338 ha of vineyard (was 300), and the whole
+  tax lots now ignore only 0.1 km² (was 0.5).
+- Inside a region, untraced ground counts as "not vineyard". Ignored instead: outside the
+  valley AVA; a 3 m ring either side of the 2,600 other 'tax-lot' outlines (loose edges,
+  mostly the three newly included AVAs, 7.0 km²); tiles the 2022 run skipped as built-up
+  (943 km²) or high ground (56 km²), outside the nine traced AVAs, because only 6 traced
+  blocks (1.7 ha) sit there; the 181 possible-vineyard outlines plus 10 m (4.3 km²).
+- Regions: the nine traced AVAs, then the rest of the valley by county (9), then a held-out
+  test area.
+- **Test area "Test - Mt Angel-Monitor"**: a 12.5 km square (10×10 OSIP tiles) between
+  Mt. Angel, Monitor and Woodburn, with 298 ha / 65 blocks of vineyard among nurseries,
+  berries and hazelnuts. It was picked as the window with the most 2022 false alarms (461)
+  that also holds 150–400 ha of traced vineyard. Van Duzer and Lower Long Tom stay held
+  out as before, so the new model can be compared with C-pair.
+- **Hard negatives:** 8,250 outlines from the 2022 valley run as it came off the model
+  (`valley-vineyards-2022.gpkg original`) with at most 20 % on a label, 13,740 ha. Marion
+  has 2,528 and Clackamas 1,694.
+
+**Patch cutter** (`scripts/cut-patches-ava.py`):
+- `--label-all` gives every region the same label file.
+- `--hard-neg` cuts every non-overlapping window where false alarms cover at least 5 %,
+  on top of the random negatives (kind `false_alarm`).
+- `--stream YEAR` plans from the OSIP tile grid alone (same grid as `predict-valley.py`).
+  It then downloads 40 tiles at a time, cuts them and deletes the photos. It can resume
+  (`patches/<tile>/_meta.json`). Random negatives are sampled with a per-region probability
+  set from the plan.
+- `--tiles-dir` output is unchanged: on three Mt. Pisgah tiles, the old and new versions
+  wrote byte-identical patches and manifests.
+- A live test of `--stream` on 4 tiles in the test area downloaded, cut (74 false-alarm
+  patches) and deleted cleanly.
+
+**Training** (`ml/dataset.py`, `ml/train.py`):
+- `--sensor-aug`: on half of the training patches, scales and offsets the raw bands before
+  NDVI is computed. RGB gets one shared gain of 0.75–1.35 (±5 % per band) and an offset of
+  ±10; NIR gets its own gain of 0.80–1.20 and offset of ±10. Only RGB was varied before,
+  never NIR. On a real patch the RGB mean ranges 74–167, which covers 2024's 124 → 164 shift.
+- `--balance-alpha`: a region's share of an epoch is proportional to its patch count to
+  the power alpha. 0 is the old equal draw, which would massively repeat Linn's 15 blocks;
+  0.5 is meant for the valley regions.
+- Smoke test of one epoch with both options on CPU: ran clean.
+
 ## Appendix — technical details
 
 **Imagery.** OSIP 2022 `_SL` ImageServer, 4-band RGBN, 0.3048 m, EPSG:32610,

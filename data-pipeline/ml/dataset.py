@@ -36,6 +36,7 @@ Normalisation
 """
 
 import json
+import random
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -155,18 +156,44 @@ def stats_from_avas(ava_stats: dict, avas) -> dict:
             "std": np.sqrt(sq / n - mean ** 2).tolist()}
 
 
+def sensor_shift(raw: np.ndarray, p: float = 0.5) -> np.ndarray:
+    """
+    Make a patch look as if a different camera or processing run took it.
+
+    OSIP years differ in exposure and processing: 2024's red, green and blue
+    average ~40 levels brighter than 2022's (124 → 164 of 255) and its NIR
+    is a little darker, which wrecked a 2022-only model.  This scales and
+    offsets the raw 0-255 bands before NDVI is computed, so NDVI shifts the
+    way it really does when red and NIR are processed differently:
+      RGB  one shared gain 0.75-1.35, each band ±5 % on top, offset ±10
+      NIR  its own gain 0.80-1.20 and offset ±10
+    Uses the random module, which PyTorch reseeds in every loader worker.
+    """
+    if random.random() >= p:
+        return raw
+    g = random.uniform(0.75, 1.35)
+    gains = [g * random.uniform(0.95, 1.05) for _ in range(3)] + [random.uniform(0.80, 1.20)]
+    o_rgb = random.uniform(-10, 10)
+    offs = [o_rgb] * 3 + [random.uniform(-10, 10)]
+    out = raw * np.array(gains, np.float32).reshape(4, 1, 1) + np.array(offs, np.float32).reshape(4, 1, 1)
+    return np.clip(out, 0, 255)
+
+
 class AvaPatchDataset(VineyardDataset):
     """
     Patches from cut-patches-ava.py: one .npz per patch holding a uint8
     (4, H, W) RGBN image and a mask with 0 / 1 / 255 (255 = outside the AVA,
     ignored by loss and metrics).
     NDVI is computed here, so the model still sees the same 5 channels.
+    With sensor_aug, training patches also get sensor_shift() first.
     """
 
-    def __init__(self, patches_dir: Path, files, stats: dict, augment: bool = False):
+    def __init__(self, patches_dir: Path, files, stats: dict, augment: bool = False,
+                 sensor_aug: bool = False):
         # Same augmentation and normalisation as VineyardDataset; files come from the manifest
         self.root     = patches_dir
         self.augment  = augment
+        self.sensor_aug = sensor_aug and augment
         self.mean = np.array(stats["mean"], dtype=np.float32).reshape(5, 1, 1)
         self.std  = np.array(stats["std"],  dtype=np.float32).reshape(5, 1, 1)
         self.files = list(files)
@@ -184,6 +211,8 @@ class AvaPatchDataset(VineyardDataset):
         with np.load(self.root / fname) as z:
             raw  = z["img"].astype(np.float32)   # (4, H, W) 0-255
             mask = z["mask"]
+        if self.sensor_aug:
+            raw = sensor_shift(raw)
         r, nir = raw[0], raw[3]
         ndvi = (nir - r) / (nir + r + 1e-6)
         img = np.concatenate([raw / 255.0, ndvi[None]], axis=0)
@@ -209,12 +238,17 @@ class AvaDataModule(L.LightningDataModule):
     (val_tile_frac) drawn from the training AVAs, so the held-out AVA has no
     say in which checkpoint is kept.  Normalisation stats come from the
     training AVAs only, unless *stats* is passed (e.g. the 0.773 model's own).
-    With balance_avas, each training AVA is drawn equally often per epoch.
+    With balance_avas, each region's share of an epoch is proportional to
+    (its patch count) ** balance_alpha: 0 draws every region equally often
+    (the six-AVA runs), 1 is no balancing, 0.5 lets big regions count for
+    more without swamping small ones — use it when regions differ a lot in
+    size, as the whole-valley regions do.
     """
 
     def __init__(self, patches_dir: Path, holdout_avas, batch_size: int = 16,
                  num_workers: int = 0, balance_avas: bool = True,
-                 val_tile_frac: float = 0.1, stats: Optional[dict] = None, seed: int = 42):
+                 val_tile_frac: float = 0.1, stats: Optional[dict] = None, seed: int = 42,
+                 balance_alpha: float = 0.0, sensor_aug: bool = False):
         super().__init__()
         self.patches_dir   = Path(patches_dir)
         self.holdout_avas  = set(holdout_avas)
@@ -224,6 +258,8 @@ class AvaDataModule(L.LightningDataModule):
         self.val_tile_frac = val_tile_frac
         self.fixed_stats   = stats
         self.seed          = seed
+        self.balance_alpha = balance_alpha
+        self.sensor_aug    = sensor_aug
 
     def setup(self, stage: Optional[str] = None):
         manifest = json.loads((self.patches_dir / "manifest.json").read_text())
@@ -244,11 +280,11 @@ class AvaDataModule(L.LightningDataModule):
         train = [m for m in pool if m["tile"] not in val_tiles]
         val   = [m for m in pool if m["tile"] in val_tiles]
         self.train_ds = AvaPatchDataset(self.patches_dir, [m["file"] for m in train],
-                                        self.stats, augment=True)
+                                        self.stats, augment=True, sensor_aug=self.sensor_aug)
         self.val_ds   = AvaPatchDataset(self.patches_dir, [m["file"] for m in val],
                                         self.stats, augment=False)
         counts = {a: sum(m["ava"] == a for m in train) for a in self.train_avas}
-        self.train_weights = [1.0 / counts[m["ava"]] for m in train]
+        self.train_weights = [counts[m["ava"]] ** (self.balance_alpha - 1.0) for m in train]
 
     def train_dataloader(self) -> DataLoader:
         sampler = None

@@ -254,6 +254,30 @@ def finish(out_dir, region_names):
     click.echo(f"\nWrote {len(manifest):,} patches → {out_dir}  " + dict(kinds).__repr__())
 
 
+def thin_negative_tiles(lab, tiles, p_neg, keep, max_p, seed, tname):
+    """Keep a fixed random share of the tiles that hold no block and no false alarm.
+
+    Such tiles only supply random negatives, and where p_neg is small that is a
+    handful of patches per 67 MB photo, so they are most of the download for
+    little data.  A kept tile samples its negatives at p_neg / keep, which leaves
+    the expected count unchanged.  Tiles on a region whose p_neg is above max_p
+    are always kept.  → (tiles to cut, {tile: p_neg multiplier})
+    """
+    kept, boost = [], {}
+    for t in tiles:
+        tb = box(*t)
+        names = lab.touching(tb)
+        busy = any(len(lab.regions[n][1].sindex.query(tb, predicate="intersects")) for n in names)
+        if lab.hard is not None:
+            busy = busy or len(lab.hard.sindex.query(tb, predicate="intersects")) > 0
+        if busy or keep >= 1 or max(p_neg[n] for n in names) > max_p:
+            kept.append(t)
+        elif random.Random(f"{seed}-thin-{tname(t)}").random() < keep:
+            kept.append(t)
+            boost[t] = 1.0 / keep
+    return kept, boost
+
+
 def report(counts, n_neg_by_region, P):
     click.echo("")
     total = 0
@@ -307,10 +331,13 @@ def report(counts, n_neg_by_region, P):
 @click.option("--plan-only", is_flag=True, help="--stream: write plan.json and stop")
 @click.option("--finish-only", is_flag=True,
               help="--stream: only gather the tiles' _meta.json into manifest.json")
+@click.option("--neg-tile-keep", type=float, default=1.0, show_default=True,
+              help="--stream: share of tiles with no block or false alarm to download; each "
+                   "kept one gives proportionally more negatives (only where p_neg <= 0.1)")
 def main(tiles_dir, stream_year, valley, download_dir, keep_photos, batch, dl_workers, avas_file,
          labels, label_all, hard_neg, fa_min_pct, out_dir, patch_size, stride, erosion_m,
          min_inside, min_pos_pct, neg_ratio, hard_ndvi, seed, dry_run, shard, plan_only,
-         finish_only):
+         finish_only, neg_tile_keep):
     if (tiles_dir is None) == (stream_year is None):
         sys.exit("Give exactly one of --tiles-dir or --stream YEAR")
     out_dir = Path(out_dir)
@@ -327,7 +354,7 @@ def main(tiles_dir, stream_year, valley, download_dir, keep_photos, batch, dl_wo
             sys.exit("--stream needs --download-dir")
         run_stream(stream_year, Path(valley), download_dir, keep_photos, batch, dl_workers,
                    avas_file, labels, label_all, hard_neg, erosion_m, out_dir, args, neg_ratio,
-                   hard_ndvi, seed, dry_run, shard, plan_only)
+                   hard_ndvi, seed, dry_run, shard, plan_only, neg_tile_keep)
 
 
 def run_local(tiles_dir, avas_file, labels, label_all, hard_neg, erosion_m, out_dir, args,
@@ -374,7 +401,7 @@ def run_local(tiles_dir, avas_file, labels, label_all, hard_neg, erosion_m, out_
 
 def run_stream(year, valley, download_dir, keep_photos, batch, dl_workers, avas_file, labels,
                label_all, hard_neg, erosion_m, out_dir, args, neg_ratio, hard_ndvi, seed, dry_run,
-               shard=None, plan_only=False):
+               shard=None, plan_only=False, neg_tile_keep=1.0):
     spec = importlib.util.spec_from_file_location("download_osip", HERE / "download-osip.py")
     dl = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(dl)
@@ -424,6 +451,12 @@ def run_stream(year, valley, download_dir, keep_photos, batch, dl_workers, avas_
         k, n = map(int, shard.split("/"))
         tiles = tiles[k::n]
         click.echo(f"Shard {k}/{n}: {len(tiles):,} tiles")
+    # After sharding, so each shard keeps the tiles (and downloaded photos) it had
+    n_all = len(tiles)
+    tiles, boost = thin_negative_tiles(lab, tiles, plan["p_neg"], neg_tile_keep, 0.1, seed, tname)
+    if boost:
+        click.echo(f"Negative-only tiles thinned: {n_all:,} → {len(tiles):,} tiles "
+                   f"({len(boost):,} kept negative-only tiles at {1 / neg_tile_keep:.0f}× p_neg)")
     todo = [t for t in tiles if not (out_dir / "patches" / Path(tname(t)).stem / "_meta.json").exists()]
     click.echo(f"{len(tiles) - len(todo):,} tiles already cut, {len(todo):,} to go")
     photo_dir = Path(download_dir)
@@ -467,7 +500,8 @@ def run_stream(year, valley, download_dir, keep_photos, batch, dl_workers, avas_
             items = []
             for name, c in classify(lab, tb, tf, img.shape[1:], *args).items():
                 items += [(name, "positive", r) for r in c["pos"]]
-                items += [(name, "negative", r) for r in c["neg"] if rng.random() < plan["p_neg"][name]]
+                pn = min(1.0, plan["p_neg"][name] * boost.get(t, 1.0))
+                items += [(name, "negative", r) for r in c["neg"] if rng.random() < pn]
                 items += [(name, "false_alarm", r) for r in c["fa"]]
             write_tile(lab, out_dir, tname(t), img, tb, tf, items, hard_ndvi)
             if not keep_photos:

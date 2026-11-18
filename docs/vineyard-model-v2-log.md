@@ -545,6 +545,47 @@ Estimate on 1× A100 40 GB ($1.99/h): cutting 2–3 h; each model about 11 min/e
 roughly 5–6 h if it stops near epoch 30 as final-C did; grading under 1 h. About 14–16 h,
 **about $30–35** for both V and W.
 
+## 2026-11-18 — Valley run launched; empty tiles thinned
+
+**Launched** at 22:11 UTC on TrainingRun2 (1× A100 40 GB, Arizona) in tmux
+`valley`, log `~/valley.log`. The graded regions' 415 photos downloaded with
+0 errors in about 28 minutes.
+
+**The cut was far too slow.** After an hour, 8 shards × 3 download workers had
+cut about 240 of 9,868 tiles, which works out to about 2 days of an idle GPU. The
+state photo server (`imagery.oregonexplorer.info`) gave only about 9.4 MB/s in
+total. One 256-pixel request took 57 seconds to render, so asking for small
+windows instead of whole tiles would not help. The server is the bottleneck.
+
+**Two-thirds of the tiles were nearly useless.** 6,695 of the 9,868 tiles hold no
+block and no known false alarm. They are downloaded only for random negatives.
+Outside the traced AVAs the negative sampling rate is 0.4–6 %, so each 67 MB
+photo gave about 1–15 patches.
+
+**Fix: `cut-patches-ava.py --neg-tile-keep 0.2`.**
+- Of the tiles with no block and no false alarm, a fixed random fifth is kept.
+  The choice is seeded by tile name.
+- Each kept tile samples negatives at 5× the rate, so the expected number of
+  negatives is unchanged.
+- This applies only where every region on the tile samples negatives at
+  10 % or less. Eola-Amity, Dundee, Chehalem, Yamhill-Carlton, the two graded
+  AVAs and the test area keep every tile.
+- Thinning is applied after sharding, so each shard keeps its own tiles and any
+  photos it already downloaded.
+- Result: **9,868 → 4,925 tiles**. Negatives still come from about 1,275 places
+  across the valley.
+- About 185 empty tiles were cut before the change. They stay in the patch set
+  at the old rate, adding a few hundred extra negatives.
+
+**Prep script safety.** `lambda-prep-valley.sh` now waits on each shard's
+process and stops if any shard exits early. Before this, stopping the shards
+would have let it build `manifest.json` and start training on a partial patch
+set.
+
+**Restarted** at 23:48 UTC with 4,870 tiles to go. Expect about 12 hours of
+cutting at the server's current speed, then about 12 hours of training: results
+roughly a day later, at about $30–35 more.
+
 ## Appendix — technical details
 
 **Imagery.** OSIP 2022 `_SL` ImageServer, 4-band RGBN, 0.3048 m, EPSG:32610,

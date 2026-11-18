@@ -6,8 +6,8 @@
 # and final-C checkpoint on the persistent filesystem.  Works on the instance's
 # fast local disk (~/data-pipeline):
 #   1. copy code, labels and checkpoints from the filesystem
-#      (C-pair comes from <fs>/checkpoints/C-pair if this filesystem has it —
-#      TrainingRun2 does; without it the C-pair-rescore job is skipped)
+#      (C-pair and final-C come from <fs>/checkpoints if this filesystem has
+#      them — TrainingRun2 does; a missing one's grading job is skipped)
 #   2. install deps (lambda-setup.sh)
 #   3. download the 2022 photos of the three graded regions (Van Duzer, Lower
 #      Long Tom, Mt Angel-Monitor test area), kept for prediction
@@ -32,12 +32,14 @@ echo "=== 1/4  Copy code, labels and checkpoints to $WORK   [$(date +%H:%M)]"
 mkdir -p "$WORK"
 rsync -a "$FS/data-pipeline/" "$WORK/"
 cd "$WORK"
-if [ -d "$FS/checkpoints/C-pair" ]; then
-  mkdir -p ml/checkpoints/C-pair && rsync -a "$FS/checkpoints/C-pair/" ml/checkpoints/C-pair/
-  echo "C-pair checkpoint: found"
-else
-  echo "C-pair checkpoint: not on this filesystem — C-pair-rescore will be skipped"
-fi
+for c in C-pair final-C; do
+  if [ -d "$FS/checkpoints/$c" ]; then
+    mkdir -p ml/checkpoints/$c && rsync -a "$FS/checkpoints/$c/" ml/checkpoints/$c/
+    echo "$c checkpoint: found"
+  else
+    echo "$c checkpoint: not on this filesystem — its grading job will be skipped"
+  fi
+done
 
 echo "=== 2/4  Install dependencies   [$(date +%H:%M)]"
 bash scripts/lambda-setup.sh
@@ -67,10 +69,18 @@ if [ -f "$P/manifest.json" ]; then
 else
   mkdir -p $P/logs
   [ -f "$P/plan.json" ] || $CUT --plan-only 2>&1 | grep -v "it/s]" | tee $P/logs/plan.log
+  # Tiles with no block or false alarm only give random negatives (a few per
+  # 67 MB photo): download a fifth of them and take 5× the negatives from each.
+  # The state server manages only ~10 MB/s, so this halves the cut (9,868 → 4,925 tiles).
+  pids=()
   for k in $(seq 0 $((SHARDS - 1))); do
-    $CUT --shard $k/$SHARDS --dl-workers 3 --download-dir ~/photos-shard$k > $P/logs/shard$k.log 2>&1 &
+    $CUT --shard $k/$SHARDS --neg-tile-keep 0.2 --dl-workers 3 --download-dir ~/photos-shard$k \
+      >> $P/logs/shard$k.log 2>&1 &
+    pids+=($!)
   done
-  wait
+  bad=0
+  for pid in "${pids[@]}"; do wait "$pid" || bad=1; done
+  [ "$bad" = 0 ] || { echo "A shard stopped early — see $P/logs/shard*.log, then re-run this script."; exit 1; }
   rm -f $P/failed_tiles-*.txt.prev
   if ls $P/failed_tiles-*.txt >/dev/null 2>&1; then
     echo "Some tiles failed to download:"; cat $P/failed_tiles-*.txt | wc -l

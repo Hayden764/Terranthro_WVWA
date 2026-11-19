@@ -72,22 +72,25 @@ else
   # Tiles with no block or false alarm only give random negatives (a few per
   # 67 MB photo): download a fifth of them and take 5× the negatives from each.
   # The state server manages only ~10 MB/s, so this halves the cut (9,868 → 4,925 tiles).
-  pids=()
-  for k in $(seq 0 $((SHARDS - 1))); do
-    $CUT --shard $k/$SHARDS --neg-tile-keep 0.2 --dl-workers 3 --download-dir ~/photos-shard$k \
-      >> $P/logs/shard$k.log 2>&1 &
-    pids+=($!)
+  # Failed downloads are retried in further rounds (cut tiles are skipped), with a
+  # pause for the state server to recover — on 2026-11-19 a ~30 min outage failed
+  # 1,012 tiles, and stopping there left the GPU idle for 6 hours.
+  for round in 1 2 3 4 5; do
+    rm -f $P/failed_tiles-*.txt
+    pids=()
+    for k in $(seq 0 $((SHARDS - 1))); do
+      $CUT --shard $k/$SHARDS --neg-tile-keep 0.2 --dl-workers 3 --download-dir ~/photos-shard$k \
+        >> $P/logs/shard$k.log 2>&1 &
+      pids+=($!)
+    done
+    bad=0
+    for pid in "${pids[@]}"; do wait "$pid" || bad=1; done
+    [ "$bad" = 0 ] || { echo "A shard stopped early — see $P/logs/shard*.log, then re-run this script."; exit 1; }
+    ls $P/failed_tiles-*.txt >/dev/null 2>&1 || break
+    echo "Round $round: $(cat $P/failed_tiles-*.txt | wc -l) tiles failed to download   [$(date +%H:%M)]"
+    [ "$round" = 5 ] && { echo "Still failing after 5 rounds — re-run this script later."; exit 1; }
+    sleep 600
   done
-  bad=0
-  for pid in "${pids[@]}"; do wait "$pid" || bad=1; done
-  [ "$bad" = 0 ] || { echo "A shard stopped early — see $P/logs/shard*.log, then re-run this script."; exit 1; }
-  rm -f $P/failed_tiles-*.txt.prev
-  if ls $P/failed_tiles-*.txt >/dev/null 2>&1; then
-    echo "Some tiles failed to download:"; cat $P/failed_tiles-*.txt | wc -l
-    echo "Re-run this script to retry them (cut tiles are skipped)."
-    for f in $P/failed_tiles-*.txt; do mv "$f" "$f.prev"; done
-    exit 1
-  fi
   $CUT --finish-only | tail -1
   mkdir -p "$FS/patches-valley-2022" && cp $P/plan.json $P/manifest.json $P/ava_stats.json "$FS/patches-valley-2022/"
 fi

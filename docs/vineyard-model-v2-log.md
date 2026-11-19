@@ -586,6 +586,14 @@ set.
 cutting at the server's current speed, then about 12 hours of training: results
 roughly a day later, at about $30–35 more.
 
+**2026-11-19: a server outage stalled the run.** All shards finished by about
+13:30 UTC. Between 12:58 and 13:32 UTC the state server failed 1,012 downloads.
+The prep script stopped as written ("re-run to retry"), and the instance sat
+idle for about 6 hours until the run was restarted at 19:18 UTC. The retries
+downloaded normally. `lambda-prep-valley.sh` now retries failed tiles itself:
+up to 5 rounds, 10 minutes apart. New estimate: results around 11:00 UTC on
+Nov 20, about 37 hours of instance time, roughly $50.
+
 ## Appendix — technical details
 
 **Imagery.** OSIP 2022 `_SL` ImageServer, 4-band RGBN, 0.3048 m, EPSG:32610,

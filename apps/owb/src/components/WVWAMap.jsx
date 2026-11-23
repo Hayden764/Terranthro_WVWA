@@ -1075,7 +1075,7 @@ function ListingTabContent({ listing, cat, vineyards, parcelTopoStats, onVineyar
       g.acresCount += 1;
     }
 
-    const ava = p.nested_nested_ava || p.nested_ava || p.Nested_Nested_AVA || p.Nested_AVA || p.C3_NestNestAVA || p.C2_NestAVA || p.C1_AVA || null;
+    const ava = p.nested_nested_ava || p.nested_ava || p.Nested_Nested_AVA || p.Nested_AVA || p.C3_NestNestAVA || p.C2_NestAVA || p.C1_AVA || p.ava_name || null;
     if (ava) g.avas.add(ava);
 
     return acc;

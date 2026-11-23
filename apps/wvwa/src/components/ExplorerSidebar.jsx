@@ -302,6 +302,7 @@ const AVA_DISPLAY_NAMES = {
   'ribbon-ridge':             'Ribbon Ridge',
   'tualatin-hills':           'Tualatin Hills',
   'van-duzer-corridor':       'Van Duzer Corridor',
+  'willamette-valley':        'Willamette Valley',
   'yamhill-carlton':          'Yamhill-Carlton',
 };
 
@@ -309,15 +310,15 @@ const AVA_DISPLAY_NAMES = {
 const AVA_SORT_ORDER = [
   'lower-long-tom','mount-pisgah-polk-county','van-duzer-corridor','eola-amity-hills',
   'mcminnville','yamhill-carlton','dundee-hills','ribbon-ridge','chehalem-mountains',
-  'laurelwood-district','tualatin-hills',
+  'laurelwood-district','tualatin-hills','willamette-valley',
 ];
 
 function primaryAva(avas) {
   if (!avas || avas.size === 0) return null;
   const arr = Array.from(avas);
   const sorted = arr.slice().sort((a, b) => {
-    const ia = AVA_SORT_ORDER.indexOf(a.toLowerCase().replace(/\s+/g, '-'));
-    const ib = AVA_SORT_ORDER.indexOf(b.toLowerCase().replace(/\s+/g, '-'));
+    const ia = AVA_SORT_ORDER.indexOf(a.toLowerCase().replace(/,?\s*oregon$/, '').replace(/[^a-z0-9]+/g, '-'));
+    const ib = AVA_SORT_ORDER.indexOf(b.toLowerCase().replace(/,?\s*oregon$/, '').replace(/[^a-z0-9]+/g, '-'));
     return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
   });
   return sorted[0];
@@ -325,7 +326,7 @@ function primaryAva(avas) {
 
 function avaDisplayLabel(ava) {
   if (!ava) return null;
-  const slug = ava.toLowerCase().replace(/\s+/g, '-');
+  const slug = ava.toLowerCase().replace(/,?\s*oregon$/, '').replace(/[^a-z0-9]+/g, '-');
   return AVA_DISPLAY_NAMES[slug] || ava;
 }
 
@@ -367,14 +368,14 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
       const acresRaw = p.acres ?? p.Acres ?? p.VA0_TotalVineAcres;
       const acresVal = Number(acresRaw);
       if (Number.isFinite(acresVal) && acresVal > 0) { g.acresTotal += acresVal; g.acresCount += 1; }
-      const ava = p.nested_nested_ava || p.nested_ava || p.Nested_Nested_AVA || p.Nested_AVA || p.C3_NestNestAVA || p.C2_NestAVA || p.C1_AVA || null;
+      const ava = p.nested_nested_ava || p.nested_ava || p.Nested_Nested_AVA || p.Nested_AVA || p.C3_NestNestAVA || p.C2_NestAVA || p.C1_AVA || p.ava_name || null;
       if (ava) g.avas.add(ava);
       return acc;
     }, {})
   ).sort((a, b) => {
     // Sort by primary AVA first, then alphabetically within AVA
-    const aSlug = (primaryAva(a.avas) || '').toLowerCase().replace(/\s+/g, '-');
-    const bSlug = (primaryAva(b.avas) || '').toLowerCase().replace(/\s+/g, '-');
+    const aSlug = (primaryAva(a.avas) || '').toLowerCase().replace(/,?\s*oregon$/, '').replace(/[^a-z0-9]+/g, '-');
+    const bSlug = (primaryAva(b.avas) || '').toLowerCase().replace(/,?\s*oregon$/, '').replace(/[^a-z0-9]+/g, '-');
     const ai = AVA_SORT_ORDER.indexOf(aSlug), bi = AVA_SORT_ORDER.indexOf(bSlug);
     const avaOrder = (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
     return avaOrder !== 0 ? avaOrder : a.name.localeCompare(b.name);

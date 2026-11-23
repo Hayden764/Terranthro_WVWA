@@ -9,8 +9,8 @@ legible.
 
 Each run writes one scope (migration 036): the association slug the colouring
 is for. --scope wvwa (default) colours WVWA-member vineyards for the WVWA map;
---scope all colours every vineyard with an owner on record for the statewide
-OWB map. The API joins the scope that matches the request's ?association=.
+--scope all colours every named vineyard (any owner, or none) for the
+statewide OWB map. The API joins the scope that matches the request's ?association=.
 
 Only member vineyards are colored: on the map, non-members render grey and
 unnamed parcels render white, so neither needs a palette slot. A member vineyard
@@ -107,11 +107,13 @@ def fetch_vineyards(conn, scope):
             LOWER(TRIM(vp.vineyard_name)) AS vineyard_key,
             ST_AsText(vp.geometry)        AS wkt
         FROM vineyards vp
-        JOIN wineries w ON vp.winery_id = w.id
         WHERE vp.vineyard_name IS NOT NULL
           AND TRIM(vp.vineyard_name) <> ''
           AND vp.geometry IS NOT NULL
-          AND (%(scope)s = 'all' OR w.id IN (
+          -- 'all' (statewide OWB map) colours EVERY named vineyard, whether or
+          -- not it is linked to an organization; association scopes colour
+          -- their members' vineyards only.
+          AND (%(scope)s = 'all' OR vp.winery_id IN (
                 SELECT oa.organization_id FROM organization_associations oa
                 JOIN associations a ON a.id = oa.association_id
                 WHERE a.slug = %(scope)s))

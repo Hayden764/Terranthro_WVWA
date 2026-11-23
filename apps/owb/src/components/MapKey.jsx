@@ -8,7 +8,7 @@ import { topoRangeLabel } from '../config/topoClasses';
 import { legendGroupsFor } from '../lib/legendGroups';
 import { describeLegendSelection } from '../lib/legendSelection';
 import { useVintagePlayback } from './climate/VintageYearControls';
-import { VINEYARD_PALETTE, VINEYARD_GREY, VINEYARD_WHITE, VINEYARD_STRIPE, VINEYARD_STRIPE_EDGE, VINEYARD_OUTLINE_WHITE } from './WVWAMap';
+import { VINEYARD_PALETTE, VINEYARD_WHITE, VINEYARD_STRIPE, VINEYARD_STRIPE_EDGE, VINEYARD_OUTLINE_WHITE } from './WVWAMap';
 import LegendFilter from './LegendFilter';
 
 /**
@@ -288,8 +288,7 @@ function VineyardLegend({ themeId, values, outline, scope }) {
   if (themeId === 'ownership') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <LegendRow swatch={<span style={{ display: 'flex', gap: 1 }}>{VINEYARD_PALETTE.slice(0, 3).map((c) => <Swatch key={c} color={c} outline={outline} narrow />)}</span>}>Owner on record <span style={{ color: muted }}>· one colour each</span></LegendRow>
-        <LegendRow swatch={<Swatch color={VINEYARD_GREY} outline={outline} />}>Named, owner unknown</LegendRow>
+        <LegendRow swatch={<span style={{ display: 'flex', gap: 1 }}>{VINEYARD_PALETTE.slice(0, 3).map((c) => <Swatch key={c} color={c} outline={outline} narrow />)}</span>}>Named vineyard <span style={{ color: muted }}>· one colour each</span></LegendRow>
         <LegendRow swatch={<Swatch color={VINEYARD_WHITE} outline={outline} />}>Unnamed <span style={{ color: muted }}>· help us name it</span></LegendRow>
         <HighlightRows scope={scope} />
       </div>
@@ -329,7 +328,7 @@ function HighlightRows({ scope }) {
 
 function ThemeSwatches({ themeId, values, outline }) {
   let colors;
-  if (themeId === 'ownership') colors = [VINEYARD_PALETTE[0], VINEYARD_PALETTE[1], VINEYARD_GREY];
+  if (themeId === 'ownership') colors = [VINEYARD_PALETTE[0], VINEYARD_PALETTE[1], VINEYARD_PALETTE[2]];
   else if (themeId === 'none') colors = [VINEYARD_THEMES.none.paint];
   else colors = vineyardThemeLegend(themeId, values).items.slice(0, 3).map((it) => it.color);
   return (

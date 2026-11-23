@@ -49,15 +49,20 @@ const rangeLegend = (breaks, colors, unit, lastSuffix = '+') => colors.map((colo
     : `${breaks[i - 1]}–${breaks[i]}${unit}`,
 }));
 
+// Naming status — same green / yellow / red and rules as the portal's admin
+// naming map (GET /api/admin/naming-status): no name → red; a name but no
+// linked organization and no org text → yellow; otherwise green.
+const NAMING_COLORS = { named: '#2FA84F', no_org: '#E8B21A', unnamed: '#D7263D' };
+
 const ELEV_BREAKS = [200, 400, 600, 800, 1000];  // ft, 6 bins
 const SLOPE_BREAKS = [3, 6, 10, 15, 20];
 
 export const VINEYARD_THEMES = {
   ownership: {
     id: 'ownership',
-    short: 'Ownership', // chip label in the on-map key
-    label: 'Ownership (default)',
-    description: 'Vineyards with a known owner in green, others grey',
+    short: 'Vineyards', // chip label in the on-map key
+    label: 'Each vineyard (default)',
+    description: 'Every named vineyard in its own colour, unnamed ones in white',
     paint: null,
     legend: null,
   },
@@ -114,6 +119,27 @@ export const VINEYARD_THEMES = {
     paint: catExpression('aspect', ASPECT),
     legend: Object.entries(ASPECT).map(([label, color]) => ({ label, color })),
   },
+  naming: {
+    id: 'naming',
+    short: 'Naming',
+    label: 'Naming status',
+    description: 'Green: named with an owner. Yellow: named, owner unknown. Red: unnamed',
+    paint: [
+      'case',
+      ['==', ['coalesce', ['get', 'vineyard_name'], ''], ''], NAMING_COLORS.unnamed,
+      ['all',
+        ['!', ['has', 'winery_id']],
+        ['in', ['downcase', ['coalesce', ['get', 'vineyard_org'], '']], ['literal', ['', 'unknown', '??', '?']]]],
+      NAMING_COLORS.no_org,
+      NAMING_COLORS.named,
+    ],
+    legend: [
+      { label: 'Named, owner known', color: NAMING_COLORS.named },
+      { label: 'Named, owner unknown', color: NAMING_COLORS.no_org },
+      { label: 'Unnamed', color: NAMING_COLORS.unnamed },
+    ],
+    noData: false, // every vineyard falls in one of the three classes
+  },
 };
 
 export const VINEYARD_THEME_IDS = Object.keys(VINEYARD_THEMES);
@@ -133,7 +159,7 @@ export function vineyardThemeLegend(themeId, values) {
   const items = isCategorical && present?.size
     ? theme.legend.filter((it) => present.has(it.label))
     : theme.legend;
-  const showNoData = !isCategorical || values?.missing !== false;
+  const showNoData = theme.noData !== false && (!isCategorical || values?.missing !== false);
   return { items, showNoData };
 }
 

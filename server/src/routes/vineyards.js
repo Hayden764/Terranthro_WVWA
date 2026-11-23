@@ -1,6 +1,6 @@
 import express from 'express';
 import { pool } from '../db/pool.js';
-import { resolveAssociation, membersOf, badAssociation } from '../lib/associations.js';
+import { resolveAssociation, membersOf, badAssociation, ALL_ASSOCIATIONS } from '../lib/associations.js';
 
 const router = express.Router();
 
@@ -104,7 +104,8 @@ router.get('/tiles/:z/:x/:y', async (req, res) => {
          LEFT JOIN vineyard_colors vc
            ON vc.vineyard_key = LOWER(TRIM(v.vineyard_name))
            AND vc.scope = $4  -- each association has its own colouring (036)
-           AND v.winery_id IN ${membersOf('$4')}
+           -- 'all' (statewide OWB) colours every named vineyard, owner or not
+           AND ($4 = '${ALL_ASSOCIATIONS}' OR v.winery_id IN ${membersOf('$4')})
          CROSS JOIN bounds
          CROSS JOIN px
          CROSS JOIN LATERAL (SELECT ST_Transform(b.geometry, 3857) AS geom3857) g
@@ -264,7 +265,7 @@ router.get('/parcels', async (req, res) => {
       LEFT JOIN vineyard_colors vc
         ON vc.vineyard_key = LOWER(TRIM(vp.vineyard_name))
         AND vc.scope = ${assocParam}  -- each association has its own colouring (036)
-        AND vp.winery_id IN ${membersOf(assocParam)}
+        AND (${assocParam} = '${ALL_ASSOCIATIONS}' OR vp.winery_id IN ${membersOf(assocParam)})
       WHERE ${bboxCondition}
         ${avaCondition}
         ${datasetCondition}

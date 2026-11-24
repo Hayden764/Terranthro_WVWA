@@ -594,6 +594,42 @@ downloaded normally. `lambda-prep-valley.sh` now retries failed tiles itself:
 up to 5 rounds, 10 minutes apart. New estimate: results around 11:00 UTC on
 Nov 20, about 37 hours of instance time, roughly $50.
 
+## 2026-11-23 — Southern Oregon 2022 run set up
+
+Running the model over the whole Southern Oregon AVA (Rogue, Applegate, Umpqua, Elkton,
+Red Hill) on the **2022** photos instead of the Willamette Valley on 2024. The 2022 photo
+service covers the whole state with the same four bands, so the 2024 colour problem does not
+apply. The risk is new ground: the model has never seen pear orchards, hemp/cannabis plots or
+the drier Southern Oregon landscape, and nothing there is hand-traced, so the result can only
+be reviewed by eye.
+
+- **Model:** W-valley (best on 2022) at a **0.3 cutoff**, the setting that restored recall in
+  wine country.
+- **Tiles:** `valley-tiles.py` now takes any outline (`--valley`), and `--parcels ""` /
+  `--traced ""` skip the built-up and already-traced tests (no parcel data or tracing down
+  there). Southern Oregon: 5,865 tiles touch the AVA; 131 dropped whose lowest point is above
+  **3,200 ft** (vineyards there reach ~2,800 ft; Medford sits at ~1,300 ft, so the valley's
+  1,500 ft cut would drop most of the region) → **5,734 tiles**, ~300 GB of photos.
+  Lower cut-offs: 2,800 ft → 5,613, 2,500 ft → 5,434, 2,000 ft → 4,871.
+- **`predict-valley.py`** gained `--threshold` and `--name` (merged layer
+  `<name>-<year>.gpkg`). One Applegate tile ran end to end on the Mac.
+- **Lambda:** `scripts/lambda-push-southern-oregon.sh` → `lambda-run-southern-oregon.sh <fs>`
+  on an instance with **TrainingRun2** attached (W-valley is only there). Retries the run up to
+  5× with 10-min pauses for photo-server outages; output in `<fs>/southern-oregon-2022/`.
+  Estimate ~4 h on an A100, ~5–7 h on an A10/RTX 6000 (the 2022 valley run did 8,339 tiles in
+  ~5 h). Downloads already overlap prediction. Tested 2026-11-23: the state server spends
+  ~8–10 s *rendering* each tile and only ~1.3 s sending it, so asking for compressed TIFFs
+  (LZ77) doesn't help — the file came back bigger (77 vs 67 MB), with identical pixels.
+
+## 2026-11-24 — Southern Oregon 2022 run finished
+
+Ran on a 1× A100 (Arizona, TrainingRun2) from 11:30 pm to 6:38 am PST, about 7 h, roughly $14.
+All 5,734 tiles done, no failed downloads, no restarts. Downloads set the pace (~22 min per
+300 tiles); prediction took 7 min per batch. **1,889 outlines, 2,442 ha** (1,865 touch the
+AVA), median 0.28 ha, 17 over 20 ha. Not reviewed yet — expect orchards and hemp among them.
+Layer: `data-pipeline/data/southern-oregon/southern-oregon-vineyards-2022.gpkg` (also
+TrainingRun2/southern-oregon-2022/, with the 5,734 probability maps, 1.5 GB).
+
 ## Appendix — technical details
 
 **Imagery.** OSIP 2022 `_SL` ImageServer, 4-band RGBN, 0.3048 m, EPSG:32610,

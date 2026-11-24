@@ -34,6 +34,8 @@ Usage (from data-pipeline/)
   python3 ml/predict-valley.py --ckpt <best.ckpt> --stats <stats.json>        # the full run
   python3 ml/predict-valley.py ... --only 474953_4988013,476201_4988013       # a few tiles
   python3 ml/predict-valley.py ... --merge-only                               # rebuild the layer
+  # another region: scripts/valley-tiles.py --valley <outline> …, then
+  python3 ml/predict-valley.py ... --tiles <tiles.geojson> --valley <outline> --out data/<region>-2022 --name <region>-vineyards
 """
 
 import argparse
@@ -77,10 +79,10 @@ EDGE_M = 0.5           # a shape this close to its tile's edge may continue next
 
 # ── Polygons from one probability map (CPU pool) ──────────────────────────────
 
-def tile_shapes(prob_path, min_area, closing):
+def tile_shapes(prob_path, min_area, closing, threshold=THRESHOLD):
     """Production clean-up of one tile → [(wkb, touches_edge)]."""
     with rasterio.open(prob_path) as src:
-        pred = (src.read(1) >= THRESHOLD).astype(np.uint8)
+        pred = (src.read(1) >= threshold).astype(np.uint8)
         tf, tb = src.transform, box(*src.bounds)
     # The closing treats beyond-the-edge as empty and would shave ~3 m off
     # every shape at the tile edge, so the two halves of a vineyard never meet.
@@ -137,7 +139,7 @@ def downloader(batches, q, args, out):
 
 # ── Merge ─────────────────────────────────────────────────────────────────────
 
-def merge(out, year, min_area, simplify, valley, sync_to):
+def merge(out, year, min_area, simplify, valley, sync_to, name="valley-vineyards"):
     parts = [gpd.read_file(p) for p in sorted((out / "shapes").glob("[!.]*.gpkg"))]
     parts = [p for p in parts if len(p)]
     if not parts:
@@ -159,7 +161,7 @@ def merge(out, year, min_area, simplify, valley, sync_to):
                            geometry=polys, crs=g.crs)
     ava = gpd.read_file(valley).to_crs(res.crs).geometry.union_all()
     res["in_ava"] = res.geometry.intersects(ava)
-    path = out / f"valley-vineyards-{year}.gpkg"
+    path = out / f"{name}-{year}.gpkg"
     res.to_file(path, driver="GPKG")
     print(f"Merged: {len(res):,} shapes, {res.area_ha.sum():,.0f} ha "
           f"({int(res.in_ava.sum()):,} inside the AVA) → {path}")
@@ -190,6 +192,9 @@ def main():
     ap.add_argument("--min-area", type=float, default=1000.0, help="m², as in production")
     ap.add_argument("--closing", type=float, default=3.0, help="m, as in production")
     ap.add_argument("--simplify", type=float, default=1.0, help="m")
+    ap.add_argument("--threshold", type=float, default=0.5,
+                    help="Probability cutoff for a vineyard pixel (0.3 restored recall for W-valley)")
+    ap.add_argument("--name", default="valley-vineyards", help="Merged layer: <name>-<year>.gpkg")
     ap.add_argument("--only", default=None, help="Comma-separated tile ids (testing)")
     ap.add_argument("--sync-to", default=None)
     ap.add_argument("--merge-only", action="store_true")
@@ -203,7 +208,7 @@ def main():
             (Path(args.sync_to) / d).mkdir(parents=True, exist_ok=True)
 
     if args.merge_only:
-        merge(out, args.year, args.min_area, args.simplify, args.valley, args.sync_to)
+        merge(out, args.year, args.min_area, args.simplify, args.valley, args.sync_to, args.name)
         return
 
     grid = gpd.read_file(args.tiles)
@@ -217,7 +222,7 @@ def main():
     print(f"Tiles: {len(grid):,} selected, {len(grid) - len(todo):,} done, {len(todo):,} to run "
           f"in {len(batches)} batches of up to {args.batch}", flush=True)
     if not batches:
-        merge(out, args.year, args.min_area, args.simplify, args.valley, args.sync_to)
+        merge(out, args.year, args.min_area, args.simplify, args.valley, args.sync_to, args.name)
         return
 
     predict = load("predict", ML / "predict.py")
@@ -258,7 +263,8 @@ def main():
                 prob = predict.sliding_window_predict(model, img, device, batch_size=args.gpu_batch)
                 prob_path = out / "probs" / f"{tid}_prob.tif"
                 predict.save_geotiff(np.round(prob * 255), profile, prob_path, dtype="uint8")
-                futures[tid] = pool.submit(tile_shapes, prob_path, args.min_area, args.closing)
+                futures[tid] = pool.submit(tile_shapes, prob_path, args.min_area, args.closing,
+                                           round(args.threshold * 255))
             except Exception as exc:
                 print(f"  ERROR {tid}: {exc}", flush=True)
                 failed.append(tid)
@@ -274,7 +280,7 @@ def main():
         finish(*pending)
     pool.shutdown()
 
-    merge(out, args.year, args.min_area, args.simplify, args.valley, args.sync_to)
+    merge(out, args.year, args.min_area, args.simplify, args.valley, args.sync_to, args.name)
 
 
 if __name__ == "__main__":

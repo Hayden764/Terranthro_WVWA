@@ -18,9 +18,19 @@ tiles that can't hold unmapped vineyard:
 Writes every tile with its measurements and a `keep` flag, so the cut-offs
 can be revisited without recomputing.  Read by ml/predict-valley.py.
 
+Works for any region: --valley is the outline to cover (it can be another
+AVA, e.g. Southern Oregon), --parcels "" skips the built-up test where we have
+no parcel data, and --traced "" skips the already-traced test.
+
 Usage
 -----
   .venv/bin/python scripts/valley-tiles.py --out data/valley/valley-tiles.geojson
+
+  # Southern Oregon (vineyards reach ~2,800 ft there; no parcels, nothing traced)
+  .venv/bin/python scripts/valley-tiles.py --out data/southern-oregon/so-tiles.geojson \
+      --valley data/southern-oregon/southern_oregon.geojson \
+      --dem data/topography/OR/southern_oregon/elevation.tif \
+      --parcels "" --traced "" --max-floor-ft 3200
 """
 
 import importlib.util
@@ -57,10 +67,12 @@ def load_downloader():
 @click.option("--dem", default="data/topography/OR/willamette_valley/elevation.tif",
               show_default=True, type=click.Path(exists=True), help="Elevation in metres")
 @click.option("--parcels", default="data/Parcel_WIllamette.gpkg", show_default=True,
-              type=click.Path(exists=True))
+              help='County parcels for the built-up test ("" = skip)')
+@click.option("--traced", "traced_names", default=",".join(TRACED), show_default=False,
+              help="Comma-separated AVA names already hand-traced (\"\" = none)")
 @click.option("--max-floor-ft", default=1500.0, show_default=True)
 @click.option("--urban-frac", default=0.3, show_default=True)
-def main(out_path, valley, avas, dem, parcels, max_floor_ft, urban_frac):
+def main(out_path, valley, avas, dem, parcels, traced_names, max_floor_ft, urban_frac):
     dl = load_downloader()
     xmin, ymin, xmax, ymax = dl.utm_bbox_from_blocks(Path(valley), 0)
     tiles = dl.filter_to_intersecting(dl.make_tile_grid(xmin, ymin, xmax, ymax), Path(valley))
@@ -68,17 +80,19 @@ def main(out_path, valley, avas, dem, parcels, max_floor_ft, urban_frac):
 
     wv = gpd.read_file(valley).to_crs(UTM).geometry.union_all()
     a = gpd.read_file(avas).to_crs(UTM)
-    traced = a[a.name.isin(TRACED)].geometry.union_all()
+    names = [n.strip() for n in traced_names.split(",") if n.strip()]
+    traced = a[a.name.isin(names)].geometry.union_all() if names else None
 
     # Built-up share: area of sub-acre lots, binned to tiles by lot centroid
-    lots = gpd.read_file(parcels, columns=["calcarea"]).to_crs(UTM)
-    small = lots[lots.geometry.area < SMALL_LOT_M2]
     x0, y0, s = xmin, ymin, dl.TILE_M   # the grid's origin and step
-    c = small.geometry.centroid
-    keys = zip(np.floor((c.x - x0) / s).astype(int), np.floor((c.y - y0) / s).astype(int))
     small_area = {}
-    for k, ar in zip(keys, small.geometry.area):
-        small_area[k] = small_area.get(k, 0.0) + ar
+    if parcels:
+        lots = gpd.read_file(parcels, columns=["calcarea"]).to_crs(UTM)
+        small = lots[lots.geometry.area < SMALL_LOT_M2]
+        c = small.geometry.centroid
+        keys = zip(np.floor((c.x - x0) / s).astype(int), np.floor((c.y - y0) / s).astype(int))
+        for k, ar in zip(keys, small.geometry.area):
+            small_area[k] = small_area.get(k, 0.0) + ar
 
     rows = []
     with rasterio.open(dem) as d:
@@ -95,7 +109,7 @@ def main(out_path, valley, avas, dem, parcels, max_floor_ft, urban_frac):
             rows.append({
                 "tile": f"{int(t[0])}_{int(t[1])}",
                 "floor_ft": round(float(v.min()), 1) if v.size else None,
-                "traced_frac": round(part.intersection(traced).area / part.area, 4),
+                "traced_frac": round(part.intersection(traced).area / part.area, 4) if traced else 0.0,
                 "urban_frac": round(small_area.get(k, 0.0) / tb.area, 4),
                 "geometry": tb,
             })

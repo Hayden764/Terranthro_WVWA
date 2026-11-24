@@ -767,6 +767,96 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
 }
 
 // ── Data layers section ───────────────────────────────────────────────────
+// ── AvaListView ───────────────────────────────────────────────────────────
+// Every Oregon AVA, grouped under its top-level AVA (Willamette Valley first —
+// it is mapped in the most detail) and indented by nesting depth. Scrolls;
+// rows keep their natural height however many AVAs there are.
+const AVA_GROUP_FIRST = 'willamette-valley';
+
+function avaGroups() {
+  const bySlug = new Map(REGION_AVAS.map(a => [a.slug, a]));
+  const depthOf = (a) => {
+    let d = 0, p = a.parentAva;
+    while (p && bySlug.has(p) && d < 6) { d++; p = bySlug.get(p).parentAva; }
+    return d;
+  };
+  const groups = [];
+  for (const ava of REGION_AVAS) {          // tree order: parent then its subs
+    const depth = depthOf(ava);
+    if (depth === 0) groups.push({ top: ava, subs: [] });
+    else if (groups.length) groups[groups.length - 1].subs.push({ ava, depth });
+  }
+  return groups.sort((a, b) =>
+    (a.top.slug === AVA_GROUP_FIRST ? -1 : 0) - (b.top.slug === AVA_GROUP_FIRST ? -1 : 0));
+}
+
+function AvaListView({ selectedAva, onAvaClick, onAvaHover }) {
+  const groups = useMemo(avaGroups, []);
+
+  const row = (ava, { depth = 0, top = false, count = 0 } = {}) => {
+    const isSelected = selectedAva === ava.slug;
+    const meta = avaMeta(ava);
+    const subtitle = [
+      meta.established ? `Est. ${meta.established}` : null,
+      meta.acres ? `${meta.acres} ac${meta.outOfState.length ? ' in OR' : ''}` : null,
+      top && count ? `${count} nested AVA${count !== 1 ? 's' : ''}` : null,
+    ].filter(Boolean).join(' · ') || 'AVA';
+    return (
+      <div
+        key={ava.slug}
+        role="button"
+        tabIndex={0}
+        onClick={() => onAvaClick(ava)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAvaClick(ava); } }}
+        onMouseEnter={() => onAvaHover(ava.slug)}
+        onMouseLeave={() => onAvaHover(null)}
+        className={`ava-card tx-box${isSelected ? ' is-active' : ''}`}
+        style={{
+          flexShrink: 0,
+          marginLeft: depth * 14,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+          padding: top ? '9px 12px' : '7px 12px',
+          border: `1px solid ${border}`,
+          borderRadius: 10,
+          background: isSelected ? interactiveSoft : parchment,
+          cursor: 'pointer',
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="ava-card-name tx-title" style={{
+            fontSize: top ? 'var(--type-body-size)' : 'var(--type-mono-size)',
+            fontWeight: top ? 700 : 600, color: ink,
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {ava.name}
+          </div>
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {subtitle}
+          </div>
+        </div>
+        <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted, flexShrink: 0 }}>›</span>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 12px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {groups.map(({ top, subs }) => (
+        <div key={top.slug} style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0 }}>
+          {row(top, { top: true, count: subs.length })}
+          {subs.length > 0 && (
+            // guide line ties the nested AVAs to their parent
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginLeft: 8, paddingLeft: 6, borderLeft: `1px solid ${border}` }}>
+              {subs.map(({ ava, depth }) => row(ava, { depth: depth - 1 }))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
 // ── ParcelBlockView ───────────────────────────────────────────────────────
 /**
  * Full-panel view of a vineyard's polygons — the planted areas we mapped
@@ -2194,50 +2284,11 @@ export default function ExplorerSidebar({
                 vineyardFilterResult={vineyardFilterResult}
               />
             ) : (
-              <div style={{ flex: 1, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden' }}>
-                {REGION_AVAS.map(ava => {
-                  const isSelected = selectedAva === ava.slug;
-                  const meta = avaMeta(ava);
-                  const subtitle = [
-                    meta.established ? `Est. ${meta.established}` : null,
-                    meta.acres ? `${meta.acres} ac${meta.outOfState.length ? ' in OR' : ''}` : null,
-                  ].filter(Boolean).join(' · ') || 'AVA';
-                  return (
-                    <div key={ava.slug} style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {ava.parentAva && (
-                        <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted, flexShrink: 0, lineHeight: 1, userSelect: 'none' }}>└</span>
-                      )}
-                      <div
-                        onClick={() => handleAvaClick(ava)}
-                        className={`ava-card tx-box${isSelected ? ' is-active' : ''}`}
-                        style={{
-                          flex: 1,
-                          height: '100%',
-                          border: `1px solid ${border}`,
-                          borderRadius: 10,
-                          background: isSelected ? interactiveSoft : parchment,
-                          cursor: 'pointer', overflow: 'hidden',
-                          display: 'flex', alignItems: 'center',
-                        }}
-                        onMouseEnter={() => mapRef.current?.hoverAva(ava.slug)}
-                        onMouseLeave={() => mapRef.current?.hoverAva(null)}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', width: '100%' }}>
-                          <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                            <div className="ava-card-name tx-title" style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {ava.name}
-                            </div>
-                            <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
-                              {subtitle}
-                            </div>
-                          </div>
-                          <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted, flexShrink: 0 }}>›</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <AvaListView
+                selectedAva={selectedAva}
+                onAvaClick={handleAvaClick}
+                onAvaHover={(slug) => mapRef.current?.hoverAva(slug)}
+              />
             )}
           </div>
 

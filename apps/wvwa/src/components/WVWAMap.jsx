@@ -86,6 +86,10 @@ function getVineyardNameFromProperties(properties = {}) {
   return properties.vineyard_name || properties.Vineyard_Name || properties.A1_VineyardName || '';
 }
 
+// White AVA boundary lines. Half strength so they frame the vineyards
+// without competing with them; the blue hover outline stays at full.
+const AVA_LINE_OPACITY = 0.5;
+
 function normalizeVineyardName(name) {
   return (typeof name === 'string' ? name : '').trim().toLowerCase();
 }
@@ -3125,7 +3129,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             paint: {
               'line-color': '#FFFFFF',
               'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 3.5, 2.5],
-              'line-opacity': 1.0,
+              'line-opacity': AVA_LINE_OPACITY,
             },
           });
 
@@ -3318,7 +3322,7 @@ const WVWAMap = forwardRef(function WVWAMap({
           }
           if (map.getLayer(`ava-${ava.slug}-line`)) {
             map.setPaintProperty(`ava-${ava.slug}-line`, 'line-color',   '#FFFFFF');
-            map.setPaintProperty(`ava-${ava.slug}-line`, 'line-opacity', isSelected ? 1.0 : 0);
+            map.setPaintProperty(`ava-${ava.slug}-line`, 'line-opacity', isSelected ? AVA_LINE_OPACITY : 0);
             map.setPaintProperty(`ava-${ava.slug}-line`, 'line-width',   isSelected ? 3.5 : 2.5);
           }
 
@@ -3428,7 +3432,7 @@ const WVWAMap = forwardRef(function WVWAMap({
             map.setPaintProperty(`ava-${ava.slug}-fill`, 'fill-opacity', 0);
           }
           if (map.getLayer(`ava-${ava.slug}-line`)) {
-            map.setPaintProperty(`ava-${ava.slug}-line`, 'line-opacity', 1.0);
+            map.setPaintProperty(`ava-${ava.slug}-line`, 'line-opacity', AVA_LINE_OPACITY);
             map.setPaintProperty(`ava-${ava.slug}-line`, 'line-width',
               ['case', ['boolean', ['feature-state', 'hover'], false], 3.5, 2.5]);
           }

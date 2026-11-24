@@ -18,6 +18,8 @@ Usage:
     python compute-climate-monthly.py                 # all years on disk
     python compute-climate-monthly.py --start 2025 --skip-vineyards
     python compute-climate-monthly.py --skip-vineyards --dry-run   # compute, write nothing
+    python compute-climate-monthly.py --skip-avas --missing-only   # after a vineyard load:
+                                      # only vineyards that have no climate rows yet
 """
 
 import io
@@ -64,11 +66,15 @@ def ava_masks(conn, transform, shape):
     return masks
 
 
-def vineyard_pixels(conn, transform, shape):
+def vineyard_pixels(conn, transform, shape, missing_only=False):
+    # missing_only: just vineyards with no climate_monthly rows (e.g. a new load)
+    missing = """AND NOT EXISTS (SELECT 1 FROM climate_monthly c
+                                 WHERE c.entity_type = 'vineyard' AND c.entity_key = v.id::text)"""
     with conn.cursor() as cur:
-        cur.execute("""SELECT id, ST_X(p), ST_Y(p) FROM (
-                         SELECT id, ST_PointOnSurface(ST_Transform(geometry, 4326)) p
-                         FROM vineyards WHERE geometry IS NOT NULL) s""")
+        cur.execute(f"""SELECT id, ST_X(p), ST_Y(p) FROM (
+                         SELECT v.id, ST_PointOnSurface(ST_Transform(v.geometry, 4326)) p
+                         FROM vineyards v WHERE v.geometry IS NOT NULL
+                         {missing if missing_only else ''}) s""")
         rows = cur.fetchall()
     out = {}
     for vid, x, y in rows:
@@ -82,8 +88,11 @@ def vineyard_pixels(conn, transform, shape):
 @click.option("--start", default=1991, show_default=True)
 @click.option("--end", default=2100, show_default=True)
 @click.option("--skip-vineyards", is_flag=True, default=False)
+@click.option("--skip-avas", is_flag=True, default=False, help="Vineyards only; leave AVA rows alone.")
+@click.option("--missing-only", is_flag=True, default=False,
+              help="Only vineyards that have no climate rows yet (fill a new load).")
 @click.option("--dry-run", is_flag=True, default=False, help="Compute and summarise; write nothing.")
-def main(start, end, skip_vineyards, dry_run):
+def main(start, end, skip_vineyards, skip_avas, missing_only, dry_run):
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
         click.echo("Error: DATABASE_URL is not set", err=True)
@@ -102,8 +111,8 @@ def main(start, end, skip_vineyards, dry_run):
 
     with rasterio.open(files[0][3]) as ref:
         transform, shape = ref.transform, (ref.height, ref.width)
-    masks = ava_masks(conn, transform, shape)
-    vpix = {} if skip_vineyards else vineyard_pixels(conn, transform, shape)
+    masks = {} if skip_avas else ava_masks(conn, transform, shape)
+    vpix = {} if skip_vineyards else vineyard_pixels(conn, transform, shape, missing_only)
     click.echo(f"{len(files)} grids · {len(masks)} AVAs · {len(vpix)} vineyards")
     if vpix:
         vr = np.array([rc[0] for rc in vpix.values()])

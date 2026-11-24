@@ -357,8 +357,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
     let cancelled = false;
     setSourcedFrom([]);
     if (!listing?.id) return;
-    fetch(`/api/public/wineries/${listing.id}/sourced-from`)
-      .then(r => r.ok ? r.json() : [])
+    apiJson(`/api/public/wineries/${listing.id}/sourced-from`)
       .then(data => { if (!cancelled && Array.isArray(data)) setSourcedFrom(data); })
       .catch(() => { /* ignore */ });
     return () => { cancelled = true; };
@@ -792,13 +791,14 @@ function ParcelBlockView({ parcel, onBack, onVineyardHover, onViewAllVineyards }
     setError(null);
     Promise.all(
       ids.map(id =>
-        fetch(`/api/vineyards/parcels/${id}/blocks`)
-          .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        // apiJson targets the API server in production; a bare '/api/...'
+        // fetch would hit this site and get its HTML page back
+        apiJson(`/api/vineyards/parcels/${id}/blocks`)
           .then(data => Array.isArray(data?.blocks) ? data.blocks : (Array.isArray(data) ? data : []))
       )
     )
       .then(results => { if (!cancelled) setRows(results.flat()); })
-      .catch(e => { if (!cancelled) setError(`Could not load polygons (${e})`); });
+      .catch(e => { if (!cancelled) setError(`Could not load polygons (${e.message || e})`); });
     return () => { cancelled = true; };
   }, [parcel?.ids?.join(','), parcel?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => onVineyardHover?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps

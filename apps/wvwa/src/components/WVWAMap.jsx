@@ -411,8 +411,8 @@ const LISTING_LAYER_ORDER = [
   'vineyards-selected-fill',
   'vineyards-selected-line',
   'vineyards-hovered-fill',
-  'vineyards-hovered-line',
   'vineyards-focused-line',
+  'vineyards-hovered-line',
   'listings-unclustered',
   'listings-hovered-glow',
   'listings-hovered-dot',
@@ -780,8 +780,8 @@ function setVineyardVisualizationVisibility(map, isVisible) {
     'vineyards-selected-fill',
     'vineyards-selected-line',
     'vineyards-hovered-fill',
-    'vineyards-hovered-line',
     'vineyards-focused-line',
+    'vineyards-hovered-line',
   ];
   for (const layerId of vineyardLayerIds) {
     if (map.getLayer(layerId)) {
@@ -3081,7 +3081,13 @@ const WVWAMap = forwardRef(function WVWAMap({
             'fill-opacity': 0.12,
           },
         });
-        addOutlineLayer(map, { id: 'vineyards-hovered-line', source: 'vineyards-hovered', color: VINEYARD_HIGHLIGHT, width: 3 });
+        // A single polygon hovered in the sidebar's polygon list (polygon_hover)
+        // is drawn thicker and in yellow so it stands out from its vineyard.
+        addOutlineLayer(map, {
+          id: 'vineyards-hovered-line', source: 'vineyards-hovered',
+          color: ['case', ['boolean', ['get', 'polygon_hover'], false], '#F5C518', VINEYARD_HIGHLIGHT],
+          width: ['case', ['boolean', ['get', 'polygon_hover'], false], 5, 3],
+        });
 
         // The one vineyard opened on the winery page (expanded card or a map
         // click) — stays blue after the pointer leaves its card.
@@ -3604,8 +3610,8 @@ const WVWAMap = forwardRef(function WVWAMap({
       'vineyards-selected-fill',
       'vineyards-selected-line',
       'vineyards-hovered-fill',
-      'vineyards-hovered-line',
       'vineyards-focused-line',
+      'vineyards-hovered-line',
     ];
     for (const layerId of vineyardHighlightLayerIds) {
       setLayerVisibility(map, layerId, devLayerToggles.vineyardHighlights);

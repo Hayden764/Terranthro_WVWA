@@ -258,6 +258,10 @@ router.get('/parcels', async (req, res) => {
         w.recid AS winery_recid,
         w.title AS winery_title,
         (vp.winery_id IS NOT NULL AND vp.winery_id IN ${membersOf(assocParam)}) AS is_member,
+        -- polygons we mapped from imagery (vineyard_blocks rows with a shape);
+        -- grower blocks without geometry are not counted
+        (SELECT COUNT(*)::int FROM vineyard_blocks b
+          WHERE b.vineyard_id = vp.id AND b.geometry IS NOT NULL) AS polygon_count,
         COALESCE(vc.color_index, -1) AS color_index,
         ST_AsGeoJSON(vp.geometry)::json AS geometry
       FROM vineyards vp
@@ -296,6 +300,7 @@ router.get('/parcels', async (req, res) => {
           winery_recid:     row.winery_recid,
           winery_title:     row.winery_title,
           is_member:        row.is_member === true,
+          polygon_count:    row.polygon_count ?? 0,
           color_index:      row.color_index != null ? Number(row.color_index) : -1,
         },
         geometry: row.geometry,

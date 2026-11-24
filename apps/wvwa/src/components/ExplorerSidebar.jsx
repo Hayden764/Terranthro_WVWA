@@ -361,10 +361,12 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
       const rawName = (p.vineyard_name || p.Vineyard_Name || p.A1_VineyardName || '').trim();
       const key = rawName ? `name:${rawName.toLowerCase()}` : `block:${index}`;
       if (!acc[key]) {
-        acc[key] = { key, name: rawName || `Vineyard Block ${index + 1}`, features: [], acresTotal: 0, acresCount: 0, avas: new Set() };
+        acc[key] = { key, name: rawName || `Vineyard ${index + 1}`, features: [], acresTotal: 0, acresCount: 0, polygonCount: 0, avas: new Set() };
       }
       const g = acc[key];
       g.features.push(feature);
+      // Polygons = shapes we mapped from imagery (not the grower's own blocks)
+      g.polygonCount += Number(p.polygon_count) || 0;
       const acresRaw = p.acres ?? p.Acres ?? p.VA0_TotalVineAcres;
       const acresVal = Number(acresRaw);
       if (Number.isFinite(acresVal) && acresVal > 0) { g.acresTotal += acresVal; g.acresCount += 1; }
@@ -499,22 +501,6 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                 let lastAvaLabel = null;
 
                 vineyardGroups.forEach((group, i) => {
-                  // Build block data
-                  const blockMap = new Map();
-                  for (const f of group.features) {
-                    for (const b of (Array.isArray(f.properties?.blocks) ? f.properties.blocks : [])) {
-                      const name = (b.Block || '').trim();
-                      if (!name) continue;
-                      if (!blockMap.has(name)) blockMap.set(name, { name, varieties: new Set(), clones: new Set(), acres: [] });
-                      const row = blockMap.get(name);
-                      if (b.Variety) row.varieties.add(String(b.Variety).trim());
-                      if (b.Clone) row.clones.add(String(b.Clone).trim());
-                      const ac = Number(b.Acres);
-                      if (Number.isFinite(ac) && ac > 0) row.acres.push(ac);
-                    }
-                  }
-                  const blockRows = Array.from(blockMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-
                   const acres = group.acresCount > 0 ? group.acresTotal.toFixed(1) : null;
                   const pAva = primaryAva(group.avas);
                   const avaLabel = pAva ? avaDisplayLabel(pAva) : (group.avas.size > 1 ? 'Multiple AVAs' : null);
@@ -552,10 +538,10 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                   })();
 
                   const terroirChips = [
-                    // Top-left: Blocks
+                    // Top-left: Polygons
                     {
-                      label: 'Blocks',
-                      value: String(blockRows.length || group.features.length),
+                      label: 'Polygons',
+                      value: group.polygonCount > 0 ? String(group.polygonCount) : '—',
                       tone: 'amber',
                       glow: false,
                     },
@@ -646,7 +632,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                           {acres && (
                             <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
                               {acres} ac
-                              {blockRows.length > 0 && ` · ${blockRows.length} block${blockRows.length !== 1 ? 's' : ''}`}
+                              {group.polygonCount > 0 && ` · ${group.polygonCount} polygon${group.polygonCount !== 1 ? 's' : ''}`}
                             </div>
                           )}
                         </div>
@@ -677,25 +663,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                             </div>
                           )}
 
-                          {/* Block list */}
-                          {blockRows.length > 0 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 10 }}>
-                              {blockRows.map((b, bi) => (
-                                <div key={`${b.name}-${bi}`} style={{ border: `1px solid ${border}`, borderRadius: 7, padding: '7px 10px', background: parchment }}>
-                                  <div style={{ fontSize: 'var(--type-body-size)', fontWeight: 700, color: ink }}>{b.name}</div>
-                                  <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 2 }}>
-                                    {[
-                                      b.varieties.size > 0 ? Array.from(b.varieties).slice(0, 2).join(', ') : null,
-                                      b.clones.size > 0 ? `Clone ${Array.from(b.clones).slice(0, 2).join('/')}` : null,
-                                      b.acres.length > 0 ? `${Math.max(...b.acres).toFixed(2)} ac` : null,
-                                    ].filter(Boolean).join(' · ') || '—'}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* View Blocks deep-dive button */}
+                          {/* Polygon (and grower block) deep-dive */}
                           {onParcelClick && (() => {
                             const parcelIds = group.features.map(f => f.properties?.id).filter(Boolean);
                             if (!parcelIds.length) return null;
@@ -710,6 +678,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                                     vineyard_name: firstFeature?.properties?.vineyard_name || group.name,
                                     acres: group.acresCount > 0 ? group.acresTotal : null,
                                   });
+                                  onVineyardHover?.(null);
                                 }}
                                 className="tx-box tx-link"
                                 style={{
@@ -720,7 +689,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                                   fontFamily: 'var(--font-sans)', fontWeight: 600,
                                 }}
                               >
-                                View Blocks →
+                                View polygons →
                               </button>
                             );
                           })()}
@@ -784,21 +753,23 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
 // ── Data layers section ───────────────────────────────────────────────────
 // ── ParcelBlockView ───────────────────────────────────────────────────────
 /**
- * Full-panel view for a single vineyard parcel's blocks.
- * Fetches /api/vineyards/parcels/:id/blocks and renders a sortable table.
- * Reached by clicking "View Blocks →" on an expanded parcel card.
+ * Full-panel view of a vineyard's polygons — the planted areas we mapped
+ * from imagery — and, only where a grower has supplied them, their own
+ * blocks (variety, clone, rootstock…). Both live in vineyard_blocks today:
+ * rows with a shape are polygons; rows carrying grower facts are blocks.
+ * Reached by clicking "View polygons →" on an expanded vineyard card.
  */
-function ParcelBlockView({ parcel, onBack }) {
-  const [blocks, setBlocks] = useState(null); // null = loading
-  const [error, setError]   = useState(null);
-  const [sort, setSort]     = useState({ key: 'block_name', dir: 1 });
+function ParcelBlockView({ parcel, onBack, onVineyardHover, onViewAllVineyards }) {
+  const [rows, setRows]   = useState(null); // null = loading
+  const [error, setError] = useState(null);
+  const [sort, setSort]   = useState({ key: 'block_name', dir: 1 });
   const [hoveredRow, setHoveredRow] = useState(null);
 
   useEffect(() => {
     const ids = parcel?.ids?.length ? parcel.ids : (parcel?.id ? [parcel.id] : []);
     if (!ids.length) return;
     let cancelled = false;
-    setBlocks(null);
+    setRows(null);
     setError(null);
     Promise.all(
       ids.map(id =>
@@ -807,39 +778,35 @@ function ParcelBlockView({ parcel, onBack }) {
           .then(data => Array.isArray(data?.blocks) ? data.blocks : (Array.isArray(data) ? data : []))
       )
     )
-      .then(results => {
-        if (!cancelled) setBlocks(results.flat());
-      })
-      .catch(e => { if (!cancelled) setError(`Could not load blocks (${e})`); });
+      .then(results => { if (!cancelled) setRows(results.flat()); })
+      .catch(e => { if (!cancelled) setError(`Could not load polygons (${e})`); });
     return () => { cancelled = true; };
   }, [parcel?.ids?.join(','), parcel?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onVineyardHover?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Largest first, numbered in that order (our polygons have no names)
+  const polygons = (rows || [])
+    .filter(r => r.geometry)
+    .sort((a, b) => (Number(b.acres) || 0) - (Number(a.acres) || 0))
+    .map((r, i) => ({ ...r, label: `Polygon ${i + 1}`, feature: { type: 'Feature', geometry: r.geometry, properties: { id: r.id, polygon_hover: true } } }));
+  const hasGrowerFacts = r => r.variety || r.clone || r.rootstock || r.year_planted || r.vines
+    || (Array.isArray(r.buyers) && r.buyers.length > 0);
+  const growerBlocks = (rows || []).filter(r => !r.geometry || hasGrowerFacts(r));
 
   function toggleSort(key) {
     setSort(s => s.key === key ? { key, dir: s.dir * -1 } : { key, dir: 1 });
   }
+  const sortedBlocks = [...growerBlocks].sort((a, b) => {
+    const av = a[sort.key] ?? '';
+    const bv = b[sort.key] ?? '';
+    if (av === '' && bv !== '') return 1;
+    if (bv === '' && av !== '') return -1;
+    return typeof av === 'number'
+      ? (av - bv) * sort.dir
+      : String(av).localeCompare(String(bv), undefined, { numeric: true }) * sort.dir;
+  });
 
-  const sorted = blocks
-    ? [...blocks].sort((a, b) => {
-        const av = a[sort.key] ?? '';
-        const bv = b[sort.key] ?? '';
-        if (av === '' && bv !== '') return 1;
-        if (bv === '' && av !== '') return -1;
-        return typeof av === 'number'
-          ? (av - bv) * sort.dir
-          : String(av).localeCompare(String(bv)) * sort.dir;
-      })
-    : [];
-
-  const totalAcres = blocks ? blocks.reduce((s, b) => s + (Number(b.acres) || 0), 0) : 0;
-  const totalVines = blocks ? blocks.reduce((s, b) => s + (Number(b.vines) || 0), 0) : 0;
-
-  // Compute top variety by block count for the summary pill
-  const topVariety = blocks && blocks.length > 0 ? (() => {
-    const counts = {};
-    blocks.forEach(b => { if (b.variety) counts[b.variety] = (counts[b.variety] || 0) + 1; });
-    const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-    return best ? { name: best[0], count: best[1] } : null;
-  })() : null;
+  const polygonAcres = polygons.reduce((s, p) => s + (Number(p.acres) || 0), 0);
 
   const COL_DEFS = [
     { key: 'block_name',    label: 'Block',       width: 110, bold: true },
@@ -848,7 +815,6 @@ function ParcelBlockView({ parcel, onBack }) {
     { key: 'rootstock',     label: 'Rootstock',   width: 80  },
     { key: 'year_planted',  label: 'Yr',          width: 44  },
     { key: 'acres',         label: 'Acres',       width: 54, num: true, fmt: v => v != null ? Number(v).toFixed(2) : '—' },
-    { key: 'rows',          label: 'Rows',        width: 44, num: true },
   ];
 
   const thStyle = (key) => ({
@@ -876,6 +842,7 @@ function ParcelBlockView({ parcel, onBack }) {
     textOverflow: 'ellipsis',
     maxWidth: 140,
   });
+  const note = { padding: '24px 16px', textAlign: 'center', color: muted, fontSize: 'var(--type-mono-size)' };
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', paddingBottom: 16 }}>
@@ -886,103 +853,103 @@ function ParcelBlockView({ parcel, onBack }) {
         <div style={{ fontSize: 'var(--type-display-italic-size)', fontWeight: 700, color: ink, lineHeight: 1.2 }}>
           {parcel.parcel_label || parcel.vineyard_name}
         </div>
-        <div style={{ fontSize: 'var(--type-mono-size)', color: muted, marginTop: 2 }}>
-          {parcel.vineyard_name}
-          {parcel.acres ? ` · ${Number(parcel.acres).toFixed(1)} ac` : ''}
-        </div>
+        {rows && (
+          <div style={{ fontSize: 'var(--type-mono-size)', color: muted, marginTop: 2 }}>
+            {[
+              `${polygons.length} polygon${polygons.length !== 1 ? 's' : ''}`,
+              polygonAcres > 0 ? `${polygonAcres.toFixed(1)} ac mapped` : null,
+              growerBlocks.length ? `${growerBlocks.length} grower block${growerBlocks.length !== 1 ? 's' : ''}` : null,
+            ].filter(Boolean).join(' · ')}
+          </div>
+        )}
       </div>
 
-      {/* Summary pills */}
-      {blocks && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '10px 16px 0' }}>
-          {[
-            { label: 'Blocks',  val: blocks.length },
-            { label: 'Acres',   val: totalAcres > 0 ? totalAcres.toFixed(1) : null },
-            { label: 'Vines',   val: totalVines > 0 ? totalVines.toLocaleString() : null },
-          ].filter(p => p.val != null).map(p => (
-            <div key={p.label} style={{
-              padding: '4px 10px', borderRadius: 20,
-              background: alpha(ink, 0.05),
-              fontSize: 'var(--type-ui-label-size)', color: ink, fontWeight: 600,
-            }}>
-              {p.val} <span style={{ fontWeight: 400, color: muted }}>{p.label}</span>
-            </div>
-          ))}
-          {topVariety && (
-            <div style={{
-              padding: '4px 10px', borderRadius: 20,
-              background: alpha(ink, 0.05),
-              fontSize: 'var(--type-ui-label-size)', color: ink, fontWeight: 600,
-            }}>
-              {topVariety.name}
-              {topVariety.count > 1 && <span style={{ fontWeight: 400, color: muted }}> ({topVariety.count})</span>}
+      {error && <div style={{ padding: '12px 16px', color: crimson, fontSize: 'var(--type-mono-size)' }}>{error}</div>}
+      {!error && rows === null && <div style={note}>Loading…</div>}
+
+      {/* Polygons — hover outlines one on the map, click zooms to it */}
+      {!error && rows !== null && (
+        <div style={{ padding: '14px 16px 0' }}>
+          <div style={{ ...T.sectionLabel, marginBottom: 4 }}>Polygons</div>
+          <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginBottom: 8 }}>
+            Planted areas mapped from aerial imagery. These are not the grower's own blocks.
+          </div>
+          {polygons.length === 0 ? (
+            <div style={{ ...note, padding: '8px 0' }}>No polygons mapped for this vineyard.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {polygons.map(p => (
+                <button
+                  key={p.id}
+                  onMouseEnter={() => { setHoveredRow(p.id); onVineyardHover?.([p.feature]); }}
+                  onMouseLeave={() => { setHoveredRow(null); onVineyardHover?.(null); }}
+                  onClick={() => onViewAllVineyards?.([p.feature])}
+                  className="tx-box"
+                  title="Zoom to this polygon"
+                  style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                    textAlign: 'left', border: `1px solid ${border}`, borderRadius: 7,
+                    padding: '7px 10px', cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                    background: hoveredRow === p.id ? interactiveSoft : parchment,
+                    transition: 'background 0.12s',
+                  }}
+                >
+                  <span style={{ fontSize: 'var(--type-mono-size)', fontWeight: 600, color: ink }}>{p.label}</span>
+                  <span style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>
+                    {p.acres != null ? `${Number(p.acres).toFixed(2)} ac` : '—'}
+                  </span>
+                </button>
+              ))}
             </div>
           )}
         </div>
       )}
 
-      {/* Table */}
-      <div style={{ flex: 1, overflowX: 'auto', padding: '12px 0 0' }}>
-        {error && (
-          <div style={{ padding: '12px 16px', color: crimson, fontSize: 'var(--type-mono-size)' }}>{error}</div>
-        )}
-        {!error && blocks === null && (
-          <div style={{ padding: '24px 16px', textAlign: 'center', color: muted, fontSize: 'var(--type-mono-size)' }}>Loading…</div>
-        )}
-        {!error && blocks !== null && blocks.length === 0 && (
-          <div style={{ padding: '24px 16px', textAlign: 'center', color: muted, fontSize: 'var(--type-mono-size)' }}>No blocks recorded for this parcel.</div>
-        )}
-        {!error && sorted.length > 0 && (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--type-mono-size)' }}>
-            <thead>
-              <tr>
-                {COL_DEFS.map(c => (
-                  <th key={c.key} className={`tx-link${sort.key === c.key ? ' is-active' : ''}`} style={thStyle(c.key)} onClick={() => toggleSort(c.key)}>
-                    {c.label}{sort.key === c.key ? (sort.dir === 1 ? ' ▴' : ' ▾') : ''}
-                  </th>
-                ))}
-                <th style={{ ...thStyle(null), cursor: 'default' }}>Sold To</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map(block => (
-                <tr
-                  key={block.id}
-                  onMouseEnter={() => setHoveredRow(block.id)}
-                  onMouseLeave={() => setHoveredRow(null)}
-                  style={{ background: hoveredRow === block.id ? interactiveSoft : 'transparent', transition: 'background 0.12s' }}
-                >
+      {/* Grower blocks — only where a grower's own block data exists */}
+      {!error && sortedBlocks.length > 0 && (
+        <div style={{ padding: '16px 0 0' }}>
+          <div style={{ ...T.sectionLabel, margin: '0 16px 8px' }}>Grower blocks</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--type-mono-size)' }}>
+              <thead>
+                <tr>
                   {COL_DEFS.map(c => (
-                    <td key={c.key} style={tdStyle(c.bold)}>
-                      {c.fmt ? c.fmt(block[c.key]) : (block[c.key] ?? '—')}
-                    </td>
+                    <th key={c.key} className={`tx-link${sort.key === c.key ? ' is-active' : ''}`} style={thStyle(c.key)} onClick={() => toggleSort(c.key)}>
+                      {c.label}{sort.key === c.key ? (sort.dir === 1 ? ' ▴' : ' ▾') : ''}
+                    </th>
                   ))}
-                  {/* Inline buyers column */}
-                  <td style={{ ...tdStyle(false), maxWidth: 120 }}>
-                    {Array.isArray(block.buyers) && block.buyers.length > 0 ? (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                        {block.buyers.map(buyer => (
-                          <span key={buyer.name} style={{
-                            padding: '1px 6px', borderRadius: 10,
-                            fontSize: '10px',
-                            background: alpha(ink, 0.07),
-                            color: muted,
-                            fontWeight: 500,
-                            whiteSpace: 'nowrap',
-                          }}>
-                            {buyer.winery_title || buyer.name}
-                          </span>
-                        ))}
-                      </div>
-                    ) : '—'}
-                  </td>
+                  <th style={{ ...thStyle(null), cursor: 'default' }}>Sold To</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
+              </thead>
+              <tbody>
+                {sortedBlocks.map(block => (
+                  <tr key={block.id}>
+                    {COL_DEFS.map(c => (
+                      <td key={c.key} style={tdStyle(c.bold)}>
+                        {c.fmt ? c.fmt(block[c.key]) : (block[c.key] ?? '—')}
+                      </td>
+                    ))}
+                    <td style={{ ...tdStyle(false), maxWidth: 120 }}>
+                      {Array.isArray(block.buyers) && block.buyers.length > 0 ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                          {block.buyers.map(buyer => (
+                            <span key={buyer.name} style={{
+                              padding: '1px 6px', borderRadius: 10, fontSize: '10px',
+                              background: alpha(ink, 0.07), color: muted, fontWeight: 500, whiteSpace: 'nowrap',
+                            }}>
+                              {buyer.winery_title || buyer.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1845,7 +1812,7 @@ export default function ExplorerSidebar({
     : currentView === 'winery-list' ? 'Wineries'
     : currentView === 'ava-detail' ? (detailAva?.name ?? '')
     : currentView === 'winery-detail' ? (detailWinery?.title ?? '')
-    : currentView === 'parcel-blocks' ? (detailParcel?.parcel_label ?? 'Blocks')
+    : currentView === 'parcel-blocks' ? (detailParcel?.parcel_label ?? 'Polygons')
     : '';
 
   // Sheet geometry: the sheet is always full height and slid down to expose
@@ -2289,6 +2256,8 @@ export default function ExplorerSidebar({
               <ParcelBlockView
                 parcel={detailParcel}
                 onBack={() => setViewStack(prev => prev.slice(0, -1))}
+                onVineyardHover={onVineyardHover}
+                onViewAllVineyards={onViewAllVineyards}
               />
             )}
           </div>

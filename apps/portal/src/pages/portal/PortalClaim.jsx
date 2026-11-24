@@ -4,6 +4,7 @@ import { border, ink, muted, parchment, TOKENS } from '@terranthro/shared/styles
 import { LIGHT_INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
 import { apiJson, apiPost } from '@terranthro/shared/lib/api.js';
 import TerroirDataChips from '@terranthro/shared/components/TerroirDataChips.jsx';
+import { combineTopo, slopeChip } from '../../lib/terrainChips.jsx';
 
 // Vineyards describe elevation as a range, never an average: "334–378 ft".
 function fmtElevRange(min, max) {
@@ -134,8 +135,7 @@ export default function PortalClaim() {
                         { label: 'AVA',   value: r.nested_ava || r.ava_name || '—',          tone: 'blue',  glow: true  },
                         { label: 'Elevation', value: fmtElevRange(r.topo_stats?.elevation_min_ft, r.topo_stats?.elevation_max_ft) || '—',
                                                                                               tone: 'parchment', glow: false },
-                        { label: 'Slope', value: r.topo_stats?.slope_mean_deg
-                            ? `${Number(r.topo_stats.slope_mean_deg).toFixed(1)}°` : '—',   tone: 'green', glow: true  },
+                        slopeChip(combineTopo(r.topo_stats)),
                       ]} />
                     </div>
 

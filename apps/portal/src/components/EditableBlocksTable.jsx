@@ -61,10 +61,21 @@ function fmtElevRange(min, max) {
   return lo === hi ? `${lo.toLocaleString()} ft` : `${lo.toLocaleString()}–${hi.toLocaleString()} ft`;
 }
 
+// A polygon's slope as its middle-80% range (10th–90th percentile), else its average
+function fmtSlopeSpan(t) {
+  const p10 = t?.slope_p10_deg != null ? Number(t.slope_p10_deg) : null;
+  const p90 = t?.slope_p90_deg != null ? Number(t.slope_p90_deg) : null;
+  if (p10 != null && p90 != null) {
+    const lo = Math.round(p10), hi = Math.round(p90);
+    return lo === hi ? `${p10.toFixed(1)}–${p90.toFixed(1)}°` : `${lo}–${hi}°`;
+  }
+  return t?.slope_mean_deg != null ? `${Number(t.slope_mean_deg).toFixed(1)}°` : null;
+}
+
 // Read-only terroir stat columns appended to the read-mode table (from block.topo).
 const TERROIR_COLUMNS = [
   { key: 'elevation', label: 'Elevation', get: (t) => fmtElevRange(t?.elevation_min_ft, t?.elevation_max_ft) || '' },
-  { key: 'slope',     label: 'Slope',     get: (t) => (t?.slope_mean_deg != null ? `${Number(t.slope_mean_deg).toFixed(1)}°` : '') },
+  { key: 'slope',     label: 'Slope',     get: (t) => fmtSlopeSpan(t) || '' },
   { key: 'aspect',    label: 'Aspect',    get: (t) => (t?.aspect_bucket || (t?.aspect_dominant_deg != null && Number(t.aspect_dominant_deg) >= 0 ? `${Math.round(Number(t.aspect_dominant_deg))}°` : '')) },
 ];
 
@@ -99,7 +110,8 @@ function fmtTopo(topo) {
   const parts = [];
   const elev = fmtElevRange(topo.elevation_min_ft, topo.elevation_max_ft);
   if (elev) parts.push(elev);
-  if (topo.slope_mean_deg != null) parts.push(`${Number(topo.slope_mean_deg).toFixed(1)}° slope`);
+  const slope = fmtSlopeSpan(topo);
+  if (slope) parts.push(`${slope} slope`);
   if (topo.aspect_bucket) parts.push(`${topo.aspect_bucket} aspect`);
   else if (topo.aspect_dominant_deg != null && Number(topo.aspect_dominant_deg) >= 0) parts.push(`${Math.round(Number(topo.aspect_dominant_deg))}° aspect`);
   return parts.length ? parts.join(' · ') : null;

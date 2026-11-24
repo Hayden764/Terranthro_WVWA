@@ -5,6 +5,7 @@ import { apiJson, apiFetch } from '@terranthro/shared/lib/api.js';
 import EditableBlocksTable from '../../components/EditableBlocksTable';
 import ParcelHistorySection from '../../components/ParcelHistorySection';
 import TerroirDataChips from '@terranthro/shared/components/TerroirDataChips.jsx';
+import { combineTopo, polygonsFromBlocks, elevationChip, slopeChip, aspectChip, fmtSlopeRange } from '../../lib/terrainChips.jsx';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import SplitVineyardModal from '../../components/admin/SplitVineyardModal';
 import SplitParcelModal from '../../components/admin/SplitParcelModal';
@@ -95,31 +96,9 @@ export default function AdminVineyardBlockDetail() {
       tone: 'amber',
       glow: false,
     },
-    {
-      label: 'Elevation',
-      value: fmtElevRange(ts?.elevation_min_ft, ts?.elevation_max_ft) || '—',
-      subValue: ts?.elevation_min_ft != null ? 'lowest to highest point' : null,
-      tone: 'parchment',
-      glow: false,
-    },
-    {
-      label: 'Aspect',
-      value: ts?.aspect_dominant_deg != null ? degToCardinal(ts.aspect_dominant_deg) : '—',
-      subValue: ts?.aspect_dominant_deg != null
-        ? `${Math.round(Number(ts.aspect_dominant_deg))}° dom · ${Math.round(Number(ts.aspect_mean_deg))}° avg`
-        : null,
-      tone: 'blue',
-      glow: true,
-    },
-    {
-      label: 'Slope',
-      value: ts?.slope_mean_deg != null ? `${Number(ts.slope_mean_deg).toFixed(1)}°` : '—',
-      subValue: ts?.slope_p10_deg != null
-        ? `${Number(ts.slope_p10_deg).toFixed(1)}–${Number(ts.slope_p90_deg).toFixed(1)}° range`
-        : null,
-      tone: 'green',
-      glow: true,
-    },
+    elevationChip(combineTopo(ts)),
+    aspectChip(combineTopo(ts), polygonsFromBlocks(blocks)),
+    slopeChip(combineTopo(ts)),
   ];
 
   return (
@@ -258,8 +237,14 @@ export default function AdminVineyardBlockDetail() {
         {ts && (
           <Section title="Topography">
             <InfoRow label="Elevation" value={fmtElevRange(ts.elevation_min_ft, ts.elevation_max_ft) || '—'} />
-            <InfoRow label="Slope" value={`${Number(ts.slope_mean_deg).toFixed(1)}° avg, ${Number(ts.slope_max_deg).toFixed(1)}° max`} />
-            <InfoRow label="Aspect" value={`${degToCardinal(ts.aspect_dominant_deg)} (${Math.round(Number(ts.aspect_dominant_deg))}°)`} />
+            <InfoRow label="Slope" value={[
+              fmtSlopeRange(ts.slope_p10_deg != null ? Number(ts.slope_p10_deg) : null, ts.slope_p90_deg != null ? Number(ts.slope_p90_deg) : null),
+              ts.slope_max_deg != null ? `steepest ${Math.round(Number(ts.slope_max_deg))}°` : null,
+            ].filter(Boolean).join(' · ') || '—'} />
+            <InfoRow label="Aspect" value={(() => {
+              const a = aspectChip(combineTopo(ts), polygonsFromBlocks(blocks), { compass: false });
+              return [a.value, a.subValue].filter(Boolean).join(' · ');
+            })()} />
           </Section>
         )}
 
@@ -361,11 +346,6 @@ export default function AdminVineyardBlockDetail() {
 }
 
 /* ── Helpers ── */
-function degToCardinal(deg) {
-  const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-  return dirs[Math.round(Number(deg) / 22.5) % 16];
-}
-
 function Section({ title, children }) {
   return (
     <div style={{

@@ -9,6 +9,7 @@ import PortalVineyardMap from '../../components/PortalVineyardMap';
 import EditableBlocksTable from '../../components/EditableBlocksTable';
 import ParcelHistorySection from '../../components/ParcelHistorySection';
 import TerroirDataChips from '@terranthro/shared/components/TerroirDataChips.jsx';
+import { combineTopo, polygonsFromBlocks, elevationChip, slopeChip, aspectChip } from '../../lib/terrainChips.jsx';
 
 // Vineyards describe elevation as a range, never an average: "334–378 ft".
 function fmtElevRange(min, max) {
@@ -227,28 +228,9 @@ export default function PortalVineyardDetail() {
 
   const terroirChips = [
     { label: 'Blocks', value: blockCount > 0 ? String(blockCount) : '—', tone: 'amber', glow: false },
-    {
-      label: 'Elevation',
-      value: fmtElevRange(ts?.elevation_min_ft, ts?.elevation_max_ft) || '—',
-      subValue: ts?.elevation_min_ft != null ? 'lowest to highest point' : null,
-      tone: 'parchment', glow: false,
-    },
-    {
-      label: 'Aspect',
-      value: ts?.aspect_dominant_deg != null ? degToCardinal(ts.aspect_dominant_deg) : '—',
-      subValue: ts?.aspect_dominant_deg != null
-        ? `${Math.round(Number(ts.aspect_dominant_deg))}° dom · ${Math.round(Number(ts.aspect_mean_deg))}° avg`
-        : null,
-      tone: 'blue', glow: true,
-    },
-    {
-      label: 'Slope',
-      value: ts?.slope_mean_deg != null ? `${Number(ts.slope_mean_deg).toFixed(1)}°` : '—',
-      subValue: ts?.slope_p10_deg != null
-        ? `${Number(ts.slope_p10_deg).toFixed(1)}–${Number(ts.slope_p90_deg).toFixed(1)}° range`
-        : null,
-      tone: 'green', glow: true,
-    },
+    elevationChip(combineTopo(ts)),
+    aspectChip(combineTopo(ts), polygonsFromBlocks(vineyard.blocks)),
+    slopeChip(combineTopo(ts)),
   ];
 
   return (
@@ -511,11 +493,6 @@ function StatusBanner({ statuses }) {
       ))}
     </div>
   );
-}
-
-function degToCardinal(deg) {
-  const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-  return dirs[Math.round(Number(deg) / 22.5) % 16];
 }
 
 function Shell({ children }) {

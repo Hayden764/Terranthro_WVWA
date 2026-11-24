@@ -19,6 +19,7 @@ import PortalVineyardMap from '../../components/PortalVineyardMap';
 import EditableBlocksTable from '../../components/EditableBlocksTable';
 import ParcelHistorySection from '../../components/ParcelHistorySection';
 import TerroirDataChips from '@terranthro/shared/components/TerroirDataChips.jsx';
+import { combineTopo, polygonsFromBlocks, elevationChip, slopeChip, aspectChip } from '../../lib/terrainChips.jsx';
 
 export default function PortalVineyardGroup() {
   const [searchParams] = useSearchParams();
@@ -427,25 +428,11 @@ function ParcelCard({ parcel, highlighted, onHighlight, onEditGeometry, isEditin
   const address = [parcel.situs_address, parcel.situs_city, parcel.situs_zip]
     .filter(Boolean).join(', ');
 
+  const parcelTopo = combineTopo(parcel.topo_stats);
   const parcelChips = parcel.topo_stats ? [
-    {
-      label: 'Elev',
-      value: `${Number(parcel.topo_stats.elevation_min_ft).toFixed(0)}-${Number(parcel.topo_stats.elevation_max_ft).toFixed(0)} ft`,
-      tone: 'parchment',
-      glow: false,
-    },
-    {
-      label: 'Slope',
-      value: `${Number(parcel.topo_stats.slope_mean_deg).toFixed(1)}° avg`,
-      tone: 'green',
-      glow: true,
-    },
-    {
-      label: 'Aspect',
-      value: `${Number(parcel.topo_stats.aspect_dominant_deg).toFixed(0)}°`,
-      tone: 'blue',
-      glow: true,
-    },
+    elevationChip(parcelTopo, { sub: false }),
+    slopeChip(parcelTopo),
+    aspectChip(parcelTopo, polygonsFromBlocks(parcel.blocks)),
     {
       label: 'Acres',
       value: parcel.acres ? `${Number(parcel.acres).toFixed(1)} ac` : '—',

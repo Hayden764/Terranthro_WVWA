@@ -93,6 +93,8 @@ async function fetchParcelsWithDetails(vineyardIds) {
          bt.elevation_mean_ft AS t_elev_mean,
          bt.slope_mean_deg    AS t_slope_mean,
          bt.slope_max_deg     AS t_slope_max,
+         bt.slope_p10_deg     AS t_slope_p10,
+         bt.slope_p90_deg     AS t_slope_p90,
          bt.aspect_dominant_deg AS t_aspect_deg,
          bt.aspect_bucket     AS t_aspect_bucket
        FROM vineyard_blocks vb
@@ -103,7 +105,8 @@ async function fetchParcelsWithDetails(vineyardIds) {
     ),
     pool.query(
       `SELECT vineyard_id, elevation_min_ft, elevation_max_ft, elevation_mean_ft,
-              slope_mean_deg, slope_max_deg, aspect_dominant_deg, aspect_mean_deg
+              slope_mean_deg, slope_max_deg, slope_p10_deg, slope_p90_deg,
+              aspect_dominant_deg, aspect_mean_deg
        FROM vineyard_topo_stats
        WHERE vineyard_id = ANY($1)`,
       [vineyardIds]
@@ -121,10 +124,12 @@ async function fetchParcelsWithDetails(vineyardIds) {
       elevation_mean_ft: b.t_elev_mean,
       slope_mean_deg: b.t_slope_mean,
       slope_max_deg: b.t_slope_max,
+      slope_p10_deg: b.t_slope_p10,
+      slope_p90_deg: b.t_slope_p90,
       aspect_dominant_deg: b.t_aspect_deg,
       aspect_bucket: b.t_aspect_bucket,
     } : null;
-    for (const k of ['t_elev_min', 't_elev_max', 't_elev_mean', 't_slope_mean', 't_slope_max', 't_aspect_deg', 't_aspect_bucket']) {
+    for (const k of ['t_elev_min', 't_elev_max', 't_elev_mean', 't_slope_mean', 't_slope_max', 't_slope_p10', 't_slope_p90', 't_aspect_deg', 't_aspect_bucket']) {
       delete b[k];
     }
     if (!blocksByParcel[b.vineyard_id]) blocksByParcel[b.vineyard_id] = [];
@@ -278,7 +283,12 @@ router.get('/vineyards/available', async (req, res) => {
       `SELECT
          vp.id, vp.vineyard_name, vp.vineyard_org, vp.ava_name,
          vp.nested_ava, vp.acres,
-         ST_AsGeoJSON(ST_Centroid(vp.geometry))::json AS centroid
+         ST_AsGeoJSON(ST_Centroid(vp.geometry))::json AS centroid,
+         (SELECT row_to_json(t) FROM (
+            SELECT elevation_min_ft, elevation_max_ft, slope_mean_deg,
+                   slope_p10_deg, slope_p90_deg, slope_max_deg, aspect_dominant_deg
+            FROM vineyard_topo_stats WHERE vineyard_id = vp.id
+          ) t) AS topo_stats
        FROM vineyards vp
        WHERE vp.winery_id IS NULL
          ${searchCondition}

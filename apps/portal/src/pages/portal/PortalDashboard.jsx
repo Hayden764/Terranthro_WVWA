@@ -7,6 +7,7 @@ import PortalHeader from '../../components/portal/PortalHeader';
 import { DataSharingPrompt } from '../../components/portal/DataSharing';
 import PortalVineyardMap from '../../components/PortalVineyardMap';
 import TerroirDataChips from '@terranthro/shared/components/TerroirDataChips.jsx';
+import { combineTopo, polygonsFromBlocks, elevationChip, slopeChip, aspectChip } from '../../lib/terrainChips.jsx';
 
 export default function PortalDashboard() {
   const navigate = useNavigate();
@@ -126,19 +127,15 @@ export default function PortalDashboard() {
                 ? `/portal/vineyards/${group.parcels[0].id}`
                 : `/portal/vineyards/group?name=${encodeURIComponent(group.name)}`;
 
-              // Aggregate topo stats across parcels that have data
-              const topoList = group.parcels.map((p) => p.topo_stats).filter(Boolean);
-              const topo = topoList.length > 0 ? {
-                elevation_mean_ft: topoList.reduce((s, t) => s + Number(t.elevation_mean_ft), 0) / topoList.length,
-                slope_mean_deg: topoList.reduce((s, t) => s + Number(t.slope_mean_deg), 0) / topoList.length,
-                aspect_dominant_deg: topoList[0].aspect_dominant_deg,
-              } : null;
+              // Terrain across every record with this name: ranges, not averages
+              const topo = combineTopo(group.parcels.map((p) => p.topo_stats));
+              const polygons = polygonsFromBlocks(group.parcels.flatMap((p) => p.blocks || []));
 
               const terroirChips = [
                 { label: 'Acres', value: `${totalAcres.toFixed(1)} ac`, tone: 'amber', glow: false },
-                { label: 'Elev', value: topo ? `${Math.round(topo.elevation_mean_ft)} ft` : '—', tone: 'parchment', glow: false },
-                { label: 'Slope', value: topo ? `${topo.slope_mean_deg.toFixed(1)}°` : '—', tone: 'green', glow: true },
-                { label: 'Aspect', value: topo ? degToCardinal(topo.aspect_dominant_deg) : '—', tone: 'blue', glow: true },
+                elevationChip(topo, { sub: false }),
+                slopeChip(topo),
+                aspectChip(topo, polygons),
               ];
 
               return (
@@ -294,7 +291,3 @@ function groupVineyardsByName(vineyards) {
     .map(([name, parcels]) => ({ name, parcels }));
 }
 
-function degToCardinal(deg) {
-  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  return dirs[Math.round(Number(deg) / 45) % 8];
-}

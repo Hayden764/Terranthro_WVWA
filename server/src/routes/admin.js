@@ -1381,12 +1381,14 @@ router.get('/vineyards/:parcelId/blocks', async (req, res) => {
         [parcelId]
       ),
       pool.query(
-        `SELECT id, vineyard_id, vineyard_name, block_name, variety, clone,
-                rootstock, rows, spacing, vines_per_acre, vines, acres, year_planted, notes,
-                source_dataset, (geometry IS NOT NULL) AS has_geometry
-         FROM vineyard_blocks
-         WHERE vineyard_id = $1
-         ORDER BY block_name`,
+        `SELECT b.id, b.vineyard_id, b.vineyard_name, b.block_name, b.variety, b.clone,
+                b.rootstock, b.rows, b.spacing, b.vines_per_acre, b.vines, b.acres, b.year_planted, b.notes,
+                b.source_dataset, (b.geometry IS NOT NULL) AS has_geometry,
+                bt.aspect_dominant_deg AS aspect_deg
+         FROM vineyard_blocks b
+         LEFT JOIN vineyard_block_topo_stats bt ON bt.block_id = b.id
+         WHERE b.vineyard_id = $1
+         ORDER BY b.block_name`,
         [parcelId]
       ),
       pool.query(

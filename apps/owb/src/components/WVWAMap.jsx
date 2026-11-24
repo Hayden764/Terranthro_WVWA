@@ -92,6 +92,23 @@ function normalizeVineyardName(name) {
   return (typeof name === 'string' ? name : '').trim().toLowerCase();
 }
 
+// A vineyard with no linked winery (an independent grower) opens in the same
+// sidebar panel as a winery, standing in as a "listing" whose only vineyard is
+// itself. Its parcels are registered under the pseudo id in VINEYARD_BY_ORG so
+// the selection, highlight and "view all" code paths work unchanged.
+function vineyardOnlyListing(name, props = {}) {
+  const key = normalizeVineyardName(name);
+  const id = `vineyard:${key}`;
+  VINEYARD_BY_ORG[id] = VINEYARD_ALL_BY_NAME[key] || [];
+  const owner = String(props.vineyard_org || '').trim();
+  return {
+    id,
+    title: name,
+    vineyardOnly: true,
+    owner: owner && !['unknown', '?', '??'].includes(owner.toLowerCase()) ? owner : null,
+  };
+}
+
 // Layers a tap can land on and still count as "on a vineyard".
 const VINEYARD_CLICK_HIT_LAYERS = ['vineyards-linked-fill', 'vineyards-reference-passive-fill'];
 
@@ -2301,7 +2318,8 @@ const WVWAMap = forwardRef(function WVWAMap({
     if (!map || !mapLoaded) return;
     const src = map.getSource('selected-listing');
     if (!src) return;
-    if (!selectedListing) {
+    // Vineyard-only selections have no tasting-room point to mark
+    if (!selectedListing || selectedListing.vineyardOnly) {
       src.setData({ type: 'FeatureCollection', features: [] });
       return;
     }
@@ -3041,6 +3059,37 @@ const WVWAMap = forwardRef(function WVWAMap({
             vineyardPopupRef.current.remove();
             vineyardPopupRef.current = null;
           }
+        });
+        // Click on a named vineyard with no linked winery (independent growers):
+        // open it on its own, as a vineyard-only "listing" (see vineyardOnlyListing).
+        // Vineyards that do have a winery are handled by the linked layer above.
+        map.on('click', 'vineyards-reference-passive-fill', (e) => {
+          if (!e.features?.length) return;
+          if (map.getLayer('vineyards-linked-fill')
+            && map.queryRenderedFeatures(e.point, { layers: ['vineyards-linked-fill'] }).length) return;
+          const clickedFeature = e.features[0];
+          const clickedProps = clickedFeature?.properties || {};
+          const vineyardName = getVineyardNameFromProperties(clickedProps).trim();
+          if (!vineyardName) return;   // unnamed polygons have nothing to open
+          if (vineyardPopupRef.current) { vineyardPopupRef.current.remove(); vineyardPopupRef.current = null; }
+          const listing = vineyardOnlyListing(vineyardName, clickedProps);
+
+          if (isTouchRef.current) {
+            const groupFeatures = VINEYARD_ALL_BY_NAME[normalizeVineyardName(vineyardName)] || [];
+            const src = map.getSource('vineyards-hovered');
+            if (src) {
+              src.setData({
+                type: 'FeatureCollection',
+                features: groupFeatures.length
+                  ? groupFeatures
+                  : [{ type: 'Feature', geometry: clickedFeature.geometry, properties: clickedProps }],
+              });
+            }
+            setPreviewVineyard({ name: vineyardName, winery: listing.owner || '', listing });
+            return;
+          }
+          setSelectedListingRef.current?.(listing);
+          onVineyardFocusRef.current?.(vineyardName);
         });
 
         // Selected parcel highlight — updated dynamically when a listing is chosen

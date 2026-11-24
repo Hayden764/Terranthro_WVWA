@@ -371,7 +371,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
   useEffect(() => {
     let cancelled = false;
     setSourcedFrom([]);
-    if (!listing?.id) return;
+    if (!listing?.id || listing.vineyardOnly) return;
     // listing.id is the organization id (statewide map) — growers have no recid.
     apiJson(`/api/wineries/organizations/${listing.id}`, { headers: API_KEY_HEADERS })
       .then(data => { if (!cancelled && Array.isArray(data?.sourced_from)) setSourcedFrom(data.sourced_from); })
@@ -437,7 +437,10 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
   const headerAvas = new Set();
   vineyardGroups.forEach(g => { const a = primaryAva(g.avas); if (a) headerAvas.add(avaDisplayLabel(a)); });
   const headerSub = [
-    vineyardGroups.length
+    // A vineyard opened on its own (no linked winery) names its owner instead
+    listing.vineyardOnly ? (listing.owner && listing.owner.toLowerCase() !== listing.title.toLowerCase()
+      ? `Owner: ${listing.owner}` : 'Independent vineyard') : null,
+    !listing.vineyardOnly && vineyardGroups.length
       ? `${vineyardGroups.length} vineyard${vineyardGroups.length !== 1 ? 's' : ''}`
       : null,
     totalAcres > 0 ? `${Math.round(totalAcres).toLocaleString()} ac` : null,
@@ -471,7 +474,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
         {vineyardGroups.length > 0 && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={T.sectionLabel}>🍇 Estate Vineyard{vineyardGroups.length !== 1 ? 's' : ''}</span>
+              <span style={T.sectionLabel}>🍇 {listing.vineyardOnly ? 'Vineyard' : 'Estate Vineyard'}{vineyardGroups.length !== 1 ? 's' : ''}</span>
               {vineyardGroups.length > 1 && (
                 <button
                   onClick={() => onViewAllVineyards?.(selectedVineyards)}

@@ -10,7 +10,9 @@ import { border, ink, muted, TYPE } from '../styles/tokens.js';
  *
  * Renders nothing while loading or when the AVA has no data.
  */
-export default function AvaTerroirComposition({ slug, colors, fallbackColor, labelStyle }) {
+// renderAction(key) — optional node beside a section title ('soils' | 'bedrock'),
+// e.g. a button that shows that layer on the map.
+export default function AvaTerroirComposition({ slug, colors, fallbackColor, labelStyle, renderAction }) {
   const [data, setData] = useState(null);
 
   useEffect(() => {
@@ -30,9 +32,9 @@ export default function AvaTerroirComposition({ slug, colors, fallbackColor, lab
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <Layer title="Soils" classes={data.soil} units={data.soil_series} unitLabel="Main soil series"
-        colorOf={colorOf} labelStyle={label} />
+        colorOf={colorOf} labelStyle={label} action={renderAction?.('soils')} />
       <Layer title="Bedrock" classes={data.bedrock} units={data.formation} unitLabel="Main formations"
-        colorOf={colorOf} labelStyle={label} />
+        colorOf={colorOf} labelStyle={label} action={renderAction?.('bedrock')} />
     </div>
   );
 }
@@ -41,11 +43,14 @@ const SHOWN_CLASSES = 4;   // listed under the bar; the bar itself shows every c
 const SHOWN_UNITS = 4;
 const fmtPct = (p) => (p >= 1 ? `${Math.round(p)}%` : '<1%');
 
-function Layer({ title, classes, units, unitLabel, colorOf, labelStyle }) {
+function Layer({ title, classes, units, unitLabel, colorOf, labelStyle, action = null }) {
   if (!classes?.length) return null;
   return (
     <div>
-      <div style={{ ...labelStyle, marginBottom: 6 }}>{title}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+        <div style={labelStyle}>{title}</div>
+        {action}
+      </div>
       <div
         role="img"
         aria-label={`${title}: ${classes.map((c) => `${c.class} ${fmtPct(c.pct)}`).join(', ')}`}

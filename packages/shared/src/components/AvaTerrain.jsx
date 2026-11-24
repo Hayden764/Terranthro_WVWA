@@ -12,7 +12,9 @@ import { border, ink, muted, TYPE } from '../styles/tokens.js';
  *
  * Renders nothing while loading or when the AVA has no data.
  */
-export default function AvaTerrain({ slug, classes, labelStyle }) {
+// renderAction(key) — optional node beside a section title
+// ('elevation' | 'slope' | 'aspect'), e.g. a show-on-map button.
+export default function AvaTerrain({ slug, classes, labelStyle, renderAction }) {
   const [data, setData] = useState(null);
 
   useEffect(() => {
@@ -44,9 +46,12 @@ export default function AvaTerrain({ slug, classes, labelStyle }) {
           <div style={{ fontSize: 'var(--type-body-size)', color: ink, lineHeight: 1.5 }}>{summary}</div>
         </div>
       )}
-      <Layer title="Elevation" bands={rollUp(data.elevation, classes.elevation)} labelStyle={label} />
-      <Layer title="Slope" bands={rollUp(data.slope, classes.slope)} labelStyle={label} />
-      <Layer title="Aspect" bands={rollUp(data.aspect, classes.aspect, true)} labelStyle={label} order="legend" />
+      <Layer title="Elevation" bands={rollUp(data.elevation, classes.elevation)} labelStyle={label}
+        action={renderAction?.('elevation')} />
+      <Layer title="Slope" bands={rollUp(data.slope, classes.slope)} labelStyle={label}
+        action={renderAction?.('slope')} />
+      <Layer title="Aspect" bands={rollUp(data.aspect, classes.aspect, true)} labelStyle={label} order="legend"
+        action={renderAction?.('aspect')} />
       {s?.data_source && (
         <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted }}>{s.data_source}, Oregon land only.</div>
       )}
@@ -81,12 +86,15 @@ function rollUp(bins, cls, circular = false) {
   return bands.filter((b) => b.pct > 0);
 }
 
-function Layer({ title, bands, labelStyle, order }) {
+function Layer({ title, bands, labelStyle, order, action = null }) {
   if (!bands.length) return null;
   const listed = order === 'legend' ? bands : [...bands].sort((a, b) => b.pct - a.pct);
   return (
     <div>
-      <div style={{ ...labelStyle, marginBottom: 6 }}>{title}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+        <div style={labelStyle}>{title}</div>
+        {action}
+      </div>
       <div
         role="img"
         aria-label={`${title}: ${bands.map((b) => `${b.label} ${fmtPct(b.pct)}`).join(', ')}`}

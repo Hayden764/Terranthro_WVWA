@@ -209,7 +209,39 @@ const avaMeta = (ava) => {
 const fmtAcres = (n) => (Number.isFinite(n) ? Math.round(n).toLocaleString() : null);          // 2887.07 → "2,887"
 const fmtAcresApprox = (n) => (Number.isFinite(n) ? `${(Math.floor(n / 100) * 100).toLocaleString()}+` : null); // 16622 → "16,600+"
 
-function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, mappedAcres, climateYear, onClimateYearChange, vintageMapActive, onShowVintageMap, onListingClick, onListingHover }) {
+// Section → map layer for the AVA snapshot's "Show on map" toggles
+const AVA_SECTION_LAYERS = { soils: 'soils', bedrock: 'geology', elevation: 'elevation', slope: 'slope', aspect: 'aspect' };
+
+// Small toggle beside an AVA snapshot section: shows that data as the map
+// layer, or hides it again when it is already showing.
+function MapLayerToggle({ layerId, activeLayer, onLayerChange }) {
+  if (!layerId || !onLayerChange) return null;
+  const on = activeLayer === layerId;
+  return (
+    <button
+      type="button"
+      onClick={() => onLayerChange(on ? null : layerId)}
+      aria-pressed={on}
+      title={on ? 'Hide this layer on the map' : 'Show this data as a map layer'}
+      className={`tx-box tx-link${on ? ' is-active' : ''}`}
+      style={{
+        flexShrink: 0, fontSize: 'var(--type-ui-label-size)', fontFamily: 'var(--font-sans)',
+        padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
+        border: `1px solid ${on ? interactive : border}`,
+        background: on ? interactiveSoft : 'transparent',
+        color: on ? interactive : ink,
+        textTransform: 'none', letterSpacing: 0,
+      }}
+    >
+      {on ? 'On map · hide' : 'Show on map'}
+    </button>
+  );
+}
+
+function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, mappedAcres, climateYear, onClimateYearChange, vintageMapActive, onShowVintageMap, onListingClick, onListingHover, activeLayer, onLayerChange }) {
+  const mapToggle = (key) => (
+    <MapLayerToggle layerId={AVA_SECTION_LAYERS[key]} activeLayer={activeLayer} onLayerChange={onLayerChange} />
+  );
   const meta = avaMeta(ava);
   const inside = insideIds
     ? listings.filter(l => l.category === 'winery' && insideIds.includes(l.id))
@@ -249,10 +281,10 @@ function AvaDetailView({ ava, onBack, listings, insideIds, vineyardRecidSet, map
 
         {/* Soil + bedrock make-up (ava_terroir_composition) */}
         <AvaTerroirComposition slug={ava.slug} colors={TERROIR_CLASS_COLORS}
-          fallbackColor={NO_DATA_COLOR} labelStyle={T.sectionLabel} />
+          fallbackColor={NO_DATA_COLOR} labelStyle={T.sectionLabel} renderAction={mapToggle} />
 
         {/* Elevation / slope / aspect make-up (ava_terrain_distribution) */}
-        <AvaTerrain slug={ava.slug} classes={TOPO_CLASSES} labelStyle={T.sectionLabel} />
+        <AvaTerrain slug={ava.slug} classes={TOPO_CLASSES} labelStyle={T.sectionLabel} renderAction={mapToggle} />
 
         {/* Vintage climate (PRISM monthly, 1991 onward) */}
         <div>
@@ -2305,6 +2337,8 @@ export default function ExplorerSidebar({
                 onClimateYearChange={onClimateYearChange}
                 vintageMapActive={activeLayer === 'gdd_vintage'}
                 onShowVintageMap={() => onLayerChange?.('gdd_vintage')}
+                activeLayer={activeLayer}
+                onLayerChange={onLayerChange}
                 onListingClick={handleListingClick}
                 onListingHover={(l) => mapRef.current?.hoverListing(l)}
               />

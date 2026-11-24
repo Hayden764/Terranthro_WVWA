@@ -745,8 +745,10 @@ router.get('/filter-ranges', async (_req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
-        ROUND(percentile_cont(0.01) WITHIN GROUP (ORDER BY ts.elevation_mean_ft)::numeric, 0) AS elev_p01,
-        ROUND(percentile_cont(0.99) WITHIN GROUP (ORDER BY ts.elevation_mean_ft)::numeric, 0) AS elev_p99,
+        -- elevation filters on each vineyard's min–max range, so the slider
+        -- spans the low points' 1st to the high points' 99th percentile
+        ROUND(percentile_cont(0.01) WITHIN GROUP (ORDER BY ts.elevation_min_ft)::numeric, 0)  AS elev_p01,
+        ROUND(percentile_cont(0.99) WITHIN GROUP (ORDER BY ts.elevation_max_ft)::numeric, 0)  AS elev_p99,
         ROUND(percentile_cont(0.01) WITHIN GROUP (ORDER BY ts.slope_mean_deg)::numeric, 1)    AS slope_p01,
         ROUND(percentile_cont(0.99) WITHIN GROUP (ORDER BY ts.slope_mean_deg)::numeric, 1)    AS slope_p99
       FROM vineyard_topo_stats ts

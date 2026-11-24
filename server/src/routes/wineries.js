@@ -197,7 +197,8 @@ router.get('/', async (req, res) => {
  * stats are excluded from those filtered queries.
  *
  * Query params (all optional):
- *   elevation_min, elevation_max   — feet, on elevation_mean_ft
+ *   elevation_min, elevation_max   — feet; a vineyard matches when any part of
+ *                                    its elevation range (min–max) falls in the band
  *   slope_min, slope_max           — degrees, on slope_mean_deg
  *   aspect=N,NE,SW                 — comma-separated 8-pt buckets
  *   variety=Pinot+Noir             — ILIKE on varietals_list
@@ -256,13 +257,15 @@ router.get('/query', async (req, res) => {
   const where = ['v.winery_id IS NOT NULL']; // roll-up only meaningful for linked vineyards
   // (linkedOnly is implied; the explicit param is kept for symmetry but is a no-op here.)
 
+  // Elevation is a range per vineyard (lowest to highest point), so a
+  // vineyard matches when that range overlaps the requested band.
   if (elevMin != null) {
     params.push(elevMin);
-    where.push(`ts.elevation_mean_ft >= $${params.length}`);
+    where.push(`ts.elevation_max_ft >= $${params.length}`);
   }
   if (elevMax != null) {
     params.push(elevMax);
-    where.push(`ts.elevation_mean_ft <= $${params.length}`);
+    where.push(`ts.elevation_min_ft <= $${params.length}`);
   }
   if (slopeMin != null) {
     params.push(slopeMin);

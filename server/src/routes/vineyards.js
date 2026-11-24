@@ -532,7 +532,7 @@ router.get('/parcels/:id/topo-stats', async (req, res) => {
     // Soil-over-bedrock pairing (migrations 022/023) and where this vineyard
     // ranks against others in its most specific AVA. Both are optional extras:
     // a missing row leaves the field null rather than failing the topo response.
-    const [terroirRes, rankRes] = await Promise.all([
+    const [terroirRes, rankRes, polygonRes] = await Promise.all([
       pool.query(
         `SELECT terroir_label, terroir_origin, soil_series, soil_texture, soil_class,
                 soil_pct, soil_parent_material, soil_drainage,
@@ -559,6 +559,18 @@ router.get('/parcels/:id/topo-stats', async (req, res) => {
            FROM v
          )
          SELECT * FROM ranked WHERE id = $1`,
+        [id]
+      ),
+      // Each mapped polygon's main facing direction and size: the card's
+      // aspect compass draws one dot per polygon to show the vineyard's spread.
+      pool.query(
+        `SELECT b.id,
+                COALESCE(b.acres, ST_Area(b.geometry::geography) / 4046.8564) AS acres,
+                t.aspect_dominant_deg
+         FROM vineyard_blocks b
+         JOIN vineyard_block_topo_stats t ON t.block_id = b.id
+         WHERE b.vineyard_id = $1 AND b.geometry IS NOT NULL
+           AND t.aspect_dominant_deg >= 0`,
         [id]
       ),
     ]);
@@ -592,7 +604,13 @@ router.get('/parcels/:id/topo-stats', async (req, res) => {
       slope_pct_wv:     pct(k.slope_pr_wv),
     } : null;
 
-    res.json({ parcel_id: id, topo: { ...topo, terroir, rank } });
+    const polygons = polygonRes.rows.map((p) => ({
+      id:         p.id,
+      acres:      p.acres != null ? Math.round(Number(p.acres) * 100) / 100 : null,
+      aspect_deg: Number(p.aspect_dominant_deg),
+    }));
+
+    res.json({ parcel_id: id, topo: { ...topo, terroir, rank, polygons } });
   } catch (err) {
     console.error('GET /api/vineyards/parcels/:id/topo-stats error:', err);
     res.status(500).json({ error: 'Internal server error' });

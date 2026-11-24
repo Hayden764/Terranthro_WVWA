@@ -19,6 +19,9 @@ const TONE = {
   },
 };
 
+// Each chip: { label, value, subValue?, tone, glow, visual?, aside? }
+//   visual — a small drawing under the value (e.g. a slope range bar)
+//   aside  — a small drawing to the right of the text (e.g. an aspect compass)
 export default function TerroirDataChips({ chips = [], variant = 'light', columns = null }) {
   if (!chips.length) return null;
 
@@ -46,8 +49,10 @@ export default function TerroirDataChips({ chips = [], variant = 'light', column
                 : '1px solid var(--color-ghost)',
               borderRadius: 6,
               padding: '8px 12px',
+              ...(chip.aside ? { display: 'flex', alignItems: 'center', gap: 8 } : null),
             }}
           >
+            <div style={chip.aside ? { flex: 1, minWidth: 0 } : undefined}>
             <div style={{
               // `.chip-label`: 9px / 0.14em / uppercase / ghost
               fontFamily: 'var(--font-sans)',
@@ -77,6 +82,7 @@ export default function TerroirDataChips({ chips = [], variant = 'light', column
             }}>
               {chip.value || '—'}
             </div>
+            {chip.visual}
             {chip.subValue && (
               <div style={{
                 fontFamily: 'var(--font-sans)',
@@ -92,6 +98,8 @@ export default function TerroirDataChips({ chips = [], variant = 'light', column
                 {chip.subValue}
               </div>
             )}
+            </div>
+            {chip.aside}
           </div>
         );
       })}

@@ -12,6 +12,8 @@ import LegendFilter from './LegendFilter';
 import TopoRangeControl from './TopoRangeControl';
 import { TOPO_CLASSES, topoLegendGroups } from '../config/topoClasses';
 import TerroirDataChips from '@terranthro/shared/components/TerroirDataChips.jsx';
+import SlopeRangeBar from '@terranthro/shared/components/SlopeRangeBar.jsx';
+import AspectCompass, { summariseAspect } from '@terranthro/shared/components/AspectCompass.jsx';
 import TerroirFactRows from './TerroirFactRows';
 import { terroirFactRows } from '../lib/terroirFacts';
 import ClimateVintages from './climate/ClimateVintages';
@@ -539,6 +541,9 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                       slope_mean:     avg('slope_mean_deg'),
                       slope_p10:      mn('slope_p10_deg'),
                       slope_p90:      mx('slope_p90_deg'),
+                      slope_max:      mx('slope_max_deg'),
+                      // each mapped polygon's facing + acres, for the aspect compass
+                      polygons:       rows.flatMap(r => (Array.isArray(r.polygons) ? r.polygons : [])),
                       aspect_card:    degToCardinal(aspectMeanDeg),
                       aspect_dom_deg: aspectDomDeg,
                       aspect_mean_deg: aspectMeanDeg,
@@ -562,25 +567,47 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                       glow: false,
                     },
                     // Bottom-left: Aspect
-                    {
-                      label: 'Aspect',
-                      value: groupTopoStats?.aspect_card || '—',
-                      subValue: groupTopoStats?.aspect_dom_deg != null && groupTopoStats?.aspect_mean_deg != null
-                        ? `${Math.round(groupTopoStats.aspect_dom_deg)}° dom · ${Math.round(groupTopoStats.aspect_mean_deg)}° avg`
-                        : null,
-                      tone: 'blue',
-                      glow: true,
-                    },
+                    // Which way the polygons face: the tightest compass range that
+                    // holds them all, the main direction(s), and a dot per polygon.
+                    ...(() => {
+                      const facing = summariseAspect(groupTopoStats?.polygons);
+                      return [{
+                        label: 'Aspect',
+                        value: facing?.range || groupTopoStats?.aspect_card || '—',
+                        subValue: !facing ? null
+                          : facing.points > 1 ? `mostly ${facing.mostly.join(', ')}`
+                          : facing.count > 1 ? `all ${facing.count} polygons`
+                          : 'one polygon',
+                        aside: groupTopoStats ? (
+                          <AspectCompass
+                            polygons={groupTopoStats.polygons}
+                            fallbackDeg={groupTopoStats.aspect_dom_deg}
+                            size={52}
+                          />
+                        ) : null,
+                        tone: 'blue',
+                        glow: true,
+                      }];
+                    })(),
                     // Bottom-right: Slope
                     {
                       label: 'Slope',
-                      value: groupTopoStats?.slope_mean != null ? `${groupTopoStats.slope_mean.toFixed(1)}°` : '—',
-                      subValue: (() => {
-                        const p10 = groupTopoStats?.slope_p10;
-                        const p90 = groupTopoStats?.slope_p90;
-                        if (p10 != null && p90 != null) return `${p10.toFixed(1)}–${p90.toFixed(1)}° range`;
-                        return null;
+                      // Middle 80% of the vineyard (10th–90th percentile), not an average
+                      value: (() => {
+                        const p10 = groupTopoStats?.slope_p10, p90 = groupTopoStats?.slope_p90;
+                        if (p10 == null || p90 == null) return '—';
+                        const lo = Math.round(p10), hi = Math.round(p90);
+                        return lo === hi ? `${p10.toFixed(1)}–${p90.toFixed(1)}°` : `${lo}–${hi}°`;
                       })(),
+                      visual: groupTopoStats?.slope_p10 != null ? (
+                        <SlopeRangeBar
+                          p10={groupTopoStats.slope_p10}
+                          p90={groupTopoStats.slope_p90}
+                          mean={groupTopoStats.slope_mean}
+                          max={groupTopoStats.slope_max}
+                        />
+                      ) : null,
+                      subValue: groupTopoStats?.slope_max != null ? `steepest ${Math.round(groupTopoStats.slope_max)}°` : null,
                       tone: 'green',
                       glow: true,
                     },

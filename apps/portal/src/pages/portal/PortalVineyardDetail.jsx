@@ -10,6 +10,14 @@ import EditableBlocksTable from '../../components/EditableBlocksTable';
 import ParcelHistorySection from '../../components/ParcelHistorySection';
 import TerroirDataChips from '@terranthro/shared/components/TerroirDataChips.jsx';
 
+// Vineyards describe elevation as a range, never an average: "334–378 ft".
+function fmtElevRange(min, max) {
+  if (min == null || max == null) return null;
+  const lo = Math.round(Number(min)), hi = Math.round(Number(max));
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) return null;
+  return lo === hi ? `${lo.toLocaleString()} ft` : `${lo.toLocaleString()}–${hi.toLocaleString()} ft`;
+}
+
 export default function PortalVineyardDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -221,10 +229,8 @@ export default function PortalVineyardDetail() {
     { label: 'Blocks', value: blockCount > 0 ? String(blockCount) : '—', tone: 'amber', glow: false },
     {
       label: 'Elevation',
-      value: ts?.elevation_mean_ft != null ? `${Math.round(Number(ts.elevation_mean_ft))} ft` : '—',
-      subValue: ts?.elevation_min_ft != null
-        ? `${Math.round(Number(ts.elevation_min_ft))}–${Math.round(Number(ts.elevation_max_ft))} ft range`
-        : null,
+      value: fmtElevRange(ts?.elevation_min_ft, ts?.elevation_max_ft) || '—',
+      subValue: ts?.elevation_min_ft != null ? 'lowest to highest point' : null,
       tone: 'parchment', glow: false,
     },
     {

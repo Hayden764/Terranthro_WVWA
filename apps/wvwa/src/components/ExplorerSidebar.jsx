@@ -336,6 +336,14 @@ function degToCardinal(deg) {
   return dirs[Math.round(deg / 45) % 8];
 }
 
+// Vineyards describe elevation as a range, never an average: "334–378 ft".
+function fmtElevRange(min, max) {
+  if (min == null || max == null) return null;
+  const lo = Math.round(Number(min)), hi = Math.round(Number(max));
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) return null;
+  return lo === hi ? `${lo.toLocaleString()} ft` : `${lo.toLocaleString()}–${hi.toLocaleString()} ft`;
+}
+
 function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focusedVineyard, onBack, onVineyardHover, onVineyardSelect, onViewAllVineyards, onParcelClick }) {
   const [expandedGroupKey, setExpandedGroupKey] = useState(null);
   const [hoveredGroup, setHoveredGroup] = useState(null);
@@ -547,13 +555,9 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                     },
                     // Top-right: Elevation
                     {
-                      label: 'Elev',
-                      value: groupTopoStats?.elev_min != null && groupTopoStats?.elev_max != null
-                        ? `${Math.round((groupTopoStats.elev_min + groupTopoStats.elev_max) / 2)} ft`
-                        : '—',
-                      subValue: groupTopoStats?.elev_min != null && groupTopoStats?.elev_max != null
-                        ? `${Math.round(groupTopoStats.elev_min)}–${Math.round(groupTopoStats.elev_max)} ft range`
-                        : null,
+                      label: 'Elevation',
+                      value: fmtElevRange(groupTopoStats?.elev_min, groupTopoStats?.elev_max) || '—',
+                      subValue: groupTopoStats?.elev_min != null ? 'lowest to highest point' : null,
                       tone: 'parchment',
                       glow: false,
                     },
@@ -1339,7 +1343,8 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
         ...l,
         _matching_vineyard_count: r ? r.matching_vineyard_count : (vineyardRecidSet.get?.(l.id) ?? 0),
         _matching_acres:        r ? r.matching_acres        : null,
-        _elevation_mean_ft:     r ? r.elevation_mean_ft     : null,
+        _elevation_mean_ft:     r ? r.elevation_mean_ft     : null,   // sort key only
+        _elevation_range:       r ? fmtElevRange(r.elevation_low_ft, r.elevation_high_ft) : null,
         _ava_names:             r ? (Array.isArray(r.ava_names) ? r.ava_names : []) : [],
       };
     });
@@ -1436,7 +1441,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
           <option value="name">Name (A–Z)</option>
           <option value="parcels">{filterActive ? 'Matching parcels' : '# Parcels'} (high → low)</option>
           {filterActive && <option value="acres">Matching acres (high → low)</option>}
-          {filterActive && <option value="elevation">Mean elevation (high → low)</option>}
+          {filterActive && <option value="elevation">Elevation (high → low)</option>}
           {filterActive && <option value="ava">AVA</option>}
         </select>
       </div>
@@ -1458,7 +1463,7 @@ function WineriesSection({ listings, listingFilterMode, onListingFilterModeChang
             ? [
                 `${l._matching_vineyard_count} vineyard${l._matching_vineyard_count === 1 ? '' : 's'}`,
                 l._matching_acres != null ? `${l._matching_acres} ac` : null,
-                l._elevation_mean_ft != null ? `${l._elevation_mean_ft} ft avg` : null,
+                l._elevation_range,
               ].filter(Boolean).join(' · ')
             : baseLabel;
           return (

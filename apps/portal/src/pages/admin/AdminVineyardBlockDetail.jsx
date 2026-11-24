@@ -9,6 +9,14 @@ import PortalVineyardMap from '../../components/PortalVineyardMap';
 import SplitVineyardModal from '../../components/admin/SplitVineyardModal';
 import SplitParcelModal from '../../components/admin/SplitParcelModal';
 
+// Vineyards describe elevation as a range, never an average: "334–378 ft".
+function fmtElevRange(min, max) {
+  if (min == null || max == null) return null;
+  const lo = Math.round(Number(min)), hi = Math.round(Number(max));
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) return null;
+  return lo === hi ? `${lo.toLocaleString()} ft` : `${lo.toLocaleString()}–${hi.toLocaleString()} ft`;
+}
+
 export default function AdminVineyardBlockDetail() {
   const { parcelId } = useParams();
   const navigate = useNavigate();
@@ -89,10 +97,8 @@ export default function AdminVineyardBlockDetail() {
     },
     {
       label: 'Elevation',
-      value: ts?.elevation_mean_ft != null ? `${Math.round(Number(ts.elevation_mean_ft))} ft` : '—',
-      subValue: ts?.elevation_min_ft != null
-        ? `${Math.round(Number(ts.elevation_min_ft))}–${Math.round(Number(ts.elevation_max_ft))} ft range`
-        : null,
+      value: fmtElevRange(ts?.elevation_min_ft, ts?.elevation_max_ft) || '—',
+      subValue: ts?.elevation_min_ft != null ? 'lowest to highest point' : null,
       tone: 'parchment',
       glow: false,
     },
@@ -251,7 +257,7 @@ export default function AdminVineyardBlockDetail() {
         {/* Topography */}
         {ts && (
           <Section title="Topography">
-            <InfoRow label="Elevation" value={`${Math.round(Number(ts.elevation_min_ft))}–${Math.round(Number(ts.elevation_max_ft))} ft (avg ${Math.round(Number(ts.elevation_mean_ft))} ft)`} />
+            <InfoRow label="Elevation" value={fmtElevRange(ts.elevation_min_ft, ts.elevation_max_ft) || '—'} />
             <InfoRow label="Slope" value={`${Number(ts.slope_mean_deg).toFixed(1)}° avg, ${Number(ts.slope_max_deg).toFixed(1)}° max`} />
             <InfoRow label="Aspect" value={`${degToCardinal(ts.aspect_dominant_deg)} (${Math.round(Number(ts.aspect_dominant_deg))}°)`} />
           </Section>

@@ -5,6 +5,14 @@ import { LIGHT_INPUT_STYLE, btn } from '@terranthro/shared/styles/patterns.js';
 import { apiJson, apiPost } from '@terranthro/shared/lib/api.js';
 import TerroirDataChips from '@terranthro/shared/components/TerroirDataChips.jsx';
 
+// Vineyards describe elevation as a range, never an average: "334–378 ft".
+function fmtElevRange(min, max) {
+  if (min == null || max == null) return null;
+  const lo = Math.round(Number(min)), hi = Math.round(Number(max));
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) return null;
+  return lo === hi ? `${lo.toLocaleString()} ft` : `${lo.toLocaleString()}–${hi.toLocaleString()} ft`;
+}
+
 export default function PortalClaim() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
@@ -124,8 +132,8 @@ export default function PortalClaim() {
                       <TerroirDataChips chips={[
                         { label: 'Acres', value: `${Number(r.acres || 0).toFixed(1)} ac`, tone: 'amber', glow: false },
                         { label: 'AVA',   value: r.nested_ava || r.ava_name || '—',          tone: 'blue',  glow: true  },
-                        { label: 'Elev',  value: r.topo_stats?.elevation_mean_ft
-                            ? `${Math.round(r.topo_stats.elevation_mean_ft)} ft` : '—',       tone: 'parchment', glow: false },
+                        { label: 'Elevation', value: fmtElevRange(r.topo_stats?.elevation_min_ft, r.topo_stats?.elevation_max_ft) || '—',
+                                                                                              tone: 'parchment', glow: false },
                         { label: 'Slope', value: r.topo_stats?.slope_mean_deg
                             ? `${Number(r.topo_stats.slope_mean_deg).toFixed(1)}°` : '—',   tone: 'green', glow: true  },
                       ]} />

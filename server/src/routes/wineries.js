@@ -308,7 +308,9 @@ router.get('/query', async (req, res) => {
         v.acres,
         v.nested_ava,
         v.ava_name,
-        ts.elevation_mean_ft
+        ts.elevation_mean_ft,
+        ts.elevation_min_ft,
+        ts.elevation_max_ft
       FROM vineyards v
       ${join}
       ${whereSql}
@@ -318,7 +320,9 @@ router.get('/query', async (req, res) => {
         m.winery_id,
         COUNT(*)::int                                   AS matching_vineyard_count,
         ROUND(SUM(COALESCE(m.acres, 0))::numeric, 2)    AS matching_acres,
-        ROUND(AVG(m.elevation_mean_ft)::numeric, 0)     AS elevation_mean_ft,
+        ROUND(AVG(m.elevation_mean_ft)::numeric, 0)     AS elevation_mean_ft,  -- sort key only
+        ROUND(MIN(m.elevation_min_ft)::numeric, 0)      AS elevation_low_ft,   -- shown as a range
+        ROUND(MAX(m.elevation_max_ft)::numeric, 0)      AS elevation_high_ft,
         ARRAY_AGG(DISTINCT COALESCE(m.nested_ava, m.ava_name))
           FILTER (WHERE COALESCE(m.nested_ava, m.ava_name) IS NOT NULL)
                                                          AS ava_names,
@@ -336,6 +340,8 @@ router.get('/query', async (req, res) => {
       r.matching_vineyard_count,
       r.matching_acres,
       r.elevation_mean_ft,
+      r.elevation_low_ft,
+      r.elevation_high_ft,
       r.ava_names,
       r.vineyard_ids
     FROM rollup r
@@ -377,6 +383,8 @@ router.get('/query', async (req, res) => {
         matching_vineyard_count: r.matching_vineyard_count,
         matching_acres: r.matching_acres != null ? Number(r.matching_acres) : 0,
         elevation_mean_ft: r.elevation_mean_ft != null ? Number(r.elevation_mean_ft) : null,
+        elevation_low_ft:  r.elevation_low_ft  != null ? Number(r.elevation_low_ft)  : null,
+        elevation_high_ft: r.elevation_high_ft != null ? Number(r.elevation_high_ft) : null,
         ava_names: Array.isArray(r.ava_names) ? r.ava_names : [],
       })),
       matching_vineyard_ids: matchingVineyardIds,

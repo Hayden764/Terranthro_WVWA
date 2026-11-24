@@ -547,11 +547,27 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                     };
                   })();
 
+                  // The Polygons box opens the polygon (and grower block) list
+                  const parcelIds = group.features.map(f => f.properties?.id).filter(Boolean);
+                  const openPolygons = onParcelClick && parcelIds.length ? (e) => {
+                    e.stopPropagation();
+                    onParcelClick({
+                      ids: parcelIds,
+                      parcel_label: group.name,
+                      vineyard_name: group.features[0]?.properties?.vineyard_name || group.name,
+                      acres: group.acresCount > 0 ? group.acresTotal : null,
+                    });
+                    onVineyardHover?.(null);
+                  } : null;
+
                   const terroirChips = [
-                    // Top-left: Polygons
+                    // Top-left: Polygons (clickable: opens the list)
                     {
                       label: 'Polygons',
                       value: group.polygonCount > 0 ? String(group.polygonCount) : '—',
+                      subValue: openPolygons ? 'view list' : null,
+                      onClick: openPolygons,
+                      title: openPolygons ? 'Show each polygon' : undefined,
                       tone: 'amber',
                       glow: false,
                     },
@@ -674,14 +690,6 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                           <div style={{ paddingTop: 10 }}>
                             <TermHelp label="Terroir Snapshot" ids={TERROIR_TERM_IDS} style={{ marginBottom: 8 }} />
                             <TerroirDataChips chips={terroirChips} columns={2} />
-                            <div style={{ marginTop: 8 }}>
-                              <TerroirFactRows rows={terroirFactRows(groupTopoStats)} />
-                            </div>
-                            {groupTopoStats?.parcelCount > 1 && (
-                              <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 6 }}>
-                                Soil, ranking and climate for the largest of {groupTopoStats.parcelCount} parcels
-                              </div>
-                            )}
                           </div>
 
                           {groupTopoStats?.largestId != null && (
@@ -691,36 +699,16 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
                             </div>
                           )}
 
-                          {/* Polygon (and grower block) deep-dive */}
-                          {onParcelClick && (() => {
-                            const parcelIds = group.features.map(f => f.properties?.id).filter(Boolean);
-                            if (!parcelIds.length) return null;
-                            const firstFeature = group.features[0];
-                            return (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onParcelClick({
-                                    ids: parcelIds,
-                                    parcel_label: group.name,
-                                    vineyard_name: firstFeature?.properties?.vineyard_name || group.name,
-                                    acres: group.acresCount > 0 ? group.acresTotal : null,
-                                  });
-                                  onVineyardHover?.(null);
-                                }}
-                                className="tx-box tx-link"
-                                style={{
-                                  marginTop: 10, width: '100%', padding: '7px 0',
-                                  background: 'transparent', border: `1px solid ${border}`,
-                                  borderRadius: 7, fontSize: 'var(--type-mono-size)',
-                                  color: ink, cursor: 'pointer',
-                                  fontFamily: 'var(--font-sans)', fontWeight: 600,
-                                }}
-                              >
-                                View polygons →
-                              </button>
-                            );
-                          })()}
+                          {/* Soil, bedrock and how the site ranks in its AVA */}
+                          <div style={{ paddingTop: 10 }}>
+                            <TerroirFactRows rows={terroirFactRows(groupTopoStats)} />
+                            {groupTopoStats?.parcelCount > 1 && (
+                              <div style={{ fontSize: 'var(--type-ui-label-size)', color: muted, marginTop: 6 }}>
+                                Soil, ranking and climate for the largest of {groupTopoStats.parcelCount} parcels
+                              </div>
+                            )}
+                          </div>
+
                         </div>
                       )}
                     </div>
@@ -785,7 +773,7 @@ function WineryDetailView({ listing, selectedVineyards, parcelTopoStats, focused
  * from imagery — and, only where a grower has supplied them, their own
  * blocks (variety, clone, rootstock…). Both live in vineyard_blocks today:
  * rows with a shape are polygons; rows carrying grower facts are blocks.
- * Reached by clicking "View polygons →" on an expanded vineyard card.
+ * Reached by clicking the Polygons box on an expanded vineyard card.
  */
 function ParcelBlockView({ parcel, onBack, onVineyardHover, onViewAllVineyards }) {
   const [rows, setRows]   = useState(null); // null = loading

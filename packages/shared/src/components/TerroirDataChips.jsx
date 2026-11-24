@@ -19,9 +19,10 @@ const TONE = {
   },
 };
 
-// Each chip: { label, value, subValue?, tone, glow, visual?, aside? }
-//   visual — a small drawing under the value (e.g. a slope range bar)
-//   aside  — a small drawing to the right of the text (e.g. an aspect compass)
+// Each chip: { label, value, subValue?, tone, glow, visual?, aside?, onClick?, title? }
+//   visual  — a small drawing under the value (e.g. a slope range bar)
+//   aside   — a small drawing to the right of the text (e.g. an aspect compass)
+//   onClick — makes the whole chip a button (pointer, keyboard, › after the label)
 export default function TerroirDataChips({ chips = [], variant = 'light', columns = null }) {
   if (!chips.length) return null;
 
@@ -38,7 +39,18 @@ export default function TerroirDataChips({ chips = [], variant = 'light', column
         return (
           <div
             key={chip.label}
+            {...(chip.onClick ? {
+              role: 'button',
+              tabIndex: 0,
+              title: chip.title,
+              className: 'tx-box tx-link',
+              onClick: chip.onClick,
+              onKeyDown: (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); chip.onClick(e); }
+              },
+            } : null)}
             style={{
+              ...(chip.onClick ? { cursor: 'pointer' } : null),
               // Per terranthro-design-system.html `.chip`.
               // Glass variant sits on a dark dock surface; light variant sits
               // on a parchment panel and matches the vineyard popup look
@@ -63,7 +75,7 @@ export default function TerroirDataChips({ chips = [], variant = 'light', column
               color: glass ? 'rgba(255, 255, 255, 0.72)' : TOKENS.ink,
               marginBottom: 3,
             }}>
-              {chip.label}
+              {chip.label}{chip.onClick ? ' ›' : ''}
             </div>
             <div style={{
               // `.chip-value`: Cormorant Garamond 18px / 500 (non-italic)
